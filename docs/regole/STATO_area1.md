@@ -72,19 +72,40 @@ trasmissione ne' prova con i servizi dell'Agenzia.
   `tests/fixture_telematico/controllo_20261101/` (+ manifest.json): a10_positivo (solo (*) 3345), neg_cf_defunto
   ((***) 1013 XXB02), neg_importo_da_versare ((***) 3376 XXB94). Suite completa: 192 passed, 3 skipped.
 
-### In corso
-- `tests/test_telematico_controllo.py` (fixture + prova reale facoltativa), MATRICE, PROPOSTE.
+- Test: `tests/test_telematico_identificativi.py` (CF/IBAN contro le registrazioni del componente; prova reale con
+  SUCCESSIONI_CONTROLLI_SUC13), `tests/test_telematico_controllo.py` (EF/EG/EH, file A10 identico a quello
+  controllato, diagnostici registrati letti con `collegamenti.controllo`, prova reale facoltativa positivo + 2 negativi).
+- Prova aggiuntiva (non registrata in fixture): caso A10 con conto 2.400.000 (imposta di successione 22.396 da
+  `calcolo`, tempistica 1 e 2) -> controllo ufficiale: solo (*) 3345, nessuno scarto (EF18bis accettato dal componente).
 
-### Da fare
-1. CF sintetici con carattere di controllo verificato (checkCF_PIVA.jar + controllo); devoluzioni coerenti.
-2. EH (caso base), EG (elenco documenti, allegati via documenti/base64), EF (campi calcolati da calcolo.py).
-3. Iterazione con il controllo finche' spariscono i (***) sul caso base.
-4. Test con SUCCESSIONI_CONTROLLI_SUC13 (positivo + negativo), fixture in tests/fixture_telematico/.
-5. MATRICE_COPERTURA.md, PROPOSTE_telematico.md.
-6. Suite completa.
+### Esito reale dell'ultimo controllo ufficiale sul caso base (2026-11-01, 2.3.1, locale, Java 8 e Java 21+jaxb-api)
+```
+(*)
+Dati del Frontespizio:
+ - Campo "attestazione" del Frontespizio: Non e' stata richiesta l'attestazione
+di avvenuta presentazione della dichiarazione, utile ad es. per lo sblocco di un
+conto corrente (vedi istruzioni per la compilazione)
+
+La dichiarazione puo' essere trasmessa.   (elaborate 1, scartate 0, con segnalazione di anomalia 1; .dcm prodotto)
+```
+Causa della (*): casella attestazione/copia conforme non richiesta (scelta del dichiarante, non un errore); richiederla
+implica EF16 col. 1 e EF18 (non coperti).
+
+### Non finito (stato al congelamento)
+- EF: agevolazioni (G, M, P/X/Y/Z, trust), soli terreni (valori fiscali), proporzionale < fissa (fonti non concordi),
+  piu' comuni (elenco conservatorie), attestazione/copia conforme, crediti, sostitutive, sanzioni, rateazione ->
+  `quadri_mancanti` (EF) o `non_supportato` con motivo.
+- EG: testamento, inventario, imposta estera, agevolazioni/riduzioni -> `non_supportato`. Conformita' PDF/A non
+  verificata dall'export (avviso).
+- EH: sezioni II-IV, separazione (stato civile 5), unione civile (7), interdetti/disabili, rinunce -> `non_supportato`.
+- Quote di legge: coperti solo figli / coniuge / coniuge+figli; altrimenti avviso `QUOTE_DI_LEGGE_NON_VERIFICATE`.
+- Servizio/GUI/MCP: passare `ContestoExport.allegati` (allegato_id -> file) dall'archivio (proposta P8).
+- Controllo con Java >= 11 dall'adattatore area 3: serve jaxb-api nel classpath o Java 8 (proposta P9).
+- Collaudo su Desktop Telematico (Windows) e con i servizi dell'Agenzia: da fare.
 
 ### Comandi di verifica (secondo giro)
 ```
-python3 -m pytest -q
-SUCCESSIONI_CONTROLLI_SUC13=<cartella jar> python3 -m pytest -q tests/test_telematico_controllo.py
+python3 -m pytest -q                                   # 238 passed, 8 skipped (2026-11-01, chiusura)
+SUCCESSIONI_CONTROLLI_SUC13=<jar> SUCCESSIONI_JAVA=<java 8>/bin/java python3 -m pytest -q tests/test_telematico_controllo.py tests/test_telematico_identificativi.py   # 19 passed
+SUCCESSIONI_CONTROLLI_SUC13=<jar> SUCCESSIONI_CONTROLLI_CLASSPATH_EXTRA=<jaxb-api-2.3.1.jar> python3 -m pytest -q tests/test_telematico_controllo.py -k reale   # 3 passed
 ```

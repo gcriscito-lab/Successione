@@ -12,7 +12,7 @@ from successioni.archivio import Archivio  # noqa: E402
 from successioni.errori import DatiNonValidi  # noqa: E402
 from successioni.servizio import Servizio  # noqa: E402
 
-CF_FORN = "RSSNNA70A41H501X"
+CF_FORN = "RSSNNA70A41H501J"
 
 
 def ops_da_caso(d: dict) -> list[dict]:

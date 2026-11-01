@@ -32,7 +32,7 @@ class AllegatiMixin:
             shutil.copyfile(percorso_tmp, dest)
         aid = "al_" + uuid.uuid4().hex[:12]
         c.execute("INSERT INTO allegati VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                  (aid, pratica_id, nome, h, dest.stat().st_size, str(dest.relative_to(self.arch.base)), ruolo,
+                  (aid, pratica_id, nome, h, dest.stat().st_size, dest.relative_to(self.arch.base).as_posix(), ruolo,
                    origine_id, tipo_eg, finalita, persona_id, json.dumps(analisi),
                    json.dumps(rapporto) if rapporto else None, ora()))
         return {"allegato_id": aid, "nome": nome, "sha256": h, "bytes": dest.stat().st_size, "ruolo": ruolo,

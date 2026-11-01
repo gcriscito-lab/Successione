@@ -95,3 +95,24 @@ interi** (Fascicolo I p. PDF 22, 30, 34). L'export rifiuta i decimali invece di 
 - `VERSIONE_REGOLE` del servizio dovrebbe includere `telematico.fonti.VERSIONE_MODULO`.
 - Un file con `completo=False` non deve poter entrare nella preparazione dell'invio ne' essere presentato come
   dichiarazione al controllo ufficiale; puo' essere usato per prove di schema (stato `simulazione`).
+
+## P8. Allegati EG dall'archivio (secondo giro, 2026-11-01)
+
+`esporta_xml` genera ora EF, EG, EH (perimetro in `telematico/quadri_efgh.py`). Per EG serve
+`ContestoExport.allegati = {allegato_id: {"percorso": <file nell'archivio>, "nome": <nome originale>}}`: il servizio
+deve costruirlo dalla tabella allegati (`documenti_ref.allegato_id`). `documenti_ref.tipo_eg` accetta il nome del rigo
+XSD (`AlberoGenealogico`, `DocumentiPassivita`, ...), la forma snake_case o `EG1..EG11`. Nuove chiavi in
+`opzioni.telematico` (da promuovere): `persone[defunto].comune_decesso/provincia_decesso` (EH Decesso),
+`dichiarazione.versamento {iban, cf_titolare}`, `dichiarazione.tempistica_pagamento`,
+`dichiarazione.dichiara_copie_conformi` (EH FlagPassivita, conferma esplicita come la firma),
+`passivita[id].ripartizione [{persona_id, quota}]` (P5; obbligatoria per legge per i tipi diversi da 1, 2, 11, 12).
+`test_elaborati.CF_FORN` (RSSNNA70A41H501X) ha il carattere di controllo errato: con `scopo='completo'` l'export lo
+rifiuta (in bozza e' solo un avviso); il valore corretto e' RSSNNA70A41H501J.
+
+## P9. Controllo ufficiale con Java >= 11 (per l'area 3)
+
+Con allegati EG il componente 2.3.1 termina con `NoClassDefFoundError: javax/xml/bind/DatatypeConverter`
+(`GestoreAllegatiXML.trovaEprocessaAllegato`) su Java 21: nessun `.dgn`. Con Java 8 (JNLP: j2se 1.7+) oppure con
+`jaxb-api-2.3.1.jar` aggiunto al classpath i `.dgn` sono identici (3 casi, `tests/fixture_telematico/
+controllo_20261101/manifest.json`). Proposta: `ControlloJar` accetti un classpath aggiuntivo configurabile (o
+segnali `non_verificabile` con questo motivo) e la diagnostica d'ambiente avvisi quando Java >= 11.

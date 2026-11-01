@@ -2,8 +2,9 @@
 
 Aggiornata il 2026-11-01. Proprieta' dell'area 1 (docs/CONTRATTI_MODULI.md). Stati:
 
-- **implementato-collaudato**: implementato, testato in locale **e** superato il controllo ufficiale su un caso
-  documentato. *Nessuna voce e' in questo stato*: il controllo ufficiale non e' stato eseguito.
+- **implementato-collaudato**: superato il collaudo nell'ambiente ufficiale (Desktop Telematico/servizi). *Nessuna voce.*
+- **controllo locale**: il caso documentato supera il controllo ufficiale SUC13 2.3.1 eseguito in locale (batch, dati
+  sintetici, 2026-11-01): Frontespizio, EA, EB, EC, ED, EE, EF, EG, EH, ER nel perimetro del caso A10.
 - **implementato**: implementato e coperto da test locali (schema XSD e regole interne).
 - **parziale**: implementato solo per una parte dei casi; il resto blocca l'export (`non_supportato`).
 - **non coperto**: non implementato; se la pratica lo richiede l'XML non viene prodotto.
@@ -23,9 +24,9 @@ Regole e fonti dettagliate: `docs/regole/mappa_xsd.md`; albero completo: `docs/r
 | EC | parziale | fabbricati in Italia non tavolari, sezione, zona, categoria, classe, consistenza, rendita, possesso, diritto, valore, devoluzione con continuazione | estero, rendita proposta (DeterminazioneRendita), D10 senza valore, bene aziendale, graffati, diritto di abitazione, EI, imposta estera, agevolazioni (prima casa P/Z/X/Y ecc.) |
 | ED | parziale | tipo, descrizione, estremi e data documento, possesso, valore, progressivo cespite (tipi 3/4/5/7), ripartizione a un soggetto | tipo 11 (legati/oneri), ripartizione fra piu' soggetti (il modello ha un solo `persona_id`), continuazione |
 | EE | implementato | EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati | EE2-EE4 (dipendono da EN, EO, EP, EQ non coperti); esclusioni per agevolazione A e bene aziendale (non presenti nel perimetro) |
-| EF | non coperto | — | intero quadro, compresa la sezione V-bis dell'imposta di successione (il calcolo esiste ma non e' serializzato). Obbligatorio dal 2025 e con EA + immobili: `quadri_mancanti` |
-| EG | non coperto | — | elenco documenti e allegati Base64 (valori preparati dall'area 2 in `documenti/base64.py`). Obbligatorio con EA |
-| EH | non coperto | — | dichiarazioni sostitutive, agevolazioni, riduzioni. Obbligatorio salvo cariche 5/6/7 |
+| EF | parziale - **controllo locale** (caso A10: nessuno scarto) | Sez. I 2%, II 1%, III 120/circoscrizione, IV 85/circoscrizione (un solo comune), V-bis da `calcolo` (non dovuta o imposta con tempistica 1/2), EF19, ImportoDaVersare e Versamento nel frontespizio (Fascicolo I pp. 39-48; annotazioni EF) | agevolazioni, soli terreni, proporzionale < fissa, piu' comuni, copia conforme, crediti, sostitutive, sanzioni, rateazione -> `quadri_mancanti`/`non_supportato` |
+| EG | parziale - **controllo locale** | EG1, EG5, EG6, EG7, EG8 con ImageData da `documenti/base64.dati_file_attachment`; obbligatorieta' albero (EA), passivita' (ED), documento d'identita' (fornitore diverso) | testamento, inventario, estero, agevolazioni/riduzioni; PDF/A non verificato dall'export |
+| EH | parziale - **controllo locale** | Sezione I: presentatore, defunto deceduto, dichiarante carica 1, eredi EA, assenza testamento/interdetti/rinunce, FlagPassivita confermato, firma | sezioni II-IV, separazione, unione civile, disabili/interdetti, rinunce, morte presunta |
 | EI_new | non coperto | — | voltura: discordanze e passaggi intermedi |
 | EL, EM | non coperto | — | sistema tavolare (province tavolari rilevate e bloccate) |
 | EN, EO, EP, EQ | non coperto | — | aziende, titoli, aeromobili, navi |
@@ -77,5 +78,5 @@ ottiene un XML valido allo schema, dichiaratamente incompleto, utile per prove d
 | A07 Decorrenze | parziale | solo regime 2025 (autoliquidazione); pre-2025 rifiutato esplicitamente |
 | A08 Riduzioni/estero/arrotondamenti | non coperto / divergenza aperta | dubbio documentato con ispezione del componente; caso non finalizzabile |
 | A09 XML e stampa | parziale | schema valido (lxml e xmllint) su caso sintetico; EF/EG/EH mancanti; stampa: altra area |
-| A10 Controllo ufficiale | da collaudare | non eseguito (area 3); un file `bozza_tecnica` NON va presentato come dichiarazione completa |
+| A10 Controllo ufficiale | controllo locale (positivo + 2 negativi) | SUC13 2.3.1 in batch su dati sintetici, 2026-11-01: caso base solo (*) 3345, negativi predisposti scartati (1013 CF defunto, 3376 importo da versare); `tests/fixture_telematico/controllo_20261101/`, `tests/test_telematico_controllo.py`. Collaudo su Desktop Telematico (Windows) e con i servizi dell'Agenzia: da fare |
 | A20 Copertura | implementato | questa matrice; casi mancanti bloccati (`non_supportato`, `quadri_mancanti`) |

@@ -64,7 +64,7 @@ class ElaboratiMixin:
             p = cart / f"{sha[:16]}.xml"
             if not p.exists():
                 p.write_bytes(es.xml)
-            percorso = str(p.relative_to(self.arch.base))
+            percorso = p.relative_to(self.arch.base).as_posix()
         ris = {"generato": es.xml is not None, "completo": es.completo, "scopo": scopo, "xml_sha256": sha, "percorso": percorso,
                "errori": [e.asdict() for e in es.errori], "non_supportato": list(es.non_supportato),
                "quadri_mancanti": [e.asdict() for e in es.quadri_mancanti], "xsd_errori": xsd_errori,

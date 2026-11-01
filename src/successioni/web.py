@@ -178,4 +178,4 @@ def avvia(porta: int = 8765, apri_browser: bool = True):
     print(f"Successioni: {url}")
     if apri_browser:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    uvicorn.run(app, host="127.0.0.1", port=porta, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=porta, log_level="warning", use_colors=False)
