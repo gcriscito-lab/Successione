@@ -8,6 +8,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
+from . import quadri as Q
 from . import schema as S
 from . import valori as V
 from .allegati import AllegatiMixin
@@ -72,9 +73,11 @@ class Servizio(AllegatiMixin):
         self.arch = archivio or Archivio()
 
     # ---------------------------------------------------------------- pratiche
-    def crea_pratica(self, titolo: str, *, chiave: str | None = None, autore="utente", canale="gui") -> dict:
+    def crea_pratica(self, titolo: str, *, chiave: str | None = None, autore="utente", canale="gui",
+                     iniziali: list[dict] | None = None) -> dict:
+        """Crea la pratica; con `iniziali` applica nella stessa transazione le operazioni di partenza (creazione guidata)."""
         self._canale(canale)
-        impr = _impronta({"titolo": titolo})
+        impr = _impronta({"titolo": titolo, "iniziali": iniziali or []})
         with self.arch.transazione() as c:
             if chiave:
                 prec = self._richiesta(c, chiave, "crea_pratica", impr)
@@ -82,6 +85,12 @@ class Servizio(AllegatiMixin):
                     return {**prec, "ripetuta": True}
             pid = "pr_" + uuid.uuid4().hex[:12]
             dati = nuovi_dati()
+            origine = "proposto_assistente" if canale == "mcp" else "inserito"
+            for i, op in enumerate(iniziali or []):
+                self._applica(dati, op, origine, canale, i)
+            errori = S.valida_forma(dati)
+            if errori:
+                raise DatiNonValidi("dati iniziali non validi: pratica non creata", errori=[e.asdict() for e in errori])
             t = ora()
             c.execute("INSERT INTO pratiche VALUES(?,?,?,?,?,?)", (pid, titolo, t, t, 1, json.dumps(dati)))
             c.execute("INSERT INTO revisioni VALUES(?,?,?,?,?,?,?,?)",
@@ -187,12 +196,22 @@ class Servizio(AllegatiMixin):
     # ----------------------------------------------------------------- verifica
     def verifica(self, pratica_id: str) -> dict:
         d = self.leggi(pratica_id)
-        errori = S.valida_forma(d["dati"]) + S.controlli_coerenza(d["dati"])
+        errori = S.valida_forma(d["dati"]) + S.controlli_coerenza(d["dati"]) + Q.rilievi_quadri(d["dati"])
         return {"pratica_id": pratica_id, "revisione": d["revisione"],
                 "impronta_dichiarativa": d["impronta_dichiarativa"],
                 "versione_regole": VERSIONE_REGOLE,
                 "ambito": "controlli interni di forma e coerenza; NON e' il controllo ufficiale",
-                "esito": "ok" if not errori else "rilievi", "rilievi": [e.asdict() for e in errori]}
+                "esito": "ok" if not errori else "rilievi", "finalizzabile": not errori,
+                "rilievi": [e.asdict() for e in errori]}
+
+    def quadri(self, pratica_id: str) -> dict:
+        """Stato di ciascun quadro (vuoto/compilato/rilievi/non supportato/inattivo) e rilievi per il pannello controlli."""
+        v = self.verifica(pratica_id)
+        d = self.leggi(pratica_id)
+        rilievi = [{**r, "quadro": Q.quadro_per_percorso(d["dati"], r["percorso"])} for r in v["rilievi"]]
+        return {"pratica_id": pratica_id, "revisione": d["revisione"], "quadri": Q.stato_quadri(d["dati"], v["rilievi"]),
+                "esito": v["esito"], "finalizzabile": v["finalizzabile"], "rilievi": rilievi,
+                "ambito": v["ambito"]}
 
     # ------------------------------------------------------------------ interni
     @staticmethod

@@ -1,0 +1,140 @@
+"""Registro dei quadri del modello SUC13 e loro stato nell'interfaccia.
+
+Nomi e sigle seguono il compilatore/modello ufficiale (albero tree_mod.xml del pacchetto pubblico SUC13 e istruzioni).
+La corrispondenza quadro -> collezioni del modello comune e' una scelta dell'applicazione: gli id interni restano stabili
+anche se righe/moduli ministeriali cambiano. Quadri `supportato=False`: la bozza resta conservata ma la pratica non e'
+finalizzabile finche' il quadro e' attivo (specifica §1).
+"""
+from __future__ import annotations
+
+from .schema import Errore
+
+# colonne = campi mostrati nella tabella del quadro (sottoinsieme dei campi dello schema)
+QUADRI: list[dict] = [
+    {"id": "AN", "titolo": "Dati generali", "gruppo": "frontespizio", "vista": "frontespizio", "supportato": True},
+    {"id": "EA", "titolo": "Eredi, chiamati, legatari e altri soggetti", "gruppo": "quadri", "vista": "tabella",
+     "coll": "persone", "preset": {"ruolo": "erede"},
+     "colonne": ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "ruolo", "relazione_con_defunto"],
+     "supportato": True},
+    {"id": "EB", "titolo": "Attivo ereditario catasto terreni", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
+     "preset": {"tipo": "terreno"},
+     "colonne": ["comune", "sezione", "foglio", "particella", "subalterno", "diritto", "quota_defunto", "valore", "rendita", "provenienza"],
+     "supportato": True},
+    {"id": "EC", "titolo": "Attivo ereditario catasto fabbricati", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
+     "preset": {"tipo": "fabbricato"},
+     "colonne": ["comune", "sezione", "foglio", "particella", "subalterno", "categoria", "diritto", "quota_defunto", "rendita", "valore", "provenienza"],
+     "supportato": True},
+    {"id": "ER", "titolo": "Rendite, crediti e altri beni", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
+     "preset": {"tipo": "disponibilita_finanziaria"},
+     "colonne": ["tipo", "descrizione", "valore", "quota_defunto", "provenienza"], "supportato": True},
+    {"id": "ED", "titolo": "Passività ed altri oneri", "gruppo": "quadri", "vista": "tabella", "coll": "passivita",
+     "preset": {}, "colonne": ["descrizione", "importo", "persona_id"], "supportato": True},
+    {"id": "EF", "titolo": "Liquidazione delle imposte e altri tributi", "gruppo": "quadri", "vista": "non_supportato",
+     "supportato": False, "motivo": "dipende dal calcolo dell'imposta, non ancora implementato"},
+    {"id": "EG", "titolo": "Elenco documenti, certificati e dichiarazioni sostitutive", "gruppo": "quadri",
+     "vista": "documenti", "coll": "documenti_ref", "preset": {}, "colonne": ["allegato_id", "tipo_eg", "finalita", "persona_id"],
+     "supportato": True},
+    {"id": "EI", "titolo": "Dichiarazioni utili alla voltura catastale", "gruppo": "quadri", "vista": "non_supportato",
+     "supportato": False, "motivo": "dichiarazioni di voltura non ancora mappate sugli XSD"},
+    {"id": "EL", "titolo": "Attivo ereditario terreni sistema tavolare", "gruppo": "quadri", "vista": "non_supportato", "supportato": False,
+     "motivo": "sistema tavolare non ancora supportato"},
+    {"id": "EM", "titolo": "Attivo ereditario fabbricati sistema tavolare", "gruppo": "quadri", "vista": "non_supportato", "supportato": False,
+     "motivo": "sistema tavolare non ancora supportato"},
+    {"id": "EN", "titolo": "Aziende", "gruppo": "quadri", "vista": "non_supportato", "supportato": False, "motivo": "non ancora supportato"},
+    {"id": "EO", "titolo": "Azioni, Obbligazioni, Altri titoli, Quote sociali", "gruppo": "quadri", "vista": "non_supportato",
+     "supportato": False, "motivo": "non ancora supportato"},
+    {"id": "EP", "titolo": "Aeromobili", "gruppo": "quadri", "vista": "non_supportato", "supportato": False, "motivo": "non ancora supportato"},
+    {"id": "EQ", "titolo": "Navi e Imbarcazioni", "gruppo": "quadri", "vista": "non_supportato", "supportato": False, "motivo": "non ancora supportato"},
+    {"id": "EH", "titolo": "Dichiarazioni sostitutive, agevolazioni e riduzioni", "gruppo": "riepiloghi", "vista": "non_supportato",
+     "supportato": False, "motivo": "non ancora supportato"},
+    {"id": "EE", "titolo": "Prospetto riepilogativo asse ereditario", "gruppo": "riepiloghi", "vista": "non_supportato",
+     "supportato": False, "motivo": "dipende dal calcolo, non ancora implementato"},
+    {"id": "DV", "titolo": "Devoluzioni e quote", "gruppo": "lavoro", "vista": "tabella", "coll": "devoluzioni", "preset": {},
+     "colonne": ["bene_id", "persona_id", "quota", "diritto"], "supportato": True,
+     "nota": "Tabella di lavoro: collega ogni bene agli aventi diritto. Non è un quadro ministeriale."},
+]
+PER_ID = {q["id"]: q for q in QUADRI}
+SEMPRE_ATTIVI = ("AN", "DV")
+PREDEFINITI = ("EA", "EB", "EC", "ER", "ED", "EG")
+
+
+def quadro_di(coll: str, entita: dict) -> str | None:
+    if coll == "persone":
+        return "AN" if entita.get("ruolo") in ("defunto", "presentatore") else "EA"
+    if coll == "beni":
+        return {"terreno": "EB", "fabbricato": "EC"}.get(entita.get("tipo"), "ER")
+    return {"passivita": "ED", "documenti_ref": "EG", "devoluzioni": "DV"}.get(coll)
+
+
+def attivi(dati: dict) -> set[str]:
+    sel = dati.get("opzioni", {}).get("quadri_attivi")
+    base = set(PREDEFINITI) if sel is None else {x for x in sel if x in PER_ID}
+    return base | set(SEMPRE_ATTIVI)
+
+
+def _quadro_da_percorso(dati: dict, percorso: str) -> str | None:
+    import re
+    m = re.match(r"^([a-z_]+)\[(?:bene=)?([^\]\],]+)", percorso)
+    if not m:
+        return "AN" if percorso.startswith("persone") else None
+    coll, eid = m.groups()
+    if coll == "devoluzioni":
+        return "DV"
+    for e in dati.get(coll, []):
+        if e["id"] == eid:
+            return quadro_di(coll, e)
+    return quadro_di(coll, {}) if coll in ("passivita", "documenti_ref") else None
+
+
+def quadro_per_percorso(dati: dict, percorso: str) -> str:
+    if percorso.startswith("quadro["):
+        return percorso[7:-1]
+    return _quadro_da_percorso(dati, percorso) or "AN"
+
+
+def rilievi_quadri(dati: dict) -> list[Errore]:
+    """Un quadro attivo ma non supportato blocca la finalizzazione; dati in quadri inattivi vengono segnalati."""
+    out = []
+    att = attivi(dati)
+    for q in QUADRI:
+        if q["id"] in att and not q["supportato"]:
+            out.append(Errore("QUADRO_NON_SUPPORTATO", f"quadro[{q['id']}]",
+                              f"il quadro {q['id']} è selezionato ma non ancora supportato ({q.get('motivo', '')}): "
+                              "la bozza è conservata, la pratica non è finalizzabile", "docs/MATRICE_COPERTURA.md"))
+    for coll in ("persone", "beni", "passivita", "documenti_ref"):
+        for e in dati.get(coll, []):
+            qid = quadro_di(coll, e)
+            if qid and qid not in att:
+                out.append(Errore("DATI_IN_QUADRO_NON_ATTIVO", f"{coll}[{e['id']}]",
+                                  f"ci sono dati nel quadro {qid} ma il quadro non è selezionato"))
+    return out
+
+
+def stato_quadri(dati: dict, rilievi: list[dict]) -> list[dict]:
+    att = attivi(dati)
+    per_q: dict[str, list[dict]] = {}
+    for r in rilievi:
+        per_q.setdefault(quadro_per_percorso(dati, r["percorso"]), []).append(r)
+    out = []
+    for q in QUADRI:
+        qid = q["id"]
+        righe = 0
+        if q.get("coll"):
+            righe = sum(1 for e in dati.get(q["coll"], []) if quadro_di(q["coll"], e) == qid)
+        elif qid == "AN":
+            righe = sum(1 for e in dati.get("persone", []) if e.get("ruolo") in ("defunto", "presentatore"))
+        n_ril = len(per_q.get(qid, []))
+        if not q["supportato"]:
+            stato = "non_supportato" if qid in att else "inattivo"
+        elif qid not in att:
+            stato = "inattivo"
+        elif n_ril:
+            stato = "rilievi"
+        elif righe:
+            stato = "compilato"
+        else:
+            stato = "vuoto"
+        d = {k: v for k, v in q.items()}
+        d.update({"stato": stato, "righe": righe, "rilievi": n_ril, "attivo": qid in att})
+        out.append(d)
+    return out

@@ -7,14 +7,16 @@ from pathlib import Path
 
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
-from . import __version__, pdfa, schema as S
+from . import __version__, pdfa, quadri as Q, schema as S
 from .errori import ErroreServizio, NonTrovato
 from .servizio import Servizio
 
-PAGINA = (Path(__file__).parent / "static" / "index.html")
+STATIC = Path(__file__).parent / "static"
+TIPI = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+        ".svg": "image/svg+xml"}
 
 
 def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: int = 8765) -> Starlette:
@@ -49,9 +51,22 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def home(request: Request):
         if (r := controllo(request)) is not None:
             return r
-        resp = HTMLResponse(PAGINA.read_text(encoding="utf-8"))
+        resp = HTMLResponse((STATIC / "index.html").read_text(encoding="utf-8"))
         resp.set_cookie("successioni", token, httponly=True, samesite="strict")
         return resp
+
+    async def statico(request: Request):
+        if (r := controllo(request)) is not None:
+            return r
+        nome = request.path_params["nome"]
+        f = STATIC / nome
+        if "/" in nome or nome.startswith(".") or f.suffix not in TIPI or not f.is_file():
+            return JSONResponse({"codice": "NON_TROVATO"}, status_code=404)
+        return Response(f.read_bytes(), media_type=TIPI[f.suffix], headers={"Cache-Control": "no-store"})
+
+    @api
+    async def quadri(request):
+        return sv.quadri(request.path_params["pid"])
 
     @api
     async def info(request):
@@ -59,7 +74,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def schema_(request):
-        return {"collezioni": S.COLLEZIONI}
+        return {"collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI)}
 
     @api
     async def elenca(request):
@@ -68,7 +83,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     @api
     async def crea(request):
         b = await request.json()
-        return sv.crea_pratica(b["titolo"], chiave=b.get("chiave"))
+        return sv.crea_pratica(b["titolo"], chiave=b.get("chiave"), iniziali=b.get("iniziali"))
 
     @api
     async def leggi(request):
@@ -119,7 +134,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     P = "/api/pratiche/{pid}"
     return Starlette(routes=[
-        Route("/", home), Route("/api/info", info), Route("/api/schema", schema_),
+        Route("/", home), Route("/static/{nome}", statico), Route("/api/info", info),
+        Route("/api/pratiche/{pid}/quadri", quadri), Route("/api/schema", schema_),
         Route("/api/pratiche", elenca), Route("/api/pratiche", crea, methods=["POST"]),
         Route(P, leggi), Route(P + "/aggiorna", aggiorna, methods=["POST"]),
         Route(P + "/revisioni", revisioni), Route(P + "/differenze", differenze),
