@@ -28,22 +28,44 @@ def test_mcp_stdio_stessa_pratica_della_gui(tmp_path):
             async with ClientSession(r, w) as s:
                 await s.initialize()
                 tools = {t.name for t in (await s.list_tools()).tools}
-                assert {"aggiorna_pratica", "leggi_pratica", "verifica_pratica", "prepara_pdfa"} <= tools
+                assert {"successioni_aggiorna_pratica", "successioni_leggi_pratica", "successioni_verifica_pratica", "successioni_prepara_pdfa"} <= tools
                 assert not any(x in tools for x in ("shell", "sql", "esegui"))
-                c = dati(await s.call_tool("crea_pratica", {"titolo": "Rossi", "chiave_richiesta": "k1"}))
+                c = dati(await s.call_tool("successioni_crea_pratica", {"titolo": "Rossi", "chiave_richiesta": "k1"}))
                 pid = c["pratica_id"]
                 op = [{"op": "upsert", "coll": "persone", "id": "p_aaaa1111",
                        "campi": {"cognome": "Rossi", "ruolo": "defunto"}}]
-                r1 = dati(await s.call_tool("aggiorna_pratica", {"pratica_id": pid, "revisione_attesa": 1,
+                r1 = dati(await s.call_tool("successioni_aggiorna_pratica", {"pratica_id": pid, "revisione_attesa": 1,
                                                                  "operazioni": op, "chiave_richiesta": "u1"}))
                 assert r1["revisione"] == 2
                 # la "GUI" vede subito la modifica nello stesso archivio
                 assert sv.leggi(pid)["dati"]["persone"][0]["cognome"] == "Rossi"
                 # modifica manuale, poi MCP con revisione obsoleta: errore leggibile, nessuna sovrascrittura
                 sv.aggiorna(pid, 2, [{"op": "upsert", "coll": "persone", "id": "p_aaaa1111", "campi": {"cognome": "Bianchi"}}])
-                res = await s.call_tool("aggiorna_pratica", {"pratica_id": pid, "revisione_attesa": 2,
+                res = await s.call_tool("successioni_aggiorna_pratica", {"pratica_id": pid, "revisione_attesa": 2,
                                         "operazioni": [{"op": "upsert", "coll": "persone", "id": "p_aaaa1111", "campi": {"cognome": "Verdi"}}],
                                         "chiave_richiesta": "u2"})
                 assert res.is_error and "CONFLITTO_REVISIONE" in res.content[0].text
                 assert sv.leggi(pid)["dati"]["persone"][0]["cognome"] == "Bianchi"
+    anyio.run(scenario)
+
+
+def test_mcp_annotazioni_prefisso_e_paginazione(tmp_path):
+    base = tmp_path / "dati"
+    param = StdioServerParameters(command=sys.executable, args=["-m", "successioni.mcp_server"],
+                                  env={"SUCCESSIONI_DATA": str(base), "PATH": "/usr/bin:/bin"})
+
+    async def scenario():
+        from mcp.client.session import ClientSession
+        async with stdio_client(param) as (r, w):
+            async with ClientSession(r, w) as s:
+                await s.initialize()
+                tools = {t.name: t for t in (await s.list_tools()).tools}
+                assert all(n.startswith("successioni_") for n in tools)
+                assert tools["successioni_leggi_pratica"].annotations.read_only_hint is True
+                assert tools["successioni_aggiorna_pratica"].annotations.read_only_hint is False
+                assert tools["successioni_aggiorna_pratica"].annotations.destructive_hint is False
+                for i in range(3):
+                    await s.call_tool("successioni_crea_pratica", {"titolo": f"P{i}", "chiave_richiesta": f"k{i}"})
+                pag = dati(await s.call_tool("successioni_elenca_pratiche", {"limit": 2}))
+                assert pag["totale"] == 3 and len(pag["elementi"]) == 2 and pag["has_more"] and pag["next_offset"] == 2
     anyio.run(scenario)

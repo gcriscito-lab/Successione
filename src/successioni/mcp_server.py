@@ -10,6 +10,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.types import ToolAnnotations
 
 from . import __version__, pdfa, schema as S
 from .errori import ErroreServizio
@@ -19,6 +20,15 @@ COPERTURA_NON_DISPONIBILE = [
     "calcolo imposte e franchigie", "export XML SUC13 completo", "stampa", "controllo ufficiale",
     "acquisizione catastale Entratel", "invio e ricevute",
 ]
+
+
+def _pagina(righe: list, limit: int, offset: int) -> dict:
+    limit = max(1, min(int(limit), 200))
+    offset = max(0, int(offset))
+    parte = righe[offset:offset + limit]
+    fine = offset + len(parte)
+    return {"totale": len(righe), "offset": offset, "elementi": parte,
+            "has_more": fine < len(righe), "next_offset": fine if fine < len(righe) else None}
 
 
 def costruisci(servizio: Servizio | None = None) -> MCPServer:
@@ -39,8 +49,15 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
                 raise ToolError(f"{e.codice}: {e.messaggio} | {e.asdict()}") from None
         return w
 
-    def tool(fn):
-        return mcp.tool()(protetto(fn))
+    LETTURA = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+    SCRITTURA = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+    LOCALE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
+
+    def tool(fn=None, *, ann=LETTURA):
+        """Registra con prefisso di servizio (successioni_*) e annotazioni (suggerimenti, non garanzie di sicurezza)."""
+        def reg(f):
+            return mcp.tool(name="successioni_" + f.__name__, annotations=ann)(protetto(f))
+        return reg(fn) if fn else reg
 
     @tool
     def capacita() -> dict[str, Any]:
@@ -62,11 +79,11 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
                 "nota": "codici di diritto/qualifica provvisori fino al legame con gli XSD"}
 
     @tool
-    def elenca_pratiche() -> list[dict]:
-        """Pratiche presenti con revisione corrente."""
-        return sv.elenca()
+    def elenca_pratiche(limit: int = 50, offset: int = 0) -> dict:
+        """Pratiche presenti con revisione corrente (paginato: limit, offset; has_more/next_offset nel risultato)."""
+        return _pagina(sv.elenca(), limit, offset)
 
-    @tool
+    @tool(ann=SCRITTURA)
     def crea_pratica(titolo: str, chiave_richiesta: str) -> dict:
         """Crea una pratica. Ripetere con la stessa chiave non crea duplicati."""
         return sv.crea_pratica(titolo, chiave=chiave_richiesta, autore="assistente", canale="mcp")
@@ -76,16 +93,16 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Dati completi e revisione. Con 'revisione' legge una versione precedente."""
         return sv.leggi(pratica_id, revisione)
 
-    @tool
+    @tool(ann=SCRITTURA)
     def aggiorna_pratica(pratica_id: str, revisione_attesa: int, operazioni: list[dict], chiave_richiesta: str) -> dict:
         """Applica in modo atomico una lista di operazioni. Conflitto di revisione = nessuna modifica."""
         return sv.aggiorna(pratica_id, revisione_attesa, operazioni, chiave=chiave_richiesta,
                            autore="assistente", canale="mcp")
 
     @tool
-    def revisioni_pratica(pratica_id: str) -> list[dict]:
-        """Cronologia delle revisioni (autore, canale, sommario)."""
-        return sv.revisioni(pratica_id)
+    def revisioni_pratica(pratica_id: str, limit: int = 50, offset: int = 0) -> dict:
+        """Cronologia delle revisioni (autore, canale, sommario), paginata."""
+        return _pagina(sv.revisioni(pratica_id), limit, offset)
 
     @tool
     def differenze_pratica(pratica_id: str, da_revisione: int, a_revisione: int) -> list[str]:
@@ -102,14 +119,14 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """File che l'utente ha messo nella cartella d'ingresso e che possono essere acquisiti."""
         return sorted(p.name for p in sv.cartella_ingresso.iterdir() if p.is_file())
 
-    @tool
+    @tool(ann=LOCALE)
     def acquisisci_allegato(pratica_id: str, nome_file: str, tipo_eg: str | None = None,
                             finalita: str | None = None, persona_id: str | None = None) -> dict:
         """Acquisisce un file della cartella d'ingresso come originale; tipo e finalita' li indica il chiamante."""
         return sv.acquisisci_da_ingresso(pratica_id, nome_file, tipo_eg=tipo_eg, finalita=finalita,
                                          persona_id=persona_id)
 
-    @tool
+    @tool(ann=LOCALE)
     def prepara_pdfa(allegato_id: str) -> dict:
         """Crea il derivato PDF/A-1b dell'originale e lo valida. 'conforme' solo con veraPDF; altrimenti 'non_verificato'."""
         return sv.prepara_pdfa(allegato_id)
