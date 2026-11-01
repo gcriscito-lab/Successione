@@ -280,7 +280,7 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
             Passaggio("QTI", "QN + PR", esatto(qti), _g(4, "QTI")),
             Passaggio("AL", f"aliquota per grado {s['grado']}", esatto(al), fonte_al),
             Passaggio("ISL", "QTI x AL", esatto(isl), _g(5, "ISL")),
-            Passaggio("RID", "riduzioni: nessuna nel perimetro supportato", "0", _g(6, "RID")),
+            Passaggio("RID", "riduzioni: nessuna nel perimetro supportato", "0", _g(7, "RID")),
             Passaggio("DET", "detrazione imposta estera: nessuna nel perimetro supportato", "0", _g(8, "DET.estero")),
             Passaggio("ISN", "ISL - RID - DET", esatto(isn), _g(8, "ISN")),
         ]

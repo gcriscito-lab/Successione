@@ -89,3 +89,41 @@ def test_mcp_stato_quadri_e_blocco_non_supportati(tmp_path):
                 assert {q["id"]: q["stato"] for q in st["quadri"]}["EN"] == "non_supportato"
                 assert any(x["codice"] == "QUADRO_NON_SUPPORTATO" and x["quadro"] == "EN" for x in st["rilievi"])
     anyio.run(scenario)
+
+
+def test_mcp_suddividi_allegato_oltre_limite(tmp_path):
+    """Un PDF grande viene ridotto/suddiviso sotto il limite; l'originale resta invariato (A12). Richiede Ghostscript."""
+    from successioni import pdfa
+    if not pdfa.trova_gs():
+        import pytest
+        pytest.skip("Ghostscript non disponibile")
+    import os
+    from reportlab.pdfgen import canvas
+    base = tmp_path / "dati"
+    ingresso = base / "ingresso"; ingresso.mkdir(parents=True)
+    f = ingresso / "grande.pdf"
+    c = canvas.Canvas(str(f))
+    for i in range(6):
+        c.drawString(72, 750, f"pagina {i + 1}")
+        c.drawInlineImage(__import__("PIL.Image", fromlist=["x"]).frombytes("RGB", (1400, 1400), os.urandom(1400 * 1400 * 3)), 20, 20, 500, 500)
+        c.showPage()
+    c.save()
+    assert f.stat().st_size > 5_000_000
+    param = StdioServerParameters(command=sys.executable, args=["-m", "successioni.mcp_server"],
+                                  env={"SUCCESSIONI_DATA": str(base), "PATH": "/usr/bin:/bin"})
+
+    async def scenario():
+        from mcp.client.session import ClientSession
+        async with stdio_client(param) as (r, w):
+            async with ClientSession(r, w) as s:
+                await s.initialize()
+                pid = dati(await s.call_tool("successioni_crea_pratica", {"titolo": "X", "chiave_richiesta": "k"}))["pratica_id"]
+                a = dati(await s.call_tool("successioni_acquisisci_allegato", {"pratica_id": pid, "nome_file": "grande.pdf"}))
+                res = await s.call_tool("successioni_suddividi_allegato", {"allegato_id": a["allegato_id"]})
+                assert not res.is_error, res.content[0].text[:300]
+                lista = dati(await s.call_tool("successioni_elenca_allegati", {"pratica_id": pid}))
+                derivati = [x for x in lista if x["ruolo"] == "derivato"]
+                assert derivati and all(x["bytes"] <= 5_000_000 for x in derivati)
+                orig = [x for x in lista if x["ruolo"] == "originale"][0]
+                assert orig["bytes"] == f.stat().st_size
+    anyio.run(scenario)

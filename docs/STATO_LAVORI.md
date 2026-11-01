@@ -15,7 +15,14 @@ Applicato lo stile Vetro+Grafite (colori di Vetro) all'interfaccia vera: tabella
 `tests/e2e/gui_flusso.js` (13 verifiche positive, nessun errore JS). Il vecchio `app.js` è in `docs/design/vetro-grafite/app_precedente.js`.
 Avvertenza: `with_server.py` può lasciare il server attivo; chiudere per PID prima di rilanciare le prove.
 
-## Subagenti (rilanciati su Opus, risultati non ancora integrati)
+## Consegne dei subagenti
+- **Area 2 (documenti, PDF/A): consegnata e verificata il 2026-11-01.** Suite intera 179 passati, 2 saltati; vincolo sui nomi allegati (solo maiuscole, max 100)
+  confermato nell'XSD (typesDati_v2.xsd riga 18, typesReg_v2.xsd riga 422). Integrate: strumento MCP e pulsante GUI "Suddividi", pillow dichiarato.
+  Da integrare quando c'è l'XML: `verifica_fornitura` prima dell'invio, anteprima visiva, nomi EG con `dati_file_attachment` (area 1).
+  Resta **da collaudare**: veraPDF (procedura in `docs/PDFA.md` par. 9), fedeltà visiva su documenti reali.
+- Aree 1 (regole/XML) e 3 (collegamenti): ancora in corso.
+
+## Subagenti (rilanciati su Opus)
 Tre agenti lavorano su file distinti (contratti in `docs/CONTRATTI_MODULI.md`): regole/XSD/XML, documenti/PDF-A, collegamenti.
 Ognuno tiene traccia in `docs/regole/STATO_area1.md`, `docs/STATO_area2.md`, `docs/STATO_area3.md`. Alla consegna: verificare direttamente,
 integrare, poi revisore indipendente. I loro file nel repository sono bozze finché non consegnano.

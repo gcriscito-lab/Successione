@@ -129,6 +129,10 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                       finalita=form.get("finalita") or None, nome=Path(f.filename).name)
 
     @api
+    async def suddividi(request):
+        return sv.suddividi_allegato(request.path_params["aid"])
+
+    @api
     async def converti(request):
         return sv.prepara_pdfa(request.path_params["aid"])
 
@@ -142,6 +146,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/ripristina", ripristina, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),
+        Route("/api/allegati/{aid}/suddividi", suddividi, methods=["POST"]),
     ])
 
 

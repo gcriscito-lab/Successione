@@ -136,6 +136,11 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Crea il derivato PDF/A-1b dell'originale e lo valida. 'conforme' solo con veraPDF; altrimenti 'non_verificato'."""
         return sv.prepara_pdfa(allegato_id)
 
+    @tool(ann=LOCALE)
+    def suddividi_allegato(allegato_id: str, limite_byte: int | None = None) -> dict:
+        """Riduce o suddivide un allegato oltre il limite (5 MB per file secondo le specifiche): registra le parti come derivati, l'originale resta invariato. Le parti sono rivalidate e nessuna pagina viene persa."""
+        return sv.suddividi_allegato(allegato_id, limite_byte)
+
     @tool
     def elenca_allegati(pratica_id: str) -> list[dict]:
         """Originali e derivati con analisi e rapporto."""
