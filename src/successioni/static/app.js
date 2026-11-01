@@ -93,7 +93,7 @@ function renderSb() {
     S.salvata ? h("span", { class: "ok" }, "Salvata alle " + S.salvata) : null,
     nMod() ? h("span", { style: "color:var(--am)" }, nMod() + (nMod() === 1 ? " modifica non salvata" : " modifiche non salvate")) : null,
     n ? h("button", { onclick: () => { S.tab = "controlli"; renderIns(); } }, n + (n === 1 ? " rilievo" : " rilievi")) : h("span", {}, "Nessun rilievo"),
-    h("span", {}, S.Q.finalizzabile ? "Finalizzabile nel perimetro supportato" : "Non finalizzabile"),
+    h("span", {}, S.Q.finalizzabile ? "Finalizzabile" : "Non finalizzabile" + ((S.Q.blocchi_finalizzazione || []).length ? ": file XML completo non generato" : "")),
     h("span", {}, "Controllo ufficiale: non eseguito")].filter(Boolean));
 }
 
@@ -246,8 +246,9 @@ function insDati(ins) {
 }
 function insControlli(ins) {
   const q = S.Q;
-  ins.append(h("p", { class: "mut" }, q.ambito + (q.finalizzabile ? ". Finalizzabile nel perimetro supportato." : ". Non finalizzabile.")));
-  if (!q.rilievi.length) { ins.append(h("p", { class: "ok", style: "color:var(--ok);font-weight:600" }, "Nessun rilievo.")); return; }
+  ins.append(h("p", { class: "mut" }, q.ambito + (q.finalizzabile ? ". Finalizzabile." : ". Non finalizzabile.")));
+  for (const b of (q.blocchi_finalizzazione || [])) ins.append(h("div", { class: "nota", style: "margin:0 0 8px" }, b.messaggio));
+  if (!q.rilievi.length) { ins.append(h("p", { class: "ok", style: "color:var(--ok);font-weight:600" }, "Nessun rilievo sui dati inseriti.")); return; }
   const ul = h("ul", { class: "rl" });
   for (const r of q.rilievi) ul.append(h("li", {}, h("button", { onclick: () => vaiA(r) }, h("span", { class: "sigla", style: "background:var(--er-b)" }, r.quadro), h("span", {}, h("div", {}, r.messaggio), h("div", { class: "cod" }, r.codice + " · " + r.percorso)))));
   ins.append(ul);

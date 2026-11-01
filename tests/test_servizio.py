@@ -10,8 +10,9 @@ def sv(tmp_path):
     return Servizio(Archivio(tmp_path / "dati"))
 
 
-def pers(**k):
-    return {"op": "upsert", "coll": "persone", "campi": k}
+def pers(id=None, **k):
+    """L'identificativo sta al livello dell'operazione, mai tra i campi (campo riservato)."""
+    return {"op": "upsert", "coll": "persone", **({"id": id} if id else {}), "campi": k}
 
 
 def test_a04_doppia_richiesta_non_duplica(sv):

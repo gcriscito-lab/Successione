@@ -10,7 +10,7 @@ T = "tok123"
 @pytest.fixture
 def ctx(tmp_path):
     sv = Servizio(Archivio(tmp_path / "d"))
-    c = TestClient(crea_app(sv, token=T), base_url="http://testserver")
+    c = TestClient(crea_app(sv, token=T, ammetti_host_di_prova=True), base_url="http://testserver")
     return sv, c
 
 

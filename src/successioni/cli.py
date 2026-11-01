@@ -17,6 +17,8 @@ def main(argv=None):
     sub.add_parser("mcp", help="avvia il server MCP (stdio)")
     b = sub.add_parser("backup", help="copia coerente di database e allegati")
     b.add_argument("destinazione")
+    r = sub.add_parser("ripristina", help="ripristina un backup in una cartella dati NUOVA (non sovrascrive mai dati esistenti)")
+    r.add_argument("backup"); r.add_argument("--destinazione", required=True)
     c = sub.add_parser("converti-pdfa", help="converte un PDF in PDF/A-1b e riporta l'esito della validazione")
     c.add_argument("origine"); c.add_argument("destinazione")
     a = ap.parse_args(argv)
@@ -29,6 +31,14 @@ def main(argv=None):
         m()
     elif cmd == "backup":
         print(Archivio().backup(a.destinazione))
+    elif cmd == "ripristina":
+        from .errori import ErroreServizio
+        try:
+            Archivio(a.destinazione).ripristina(a.backup)
+        except ErroreServizio as e:
+            print("Ripristino non eseguito:", e.messaggio, file=sys.stderr)
+            return 2
+        print("Backup ripristinato in", a.destinazione)
     elif cmd == "converti-pdfa":
         from . import pdfa
         r = pdfa.converti_in_pdfa(a.origine, a.destinazione)

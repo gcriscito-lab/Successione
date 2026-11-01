@@ -19,10 +19,11 @@ TIPI = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", 
         ".svg": "image/svg+xml"}
 
 
-def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: int = 8765) -> Starlette:
+def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: int = 8765,
+             ammetti_host_di_prova: bool = False) -> Starlette:
     sv = servizio or Servizio()
     token = token or secrets.token_urlsafe(24)
-    host_ok = {f"127.0.0.1:{porta}", f"localhost:{porta}", "testserver"}
+    host_ok = {f"127.0.0.1:{porta}", f"localhost:{porta}"} | ({"testserver"} if ammetti_host_di_prova else set())
 
     def controllo(request: Request):
         if request.headers.get("host", "") not in host_ok:
@@ -46,6 +47,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                 return JSONResponse(e.asdict(), status_code=404)
             except ErroreServizio as e:
                 return JSONResponse(e.asdict(), status_code=409 if e.codice == "CONFLITTO_REVISIONE" else 422)
+            except (ValueError, KeyError, TypeError, AttributeError) as e:   # JSON malformato, campo mancante o di tipo errato
+                return JSONResponse({"codice": "RICHIESTA_NON_VALIDA", "messaggio": "richiesta non valida: " + (str(e) or type(e).__name__)[:200]}, status_code=422)
         return w
 
     async def home(request: Request):

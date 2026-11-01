@@ -32,3 +32,7 @@ class DatiNonValidi(ErroreServizio):
 
 class ChiaveRiutilizzata(ErroreServizio):
     codice = "CHIAVE_RICHIESTA_RIUTILIZZATA"
+
+
+class RipristinoNonAmmesso(ErroreServizio):
+    codice = "RIPRISTINO_NON_AMMESSO"

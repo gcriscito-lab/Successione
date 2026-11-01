@@ -198,12 +198,18 @@ class Servizio(AllegatiMixin, ElaboratiMixin):
     def verifica(self, pratica_id: str) -> dict:
         d = self.leggi(pratica_id)
         errori = S.valida_forma(d["dati"]) + S.controlli_coerenza(d["dati"]) + Q.rilievi_quadri(d["dati"])
+        blocchi = []
+        e = self._job_ultimo("esporta_xml", pratica_id)
+        if not (e and e["input"].get("impronta_dichiarativa") == d["impronta_dichiarativa"] and e["risultato"].get("completo")):
+            blocchi.append({"codice": "FILE_XML_COMPLETO_NON_DISPONIBILE",
+                            "messaggio": "il file XML completo non e' stato generato per i dati attuali: mancano quadri o casi non supportati, "
+                                         "oppure l'esportazione non e' stata eseguita dopo l'ultima modifica"})
         return {"pratica_id": pratica_id, "revisione": d["revisione"],
                 "impronta_dichiarativa": d["impronta_dichiarativa"],
                 "versione_regole": VERSIONE_REGOLE,
                 "ambito": "controlli interni di forma e coerenza; NON e' il controllo ufficiale",
-                "esito": "ok" if not errori else "rilievi", "finalizzabile": not errori,
-                "rilievi": [e.asdict() for e in errori]}
+                "esito": "ok" if not errori else "rilievi", "finalizzabile": not errori and not blocchi,
+                "blocchi_finalizzazione": blocchi, "rilievi": [x.asdict() for x in errori]}
 
     def quadri(self, pratica_id: str) -> dict:
         """Stato di ciascun quadro (vuoto/compilato/rilievi/non supportato/inattivo) e rilievi per il pannello controlli."""
@@ -211,7 +217,8 @@ class Servizio(AllegatiMixin, ElaboratiMixin):
         d = self.leggi(pratica_id)
         rilievi = [{**r, "quadro": Q.quadro_per_percorso(d["dati"], r["percorso"])} for r in v["rilievi"]]
         return {"pratica_id": pratica_id, "revisione": d["revisione"], "quadri": Q.stato_quadri(d["dati"], v["rilievi"]),
-                "esito": v["esito"], "finalizzabile": v["finalizzabile"], "rilievi": rilievi,
+                "esito": v["esito"], "finalizzabile": v["finalizzabile"], "blocchi_finalizzazione": v["blocchi_finalizzazione"],
+                "rilievi": rilievi,
                 "ambito": v["ambito"]}
 
     # ------------------------------------------------------------------ interni
@@ -252,6 +259,8 @@ class Servizio(AllegatiMixin, ElaboratiMixin):
                 elemento = {"id": eid, "_origine": {}}
                 righe.append(elemento)
             for k, v in (op.get("campi") or {}).items():
+                if k == "id" or k.startswith("_"):
+                    raise DatiNonValidi(f"operazione {i}: il campo '{k}' e' riservato e non modificabile (identificativo e metadati di origine)", campo=k)
                 if canale == "mcp" and elemento["_origine"].get(k) == "calcolato":
                     raise DatiNonValidi(f"operazione {i}: campo calcolato non modificabile da MCP", campo=k)
                 if v is None:

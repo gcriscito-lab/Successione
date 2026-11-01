@@ -117,5 +117,41 @@ class Archivio:
                 out.close()
         finally:
             src.close()
-        shutil.copytree(self.base / "allegati", dest / "allegati", dirs_exist_ok=True)
+        for cart in ("allegati", "elaborati"):          # file elaborati inclusi: lo stato dell'export li richiama
+            if (self.base / cart).exists():
+                shutil.copytree(self.base / cart, dest / cart, dirs_exist_ok=True)
         return dest
+
+    def e_vuoto(self) -> bool:
+        with self.lettura() as c:
+            if c.execute("SELECT COUNT(*) FROM pratiche").fetchone()[0]:
+                return False
+        return not any(p.is_file() for cart in ("allegati", "elaborati") if (self.base / cart).exists()
+                       for p in (self.base / cart).rglob("*"))
+
+    def ripristina(self, sorgente: Path | str) -> None:
+        """Ripristina un backup (database, allegati, elaborati) in questo archivio, che DEVE essere vuoto.
+
+        Non sovrascrive mai dati esistenti: per ripristinare su un archivio in uso, usare una cartella dati nuova."""
+        import shutil
+        from .errori import RipristinoNonAmmesso
+        sorg = Path(sorgente)
+        if not (sorg / "archivio.sqlite3").is_file():
+            raise RipristinoNonAmmesso("la cartella indicata non contiene un backup (manca archivio.sqlite3)", sorgente=str(sorg))
+        if not self.e_vuoto():
+            raise RipristinoNonAmmesso("l'archivio di destinazione contiene gia' dati: ripristina in una cartella dati nuova", destinazione=str(self.base))
+        src = sqlite3.connect(sorg / "archivio.sqlite3")
+        try:
+            versione = src.execute("PRAGMA user_version").fetchone()[0]
+            if versione > SCHEMA_VERSIONE:
+                raise RipristinoNonAmmesso(f"il backup proviene da una versione piu' recente (schema {versione})")
+            dst = self._apri()
+            try:
+                src.backup(dst)
+            finally:
+                dst.close()
+        finally:
+            src.close()
+        for cart in ("allegati", "elaborati"):
+            if (sorg / cart).exists():
+                shutil.copytree(sorg / cart, self.base / cart, dirs_exist_ok=True)

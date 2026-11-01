@@ -5,6 +5,7 @@ I codici dei diritti/qualifiche sono PROVVISORI: vanno legati alle enumerazioni 
 """
 from __future__ import annotations
 
+import datetime
 import re
 from dataclasses import dataclass, asdict
 from fractions import Fraction
@@ -63,6 +64,10 @@ def valida_campo(kind: str, valore, percorso: str, riferimenti: dict[str, set[st
         elif kind == "data":
             if not (isinstance(valore, str) and DATA_ISO.match(valore)):
                 raise V.ValoreNonValido("data in formato AAAA-MM-GG")
+            try:
+                datetime.date.fromisoformat(valore)
+            except ValueError:
+                raise V.ValoreNonValido("data inesistente nel calendario")
         elif kind == "quota":
             V.parse_quota(valore)
         elif kind == "importo":
