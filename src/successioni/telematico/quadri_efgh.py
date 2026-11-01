@@ -185,6 +185,18 @@ def _sezione_vbis(x, xml_pre):
         x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
                                       "xpath": f"{x.XP_DICH}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione"}
         return {"ImpostaNonDovuta": "1"}, 0, []
+    # Fascicolo I p.6 (dodici mesi) e p.48 (tempistica 1/2). Le decorrenze particolari,
+    # sospensioni e il ravvedimento non sono implementati: non finalizzare una tardiva
+    # con imposta di successione dovuta, neppure cambiando semplicemente codice 1 in 2.
+    try:
+        termine_ordinario = x.data_decesso.replace(year=x.data_decesso.year + 1)
+    except ValueError:  # 29 febbraio: nessuna regola di calendario fiscale indovinata
+        return None, 0, ["termine di presentazione per decesso il 29 febbraio da verificare: caso non coperto "
+                         "(Fascicolo I p.6, p.48)"]
+    if x.oggi > termine_ordinario:
+        return None, 0, ["dichiarazione tardiva rispetto al termine ordinario di dodici mesi: decorrenze "
+                         "particolari, sanzioni/interessi e tempistica di pagamento non coperti; "
+                         "non finalizzabile (Fascicolo I p.6 e p.48, EF18ter col.1)"]
     temp = SUP.dich(x.d, "tempistica_pagamento")
     if SUP.dich(x.d, "pagamento_rateale") not in (None, False):
         return None, 0, ["pagamento rateale dell'imposta di successione (EF18ter col. 2-3) non coperto"]
@@ -233,6 +245,12 @@ def quadro_eg(x) -> dict | None:
         else:
             percorso, nome = sorgente, None
         try:
+            from ..documenti.limiti import LIMITE_ALLEGATO_DECIMALE, FONTE_ALLEGATO
+            dim = Path(percorso).stat().st_size
+            if dim > LIMITE_ALLEGATO_DECIMALE:
+                x.err("ALLEGATO_OLTRE_LIMITE", perc, f"{dim} byte > {LIMITE_ALLEGATO_DECIMALE}: "
+                      "ridurre o suddividere prima della codifica Base64", FONTE_ALLEGATO)
+                continue
             fa = dati_file_attachment(Path(percorso), nome=nome or Path(percorso).name,
                                       descrizione=dr.get("finalita") or None)
         except (OSError, ValueError) as e:

@@ -124,8 +124,9 @@ class Archivio:
 
     def e_vuoto(self) -> bool:
         with self.lettura() as c:
-            if c.execute("SELECT COUNT(*) FROM pratiche").fetchone()[0]:
-                return False
+            for tabella in ('pratiche', 'revisioni', 'richieste', 'allegati', 'job'):
+                if c.execute(f"SELECT COUNT(*) FROM {tabella}").fetchone()[0]:
+                    return False
         return not any(p.is_file() for cart in ("allegati", "elaborati") if (self.base / cart).exists()
                        for p in (self.base / cart).rglob("*"))
 
@@ -134,24 +135,45 @@ class Archivio:
 
         Non sovrascrive mai dati esistenti: per ripristinare su un archivio in uso, usare una cartella dati nuova."""
         import shutil
+        import tempfile
         from .errori import RipristinoNonAmmesso
-        sorg = Path(sorgente)
+        from .integrita import verifica_copia
+        sorg = Path(sorgente).resolve()
         if not (sorg / "archivio.sqlite3").is_file():
             raise RipristinoNonAmmesso("la cartella indicata non contiene un backup (manca archivio.sqlite3)", sorgente=str(sorg))
         if not self.e_vuoto():
             raise RipristinoNonAmmesso("l'archivio di destinazione contiene gia' dati: ripristina in una cartella dati nuova", destinazione=str(self.base))
-        src = sqlite3.connect(sorg / "archivio.sqlite3")
+        consentiti = {'archivio.sqlite3', 'archivio.sqlite3-wal', 'archivio.sqlite3-shm', 'allegati', 'elaborati'}
+        if any(p.name not in consentiti for p in self.base.iterdir()):
+            raise RipristinoNonAmmesso('la destinazione contiene altri file o cartelle: usare una cartella dati nuova')
         try:
-            versione = src.execute("PRAGMA user_version").fetchone()[0]
-            if versione > SCHEMA_VERSIONE:
-                raise RipristinoNonAmmesso(f"il backup proviene da una versione piu' recente (schema {versione})")
-            dst = self._apri()
-            try:
-                src.backup(dst)
-            finally:
-                dst.close()
-        finally:
-            src.close()
-        for cart in ("allegati", "elaborati"):
-            if (sorg / cart).exists():
-                shutil.copytree(sorg / cart, self.base / cart, dirs_exist_ok=True)
+            verifica_copia(sorg, SCHEMA_VERSIONE)
+            base = self.base.resolve()
+            # Tutti i target della preparazione e degli spostamenti sono figli del
+            # medesimo parent esplicitamente risolto (anche su Windows).
+            parent = base.parent
+            with tempfile.TemporaryDirectory(prefix='.successioni-ripristino-', dir=parent) as tmp:
+                stage = Path(tmp).resolve() / 'dati'
+                precedente = Path(tmp).resolve() / 'precedente-vuoto'
+                if not stage.is_relative_to(parent) or not precedente.is_relative_to(parent) or base == parent:
+                    raise RipristinoNonAmmesso('destinazione di ripristino non valida')
+                stage.mkdir()
+                shutil.copyfile(sorg / 'archivio.sqlite3', stage / 'archivio.sqlite3')
+                for cart in ('allegati', 'elaborati'):
+                    if (sorg / cart).exists():
+                        shutil.copytree(sorg / cart, stage / cart)
+                verifica_copia(stage, SCHEMA_VERSIONE)
+                if not self.e_vuoto():
+                    raise RipristinoNonAmmesso('la destinazione e’ stata popolata durante la preparazione')
+                if any(p.name not in consentiti for p in base.iterdir()):
+                    raise RipristinoNonAmmesso('altri file aggiunti alla destinazione durante la preparazione')
+                # Il ripristino richiede una destinazione nuova, senza client aperti.
+                # Se la preparazione fallisce, il database originale non e' mai toccato.
+                base.rename(precedente)
+                try:
+                    stage.rename(base)
+                except BaseException:
+                    precedente.rename(base)
+                    raise
+        except (OSError, ValueError, sqlite3.Error) as e:
+            raise RipristinoNonAmmesso(f'backup non ripristinato: {e}') from e

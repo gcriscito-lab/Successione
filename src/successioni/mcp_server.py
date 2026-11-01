@@ -17,7 +17,7 @@ from .errori import ErroreServizio
 from .servizio import VERSIONE_REGOLE, Servizio
 
 COPERTURA_NON_DISPONIBILE = [
-    "calcolo imposte e franchigie", "export XML SUC13 completo", "stampa", "controllo ufficiale",
+    "copertura completa di tutti i casi SUC13", "stampa", "collaudo ufficiale su Windows",
     "acquisizione catastale Entratel", "invio e ricevute",
 ]
 
@@ -64,7 +64,8 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Versione, funzioni disponibili e casi non ancora coperti (da leggere prima di iniziare)."""
         return {"versione_applicazione": __version__, "versione_regole": VERSIONE_REGOLE,
                 "funzioni": ["pratiche", "soggetti/beni/devoluzioni/passivita", "revisioni e differenze",
-                             "allegati e conversione PDF/A", "verifica interna"],
+                             "allegati e conversione PDF/A", "verifica interna", "export XML nel perimetro coperto",
+                             "controllo ufficiale locale se configurato"],
                 "non_disponibile": COPERTURA_NON_DISPONIBILE,
                 "strumenti_pdfa": {"ghostscript": bool(pdfa.trova_gs()), "veraPDF": bool(pdfa.trova_verapdf())},
                 "cartella_ingresso": str(sv.cartella_ingresso)}
@@ -121,7 +122,7 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
 
     @tool(ann=LOCALE)
     def esporta_xml(pratica_id: str, cf_fornitore: str | None = None, scopo: str = "completo") -> dict:
-        """Genera l'XML SUC13 dalla pratica e lo valida sullo schema. Con scopo 'completo' non produce mai un file parziale: se mancano quadri o casi non supportati restituisce l'elenco e nessun file. Con 'bozza_tecnica' produce un file valido per lo schema ma NON completo e NON trasmissibile, utile solo ai controlli tecnici. Non invia nulla."""
+        """Genera XML SUC13 con gli allegati della pratica. Profilo in opzioni.fornitore: cf, tipo (1/10), impegno_codice (1/2), data_impegno (AAAA-MM-GG). Restituisce anche avvisi. Scopo completo: nessun file se mancano dati/casi; bozza_tecnica: file di prova incompleto. La validita XSD non prova PDF/A, conformita fiscale universale o accettazione ufficiale. Non invia nulla."""
         return sv.esporta(pratica_id, cf_fornitore=cf_fornitore, scopo=scopo)
 
     @tool

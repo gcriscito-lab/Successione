@@ -10,9 +10,11 @@ function h(tag, attrs, ...kids) {
   for (const c of kids.flat()) if (c !== null && c !== undefined && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
   return e;
 }
-const S = { schema: null, pratiche: [], P: null, Q: null, sel: "AN", riga: null, tab: "dati", dirty: new Map(), nuove: new Map(), salvata: null };
+const S = { schema: null, pratiche: [], P: null, Q: null, sel: "AN", riga: null, tab: "dati", dirty: new Map(), nuove: new Map(), salvata: null, writeBusy: false };
 const STATI = { vuoto: "da compilare", compilato: "compilato", rilievi: "rilievi", non_supportato: "non supportato", inattivo: "non selezionato" };
 const nMod = () => S.dirty.size + S.nuove.size;
+const nuovoId = coll => ({ persone: "p", beni: "b", devoluzioni: "d", passivita: "ps", documenti_ref: "dr" }[coll]) + "_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
+const uguale = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 async function api(url, opt) {
   const r = await fetch(url, opt);
@@ -62,6 +64,7 @@ async function caricaPratiche() {
   for (const p of S.pratiche) ul.append(h("li", {}, h("button", { "aria-current": S.P && S.P.pratica_id === p.id ? "true" : "false", onclick: () => apri(p.id) }, h("span", {}, p.titolo), h("span", { class: "mut" }, "rev. " + p.revisione))));
 }
 async function apri(id, sel) {
+  if (S.writeBusy) { msg("Salvataggio in corso: attendi prima di cambiare pratica.", "e"); return; }
   if (nMod() && !confirm("Ci sono modifiche non salvate: continuare senza salvarle?")) return;
   S.dirty.clear(); S.nuove.clear(); S.riga = null; S.tab = "dati"; S.salvata = null;
   await ricarica(id);
@@ -81,7 +84,7 @@ function render() {
 }
 function aggiornaBottoni() {
   const n = nMod();
-  $("#bSalva").disabled = !n; $("#bSalva").textContent = n ? "Salva (" + n + ")" : "Salva";
+  $("#bSalva").disabled = !n || S.writeBusy; $("#bSalva").textContent = S.writeBusy ? "Salvataggio…" : n ? "Salva (" + n + ")" : "Salva";
   $("#bControlla").disabled = !S.P; $("#bGenera").disabled = !S.P; $("#bGenera").title = "Apre la scheda File: genera l'XML e mostra cosa manca";
   $("#bControlla").textContent = S.Q && S.Q.rilievi.length ? "Controlla (" + S.Q.rilievi.length + ")" : "Controlla";
 }
@@ -201,8 +204,8 @@ function renderTabella(main, q) {
     h("span", { class: "mut" }, "Quote 1/2 · importi con il punto (1234.50) · dato non noto: ? oppure [assente], [zero], [non_applicabile]")));
 }
 function aggiungiRiga(q) {
-  const key = "n:" + Date.now();
-  S.nuove.set(key, { q: q.id, coll: q.coll, campi: { ...q.preset } });
+  const key = "n:" + crypto.randomUUID();
+  S.nuove.set(key, { q: q.id, coll: q.coll, id: nuovoId(q.coll), campi: { ...q.preset } });
   S.riga = key; S.tab = "dati"; renderVista(); renderIns(); aggiornaBottoni(); renderSb();
   const primo = $("#ins .rg input, #ins .rg select"); if (primo) primo.focus();
 }
@@ -241,7 +244,12 @@ function insDati(ins) {
   }
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
   if (r.nuova || S.dirty.has(r.key)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));
-  if (r.e) az.append(h("button", { class: "lk", style: "color:var(--er)", onclick: async () => { if (confirm("Eliminare la riga?")) { S.riga = null; await salvaOps([{ op: "remove", coll: q.coll, id }]); } } }, "Elimina riga"));
+  if (r.e) az.append(h("button", { class: "lk", style: "color:var(--er)", onclick: async () => {
+    if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di eliminare la riga.", "e");
+    if (confirm("Eliminare la riga?")) await salvaOps([{ op: "remove", coll: q.coll, id }], () => {
+      S.dirty.delete(r.key); S.riga = null;
+    });
+  } }, "Elimina riga"));
   ins.append(az, h("p", { class: "mut mono", style: "margin-top:10px" }, r.e ? r.e.id : ""));
 }
 function insControlli(ins) {
@@ -259,8 +267,11 @@ async function insCronologia(ins) {
   if (S.tab !== "cronologia") return;
   for (const x of lista.slice().reverse()) {
     const b = x.n !== S.P.revisione ? h("button", { class: "gh", style: "margin-top:4px", onclick: async () => {
+      if (S.writeBusy || nMod()) return msg("Completa il salvataggio delle modifiche prima di ripristinare una revisione.", "e");
       if (!confirm("Creare una nuova revisione con i dati della n. " + x.n + "?")) return;
-      try { await post("/api/pratiche/" + S.P.pratica_id + "/ripristina", { revisione_attesa: S.P.revisione, a_revisione: x.n }); await ricarica(); render(); msg("Dati della revisione " + x.n + " ripristinati in una nuova revisione.", "o"); } catch (e) { msg(e.message, "e"); } } }, "Ripristina") : null;
+      S.writeBusy = true; aggiornaBottoni();
+      try { await post("/api/pratiche/" + S.P.pratica_id + "/ripristina", { revisione_attesa: S.P.revisione, a_revisione: x.n }); await ricarica(); render(); msg("Dati della revisione " + x.n + " ripristinati in una nuova revisione.", "o"); } catch (e) { msg(e.message, "e"); }
+      finally { S.writeBusy = false; aggiornaBottoni(); } } }, "Ripristina") : null;
     ins.append(h("div", { class: "rv" }, h("b", {}, "Revisione " + x.n), " · " + x.canale + " · " + x.autore, h("div", { class: "mut" }, x.ts), h("div", {}, x.sommario), b));
   }
 }
@@ -281,16 +292,25 @@ async function insFile(ins) {
   ins.append(riga_stato("Trasmissione", st.trasmissione.stato, st.trasmissione.nota));
   if (ct.azione_richiesta) ins.append(h("div", { class: "nota", style: "margin:8px 0;white-space:pre-wrap" }, ct.azione_richiesta));
   const cfIn = h("input", { "aria-label": "Codice fiscale del fornitore", class: "mono", placeholder: "Codice fiscale del fornitore", value: ((S.P.dati.opzioni || {}).fornitore || {}).cf || "" });
-  ins.append(h("h3", { style: "margin-top:12px" }, "Fornitore"), h("div", { class: "mut", style: "font-size:12px;margin-bottom:4px" }, "Codice fiscale di chi invia (intermediario o dichiarante)."), cfIn);
+  const profilo = S.P.dati.opzioni.fornitore || {};
+  const tipoIn = h("select", { "aria-label": "Tipo fornitore" }, h("option", { value: "1" }, "Dichiarante (1)"), h("option", { value: "10" }, "Intermediario (10)")); tipoIn.value = profilo.tipo || "1";
+  const impegnoIn = h("select", { "aria-label": "Impegno a trasmettere" }, h("option", { value: "" }, "Non indicato"), h("option", { value: "1" }, "Predisposta dal dichiarante (1)"), h("option", { value: "2" }, "Predisposta dall’intermediario (2)")); impegnoIn.value = profilo.impegno_codice || "";
+  const dataIn = h("input", { "aria-label": "Data impegno", placeholder: "AAAA-MM-GG", value: profilo.data_impegno || "" });
+  ins.append(h("h3", { style: "margin-top:12px" }, "Fornitore"), h("div", { class: "mut", style: "font-size:12px;margin-bottom:4px" }, "Codice fiscale di chi invia (intermediario o dichiarante)."), cfIn,
+    h("label", {}, "Tipo fornitore", tipoIn), h("label", {}, "Impegno a trasmettere", impegnoIn), h("label", {}, "Data impegno", dataIn));
   const esegui = async (scopo) => {
     try {
-      const forn = Object.assign({}, (S.P.dati.opzioni || {}).fornitore || {}, { cf: cfIn.value.trim().toUpperCase() });
-      if (forn.cf && forn.cf !== (((S.P.dati.opzioni || {}).fornitore || {}).cf || "")) { if (!(await salvaOps([{ op: "set", sezione: "opzioni", campi: { fornitore: forn } }]))) return; }
+      const forn = { ...profilo, cf: cfIn.value.trim().toUpperCase(), tipo: tipoIn.value };
+      if (forn.tipo === "10") { forn.impegno_codice = impegnoIn.value || null; forn.data_impegno = dataIn.value.trim() || null; }
+      else { delete forn.impegno_codice; delete forn.data_impegno; }
+      if (nMod() && !(await salvaTutto())) return;
+      if (!uguale(forn, S.P.dati.opzioni.fornitore || {})) { if (!(await salvaOps([{ op: "set", sezione: "opzioni", campi: { fornitore: forn } }]))) return; }
       const r = await post("/api/pratiche/" + S.P.pratica_id + "/esporta", { scopo, cf_fornitore: forn.cf || null });
       if (!r.generato) {
         const motivi = [...(r.quadri_mancanti || []).map(x => x.messaggio), ...(r.non_supportato || []), ...(r.errori || []).map(x => x.messaggio)];
         msg("File non generato: " + (motivi.length ? motivi.slice(0, 3).join(" | ") + (motivi.length > 3 ? " … (+" + (motivi.length - 3) + ")" : "") : "nessun dettaglio") + ". Nessun file parziale è stato prodotto.", "e");
-      } else msg(r.completo ? "File generato e valido per lo schema." : "Bozza tecnica generata (valida per lo schema). " + r.avvertenza, r.completo ? "o" : "e");
+      } else msg((r.completo ? "File generato e valido per lo schema." : "Bozza tecnica generata (valida per lo schema). " + r.avvertenza)
+        + ((r.avvisi || []).length ? " Avvertenze: " + r.avvisi.map(a => a.messaggio).join(" | ") : ""), r.completo ? "o" : "e");
     } catch (e) { msg(e.message, "e"); }
     renderIns();
   };
@@ -371,26 +391,44 @@ async function renderAllegati(main) {
 }
 
 /* ---------- salvataggio ---------- */
-async function salvaOps(ops) {
+async function salvaOps(ops, confermate) {
+  if (S.writeBusy) { msg("Salvataggio già in corso. Le modifiche restano da salvare.", "e"); return false; }
+  S.writeBusy = true; aggiornaBottoni();
   try {
     const r = await post("/api/pratiche/" + S.P.pratica_id + "/aggiorna", { revisione_attesa: S.P.revisione, operazioni: ops, chiave: crypto.randomUUID() });
     const d = new Date(); S.salvata = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
     msg("Salvato (revisione " + r.revisione + ").", "o");
-    await ricarica(); render(); await caricaPratiche(); return true;
+    await ricarica(); if (confermate) confermate(); render(); await caricaPratiche(); return true;
   } catch (e) {
     if (e.dati && e.dati.errori) msg(e.dati.errori.map(x => x.percorso + ": " + x.messaggio).join(" | "), "e");
     else if (e.stato === 409) { msg("La pratica è stata modificata altrove (" + e.message + "). Le tue modifiche non sono state applicate: controlla i dati aggiornati e salva di nuovo.", "e"); await ricarica(); render(); }
     else msg(e.message, "e");
     return false;
-  }
+  } finally { S.writeBusy = false; aggiornaBottoni(); }
 }
 async function salvaTutto() {
-  if (!S.P) return;
+  if (!S.P || S.writeBusy) return false;
+  // Snapshot indipendente: la digitazione durante l'HTTP rimane nel buffer vivo.
+  for (const d of S.dirty.values()) if (!d.id) d.id = nuovoId(d.coll);
+  const dirty = structuredClone(S.dirty), nuove = structuredClone(S.nuove);
   const ops = [];
-  for (const d of S.dirty.values()) ops.push({ op: "upsert", coll: d.coll, ...(d.id ? { id: d.id } : {}), campi: { ...d.campi } });
-  for (const n of S.nuove.values()) { const campi = Object.fromEntries(Object.entries(n.campi).filter(([, v]) => v !== null)); if (Object.keys(campi).length) ops.push({ op: "upsert", coll: n.coll, campi }); }
-  if (!ops.length) { S.dirty.clear(); S.nuove.clear(); aggiornaBottoni(); return; }
-  if (await salvaOps(ops)) { S.dirty.clear(); S.nuove.clear(); S.riga = null; render(); }
+  for (const d of dirty.values()) ops.push({ op: "upsert", coll: d.coll, id: d.id, campi: { ...d.campi } });
+  for (const n of nuove.values()) { const campi = Object.fromEntries(Object.entries(n.campi).filter(([, v]) => v !== null)); if (Object.keys(campi).length) ops.push({ op: "upsert", coll: n.coll, id: n.id, campi }); }
+  if (!ops.length) return true;
+  return salvaOps(ops, () => {
+    for (const [k, inviato] of dirty) {
+      const vivo = S.dirty.get(k); if (!vivo) continue;
+      for (const [c, v] of Object.entries(inviato.campi)) if (uguale(vivo.campi[c], v)) delete vivo.campi[c];
+      if (!Object.keys(vivo.campi).length) S.dirty.delete(k);
+    }
+    for (const [k, inviato] of nuove) {
+      const vivo = S.nuove.get(k); if (!vivo) continue;
+      const restanti = Object.fromEntries(Object.entries(vivo.campi).filter(([c, v]) => !uguale(v, inviato.campi[c])));
+      const stabile = "e:" + inviato.coll + ":" + inviato.id;
+      if (Object.keys(restanti).length) S.dirty.set(stabile, { coll: inviato.coll, id: inviato.id, campi: restanti });
+      S.nuove.delete(k); if (S.riga === k) S.riga = stabile;
+    }
+  });
 }
 
 /* ---------- procedura guidata ---------- */
@@ -422,7 +460,7 @@ function wizRender() {
   }
   if (W.passo === 3) c.append(h("p", {}, "Verrà creata la dichiarazione «" + titoloWiz() + "» con " + (d.quadri || S.schema.predefiniti).length + " quadri selezionati, tipo " + (d.tipo || "originaria") + "."), h("p", { class: "mut" }, "Potrai completare ogni dato nei quadri; i controlli ti mostreranno cosa manca."));
 }
-function wizApri() { W.passo = 0; W.dati = {}; wizRender(); $("#wiz").showModal(); }
+function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; wizRender(); $("#wiz").showModal(); }
 async function wizAvanti() {
   const d = W.dati;
   if (W.passo === 0 && !(d.cognome || "").trim()) { $("#wizErr").textContent = "Indica almeno il cognome del defunto."; return; }
@@ -446,7 +484,7 @@ $("#wIndietro").onclick = () => { W.passo--; wizRender(); };
 $("#wAvanti").onclick = wizAvanti;
 $("#bSalva").onclick = salvaTutto;
 $("#bGenera").onclick = () => { if (!S.P) return; S.tab = "file"; renderIns(); };
-$("#bControlla").onclick = async () => { if (!S.P) return; if (nMod()) await salvaTutto(); S.Q = await api("/api/pratiche/" + S.P.pratica_id + "/quadri"); S.tab = "controlli"; render(); };
+$("#bControlla").onclick = async () => { if (!S.P) return; if (nMod() && !(await salvaTutto())) return; S.Q = await api("/api/pratiche/" + S.P.pratica_id + "/quadri"); S.tab = "controlli"; render(); };
 document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); salvaTutto(); } });
 window.addEventListener("beforeunload", ev => { if (nMod()) { ev.preventDefault(); ev.returnValue = ""; } });
 init();

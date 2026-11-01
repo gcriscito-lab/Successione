@@ -1114,6 +1114,9 @@ class _Export:
                 self.avv("QUOTE_DI_LEGGE_NON_VERIFICATE", "quadro[EA]", "configurazione di eredi non coperta dal "
                          "controllo delle quote di legge (coperti: solo figli, solo coniuge, coniuge e figli): le quote "
                          "di devoluzione non sono verificate dall'export", DL.FONTE)
+                self.mancanti.append(Errore("QUOTE_DI_LEGGE_NON_VERIFICATE", "quadro[EA]",
+                    "configurazione di eredi non coperta dalla verifica delle quote di legge: "
+                    "conservabile come bozza tecnica, non finalizzabile", DL.FONTE))
         beni = self.d.get("beni", [])
         per_q: dict[str, list] = {"EB": [], "EC": [], "ER": []}
         for b in beni:
@@ -1201,6 +1204,14 @@ class _Export:
         if err_xsd:
             esito.errori = self.errori + _riferisci(err_xsd, self.mappa)
             return esito
+        from ..documenti.dimensioni import verifica_fornitura
+        dimensioni = verifica_fornitura({"xml": xml}, richiedi_xml=True)
+        if dimensioni:
+            esito.errori.extend(dimensioni)
+            return esito
+        self.avv("MISURA_FORNITURA_ASSUNTA", "fornitura", "limite di 40 MB misurato sull'XML effettivo "
+                 "compresso DEFLATE, byte decimali: algoritmo/contenitore del canale reale da collaudare",
+                 FO.fonte_spec(3, "limite 40 MB compressi"))
         esito.completo = not self.mancanti
         esito.impronta_xml = hashlib.sha256(xml).hexdigest()
         if esito.completo or ctx.scopo == "bozza_tecnica":

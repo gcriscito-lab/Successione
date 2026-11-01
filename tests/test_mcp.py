@@ -16,6 +16,37 @@ def dati(res):
     return json.loads(res.content[0].text)
 
 
+def test_ce01_mcp_esporta_caso_completo_intermediario_con_allegati(tmp_path):
+    from test_correzioni_codex import pratica_con_allegati
+    from telematico_casi import CF_LUCA
+    sv, pid = pratica_con_allegati(tmp_path)
+    param = StdioServerParameters(command=sys.executable, args=['-m', 'successioni.mcp_server'],
+                                  env={'SUCCESSIONI_DATA': str(sv.arch.base)})
+
+    async def scenario():
+        from mcp.client.session import ClientSession
+        async with stdio_client(param) as (r, w):
+            async with ClientSession(r, w) as s:
+                await s.initialize()
+                p = dati(await s.call_tool('successioni_leggi_pratica', {'pratica_id': pid}))
+                aid = p['dati']['documenti_ref'][0]['allegato_id']
+                aggiornamento = await s.call_tool('successioni_aggiorna_pratica', {
+                    'pratica_id': pid, 'revisione_attesa': p['revisione'], 'chiave_richiesta': 'ce01-profilo',
+                    'operazioni': [
+                        {'op': 'set', 'sezione': 'opzioni', 'campi': {'fornitore': {
+                            'cf': CF_LUCA, 'tipo': '10', 'impegno_codice': '2', 'data_impegno': '2026-10-30'}}},
+                        {'op': 'upsert', 'coll': 'documenti_ref', 'id': 'dr_identita',
+                         'campi': {'allegato_id': aid, 'tipo_eg': 'DocumentiIdentita'}}]})
+                assert not aggiornamento.is_error
+                risposta = await s.call_tool('successioni_esporta_xml', {'pratica_id': pid})
+                assert not risposta.is_error
+                es = dati(risposta)
+                assert es['generato'] and es['completo'] and es['avvisi'], es
+                assert b'ImpegnoATrasmettere' in (sv.arch.base / es['percorso']).read_bytes()
+    anyio.run(scenario)
+    assert sv.leggi(pid)['revisione'] == 3
+
+
 def test_mcp_stdio_stessa_pratica_della_gui(tmp_path):
     base = tmp_path / "dati"
     sv = Servizio(Archivio(base))            # "interfaccia"

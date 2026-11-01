@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import secrets
+import os
 import tempfile
 from pathlib import Path
 
@@ -62,8 +63,10 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         if (r := controllo(request)) is not None:
             return r
         nome = request.path_params["nome"]
-        f = STATIC / nome
-        if "/" in nome or nome.startswith(".") or f.suffix not in TIPI or not f.is_file():
+        radice = STATIC.resolve()
+        f = (radice / nome).resolve()
+        if ("/" in nome or "\\" in nome or ":" in nome or nome.startswith(".")
+                or f.parent != radice or f.suffix not in TIPI or not f.is_file()):
             return JSONResponse({"codice": "NON_TROVATO"}, status_code=404)
         return Response(f.read_bytes(), media_type=TIPI[f.suffix], headers={"Cache-Control": "no-store"})
 
@@ -73,7 +76,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def info(request):
-        return {"versione": __version__, "pdfa": {"ghostscript": bool(pdfa.trova_gs()), "veraPDF": bool(pdfa.trova_verapdf())}}
+        return {"versione": __version__, "pid": os.getpid(),
+                "pdfa": {"ghostscript": bool(pdfa.trova_gs()), "veraPDF": bool(pdfa.trova_verapdf())}}
 
     @api
     async def schema_(request):

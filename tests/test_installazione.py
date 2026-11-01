@@ -32,6 +32,15 @@ PKG = importlib.import_module("costruisci_pacchetto")
 NOME_ITALIANO = "Studio Rossi è à ù/Dati pratiche"
 
 
+def _ferma_avviatore(proc):
+    """La venv Windows usa un launcher padre: chiude anche il server figlio del test."""
+    if os.name == 'nt' and proc.poll() is None:
+        subprocess.run(['taskkill', '/PID', str(proc.pid), '/T', '/F'], capture_output=True, timeout=15)
+    elif proc.poll() is None:
+        proc.terminate()
+    proc.wait(timeout=10)
+
+
 def _env(base: Path, **extra) -> dict:
     env = {k: v for k, v in os.environ.items() if not k.startswith("SUCCESSIONI_")}
     env.update({"SUCCESSIONI_DATA": str(base), "SUCCESSIONI_CONFIG": str(base.parent / "configurazione.json")})
@@ -109,7 +118,9 @@ def test_gui_localhost_token_host_e_seconda_apertura(tmp_path):
     try:
         s = _attendi_sessione(base, p)
         porta, tok = s["porta"], s["token"]
-        assert s["pid"] == p.pid and porta in A.PORTE
+        assert porta in A.PORTE
+        # Identita' del server che risponde, non del launcher della venv.
+        assert json.loads(_get(f"http://127.0.0.1:{porta}/api/info?t={tok}")[1])['pid'] == s['pid']
         st, corpo = _get(f"http://127.0.0.1:{porta}/?t={tok}")
         assert st == 200 and b"<html" in corpo.lower()
         assert _get(f"http://127.0.0.1:{porta}/static/app.js?t={tok}")[0] == 200
@@ -132,8 +143,7 @@ def test_gui_localhost_token_host_e_seconda_apertura(tmp_path):
         assert time.time() - t0 < 20
         assert (base / "archivio.sqlite3").exists()
     finally:
-        p.terminate()
-        p.wait(timeout=10)
+        _ferma_avviatore(p)
 
 
 def test_gui_senza_console_come_pythonw(tmp_path):
@@ -149,8 +159,7 @@ def test_gui_senza_console_come_pythonw(tmp_path):
         log = (base / "log" / "avvio.log").read_text(encoding="utf-8")
         assert f"127.0.0.1:{s['porta']}" in log
     finally:
-        p.terminate()
-        p.wait(timeout=10)
+        _ferma_avviatore(p)
 
 
 def test_sessione_scaduta_non_blocca_un_nuovo_avvio(tmp_path):

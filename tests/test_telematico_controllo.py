@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import subprocess
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -169,10 +170,12 @@ def test_ef_casi_fuori_perimetro_non_generati():
 def test_imposta_dovuta_richiede_tempistica_e_va_nel_totale():
     d = caso_a10()  # conto da 2.400.000: ciascun figlio oltre la franchigia di 1.000.000
     d["beni"][2]["valore"] = "2400000"
-    es = esporta_xml(d, contesto_caso_a10())
+    # Prova di pagamento tempestivo; le dichiarazioni tardive con imposta dovuta
+    # sono bloccate (CE04). Le fixture ufficiali originali non vengono riscritte.
+    es = esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
     assert [x.percorso for x in es.errori] == ["opzioni.telematico.dichiarazione.tempistica_pagamento"]
     d["opzioni"]["telematico"]["dichiarazione"]["tempistica_pagamento"] = "2"
-    es = esporta_xml(d, contesto_caso_a10())
+    es = esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
     assert es.errori == [] and es.completo
     doc = etree.fromstring(es.xml)
     vbis = f"{D}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione/suc:ImpostaCalcolata"

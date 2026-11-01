@@ -3,6 +3,10 @@
 Etichetta Git: `beta-1`, sul branch `claude/successioni-dichiarazioni-app-fhcwbe`. Congelata il 2026-11-01.
 Stato: **beta tecnica per la revisione. Non è utilizzabile su una pratica reale e non trasmette nulla.**
 
+Nota successiva al congelamento: il rapporto sul commit `2e2b503` e' in
+`docs/REVISIONE_ESTERNA_CODEX.md`; le correzioni CE01-CE10 e le nuove prove Windows sono
+in `docs/CORREZIONI_CODEX.md`. I risultati storici sotto non sono un collaudo della versione corretta.
+
 ## In una riga
 Archivio, interfaccia locale, MCP, PDF/A e file XML funzionano e sono provati nel cloud Linux. Un caso sintetico ha superato il controllo ufficiale SUC13 in locale, secondo la registrazione dell'agente (non ancora riprodotta da chi coordina). Mancano i collaudi su Windows, con veraPDF, con Entratel e con i servizi dell'Agenzia.
 

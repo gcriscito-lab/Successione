@@ -4,3 +4,6 @@
 *.json text eol=lf
 fonti/** -text
 *.pdf binary
+# Evidenze del controllo: identita' byte per byte e SHA-256 anche su Windows.
+tests/fixture_telematico/controllo_20261101/** -text
+src/successioni/collegamenti/fixture/controllo_reale_20261101/** -text

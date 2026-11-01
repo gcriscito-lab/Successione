@@ -30,6 +30,7 @@ import re
 import shutil
 import subprocess
 import time
+import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -535,19 +536,57 @@ class ControlloJar(_BaseControllo):
         dati, inp = self._input(xml_path, kw, "esecuzione_jar")
         inp["produci_dcm"] = bool(produci_dcm)
         j, nuovo = self.job.crea(TIPO_JOB, kw.get("pratica_id"), inp, stato="creato", chiave=chiave)
-        if not nuovo and j["stato"] != "creato":
-            return self.leggi(j["job_id"])  # richiesta ripetuta: nessuna nuova esecuzione
+        return self._esegui_job(j["job_id"], dati, rapporto_wri)
+
+    def riprendi(self, job_id: str) -> RisultatoAdattatore:
+        """Riprende solo il controllo locale interrotto, dai byte congelati; nessun invio."""
+        return self._esegui_job(job_id, None, True)
+
+    def _esegui_job(self, job_id: str, dati: bytes | None, rapporto_wri: bool) -> RisultatoAdattatore:
+        from ..blocchi import blocco_file
+        j = self.job.leggi(job_id, TIPO_JOB)
+        with blocco_file(self.arch.base / 'lavoro' / 'lock' / (job_id + '.lock')) as acquisito:
+            if not acquisito:
+                return self.leggi(job_id)  # il processo precedente e' ancora vivo
+            j = self.job.leggi(job_id, TIPO_JOB)
+            if j['stato'] == 'in_esecuzione':
+                j = self.job.transizione(job_id, ['in_esecuzione'], 'interrotto', patch={
+                    'stato_controllo': 'non_verificabile',
+                    'esito': (Esito.SIMULAZIONE if self.simulato else Esito.FALLITO).value,
+                    'azione_richiesta': 'Controllo interrotto: recupero dai byte originali congelati.'},
+                    nota='processo interrotto, lock rilasciato dal sistema')
+            if j['stato'] not in ('creato', 'interrotto'):
+                return self.leggi(job_id)
+            if dati is None:
+                art = next((a for a in j['risultato'].get('artefatti', []) if a.get('ruolo') == 'input_controllo'), None)
+                if art is None:  # job della vecchia beta: esegui(stesso XML, stessa chiave) puo' recuperarlo
+                    self.job.transizione(job_id, [j['stato']], 'interrotto', patch={
+                        'stato_controllo': 'non_verificabile', 'esito': Esito.DA_COLLAUDARE.value,
+                        'azione_richiesta': 'Input del vecchio job non conservato: rieseguire il controllo sullo stesso XML con la stessa chiave.'},
+                        nota='input necessario al recupero')
+                    return self.leggi(job_id)
+                dati = self.deposito.leggi(art)
+            if sha256_bytes(dati) != j['input']['xml_sha256']:
+                raise DatiNonValidi('input del controllo alterato: recupero non eseguito')
+            return self._esegui_acquisito(j, dati, rapporto_wri)
+
+    def _esegui_acquisito(self, j: dict, dati: bytes, rapporto_wri: bool) -> RisultatoAdattatore:
+        inp = j['input']
+        produci_dcm = inp.get('produci_dcm', False)
         art_in = self.deposito.salva_bytes(dati, inp["xml_nome"], "input_controllo")
+        self.job.annota(j['job_id'], {'artefatti': [art_in]}, nota='input congelato prima del controllo')
         amb = self.diagnostica()
         if not amb["pronto"]:
             az = ("Componente di controllo non eseguibile qui: " + "; ".join(amb["problemi"]) + ".\n"
                   + ISTRUZIONI_MANUALI)
-            j = self.job.transizione(j["job_id"], ["creato"], "attesa_diagnostico", patch={
+            j = self.job.transizione(j["job_id"], ["creato", "interrotto"], "attesa_diagnostico", patch={
                 "esito": Esito.DA_COLLAUDARE.value, "stato_controllo": "non_eseguito", "ambiente": amb,
                 "artefatti": [art_in], "azione_richiesta": az, "modalita": "manuale_tracciato",
                 "requisito_automazione": "aperto"}, nota="componente non disponibile")
             return self.leggi(j["job_id"])
-        lavoro = self.arch.base / "lavoro" / "controlli" / j["job_id"]
+        # Un Java orfano potrebbe terminare dopo il client: ogni esecuzione ha output
+        # separati, cosi' non puo' contaminare il tentativo ripreso.
+        lavoro = self.arch.base / "lavoro" / "controlli" / (j["job_id"] + '-' + uuid.uuid4().hex[:12])
         for d in ("in", "out", "tmp"):
             (lavoro / d).mkdir(parents=True, exist_ok=True)
         nome = f"{j['job_id']}.xml"
@@ -557,7 +596,9 @@ class ControlloJar(_BaseControllo):
         argv = base + [CLASSE_CONTROLLO, f"in/{nome}", f"out/{nome}"]
         if produci_dcm:
             argv.append(f"out/{j['job_id']}.dcm")
-        j = self.job.transizione(j["job_id"], ["creato"], "in_esecuzione", patch={"ambiente": amb, "argv": argv[-3:]},
+        j = self.job.transizione(j["job_id"], ["creato", "interrotto"], "in_esecuzione", patch={
+                                 "ambiente": amb, "argv": argv[-3:], "pid_esecutore": os.getpid(),
+                                 "cartella_lavoro": lavoro.relative_to(self.arch.base).as_posix()},
                                  nota="avvio del componente ufficiale")
         try:
             p = self._esec(argv, lavoro, self.config.timeout_s)

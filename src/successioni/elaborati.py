@@ -54,7 +54,10 @@ class ElaboratiMixin:
             raise DatiNonValidi("manca il codice fiscale del fornitore (intermediario o dichiarante): indicalo nel profilo",
                                 campo="opzioni.fornitore.cf")
         tipo = str(tipo_fornitore or forn.get("tipo") or "1")
-        es = esporta_xml(d["dati"], ContestoExport(cf_fornitore=cf, tipo_fornitore=tipo, scopo=scopo))
+        es = esporta_xml(d["dati"], ContestoExport(
+            cf_fornitore=cf, tipo_fornitore=tipo, scopo=scopo,
+            allegati=self._allegati_export(pratica_id, d["dati"]),
+            impegno_codice=forn.get("impegno_codice"), data_impegno=forn.get("data_impegno")))
         xsd_errori = [e.asdict() for e in valida_xsd(es.xml)] if es.xml is not None else []
         percorso = sha = None
         if es.xml is not None:
@@ -67,6 +70,7 @@ class ElaboratiMixin:
             percorso = p.relative_to(self.arch.base).as_posix()
         ris = {"generato": es.xml is not None, "completo": es.completo, "scopo": scopo, "xml_sha256": sha, "percorso": percorso,
                "errori": [e.asdict() for e in es.errori], "non_supportato": list(es.non_supportato),
+               "avvisi": [e.asdict() for e in es.avvisi],
                "quadri_mancanti": [e.asdict() for e in es.quadri_mancanti], "xsd_errori": xsd_errori,
                "versione": es.versione, "ambito": es.ambito}
         inp = {"impronta_dichiarativa": d["impronta_dichiarativa"], "revisione": d["revisione"], "scopo": scopo,
@@ -76,6 +80,26 @@ class ElaboratiMixin:
                 "avvertenza": (None if es.completo else
                                "Il file NON è una dichiarazione completa e non è trasmissibile: serve solo ai controlli tecnici.")
                 if es.xml is not None else None}
+
+    def _allegati_export(self, pratica_id: str, dati: dict) -> dict:
+        """Solo documenti della pratica e byte integri del deposito, mai percorsi forniti dal client."""
+        richiesti = {r.get("allegato_id") for r in dati.get("documenti_ref", [])}
+        out = {}
+        radice = (self.arch.base / "allegati").resolve()
+        with self.arch.lettura() as c:
+            righe = c.execute("SELECT * FROM allegati WHERE pratica_id=?", (pratica_id,)).fetchall()
+        for r in righe:
+            if r["id"] not in richiesti:
+                continue
+            p = (self.arch.base / r["percorso"]).resolve()
+            if not p.is_relative_to(radice) or not p.is_file():
+                # Il modulo restituisce ALLEGATO_NON_DISPONIBILE sul riferimento originale.
+                continue
+            if p.stat().st_size != r["bytes"] or hashlib.sha256(p.read_bytes()).hexdigest() != r["sha256"]:
+                raise DatiNonValidi("allegato alterato: impronta o dimensione diversa dal file acquisito",
+                                    allegato_id=r["id"])
+            out[r["id"]] = {"percorso": p, "nome": r["nome"]}
+        return out
 
     # ------------------------------------------------------------------ controllo ufficiale
     def controllo_ufficiale_pratica(self, pratica_id: str, *, chiave: str | None = None) -> dict:
@@ -90,7 +114,9 @@ class ElaboratiMixin:
         j = self._job_ultimo(TIPO_EXPORT, pratica_id)
         xml_path = self.arch.base / exp["percorso"]
         adattatore = controllo_ufficiale(self.arch)
-        r = adattatore.esegui(xml_path, chiave=chiave, pratica_id=pratica_id)
+        r = adattatore.esegui(xml_path, chiave=chiave, pratica_id=pratica_id,
+                             revisione=j["input"]["revisione"],
+                             impronta_dichiarativa=j["input"]["impronta_dichiarativa"])
         det = r.dettaglio or {}
         reg = adattatore.job.leggi(r.job_id, TIPO_JOB)["risultato"] if r.job_id else {}   # dettagli registrati dall'adattatore
         ris = {"esito": r.esito.value, "stato_controllo": det.get("stato_controllo", "non_eseguito"),

@@ -1,6 +1,7 @@
 # Matrice di copertura SUC13 (area 1: XML, regole, calcolo)
 
-Aggiornata il 2026-11-01. Proprieta' dell'area 1 (docs/CONTRATTI_MODULI.md). Stati:
+Aggiornata il 2026-11-01 dopo le correzioni CE01-CE10 (docs/CORREZIONI_CODEX.md).
+Proprieta' dell'area 1 (docs/CONTRATTI_MODULI.md). Stati:
 
 - **implementato-collaudato**: superato il collaudo nell'ambiente ufficiale (Desktop Telematico/servizi). *Nessuna voce.*
 - **controllo locale**: il caso documentato supera il controllo ufficiale SUC13 2.3.1 eseguito in locale (batch, dati
@@ -32,8 +33,12 @@ Regole e fonti dettagliate: `docs/regole/mappa_xsd.md`; albero completo: `docs/r
 | EN, EO, EP, EQ | non coperto | — | aziende, titoli, aeromobili, navi |
 | ER | parziale | tipi cespite BI, CR, DN, AB; descrizione; possesso; diritto 1/2; valore; devoluzione con continuazione; moduli da 4 | GD, CR senza valore, beni esteri, imposta estera, valore precedenti successioni, agevolazioni A/L |
 
-Conseguenza: oggi **nessuna pratica reale e' `completo`** (EF, EG, EH mancano). Con `scopo='bozza_tecnica'` si
-ottiene un XML valido allo schema, dichiaratamente incompleto, utile per prove di schema e anteprima.
+Il caso sintetico nel perimetro coperto puo' ottenere `completo=True` dal modulo, dal servizio/API,
+dal processo MCP e dalla GUI, con allegati e profilo intermediario. EF, EG ed EH sono parzialmente presenti.
+`completo` descrive la copertura interna: non attesta conformita' PDF/A, accettazione dell'Agenzia o idoneita'
+all'uso professionale. Le configurazioni di quote non verificate e le tardive con imposta di successione
+dovuta bloccano il completo. Con `scopo='bozza_tecnica'` resta possibile una bozza esplicitamente incompleta
+se i dati sono validi allo schema; errori dimensionali impediscono anche la produzione della bozza.
 
 ## Dettaglio campo / regola / caso / test
 
@@ -56,11 +61,13 @@ ottiene un XML valido allo schema, dichiaratamente incompleto, utile per prove d
 | EB/EC/ER | valore quota con diritto diverso dal defunto (usufrutto, nuda proprieta') | Fascicolo I p. PDF 24-27 | usufrutto devoluto | E `test_casi_non_supportati…` | non coperto |
 | EB/EC/ER | continuazione oltre 3 devoluzioni | annotazione Continuazione | 4 eredi su un fabbricato | E `test_continuazione…` | implementato |
 | EB/EC | valore = base imponibile della quota del defunto, euro interi (inserito) | Fascicolo I p. PDF 22, 30 | decimali rifiutati | E `test_errori_dati…` | implementato (il calcolo del valore catastale da rendita NON e' implementato) |
-| EB/EC | quote di legge dell'Allegato 5 | annotazione Quota | — | — | non coperto (non verificate) |
+| EB/EC/ER | quote di legge dell'Allegato 5 | Fascicolo I p.69, Allegato 5; annotazione Quota | figli, coniuge, coniuge e figli; germano/unilaterale non coperto | test quote esistenti; `test_ce03_quote_non_verificate_non_finalizzabili_ma_bozza_con_avviso` | parziale; configurazioni non verificate bloccano il completo |
 | EC | consistenza solo A/B/C; rendita obbligatoria salvo F; indirizzo obbligatorio | annotazioni DatiFabbricati, Luogo | caso completo | E `test_caso_sintetico…` | implementato |
 | ED | progressivo cespite per tipi 3/4/5/7; spese funerarie <= 1033 | annotazioni ED | mutuo collegato al fabbricato | E `test_contenuto_e_totali_ee` | implementato |
 | EE | totali = somme; asse netto | annotazioni QuadroEE | caso completo | E `test_contenuto_e_totali_ee` | implementato |
-| EF/EG/EH | obbligatorieta' rilevata e segnalata | annotazioni QuadroEF, EG, EH | decesso 2025 con immobili | E `test_caso_sintetico_completo_valido_ma_dichiaratamente_incompleto` | implementato (rilevazione); quadri non coperti |
+| EF/EG/EH | obbligatorieta' e compilazione nel caso coperto; contesto applicativo con allegati e impegno | annotazioni QuadroEF, EG, EH; Fascicolo I pp.49,51 | caso sintetico tempestivo, dichiarante/intermediario | test A10; `test_ce01_export_completo_da_servizio_e_api`; test MCP CE01; GUI `runExport` | parziale; passato localmente sui casi indicati, servizi reali da collaudare |
+| EF | tempistica con imposta dovuta; tardive non finalizzabili | Fascicolo I pp.6,48 | tardiva con codici 1/2; tempestiva con imposta 44.132 | `test_ce04_*` | parziale; nessun ravvedimento o decorrenza particolare automatizzati |
+| EG/fornitura | limite 5 MB/allegato, 40 MB compressi sull'XML | Specifiche SUC13 pp.3,7 | allegato oltre 6 MB; soglia fornitura ridotta nel test | `test_ce05_*`; test dimensioni esistenti | implementato localmente con byte decimali e stima DEFLATE dichiarata; algoritmo del canale reale da collaudare |
 | Calcolo | QE, QDN, QP, AN, FR, QN, PR, QTI, AL, ISL, ISN, totale | guida pp. 1-8 | esempio della guida (fratelli) senza L ed estero | C `test_esempio_guida_senza_riduzioni_ne_estero` | implementato |
 | Calcolo | franchigie: linea retta, fratelli, disabilita' (la piu' alta) | guida pp. 3-4 | figli sotto franchigia; cugino con disabilita' | C `test_caso_sintetico_figli_sotto_franchigia`, `test_franchigia_disabilita_e_presunzione_esclusa_con_beni_inventariati` | implementato |
 | Calcolo | presunzione su denaro/gioielli/mobilia, esclusa per legatari e con BI | guida p. 4 | esempio guida; cespite BI | C `test_esempio_guida…`, `test_franchigia_disabilita…` | implementato (ramo legatario senza test: i legatari non sono esportabili) |
@@ -73,10 +80,10 @@ ottiene un XML valido allo schema, dichiaratamente incompleto, utile per prove d
 
 | ID | Stato area 1 | Evidenza / mancanza |
 |---|---|---|
-| A05 Quote e continuazioni | parziale | numeratori/denominatori esatti, continuazioni EB/EC/ER, moduli EA; diritti diversi non coperti |
+| A05 Quote e continuazioni | parziale | numeratori/denominatori esatti, continuazioni EB/EC/ER, moduli EA; configurazioni di quote non verificate bloccate; diritti diversi non coperti |
 | A06 Franchigie e DN/BI | parziale | franchigie e presunzione da guida; qualifiche multiple non coperte |
-| A07 Decorrenze | parziale | solo regime 2025 (autoliquidazione); pre-2025 rifiutato esplicitamente |
+| A07 Decorrenze | parziale | solo regime dal 2025; pre-2025 e tardive con imposta dovuta rifiutati; termini particolari non coperti |
 | A08 Riduzioni/estero/arrotondamenti | non coperto / divergenza aperta | dubbio documentato con ispezione del componente; caso non finalizzabile |
-| A09 XML e stampa | parziale | schema valido (lxml e xmllint) su caso sintetico; EF/EG/EH mancanti; stampa: altra area |
+| A09 XML e stampa | parziale | caso sintetico con EF/EG/EH e allegati passato localmente via API, processo MCP e GUI; lxml usato nelle nuove prove, xmllint solo nella precedente evidenza; stampa: altra area |
 | A10 Controllo ufficiale | controllo locale (positivo + 2 negativi) | SUC13 2.3.1 in batch su dati sintetici, 2026-11-01: caso base solo (*) 3345, negativi predisposti scartati (1013 CF defunto, 3376 importo da versare); `tests/fixture_telematico/controllo_20261101/`, `tests/test_telematico_controllo.py`. Collaudo su Desktop Telematico (Windows) e con i servizi dell'Agenzia: da fare |
-| A20 Copertura | implementato | questa matrice; casi mancanti bloccati (`non_supportato`, `quadri_mancanti`) |
+| A20 Copertura | parziale | matrice aggiornata e regressioni CE03/CE05 sui blocchi; non prova esaustiva di tutte le combinazioni SUC13 |
