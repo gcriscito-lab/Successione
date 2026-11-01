@@ -1,0 +1,26 @@
+[project]
+name = "successioni"
+version = "0.1.0"
+description = "Compilazione dichiarazioni di successione (SUC13): archivio, regole, MCP, GUI locale"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=2,<3",
+  "lxml>=5",
+  "pypdf>=5",
+  "reportlab>=4",
+  "starlette>=0.40",
+  "uvicorn>=0.30",
+]
+[project.optional-dependencies]
+test = ["pytest"]
+[project.scripts]
+successioni = "successioni.cli:main"
+successioni-mcp = "successioni.mcp_server:main"
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

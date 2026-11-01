@@ -1,0 +1,130 @@
+"""Server MCP (stdio). Strumenti delimitati con schemi chiari; nessuna shell/SQL/lettura arbitraria.
+
+Usa lo stesso Servizio e lo stesso archivio dell'interfaccia: lo stato vive nel file di archivio,
+non nel processo del client. Le credenziali non transitano da qui.
+"""
+from __future__ import annotations
+
+import functools
+from typing import Any
+
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
+
+from . import __version__, pdfa, schema as S
+from .errori import ErroreServizio
+from .servizio import VERSIONE_REGOLE, Servizio
+
+COPERTURA_NON_DISPONIBILE = [
+    "calcolo imposte e franchigie", "export XML SUC13 completo", "stampa", "controllo ufficiale",
+    "acquisizione catastale Entratel", "invio e ricevute",
+]
+
+
+def costruisci(servizio: Servizio | None = None) -> MCPServer:
+    sv = servizio or Servizio()
+    mcp = MCPServer("successioni", version=__version__, instructions=(
+        "Compilazione di dichiarazioni di successione. Leggi sempre la pratica per ottenere la revisione, "
+        "poi modifica con aggiorna_pratica passando revisione_attesa e una chiave_richiesta univoca. "
+        "Importi come stringhe decimali con punto; quote come {num, den}. Usa {stato: da_confermare|assente|zero|"
+        "non_applicabile} quando il dato non e' noto. I risultati di verifica_pratica sono controlli interni, "
+        "non il controllo ufficiale dell'Agenzia."))
+
+    def protetto(fn):
+        @functools.wraps(fn)
+        def w(*a, **k):
+            try:
+                return fn(*a, **k)
+            except ErroreServizio as e:
+                raise ToolError(f"{e.codice}: {e.messaggio} | {e.asdict()}") from None
+        return w
+
+    def tool(fn):
+        return mcp.tool()(protetto(fn))
+
+    @tool
+    def capacita() -> dict[str, Any]:
+        """Versione, funzioni disponibili e casi non ancora coperti (da leggere prima di iniziare)."""
+        return {"versione_applicazione": __version__, "versione_regole": VERSIONE_REGOLE,
+                "funzioni": ["pratiche", "soggetti/beni/devoluzioni/passivita", "revisioni e differenze",
+                             "allegati e conversione PDF/A", "verifica interna"],
+                "non_disponibile": COPERTURA_NON_DISPONIBILE,
+                "strumenti_pdfa": {"ghostscript": bool(pdfa.trova_gs()), "veraPDF": bool(pdfa.trova_verapdf())},
+                "cartella_ingresso": str(sv.cartella_ingresso)}
+
+    @tool
+    def schema_dati() -> dict[str, Any]:
+        """Collezioni, campi e tipi ammessi (str, cf, data, quota, importo, enum, ref)."""
+        return {"collezioni": S.COLLEZIONI, "sezioni": list(S.SEZIONI),
+                "stati_dato": ["assente", "zero", "non_applicabile", "da_confermare"],
+                "operazioni": {"upsert": "{op, coll, id?, campi}", "remove": "{op, coll, id}",
+                               "set": "{op, sezione, campi}"},
+                "nota": "codici di diritto/qualifica provvisori fino al legame con gli XSD"}
+
+    @tool
+    def elenca_pratiche() -> list[dict]:
+        """Pratiche presenti con revisione corrente."""
+        return sv.elenca()
+
+    @tool
+    def crea_pratica(titolo: str, chiave_richiesta: str) -> dict:
+        """Crea una pratica. Ripetere con la stessa chiave non crea duplicati."""
+        return sv.crea_pratica(titolo, chiave=chiave_richiesta, autore="assistente", canale="mcp")
+
+    @tool
+    def leggi_pratica(pratica_id: str, revisione: int | None = None) -> dict:
+        """Dati completi e revisione. Con 'revisione' legge una versione precedente."""
+        return sv.leggi(pratica_id, revisione)
+
+    @tool
+    def aggiorna_pratica(pratica_id: str, revisione_attesa: int, operazioni: list[dict], chiave_richiesta: str) -> dict:
+        """Applica in modo atomico una lista di operazioni. Conflitto di revisione = nessuna modifica."""
+        return sv.aggiorna(pratica_id, revisione_attesa, operazioni, chiave=chiave_richiesta,
+                           autore="assistente", canale="mcp")
+
+    @tool
+    def revisioni_pratica(pratica_id: str) -> list[dict]:
+        """Cronologia delle revisioni (autore, canale, sommario)."""
+        return sv.revisioni(pratica_id)
+
+    @tool
+    def differenze_pratica(pratica_id: str, da_revisione: int, a_revisione: int) -> list[str]:
+        """Differenze tra due revisioni."""
+        return sv.differenze(pratica_id, da_revisione, a_revisione)
+
+    @tool
+    def verifica_pratica(pratica_id: str) -> dict:
+        """Controlli interni di forma e coerenza con percorso del dato; NON e' il controllo ufficiale."""
+        return sv.verifica(pratica_id)
+
+    @tool
+    def file_in_ingresso() -> list[str]:
+        """File che l'utente ha messo nella cartella d'ingresso e che possono essere acquisiti."""
+        return sorted(p.name for p in sv.cartella_ingresso.iterdir() if p.is_file())
+
+    @tool
+    def acquisisci_allegato(pratica_id: str, nome_file: str, tipo_eg: str | None = None,
+                            finalita: str | None = None, persona_id: str | None = None) -> dict:
+        """Acquisisce un file della cartella d'ingresso come originale; tipo e finalita' li indica il chiamante."""
+        return sv.acquisisci_da_ingresso(pratica_id, nome_file, tipo_eg=tipo_eg, finalita=finalita,
+                                         persona_id=persona_id)
+
+    @tool
+    def prepara_pdfa(allegato_id: str) -> dict:
+        """Crea il derivato PDF/A-1b dell'originale e lo valida. 'conforme' solo con veraPDF; altrimenti 'non_verificato'."""
+        return sv.prepara_pdfa(allegato_id)
+
+    @tool
+    def elenca_allegati(pratica_id: str) -> list[dict]:
+        """Originali e derivati con analisi e rapporto."""
+        return sv.elenca_allegati(pratica_id)
+
+    return mcp
+
+
+def main():
+    costruisci().run("stdio")
+
+
+if __name__ == "__main__":
+    main()

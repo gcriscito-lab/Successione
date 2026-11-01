@@ -1,0 +1,3 @@
+[console_scripts]
+successioni = successioni.cli:main
+successioni-mcp = successioni.mcp_server:main

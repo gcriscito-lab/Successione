@@ -1,0 +1,9 @@
+mcp<3,>=2
+lxml>=5
+pypdf>=5
+reportlab>=4
+starlette>=0.40
+uvicorn>=0.30
+
+[test]
+pytest
