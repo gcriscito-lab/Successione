@@ -1,6 +1,6 @@
 # Stato area 1 (telematico: regole, XSD, esportazione XML, calcolo)
 
-Aggiornato man mano dall'agente area 1. Ultimo aggiornamento: 2026-11-01 (codice e test fatti; documentazione in corso).
+Aggiornato man mano dall'agente area 1. Ultimo aggiornamento: 2026-11-01 (consegna del primo perimetro: codice, test e documentazione).
 
 ## Fatto (verificato con i comandi sotto)
 - `telematico/xsd.py`: `valida_xsd(xml) -> list[Errore]` (lxml, XSD di fonti/), XPath con prefissi, messaggi in
@@ -21,10 +21,12 @@ Aggiornato man mano dall'agente area 1. Ultimo aggiornamento: 2026-11-01 (codice
   documentati in `docs/regole/dubbio_arrotondamento.md`.
 - Test: `tests/test_telematico_xsd.py`, `tests/test_telematico_esporta.py`, `tests/test_telematico_calcolo.py`,
   casi sintetici in `tests/telematico_casi.py`.
+- Documenti: `docs/regole/mappa_xsd.md`, `docs/regole/dubbio_arrotondamento.md`, `docs/MATRICE_COPERTURA.md`,
+  `docs/PROPOSTE_telematico.md`.
+- Verifica indipendente dello schema: `xmllint --schema fornituraSUC13_v1.xsd` sul file del caso sintetico -> validates.
 
 ## In corso
-- docs/regole/mappa_xsd.md, docs/regole/dubbio_arrotondamento.md, docs/MATRICE_COPERTURA.md,
-  docs/PROPOSTE_telematico.md.
+- Nulla in sospeso: il lavoro riparte dai "Da fare".
 
 ## Da fare (prossimi passi riprendibili)
 - Quadri EF (incluso V-bis con l'imposta del calcolo), EG (allegati Base64: valori da `documenti/base64.py` area 2),
@@ -41,4 +43,4 @@ python3 -m pytest -q tests/test_telematico_xsd.py tests/test_telematico_esporta.
 python3 -m pytest -q
 PYTHONPATH=src python3 -m successioni.telematico.mappa > docs/regole/mappa_xsd_albero.md   # rigenera l'albero
 ```
-Ultimo esito: `python3 -m pytest -q` -> 179 passed, 2 skipped (skip di altre aree: JAR controllo e veraPDF).
+Ultimo esito: test area 1 -> 31 passed; `python3 -m pytest -q` -> 186 passed, 2 skipped (skip di altre aree: JAR del controllo e veraPDF non configurati).

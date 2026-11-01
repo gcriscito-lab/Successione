@@ -438,8 +438,14 @@ class _BaseControllo:
     riprendi = leggi
 
     def registra_diagnostico(self, job_id: str, *, dgn: bytes, log_schema: bytes, wri: bytes | None = None,
-                             ambiente_dichiarato: dict | None = None) -> RisultatoAdattatore:
-        """Registra i file originali del controllo eseguito dall'utente e ne verifica il riferimento al file."""
+                             ambiente_dichiarato: dict | None = None,
+                             conferma_associazione: bool = False) -> RisultatoAdattatore:
+        """Registra i file originali del controllo eseguito dall'utente e ne verifica il riferimento al file.
+
+        Il riferimento si verifica su codice fiscale del defunto e identificativi dei record diagnostici, sul numero di
+        dichiarazioni elaborate e sul nome del file nell'intestazione del .dgn. Un diagnostico senza record (es.
+        positivo) e con nome diverso non e' verificabile: serve `conferma_associazione=True`, registrata come
+        dichiarazione dell'utente."""
         j = self.job.leggi(job_id, TIPO_JOB)
         if j["stato"] != "attesa_diagnostico":
             return self.leggi(job_id)
@@ -453,9 +459,17 @@ class _BaseControllo:
             incoerenze.append(f"il diagnostico riguarda {sorted(sogg)}, il file il defunto {cf}")
         if id_dgn and ids and not id_dgn <= ids:
             incoerenze.append(f"identificativi del diagnostico {sorted(id_dgn)} assenti nel file {sorted(ids)}")
+        elaborate = (d.get("riepilogo") or {}).get("elaborate")
+        if elaborate and ids and elaborate != len(ids):
+            incoerenze.append(f"dichiarazioni elaborate {elaborate}, nel file {len(ids)}")
         if incoerenze:
             raise DatiNonValidi("il diagnostico non e' riferibile al file controllato: non registrato",
                                 incoerenze=incoerenze)
+        nome_dgn = Path((d.get("file_controllato") or "").replace("\\", "/")).name
+        verificata = bool((sogg and cf) or (id_dgn and ids)) or nome_dgn == j["input"].get("xml_nome")
+        if not verificata and not conferma_associazione:
+            raise DatiNonValidi("associazione del diagnostico al file non verificabile (nessun record con codice "
+                                "fiscale e nome file diverso): confermarla esplicitamente", nome_nel_dgn=nome_dgn)
         artefatti = list(j["risultato"].get("artefatti", []))
         for b, nome, ruolo in ((dgn, "diagnostico.dgn", "diagnostico_dgn"),
                                (log_schema, "diagnostico_logSchema.xml", "esito_schema"),
@@ -464,10 +478,15 @@ class _BaseControllo:
                 artefatti.append(self.deposito.salva_bytes(b, nome, ruolo, provenienza="fornito_utente"))
         extra = {"modalita": "manuale_tracciato", "requisito_automazione": "aperto",
                  "ambiente_dichiarato": ambiente_dichiarato or {},
-                 "associazione": {"cf_defunto": cf, "identificativi": sorted(ids), "metodo":
-                                  "codice fiscale e identificativo del .dgn confrontati con il file conservato"}}
+                 "associazione": {"cf_defunto": cf, "identificativi": sorted(ids), "nome_nel_dgn": nome_dgn,
+                                  "metodo": ("codice fiscale, identificativi, numero di dichiarazioni e nome del file "
+                                             "confrontati con il file conservato") if verificata else
+                                  "dichiarata dall'utente (non verificabile dal contenuto)"}}
         patch = self._completa_con_diagnostici(j, dgn_b=dgn, log_b=log_schema, wri_b=wri, reale=True, extra=extra,
                                                artefatti=artefatti, avvertenze=[])
+        if not verificata:  # mai 'passato' su un'associazione solo dichiarata: non sblocca la conferma dell'invio
+            patch["esito"] = Esito.DA_COLLAUDARE.value
+            patch["avvertenze"].append("associazione al file dichiarata dall'utente: esito non verificato")
         self.job.transizione(job_id, ["attesa_diagnostico"], "completato", patch=patch, nota=patch["stato_controllo"])
         return self.leggi(job_id)
 

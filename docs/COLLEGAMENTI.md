@@ -74,6 +74,12 @@ Spring) fallisce per `javax/annotation/PostConstruct` assente; il controllo pros
 "could not locate enum table ... ProvincieItaliane" (XMLBeans). L'equivalenza con l'esecuzione in Desktop
 Telematico (JRE proprio) va provata sul PC (A10). Il JNLP dichiara `j2se 1.7+`.
 
+**Passaggio manuale tracciato.** Il file da controllare e' conservato con impronta; i file del controllo registrati
+dall'utente sono associati al file solo se il contenuto lo conferma (CF del defunto e identificativi dei record,
+numero di dichiarazioni elaborate, nome del file nell'intestazione del `.dgn`); altrimenti serve una conferma
+esplicita e l'esito resta `da_collaudare` (non sblocca la conferma dell'invio). Limite: il percorso manuale si fida
+dei file originali forniti; un `.dgn` alterato non e' riconoscibile. Per questo l'esecuzione diretta resta l'obiettivo.
+
 **Limiti.** La "conferma" degli errori (***C) avviene nel software di compilazione: come si rappresenta nel file e'
 da verificare. `esitoFornitura_v3.xsd` importa due volte lo stesso namespace e libxml2 non lo compila da solo: il
 lettore usa un involucro in memoria (file delle fonti invariati). Condizioni di distribuzione dei JAR non verificate:

@@ -109,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--log", required=True)
     s.add_argument("--wri")
     s.add_argument("--ambiente-dichiarato", default="{}")
+    s.add_argument("--conferma-associazione", action="store_true",
+                   help="il diagnostico non contiene riferimenti verificabili: l'utente dichiara che e' di quel file")
     s = sub.add_parser("catasto-avvia")
     s.add_argument("--pratica", required=True)
     s.add_argument("--cf", required=True)
@@ -147,7 +149,8 @@ def main(argv: list[str] | None = None) -> int:
         arch = _arch(a)
         r = ControlloManuale(arch).registra_diagnostico(
             a.job, dgn=Path(a.dgn).read_bytes(), log_schema=Path(a.log).read_bytes(),
-            wri=Path(a.wri).read_bytes() if a.wri else None, ambiente_dichiarato=json.loads(a.ambiente_dichiarato))
+            wri=Path(a.wri).read_bytes() if a.wri else None, ambiente_dichiarato=json.loads(a.ambiente_dichiarato),
+            conferma_associazione=a.conferma_associazione)
         _stampa(_riassunto_controllo(arch, r.job_id))
     elif a.cmd in ("catasto-avvia", "catasto-registra"):
         from .catasto import CatastoEntratelAdattatore

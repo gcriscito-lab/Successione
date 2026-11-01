@@ -182,6 +182,22 @@ def test_manuale_rifiuta_diagnostico_di_un_altro_file(arch, tmp_path):
     assert ctl.leggi(r.job_id).stato == "attesa_diagnostico"
 
 
+def test_manuale_diagnostico_senza_riferimenti_richiede_conferma_e_non_e_passato(arch):
+    ctl = C.ControlloManuale(arch)
+    r = ctl.esegui(FIX / "frontespizio.xml")
+    # SIMULAZIONE: diagnostico positivo senza record e con un nome di file diverso nell'intestazione
+    with pytest.raises(DatiNonValidi):
+        ctl.registra_diagnostico(r.job_id, dgn=DGN_POSITIVO_SIMULATO.encode(), log_schema=LOG_VALIDO)
+    r2 = ctl.registra_diagnostico(r.job_id, dgn=DGN_POSITIVO_SIMULATO.encode(), log_schema=LOG_VALIDO,
+                                  conferma_associazione=True)
+    assert r2.dettaglio["stato_controllo"] == "positivo" and r2.esito is Esito.DA_COLLAUDARE
+    # con il nome giusto nell'intestazione l'associazione e' verificata dal contenuto. LIMITE (documentato): il
+    # percorso manuale si fida dei file originali forniti dall'utente; un .dgn alterato non e' riconoscibile.
+    r3 = ctl.esegui(FIX / "frontespizio.xml", chiave="altro")
+    dgn = DGN_POSITIVO_SIMULATO.replace("in/x.xml", "in/frontespizio.xml")
+    assert ctl.registra_diagnostico(r3.job_id, dgn=dgn.encode(), log_schema=LOG_VALIDO).esito is Esito.PASSATO
+
+
 def test_fabbrica_sceglie_la_modalita(arch, tmp_path):
     assert isinstance(C.controllo_ufficiale(arch, C.ConfigControllo(java=None)), C.ControlloManuale)
     assert isinstance(C.controllo_ufficiale(arch, ambiente_finto(tmp_path)), C.ControlloJar)

@@ -121,3 +121,16 @@ def test_dati_incompleti():
     d["opzioni"]["telematico"]["dichiarazione"]["stato_civile"] = None
     r = calcola(d)
     assert r.stato == "dati_incompleti" and r.motivi
+
+
+def test_franchigia_disabilita_e_presunzione_esclusa_con_beni_inventariati():
+    d = _cugini(150159)
+    d["opzioni"]["telematico"]["persone"]["p_anna0001"]["portatore_handicap"] = True
+    d["opzioni"]["telematico"]["beni"]["b_conto001"]["tipo_cespite"] = "BI"
+    r = calcola(d)
+    v = {b.codice_fiscale: _valori(b) for b in r.beneficiari}
+    anna, luca = v["RSSNNA70A41H501X"], v["RSSLCU72B02H501Y"]
+    assert anna["FR"] == "1500000" and anna["QN"] == "0"  # guida p. 3: 1.500.000 a prescindere dal grado
+    assert luca["FR"] == "0" and luca["PR"] == "0"         # cugino: nessuna franchigia; BI -> niente presunzione
+    assert luca["ISL"] == "6006.36"                        # 100106 x 6%
+    assert r.imposta_ef18bis == 6006

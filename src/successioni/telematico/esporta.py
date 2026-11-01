@@ -270,9 +270,13 @@ class _Export:
             grado = SUP.attr(self.d, "persone", p, "grado_parentela")
             self.usa(p, "grado_parentela", "relazione_con_defunto")
             rel = p.get("relazione_con_defunto")
-            if grado is None and isinstance(rel, str) and rel.strip() in X.enumerazioni("GradoParentela_Type"):
+            rel_codice = isinstance(rel, str) and rel.strip() in X.enumerazioni("GradoParentela_Type")
+            if grado is None and rel_codice:
                 grado = rel.strip()
-            elif rel not in (None, ""):
+            elif rel_codice and str(grado).strip() != rel.strip():
+                self.err("DATI_INCOERENTI", base + ".relazione_con_defunto", f"il codice {rel.strip()!r} e' diverso dal "
+                         f"grado di parentela indicato {grado!r}", FO.fonte_xsd(el + "/GradoParentela"))
+            elif rel not in (None, "") and not rel_codice:
                 self.interno(p, "relazione_con_defunto")
             if grado is None:
                 self.err("DATO_MANCANTE", base + ".grado_parentela", "grado di parentela (codice dell'allegato 1, es. "
@@ -907,6 +911,11 @@ class _Export:
                 return None
             return {"CFintermediario": cff, "ImpegnoATrasmettere": ctx.impegno_codice, "DataImpegno": di,
                     "FirmaIntermediario": "1"}
+        if ctx.tipo_fornitore == "1" and cf_presentatore and cff != cf_presentatore:
+            self.avv("FORNITORE_DIVERSO_DAL_DICHIARANTE", "contesto.cf_fornitore", "TipoFornitore 1 indica il soggetto "
+                     "che invia la propria dichiarazione, ma il codice fiscale del fornitore e' diverso da quello del "
+                     "dichiarante: verificare (per un intermediario usare TipoFornitore 10)",
+                     FO.fonte_annotazione("Intestazione/TipoFornitore") + "; " + FO.fonte_spec(15, "§3.3.1"))
         if ctx.impegno_codice or ctx.data_impegno:
             self.err("REGOLA_IMPEGNO", "contesto.impegno", "l'impegno alla trasmissione si indica solo con TipoFornitore "
                      "10 e fornitore diverso dal dichiarante", fonte)

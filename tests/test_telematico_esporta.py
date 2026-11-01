@@ -204,3 +204,16 @@ def test_input_non_modificato():
     prima = copia(d)
     _bozza(d)
     assert d == prima
+
+
+def test_regole_annotazioni_frontespizio_ea():
+    d = caso_completo()
+    d["persone"][0]["data_decesso"] = "2006-10-01"  # non successiva al 2 ottobre 2006
+    d["opzioni"]["telematico"]["persone"]["p_anna0001"]["grado_parentela"] = "13"  # cognata: esclusa per legge
+    d["persone"][2]["relazione_con_defunto"] = "01"  # coniuge con defunto vedovo (stato civile 4)
+    es = _bozza(d)
+    per = {(e.codice, e.percorso) for e in es.errori}
+    assert ("REGOLA_DATA_DECESSO", "persone[p_defunto1].data_decesso") in per
+    assert ("REGOLA_GRADO_LEGGE", "persone[p_anna0001].grado_parentela") in per
+    assert ("REGOLA_GRADO_CONIUGE", "persone[p_luca0001].grado_parentela") in per
+    assert es.xml is None
