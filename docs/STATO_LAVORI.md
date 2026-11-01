@@ -9,18 +9,16 @@ Nota per riprendere. Le decisioni sotto sono già prese; non vanno riaperte senz
   *Dati / Controlli / Cronologia*, barra di stato in basso (revisione, salvataggio, rilievi, controllo ufficiale).
 - Proposte visionabili: https://claude.ai/artifact/A6CKL8HtA3sgG3smRMiamc (stili), https://claude.ai/artifact/PmvopkizoXjojMyoNywadt (strutture).
 
-## Da fare subito: applicare lo stile all'interfaccia vera
-- `docs/design/vetro-grafite/index.html` e `app.css` sono già scritti (nuovo layout a tre colonne, token chiaro/scuro).
-  **Non sono attivi**: l'interfaccia in uso (`src/successioni/static/`) è ancora la versione precedente, che funziona e passa i test.
-- Manca il nuovo `app.js`: tabella con selezione di riga, ispettore (Dati: form della riga selezionata; Controlli: elenco cliccabile;
-  Cronologia: revisioni con ripristino), barra di stato, frontespizio a schede raggruppate, procedura guidata, salvataggio unico
-  di tutte le modifiche in una sola operazione. Riutilizzare le funzioni del `app.js` attuale (valori, salvataggio, procedura guidata).
-- Poi: prova con Playwright (`.claude/skills/webapp-testing`, vedi `CLAUDE.md`), sostituire i file in `static/` e committare.
-- Il font di sistema Apple non c'è su Windows: lo stack ripiega su Segoe UI.
+## Interfaccia (fatto il 2026-11-01)
+Applicato lo stile Vetro+Grafite (colori di Vetro) all'interfaccia vera: tabella fitta con selezione di riga, ispettore a destra
+(Dati / Controlli / Cronologia), barra di stato, frontespizio a schede, procedura guidata. Provata in browser reale con
+`tests/e2e/gui_flusso.js` (13 verifiche positive, nessun errore JS). Il vecchio `app.js` è in `docs/design/vetro-grafite/app_precedente.js`.
+Avvertenza: `with_server.py` può lasciare il server attivo; chiudere per PID prima di rilanciare le prove.
 
-## Subagenti (avviati, risultati non ancora integrati)
-Tre agenti lavorano su file distinti (contratti in `docs/CONTRATTI_MODULI.md`): telematico/XSD, documenti/PDF-A, collegamenti.
-Il commit contiene i loro file in corso (etichettati WIP). Alla consegna: verificare direttamente, integrare, poi revisore indipendente.
+## Subagenti (rilanciati su Opus, risultati non ancora integrati)
+Tre agenti lavorano su file distinti (contratti in `docs/CONTRATTI_MODULI.md`): regole/XSD/XML, documenti/PDF-A, collegamenti.
+Ognuno tiene traccia in `docs/regole/STATO_area1.md`, `docs/STATO_area2.md`, `docs/STATO_area3.md`. Alla consegna: verificare direttamente,
+integrare, poi revisore indipendente. I loro file nel repository sono bozze finché non consegnano.
 
 ## Limiti dichiarati
 - Validazione PDF/A indipendente (veraPDF): **da collaudare** (l'esecuzione dell'installer scaricato è stata bloccata dai permessi).

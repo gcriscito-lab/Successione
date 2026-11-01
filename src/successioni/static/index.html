@@ -7,21 +7,21 @@
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<header class="top">
+<header class="tb">
   <div class="brand">Successioni</div>
   <div class="titolo" id="titolo">Nessuna pratica aperta</div>
   <div class="azioni">
-    <button id="bNuova" class="p">Nuova dichiarazione</button>
-    <button id="bSalva" disabled>Salva modifiche</button>
-    <button id="bControlla" disabled>Controlla</button>
-    <button id="bStampa" disabled title="Disponibile quando l'esportazione dei dati sarà collegata">Stampa</button>
-    <button id="bGenera" disabled title="Disponibile quando l'esportazione XML sarà collegata">Genera file</button>
-    <button id="bInvia" disabled title="Disponibile dopo il collaudo del collegamento con i servizi dell'Agenzia">Invia</button>
+    <button id="bSalva" class="gh" disabled>Salva</button>
+    <button id="bControlla" class="gh" disabled>Controlla</button>
+    <button id="bStampa" class="gh" disabled title="Disponibile quando l'esportazione dei dati sarà collegata">Stampa</button>
+    <button id="bGenera" class="gh" disabled title="Disponibile quando l'esportazione XML sarà collegata">Genera file</button>
+    <button id="bInvia" class="gh" disabled title="Disponibile dopo il collaudo del collegamento con i servizi dell'Agenzia">Invia</button>
+    <button id="bNuova" class="pil">Nuova dichiarazione</button>
   </div>
 </header>
 <div id="msg" role="status" aria-live="polite" hidden></div>
-<div class="app">
-  <aside class="rail" aria-label="Pratiche e quadri">
+<div class="app" id="app">
+  <aside class="lat" aria-label="Pratiche e quadri">
     <details class="pratiche" id="dPratiche" open>
       <summary>Pratiche</summary>
       <ul id="lista"></ul>
@@ -35,11 +35,9 @@
       <p>Apri una pratica dall'elenco oppure avvia una nuova dichiarazione guidata.</p>
     </div>
   </main>
+  <aside class="ins" id="ins" aria-label="Ispettore" hidden></aside>
 </div>
-<section id="controlli" class="drawer" aria-label="Controlli" hidden>
-  <div class="drawer-h"><strong id="cTitolo">Controlli</strong><span class="mut" id="cAmbito"></span><button id="cChiudi" class="l">Chiudi</button></div>
-  <ul id="cLista"></ul>
-</section>
+<footer class="sb" id="sb"></footer>
 
 <dialog id="wiz" aria-labelledby="wizT">
   <form method="dialog" id="wizForm">
@@ -48,10 +46,10 @@
     <div id="wizCorpo"></div>
     <p class="err" id="wizErr" role="alert"></p>
     <div class="wiz-az">
-      <button type="button" id="wAnnulla" class="l">Annulla</button>
+      <button type="button" id="wAnnulla" class="gh">Annulla</button>
       <span class="sp"></span>
-      <button type="button" id="wIndietro">Indietro</button>
-      <button type="button" id="wAvanti" class="p">Avanti</button>
+      <button type="button" id="wIndietro" class="gh">Indietro</button>
+      <button type="button" id="wAvanti" class="pil">Avanti</button>
     </div>
   </form>
 </dialog>
