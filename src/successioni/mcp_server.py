@@ -119,6 +119,21 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Stato di ogni quadro (vuoto, compilato, rilievi, non supportato, non selezionato) con i rilievi e il quadro di appartenenza. Dice se la pratica è finalizzabile nel perimetro supportato; non è il controllo ufficiale."""
         return sv.quadri(pratica_id)
 
+    @tool(ann=LOCALE)
+    def esporta_xml(pratica_id: str, cf_fornitore: str | None = None, scopo: str = "completo") -> dict:
+        """Genera l'XML SUC13 dalla pratica e lo valida sullo schema. Con scopo 'completo' non produce mai un file parziale: se mancano quadri o casi non supportati restituisce l'elenco e nessun file. Con 'bozza_tecnica' produce un file valido per lo schema ma NON completo e NON trasmissibile, utile solo ai controlli tecnici. Non invia nulla."""
+        return sv.esporta(pratica_id, cf_fornitore=cf_fornitore, scopo=scopo)
+
+    @tool
+    def stato_elaborati(pratica_id: str) -> dict:
+        """Stati separati di dati, file XML, validazione di schema, controllo ufficiale e trasmissione. Un esito diventa 'obsoleto' se cambia il dichiarato; una nota interna non lo invalida."""
+        return sv.stato_elaborati(pratica_id)
+
+    @tool(ann=LOCALE)
+    def controllo_ufficiale(pratica_id: str) -> dict:
+        """Esegue in locale il controllo ufficiale SUC13 sul file esportato aggiornato (se Java e componenti sono configurati; altrimenti passaggio manuale tracciato, esito da_collaudare). È un controllo locale: non sostituisce la verifica con i servizi dell'Agenzia e non trasmette nulla."""
+        return sv.controllo_ufficiale_pratica(pratica_id)
+
     @tool
     def file_in_ingresso() -> list[str]:
         """File che l'utente ha messo nella cartella d'ingresso e che possono essere acquisiti."""

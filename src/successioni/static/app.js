@@ -82,7 +82,7 @@ function render() {
 function aggiornaBottoni() {
   const n = nMod();
   $("#bSalva").disabled = !n; $("#bSalva").textContent = n ? "Salva (" + n + ")" : "Salva";
-  $("#bControlla").disabled = !S.P;
+  $("#bControlla").disabled = !S.P; $("#bGenera").disabled = !S.P; $("#bGenera").title = "Apre la scheda File: genera l'XML e mostra cosa manca";
   $("#bControlla").textContent = S.Q && S.Q.rilievi.length ? "Controlla (" + S.Q.rilievi.length + ")" : "Controlla";
 }
 function renderSb() {
@@ -216,10 +216,10 @@ function renderIns() {
   const ins = $("#ins"); ins.replaceChildren();
   if (!S.P) return;
   const nr = rilievi().length;
-  const seg = h("div", { class: "seg", role: "tablist" }, [["dati", "Dati"], ["controlli", "Controlli" + (nr ? " (" + nr + ")" : "")], ["cronologia", "Cronologia"]].map(([k, n]) =>
+  const seg = h("div", { class: "seg", role: "tablist" }, [["dati", "Dati"], ["controlli", "Controlli" + (nr ? " (" + nr + ")" : "")], ["file", "File"], ["cronologia", "Cronologia"]].map(([k, n]) =>
     h("button", { role: "tab", "aria-selected": S.tab === k ? "true" : "false", onclick: () => { S.tab = k; renderIns(); } }, n)));
   ins.append(seg);
-  if (S.tab === "dati") insDati(ins); else if (S.tab === "controlli") insControlli(ins); else insCronologia(ins);
+  if (S.tab === "dati") insDati(ins); else if (S.tab === "controlli") insControlli(ins); else if (S.tab === "file") insFile(ins); else insCronologia(ins);
 }
 function rigaSelezionata() {
   const q = quadro(); if (!q || !q.coll || !S.riga) return null;
@@ -262,6 +262,43 @@ async function insCronologia(ins) {
       try { await post("/api/pratiche/" + S.P.pratica_id + "/ripristina", { revisione_attesa: S.P.revisione, a_revisione: x.n }); await ricarica(); render(); msg("Dati della revisione " + x.n + " ripristinati in una nuova revisione.", "o"); } catch (e) { msg(e.message, "e"); } } }, "Ripristina") : null;
     ins.append(h("div", { class: "rv" }, h("b", {}, "Revisione " + x.n), " · " + x.canale + " · " + x.autore, h("div", { class: "mut" }, x.ts), h("div", {}, x.sommario), b));
   }
+}
+const PILLOLE = { aggiornato: "ok", valido: "ok", positivo: "ok", senza_rilievi: "ok", negativo: "er", non_valido: "er", con_rilievi: "am", obsoleto: "am", non_eseguito: "", non_preparata: "" };
+function riga_stato(nome, stato, extra) {
+  return h("div", { class: "rg", style: "grid-template-columns:120px 1fr" }, h("label", {}, nome), h("div", {}, h("span", { class: "pz " + (PILLOLE[stato] || "") , style: PILLOLE[stato] ? "" : "background:var(--grigio)" }, String(stato).replaceAll("_", " ")), extra ? h("div", { class: "mut", style: "font-size:12px;margin-top:3px" }, extra) : null));
+}
+async function insFile(ins) {
+  let st;
+  try { st = await api("/api/pratiche/" + S.P.pratica_id + "/elaborati"); } catch (e) { ins.append(h("p", { class: "err" }, e.message)); return; }
+  if (S.tab !== "file") return;
+  ins.append(h("p", { class: "mut" }, "Stati separati. Un esito diventa obsoleto solo se cambiano i dati della dichiarazione, non per una nota interna."));
+  const ex = st.export, ct = st.controllo_ufficiale;
+  ins.append(riga_stato("Dati", st.dati.stato, st.dati.rilievi + " rilievi"));
+  ins.append(riga_stato("File XML", ex.stato, ex.stato === "non_eseguito" ? null : (ex.generato ? (ex.completo ? "dichiarazione completa" : "bozza tecnica: NON completa e NON trasmissibile") : "non generato: " + (ex.quadri_mancanti.length + ex.non_supportato.length + ex.n_errori) + " motivi")));
+  ins.append(riga_stato("Schema XSD", st.xsd.stato, st.xsd.n_errori ? st.xsd.n_errori + " errori" : null));
+  ins.append(riga_stato("Controllo ufficiale", ct.stato, ct.stato === "non_eseguito" ? null : ((ct.parola_esito || "") + (ct.versione_controllo ? " · versione " + ct.versione_controllo : "") + (ct.bozza_tecnica ? " · su bozza tecnica" : ""))));
+  ins.append(riga_stato("Trasmissione", st.trasmissione.stato, st.trasmissione.nota));
+  if (ct.azione_richiesta) ins.append(h("div", { class: "nota", style: "margin:8px 0;white-space:pre-wrap" }, ct.azione_richiesta));
+  const cfIn = h("input", { "aria-label": "Codice fiscale del fornitore", class: "mono", placeholder: "Codice fiscale del fornitore", value: ((S.P.dati.opzioni || {}).fornitore || {}).cf || "" });
+  ins.append(h("h3", { style: "margin-top:12px" }, "Fornitore"), h("div", { class: "mut", style: "font-size:12px;margin-bottom:4px" }, "Codice fiscale di chi invia (intermediario o dichiarante)."), cfIn);
+  const esegui = async (scopo) => {
+    try {
+      const forn = Object.assign({}, (S.P.dati.opzioni || {}).fornitore || {}, { cf: cfIn.value.trim().toUpperCase() });
+      if (forn.cf && forn.cf !== (((S.P.dati.opzioni || {}).fornitore || {}).cf || "")) { if (!(await salvaOps([{ op: "set", sezione: "opzioni", campi: { fornitore: forn } }]))) return; }
+      const r = await post("/api/pratiche/" + S.P.pratica_id + "/esporta", { scopo, cf_fornitore: forn.cf || null });
+      if (!r.generato) {
+        const motivi = [...(r.quadri_mancanti || []).map(x => x.messaggio), ...(r.non_supportato || []), ...(r.errori || []).map(x => x.messaggio)];
+        msg("File non generato: " + (motivi.length ? motivi.slice(0, 3).join(" | ") + (motivi.length > 3 ? " … (+" + (motivi.length - 3) + ")" : "") : "nessun dettaglio") + ". Nessun file parziale è stato prodotto.", "e");
+      } else msg(r.completo ? "File generato e valido per lo schema." : "Bozza tecnica generata (valida per lo schema). " + r.avvertenza, r.completo ? "o" : "e");
+    } catch (e) { msg(e.message, "e"); }
+    renderIns();
+  };
+  ins.append(h("div", { class: "az" }, h("button", { class: "pil", onclick: () => esegui("completo") }, "Genera file"),
+    h("button", { class: "gh", title: "Per i controlli tecnici: valido per lo schema ma incompleto e non trasmissibile", onclick: () => esegui("bozza_tecnica") }, "Genera bozza tecnica")));
+  ins.append(h("div", { class: "az" }, h("button", { class: "gh", disabled: ex.stato !== "aggiornato" || !ex.generato, title: "Esegue il controllo ufficiale in locale sul file esportato", onclick: async () => {
+    try { msg("Controllo in corso…", ""); const r = await post("/api/pratiche/" + S.P.pratica_id + "/controllo-ufficiale", {}); msg("Controllo ufficiale: " + r.stato_controllo.replaceAll("_", " ") + " (" + r.esito.replaceAll("_", " ") + ")" + (r.bozza_tecnica ? ", su bozza tecnica." : "."), r.stato_controllo === "positivo" ? "o" : "e"); } catch (e) { msg(e.message, "e"); }
+    renderIns(); } }, "Esegui controllo ufficiale")));
+  ins.append(h("p", { class: "mut", style: "margin-top:10px;font-size:12px" }, "Il controllo ufficiale locale non sostituisce la verifica con i servizi dell'Agenzia. Nessun invio è possibile da qui."));
 }
 function vaiA(r) {
   S.sel = r.quadro;
@@ -407,6 +444,7 @@ $("#wAnnulla").onclick = () => $("#wiz").close();
 $("#wIndietro").onclick = () => { W.passo--; wizRender(); };
 $("#wAvanti").onclick = wizAvanti;
 $("#bSalva").onclick = salvaTutto;
+$("#bGenera").onclick = () => { if (!S.P) return; S.tab = "file"; renderIns(); };
 $("#bControlla").onclick = async () => { if (!S.P) return; if (nMod()) await salvaTutto(); S.Q = await api("/api/pratiche/" + S.P.pratica_id + "/quadri"); S.tab = "controlli"; render(); };
 document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); salvaTutto(); } });
 window.addEventListener("beforeunload", ev => { if (nMod()) { ev.preventDefault(); ev.returnValue = ""; } });

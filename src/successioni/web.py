@@ -129,6 +129,19 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                       finalita=form.get("finalita") or None, nome=Path(f.filename).name)
 
     @api
+    async def esporta(request):
+        b = await request.json() if (await request.body()) else {}
+        return sv.esporta(request.path_params["pid"], cf_fornitore=b.get("cf_fornitore"), scopo=b.get("scopo", "completo"))
+
+    @api
+    async def elaborati(request):
+        return sv.stato_elaborati(request.path_params["pid"])
+
+    @api
+    async def controllo_ufficiale_api(request):
+        return sv.controllo_ufficiale_pratica(request.path_params["pid"])
+
+    @api
     async def suddividi(request):
         return sv.suddividi_allegato(request.path_params["aid"])
 
@@ -143,7 +156,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route("/api/pratiche", elenca), Route("/api/pratiche", crea, methods=["POST"]),
         Route(P, leggi), Route(P + "/aggiorna", aggiorna, methods=["POST"]),
         Route(P + "/revisioni", revisioni), Route(P + "/differenze", differenze),
-        Route(P + "/ripristina", ripristina, methods=["POST"]), Route(P + "/verifica", verifica),
+        Route(P + "/ripristina", ripristina, methods=["POST"]),
+        Route(P + "/esporta", esporta, methods=["POST"]), Route(P + "/elaborati", elaborati),
+        Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),
         Route("/api/allegati/{aid}/suddividi", suddividi, methods=["POST"]),

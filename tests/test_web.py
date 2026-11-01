@@ -48,3 +48,20 @@ def test_flusso_gui_e_conflitto_con_servizio(ctx):
         {"op": "upsert", "coll": "persone", "id": "p_bbbb2222", "campi": {"codice_fiscale": "x"}}]})
     assert bad.status_code == 422 and bad.json()["errori"][0]["percorso"] == "persone[p_bbbb2222].codice_fiscale"
     assert c.get(f"/api/pratiche/{pid}/verifica").json()["esito"] == "rilievi"
+
+
+def test_api_elaborati_stati_e_nessun_xml_parziale(ctx):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_elaborati import ops_da_caso, CF_FORN
+    from telematico_casi import caso_completo
+    sv, c = ctx
+    pid = sv.crea_pratica("Caso", iniziali=ops_da_caso(caso_completo()))["pratica_id"]
+    r = c.post(f"/api/pratiche/{pid}/esporta", json={"cf_fornitore": CF_FORN}, params={"t": T})
+    assert r.status_code == 200 and r.json()["generato"] is False                    # completo: nessun file parziale
+    r = c.post(f"/api/pratiche/{pid}/esporta", json={"cf_fornitore": CF_FORN, "scopo": "bozza_tecnica"}, params={"t": T})
+    assert r.json()["generato"] is True and "NON è una dichiarazione completa" in r.json()["avvertenza"]
+    st = c.get(f"/api/pratiche/{pid}/elaborati", params={"t": T}).json()
+    assert st["export"]["stato"] == "aggiornato" and st["xsd"]["stato"] == "valido" and st["trasmissione"]["stato"] == "non_preparata"
+    assert c.post(f"/api/pratiche/{pid}/esporta", json={"scopo": "x"}, params={"t": T}).status_code == 422
