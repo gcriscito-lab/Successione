@@ -1,0 +1,3 @@
+Fonte: https://github.com/anthropics/skills (skills/webapp-testing)
+Commit: ca45fc496a3436251f191354091d557da31c15b5
+Licenza: Apache-2.0. Copia non modificata.

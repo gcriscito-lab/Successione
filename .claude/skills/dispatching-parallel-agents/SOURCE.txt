@@ -1,0 +1,3 @@
+Fonte: https://github.com/obra/superpowers (skills/dispatching-parallel-agents)
+Commit: 2ce8aa15d05bd57213e6f746f953aafb7ded7a8b
+Licenza: MIT. Copia non modificata.

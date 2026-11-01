@@ -41,3 +41,16 @@ Nessun invio reale né dichiarazione sintetica ai servizi di produzione durante 
 - `fonti/manifest.json`: file di riferimento e impronte.
 
 In caso di differenza tra un precedente messaggio e queste istruzioni, usa i percorsi di questo repository e l'esplicita separazione fra sviluppo cloud e collaudo finale Windows. Le quattro funzioni richieste restano l'obiettivo finale.
+
+## Skill di sviluppo (dettagli in `docs/SKILLS_SETUP.md`)
+
+Installate in `.claude/skills/` (ripristino: `python scripts/installa_skills.py`; dopo una nuova installazione in sessione: `/reload-skills`). Sono strumenti di lavoro, non dipendenze del programma. Usale solo dove pertinenti:
+
+- `mcp-builder`: progettazione/modifica del server MCP (`src/successioni/mcp_server.py`), schemi, errori, prove con il client.
+- `pdf` (skill dell'account claude.ai, non copiata nel repository): lettura/generazione PDF. Non prova la conformità PDF/A: serve un validatore indipendente (veraPDF).
+- `webapp-testing`: prove Playwright dell'interfaccia locale (`src/successioni/web.py`).
+- `dispatching-parallel-agents`: deleghe parallele solo con file distinti e contratti in `docs/CONTRATTI_MODULI.md`.
+- `systematic-debugging`: causa radice prima di ogni correzione.
+- `verification-before-completion`: esegui il comando di verifica e leggi l'output prima di dichiarare concluso un requisito.
+
+Le skill non sostituiscono le fonti in `fonti/` né autorizzano a dichiarare superati controlli ufficiali non eseguiti. Distingui sempre prova simulata, controllo locale e verifica ufficiale.
