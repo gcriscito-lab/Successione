@@ -331,11 +331,12 @@ def test_cmd_e_ps1_solo_ascii_e_riferimenti_esistenti():
     for n in PKG.FILE_RADICE:
         testo = (WIN / n).read_text(encoding="utf-8")
         assert all(ord(c) < 128 for c in testo), n
+    import re
     for n in ("Successioni.cmd", "Diagnosi.cmd", "Configura-MCP.cmd", "Verifica-backup.cmd"):
         testo = (WIN / n).read_text(encoding="ascii")
-        assert r'"%BASE%python\python.exe" -s "%BASE%app\\' in testo
-        script = testo.split(r'"%BASE%app' + "\\", 1)[1].split('"', 1)[0]
-        assert (WIN / script).exists() and script in PKG.SCRIPT_APP, n
+        m = re.search(r'"%BASE%python\\python\.exe" -s "%BASE%app\\([a-z_]+\.py)"', testo)
+        assert m, n
+        assert (WIN / m.group(1)).exists() and m.group(1) in PKG.SCRIPT_APP, n
     for n in ("installa.ps1", "disinstalla.ps1"):
         t = (WIN / n).read_text(encoding="ascii")
         assert t.count("{") == t.count("}") and t.count("(") == t.count(")"), n

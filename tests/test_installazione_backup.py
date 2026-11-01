@@ -1,8 +1,8 @@
 """A02 su Linux: pratica con allegati, backup con il comando reale, ripristino in una cartella nuova, confronto.
 
-Il ripristino segue la procedura sicura del manuale (copia della cartella di backup come nuova cartella dati):
-non esiste ancora un comando `ripristina` (proposta in docs/PROPOSTE_installazione.md). Prova locale: il
-collaudo A02 su Windows resta da eseguire (docs/INSTALLAZIONE_WINDOWS.md, prova riprendibile).
+Due vie di ripristino provate: copia della cartella di backup come nuova cartella dati e comando
+`successioni ripristina <backup> --destinazione <cartella nuova>` (aggiunto dal coordinatore, commit 36e36a1).
+Prova locale: il collaudo A02 su Windows resta da eseguire (docs/INSTALLAZIONE_WINDOWS.md, prova riprendibile).
 """
 import importlib
 import os
@@ -87,8 +87,7 @@ def test_a02_pratica_revisioni_e_allegati_riaperti_dopo_ripristino(scenario):
     assert pa == pb and pb["dati"]["note"]["promemoria"] == "via MCP"
     assert a.revisioni(pid) == b.revisioni(pid) and [r["canale"] for r in b.revisioni(pid)] == ["gui", "mcp"]
     la, lb = a.elenca_allegati(pid), b.elenca_allegati(pid)
-    assert [(x["allegato_id"], x["sha256"], x["ruolo"]) for x in la] == \
-           [(x["allegato_id"], x["sha256"], x["ruolo"]) for x in lb]
+    assert [(x["id"], x["sha256"], x["ruolo"]) for x in la] == [(x["id"], x["sha256"], x["ruolo"]) for x in lb]
     with Archivio(scenario["d2"]).lettura() as c:
         percorsi = [r["percorso"] for r in c.execute("SELECT percorso FROM allegati")]
     for perc in percorsi:                                      # pagine identiche in ogni file ripristinato
@@ -103,29 +102,42 @@ def test_a02_pratica_revisioni_e_allegati_riaperti_dopo_ripristino(scenario):
 def test_a02_interfaccia_sul_ripristino(scenario):
     from starlette.testclient import TestClient
     from successioni.web import crea_app
-    app = crea_app(Servizio(Archivio(scenario["d2"])), token="t", porta=8765)
+    app = crea_app(Servizio(Archivio(scenario["d2"])), token="t", porta=8765, ammetti_host_di_prova=True)
     with TestClient(app) as cl:
         r = cl.get(f"/api/pratiche/{scenario['pid']}?t=t")
         assert r.status_code == 200 and r.json()["titolo"] == "Successione sintetica A02"
         assert len(cl.get(f"/api/pratiche/{scenario['pid']}/allegati?t=t").json()) >= 1
 
 
-@pytest.mark.xfail(strict=True, reason="difetto D1 (docs/PROPOSTE_installazione.md): il backup copia solo "
-                                       "database e allegati/, non elaborati/ dove sono gli XML esportati")
 def test_a02_xml_esportato_presente_dopo_ripristino(scenario):
+    """Difetto D1 (backup senza elaborati/) corretto dal coordinatore nel commit 36e36a1: prova di regressione."""
     exp = scenario["export"]
     assert exp["generato"] and (scenario["d1"] / exp["percorso"]).exists()
-    assert (scenario["d2"] / exp["percorso"]).exists()
+    assert (scenario["d2"] / exp["percorso"]).read_bytes() == (scenario["d1"] / exp["percorso"]).read_bytes()
+    st = Servizio(Archivio(scenario["d2"])).stato_elaborati(scenario["pid"])
+    assert st["export"]["stato"] == "aggiornato" and st["xsd"]["stato"] == "valido"
 
 
-def test_a02_verifica_backup_segnala_i_file_dei_job_mancanti(scenario):
-    """Finche' D1 e' aperto, lo strumento di verifica deve dirlo invece di dichiarare il backup integro."""
+def test_a02_verifica_backup_integra_anche_i_file_dei_job(scenario):
     v = VB.verifica(scenario["backup"])
-    if (scenario["backup"] / scenario["export"]["percorso"]).exists():
-        assert v["esito"] == "integro"
-    else:
-        assert v["esito"] == "incompleto"
-        assert any(scenario["export"]["percorso"] in m for m in v["file_dei_job"]["mancanti"])
+    assert v["esito"] == "integro", v["problemi"]
+    assert v["file_dei_job"]["citati"] >= 1 and v["file_dei_job"]["mancanti"] == []
+
+
+def test_a02_comando_ripristina_cartella_nuova_e_rifiuto_su_archivio_in_uso(scenario, tmp_path):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("SUCCESSIONI_")}
+    nuova = tmp_path / "Dati ripristinati è"
+    r = subprocess.run([sys.executable, "-m", "successioni.cli", "ripristina", str(scenario["backup"]),
+                        "--destinazione", str(nuova)], env=env, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert VB.confronta(VB.verifica(scenario["backup"]), VB.verifica(nuova)) == []
+    assert VB.verifica(nuova)["esito"] == "integro"
+    # su una cartella che contiene gia' dati il ripristino e' rifiutato e nulla cambia
+    prima = VB.verifica(scenario["d1"])
+    r2 = subprocess.run([sys.executable, "-m", "successioni.cli", "ripristina", str(scenario["backup"]),
+                         "--destinazione", str(scenario["d1"])], env=env, capture_output=True, text=True, timeout=120)
+    assert r2.returncode == 2 and "Ripristino non eseguito" in r2.stderr
+    assert VB.confronta(prima, VB.verifica(scenario["d1"])) == []
 
 
 def test_verifica_backup_rileva_allegato_alterato(tmp_path, scenario):
