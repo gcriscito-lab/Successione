@@ -1,0 +1,21 @@
+SUCCESSIONI - pacchetto per Windows 10/11 a 64 bit
+
+Installazione (una volta sola, senza diritti di amministratore):
+ 1. Estrarre TUTTO lo zip in una cartella qualsiasi (tasto destro > Estrai tutto).
+ 2. Fare doppio clic su Installa.cmd. Il programma viene copiato in
+    %LOCALAPPDATA%\Programs\Successioni e compare il collegamento "Successioni" sul desktop.
+    Alla fine viene mostrata la diagnosi dei prerequisiti.
+ 3. Se Windows mostra "PC protetto da Windows": "Ulteriori informazioni" > "Esegui comunque"
+    solo se lo zip proviene dal fornitore del programma.
+
+Uso:
+ - Doppio clic su "Successioni" sul desktop: si apre il browser con il programma.
+   La finestra nera ridotta a icona e' il programma: chiuderla lo termina (i dati sono gia' salvati).
+ - I dati restano in %LOCALAPPDATA%\Successioni (archivio e allegati).
+
+Strumenti esterni (installati a parte, vedi docs\INSTALLAZIONE_WINDOWS.md):
+ - Ghostscript (conversione PDF/A), veraPDF + Java (verifica PDF/A), Java (controllo ufficiale SUC13).
+ - Diagnosi.cmd indica cosa manca; "Diagnosi.cmd --salva-configurazione" registra i percorsi trovati.
+
+Claude (MCP): Configura-MCP.cmd mostra la configurazione; dettagli in docs\CONFIGURAZIONE_MCP.md.
+Manuale: docs\MANUALE_BREVE.md. Il programma non trasmette nulla all'Agenzia delle Entrate.
