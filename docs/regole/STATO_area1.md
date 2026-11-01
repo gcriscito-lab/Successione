@@ -44,3 +44,29 @@ python3 -m pytest -q
 PYTHONPATH=src python3 -m successioni.telematico.mappa > docs/regole/mappa_xsd_albero.md   # rigenera l'albero
 ```
 Ultimo esito: test area 1 -> 31 passed; `python3 -m pytest -q` -> 186 passed, 2 skipped (skip di altre aree: JAR del controllo e veraPDF non configurati).
+
+## Secondo giro (ripresa) - 2026-11-01
+
+Obiettivo: caso sintetico A10 che il controllo ufficiale SUC13 2.3.1 (eseguito in locale, batch, senza GUI) non scarta
+per errori bloccanti (***), piu' casi negativi con errore predisposto. Controllo LOCALE su dati sintetici: non e'
+trasmissione ne' prova con i servizi dell'Agenzia.
+
+### Fatto
+- (in avvio) letto lo stato precedente.
+
+### In corso
+- Verifica di `telematico/identificativi.py` e `tests/fixture_telematico/VerificaComponenti.java` (tentativo interrotto).
+
+### Da fare
+1. CF sintetici con carattere di controllo verificato (checkCF_PIVA.jar + controllo); devoluzioni coerenti.
+2. EH (caso base), EG (elenco documenti, allegati via documenti/base64), EF (campi calcolati da calcolo.py).
+3. Iterazione con il controllo finche' spariscono i (***) sul caso base.
+4. Test con SUCCESSIONI_CONTROLLI_SUC13 (positivo + negativo), fixture in tests/fixture_telematico/.
+5. MATRICE_COPERTURA.md, PROPOSTE_telematico.md.
+6. Suite completa.
+
+### Comandi di verifica (secondo giro)
+```
+python3 -m pytest -q
+SUCCESSIONI_CONTROLLI_SUC13=<cartella jar> python3 -m pytest -q tests/test_telematico_controllo.py
+```
