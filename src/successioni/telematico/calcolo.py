@@ -332,9 +332,9 @@ def calcola(dati: dict, contesto=None) -> RisultatoCalcolo:
         for p in dati.get("persone", []):
             if (rif and p["id"] == rif) or (not rif and p.get("ruolo") == "presentatore"):
                 cf = p.get("codice_fiscale")
-        contesto = ContestoExport(cf_fornitore=cf or "", scopo="bozza_tecnica")
+        contesto = ContestoExport(cf_fornitore=cf or "", scopo="bozza_tecnica", quadri_liquidazione=False)
     else:
-        contesto = ContestoExport(**{**contesto.__dict__, "scopo": "bozza_tecnica"})
+        contesto = ContestoExport(**{**contesto.__dict__, "scopo": "bozza_tecnica", "quadri_liquidazione": False})
     es = esporta_xml(dati, contesto)
     if es.xml is None:
         return RisultatoCalcolo(stato="dati_incompleti", motivi=es.errori + [

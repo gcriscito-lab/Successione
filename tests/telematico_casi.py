@@ -50,16 +50,18 @@ def caso_completo() -> dict:
              "diritto": "proprieta"},
             {"id": "d_terrluca", "_origine": {}, "bene_id": "b_terr0001", "persona_id": "p_luca0001", "quota": "1/2",
              "diritto": "proprieta"},
+            # devoluzione per legge, due figli: 1/2 ciascuno (Fascicolo I p. 69, Allegato 5)
             {"id": "d_contanna", "_origine": {}, "bene_id": "b_conto001", "persona_id": "p_anna0001",
-             "quota": {"num": 1, "den": 3}, "diritto": "1"},
+             "quota": {"num": 1, "den": 2}, "diritto": "1"},
             {"id": "d_contluca", "_origine": {}, "bene_id": "b_conto001", "persona_id": "p_luca0001",
-             "quota": {"num": 2, "den": 3}, "diritto": "1"},
+             "quota": {"num": 1, "den": 2}, "diritto": "1"},
         ],
         "passivita": [
             {"id": "ps_medic01", "_origine": {}, "descrizione": "Spese mediche ultimi sei mesi", "importo": "2000",
              "persona_id": "p_anna0001"},
-            {"id": "ps_mutuo01", "_origine": {}, "descrizione": "Mutuo ipotecario residuo", "importo": "30000",
-             "persona_id": "p_luca0001"},
+            # mutuo (tipo 3): ripartito per quote di legge (annotazione RipartizioneED/Ripartizione/Quota), vedi
+            # opzioni.telematico.passivita.ps_mutuo01.ripartizione
+            {"id": "ps_mutuo01", "_origine": {}, "descrizione": "Mutuo ipotecario residuo", "importo": "30000"},
         ],
         "documenti_ref": [],
         "opzioni": {"telematico": {
@@ -83,21 +85,19 @@ def caso_completo() -> dict:
             "passivita": {"ps_medic01": {"tipo": "1", "estremi_documento": "Fatture 1-5/2025",
                                          "data_documento": "2025-02-28", "possesso": {"num": 1, "den": 1}},
                           "ps_mutuo01": {"tipo": "3", "estremi_documento": "Contratto mutuo rep. 123",
-                                         "data_documento": "2010-05-05", "possesso": "1/1", "bene_id": "b_casa0001"}},
+                                         "data_documento": "2010-05-05", "possesso": "1/1", "bene_id": "b_casa0001",
+                                         "ripartizione": [{"persona_id": "p_anna0001", "quota": "1/2"},
+                                                          {"persona_id": "p_luca0001", "quota": "1/2"}]}},
         }},
         "note": {"promemoria": "nota interna non esportata"},
     }
 
 
 def caso_a10() -> dict:
-    """Caso base per la prova A10 con il controllo ufficiale (eseguito in locale): come ``caso_completo`` ma con le
-    quote di legge sul conto (due figli: 1/2 ciascuno; il controllo segnala (***) 'Dati di devoluzione non coerenti
-    con quelli relativi agli Eredi' con 1/3 - 2/3) e con gli allegati del quadro EG (albero genealogico EG6 e
-    documenti delle passivita' EG5, PDF sintetici in tests/fixture_telematico/allegati/)."""
+    """Caso base per la prova A10 con il controllo ufficiale (eseguito in locale): ``caso_completo`` con gli allegati
+    del quadro EG (albero genealogico EG6 e documenti delle passivita' EG5, PDF/A-1b SINTETICI in
+    tests/fixture_telematico/allegati/) e l'attestazione del dichiarante sulle copie (EH, FlagPassivita)."""
     d = caso_completo()
-    for dv in d["devoluzioni"]:
-        if dv["bene_id"] == "b_conto001":
-            dv["quota"] = {"num": 1, "den": 2}
     d["documenti_ref"] = [
         {"id": "dr_albero1", "_origine": {}, "allegato_id": "al_albero", "tipo_eg": "AlberoGenealogico",
          "finalita": "Albero genealogico (sintetico)"},

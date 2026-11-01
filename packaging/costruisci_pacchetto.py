@@ -33,9 +33,9 @@ LOCK = QUI / "requisiti-win64.lock"
 WIN = RADICE / "scripts" / "windows"
 
 #: script Python dell'avviatore, copiati in <pacchetto>/app
-SCRIPT_APP = ("avvia_successioni.py", "diagnosi.py", "configura_mcp.py")
+SCRIPT_APP = ("avvia_successioni.py", "diagnosi.py", "configura_mcp.py", "verifica_backup.py")
 #: file per l'utente nella radice del pacchetto (convertiti in CRLF, solo ASCII)
-FILE_RADICE = ("Successioni.cmd", "Diagnosi.cmd", "Configura-MCP.cmd", "Installa.cmd", "installa.ps1",
+FILE_RADICE = ("Successioni.cmd", "Diagnosi.cmd", "Configura-MCP.cmd", "Verifica-backup.cmd", "Installa.cmd", "installa.ps1",
                "Disinstalla.cmd", "disinstalla.ps1", "LEGGIMI.txt")
 DOCUMENTI = ("INSTALLAZIONE_WINDOWS.md", "MANUALE_BREVE.md", "CONFIGURAZIONE_MCP.md")
 #: moduli che devono esistere nel pacchetto (import di primo livello del programma)
@@ -267,7 +267,7 @@ def assembla(uscita: Path, embed_zip: Path, cfg: dict, cache_wheel: Path | None,
 
 
 def comprimi(cartella: Path) -> Path:
-    dest = cartella.with_suffix(".zip")
+    dest = cartella.parent / (cartella.name + ".zip")
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for p in sorted(cartella.rglob("*")):
             if p.is_file():
@@ -309,7 +309,7 @@ def verifica(cartella: Path, con_wheel: bool = True) -> list[str]:
             problemi.append("estensioni .pyd non per cp313-win_amd64")
         for m in MODULI_ATTESI:
             if not ((sp / m).is_dir() or (sp / f"{m}.py").exists() or any(sp.glob(f"{m}.*.pyd"))
-                    or any(sp.glob(f"win32/{m}.*.pyd"))):
+                    or any(sp.glob(f"win32/{m}*.pyd"))):
                 problemi.append(f"modulo assente nel pacchetto: {m}")
         installati = {normalizza(d.name.split("-")[0]) for d in sp.glob("*.dist-info")}
         for w in man.get("wheel", []):

@@ -4,19 +4,30 @@
 - Commit esaminato: `08c358792d7b81d91a51b91a353d25e157105ee5` (HEAD all'avvio; snapshot WIP dichiarato "non ancora verificato né integrato"). Durante la revisione il coordinatore ha creato `a3d22666dfd94b379478b63241e26999911e8df1`, che modifica solo documenti (`docs/REVISIONE_INDIPENDENTE.md`, `docs/STATO_area4.md`, `docs/regole/STATO_area1.md`): il codice in `src/` e `tests/` esaminato è identico nei due commit. Il lavoro non ancora committato di altri agenti (es. `telematico/quadri_efgh.py`, modifiche a `telematico/supplemento.py`, `packaging/`, `scripts/windows/`) è escluso salvo dove indicato.
 - Data: 2026-11-01.
 - Ambiente: container Linux, Python 3.13.
-- Stato del documento: IN CORSO (compilato man mano; se la sessione si interrompe, i rilievi già scritti restano validi).
+- Stato del documento: concluso per il commit indicato (compilato man mano durante la revisione).
 
 Legenda gravità: bloccante / alta / media / bassa. Legenda esiti (da `docs/COLLAUDO_CLOUD_WINDOWS.md`): passato, fallito, da_collaudare, simulazione.
 
 ## Esito
 
-(da completare a fine revisione)
+**Non OK per l'uso previsto** (preparare, controllare e trasmettere una dichiarazione SUC13 reale). Motivo in una riga: nessuna pratica può oggi produrre un file completo (EF/EG/EH mancanti nel commit esaminato), eppure GUI e MCP dichiarano «finalizzabile» pratiche che l'export rifiuta o che contengono scelte ignorate (R1, R2, R10, R20), e alcune garanzie d'integrità dichiarate non reggono (R3, R4, R6).
+
+Non ho trovato rilievi **bloccanti** nel senso di perdita di dati già salvati o di un'imposta sbagliata prodotta in silenzio: il calcolo segue la guida e i casi fuori perimetro sono rifiutati, l'export non produce mai un file «completo» parziale, gli originali degli allegati non vengono modificati, le scritture sono atomiche e versionate. Le aree solide sono: archivio e revisioni (transazioni IMMEDIATE, conflitti, idempotenza), esportazione XSD-guidata con mappa id → rigo, calcolo nel perimetro della guida, adattatore del controllo ufficiale (diagnostico originale, nessun `passato` simulato), disciplina sulle parole d'esito nei documenti (con le eccezioni R19), parser XML difesi da entità esterne, processi esterni senza shell e con `-dSAFER`, accesso MCP limitato alla cartella d'ingresso.
+
+Rilievi: 0 bloccanti, 6 alti (R1, R2, R3, R4, R6, R20), 7 medi (R7-R13), 6 bassi (R14-R19). La numerazione è quella di lavoro (ordine di verifica), non di gravità.
 
 ## Quadrature e verifiche eseguite
 
 - `python scripts/verifica_materiali.py` → `OK: 23 fonti verificate (8 PDF, 13 XSD, 2 JNLP)`.
 - `python3 -m pytest -q` (intera suite, commit sopra) → **192 passati, 3 saltati** in 81 s. Saltati: `test_collegamenti_controllo.py:213` e `test_elaborati.py:90` (JAR del controllo SUC13 non configurati, `SUCCESSIONI_CONTROLLI_SUC13`), `test_documenti_corpus.py:177` (veraPDF assente). Strumenti presenti nel container: Ghostscript 10.02.1, qpdf, Java 21, pdftotext; veraPDF assente.
-- Script di riproduzione del revisore (fuori dal repository): `/tmp/claude-0/-home-user-Successione/45d852c4-b150-580d-8ea9-929683237c63/scratchpad/riproduci1.py` (archivio temporaneo, dati sintetici di `tests/telematico_casi.py`).
+- Script di riproduzione del revisore (fuori dal repository, cartella `/tmp/claude-0/-home-user-Successione/45d852c4-b150-580d-8ea9-929683237c63/scratchpad/`): `riproduci1.py` (R1-R5), `riproduci2.py` (R6-R8), `riproduci3.py` (R9, R16), `riproduci4.py` (R20). Usano archivi temporanei e i dati sintetici di `tests/telematico_casi.py`; si lanciano con `python3 <script>` dalla cartella scratch.
+- Suite sul commit successivo `7076841` (snapshot WIP del coordinatore che integra `quadri_efgh.py` e modifica `esporta.py`, scattato durante questa revisione): **8 falliti, 184 passati, 3 saltati** (es. `test_telematico_esporta.py::test_caso_sintetico_completo_valido_ma_dichiaratamente_incompleto`, `test_telematico_calcolo.py::test_franchigia_disabilita_e_presunzione_esclusa_con_beni_inventariati`). Atteso per un lavoro in corso, ma il branch contiene ora commit con test rossi: non va considerato una base verificata.
+- Confronto con le fonti: testo estratto con `pdftotext` della guida di calcolo (10 pp.), del Fascicolo I (pp. 22-25 valore e devoluzione) e annotazioni di `fornituraSUC13_v1.xsd` (QuadroEF, SezioneVBis, TipoSoggetto, GradoParentela, DatoNP/DatoVP/DatoDT).
+- Componenti ufficiali: i 15 JAR di `ControlliSUC13.jnlp` scaricati in scratch hanno impronte identiche a `collegamenti/collaudo.py:IMPRONTE_20261101`; l'esecuzione del controllo è stata **negata dai permessi** di questa sessione (vedi «Cosa non ho potuto verificare»).
+
+### Calcolo dell'imposta: confronto con la guida (area solida, con limiti)
+
+`telematico/calcolo.py` segue la guida ufficiale passo per passo nel perimetro dichiarato: QE (esclusi DN), QDN, QP, AN = QE+QDN−QP, franchigie 1.000.000 (gradi 01-9B), 100.000 (10, 11), 1.500.000 disabilità con «la più alta» (guida p. 3-4), PR = [10% (QN−QDN)] − QDN esclusa per legatari e con BI (p. 4), aliquote 4/6/8% e gradi 36-39 esenti (appendice p. 9-10), ISN = ISL (RID e DET fuori perimetro e bloccati). Il test dell'esempio della guida riproduce QE 200.000, QDN 2.500, QP 500, AN 202.000, QN 102.000, PR 7.450, QTI 109.450, ISL 6.567. Il campo EF18bis `Imposta` è `cm:DatoNP_Type` (intero ≥ 1, `typesDati_v2.xsd:66-73`), mentre la guida (p. 8) indica 8.865,46: la scelta di due candidati di arrotondamento e lo stato `divergenza_aperta` sono prudenti e coerenti con le fonti. Non ho trovato errori sostanziali; restano: R17 (doppia arrotondatura, ≤ 1 euro in casi limite), clamp di AN a zero (interpretazione dichiarata), imposta 0 non rappresentabile in `DatoNP_Type` (da gestire con `ImpostaNonDovuta` o altro, da verificare), e il fatto che il calcolo non è richiamabile da GUI né da MCP nel commit esaminato.
 
 ## Rilievi
 
@@ -43,7 +54,7 @@ Ordinati per gravità all'interno di ciascun blocco; i rilievi sono stati aggiun
 - Correzione: far dipendere `finalizzabile` anche dai quadri obbligatori per le annotazioni XSD (stessa funzione dell'export) e dall'esito di `esporta_xml` (errori/non_supportato), oppure rinominare l'indicatore in «nessun rilievo interno».
 
 **R2 — La scelta «Dichiarazione sostitutiva» è ignorata: non blocca la finalizzazione, l'XML dichiara `PrimaDichiarazione` e il calcolo la tratta come prima dichiarazione.** (fatto verificato)
-- Evidenza: la GUI salva `opzioni.tipo_dichiarazione` (`app.js` `renderFront` e procedura guidata) e scrive «la sostitutiva non è finalizzabile»; ma nessun controllo legge `tipo_dichiarazione` (`grep` in `servizio.py`, `schema.py`, `quadri.py`, `telematico/`), il frontespizio esportato scrive sempre `PrimaDichiarazione=1` (`esporta.py`, `frontespizio`), e `supplemento.chiavi_non_gestite` controlla solo `opzioni.telematico`, quindi la chiave non finisce nemmeno in `non_supportato`.
+- Evidenza: la GUI salva `opzioni.tipo_dichiarazione` (`app.js` `renderFront` e procedura guidata) e scrive «la sostitutiva non è finalizzabile» (`app.js:334`); ma nessun controllo legge `tipo_dichiarazione` (`grep` in `servizio.py`, `schema.py`, `quadri.py`, `telematico/`), il frontespizio esportato scrive sempre `PrimaDichiarazione=1` (`esporta.py`, `frontespizio`), e `supplemento.chiavi_non_gestite` controlla solo `opzioni.telematico`, quindi la chiave non finisce nemmeno in `non_supportato`.
 - Riproduzione (`riproduci1.py`, R2): con `tipo_dichiarazione=sostitutiva` → `verifica finalizzabile True []`; bozza tecnica generata con `PrimaDichiarazione`, `non_supportato: []`; `calcola` → `completato 0`.
 - Impatto: un dato dichiarativo scelto dall'utente si perde in silenzio nel file; l'affermazione dell'interfaccia è falsa; contraddice la regola «nessuna perdita silenziosa» dichiarata in `esporta.campi_non_esportati`.
 - Correzione: rilievo bloccante in `verifica` e `non_supportato` in `esporta_xml` per `tipo_dichiarazione != originaria`; più in generale segnalare ogni chiave di `opzioni` non gestita dall'export (oggi solo `opzioni.telematico` è sorvegliata).
@@ -53,6 +64,12 @@ Ordinati per gravità all'interno di ciascun blocco; i rilievi sono stati aggiun
 - Riproduzione (`riproduci2.py`): export bozza → `elaborati/pr_…/3d14….xml`; backup → contenuto `['allegati','archivio.sqlite3']`; sull'archivio di backup `stato_elaborati` → `export aggiornato`, `file esiste: False`; `controllo_ufficiale_pratica` → `NON_TROVATO file da controllare inesistente`. Gli allegati invece sono copiati (1 allegato, file presente).
 - Impatto: A02 («pratica e allegati identici dopo riavvio e ripristino») non è dimostrata; lo stato degli elaborati dopo un ripristino è falso. Gli artefatti dei collegamenti sono invece nel deposito `allegati/` (`collegamenti/base.py:336-347`) e quindi inclusi.
 - Correzione: salvare gli XML nel deposito content-addressed (come `DepositoArtefatti`) o includere `elaborati/` nel backup; far verificare a `stato_elaborati` l'esistenza e l'impronta del file; aggiungere `ripristina` con verifica d'integrità (impronte di tutti gli allegati) e un test A02 che copra allegati, elaborati e job.
+
+**R20 — Dalla GUI non si possono compilare i dati che l'export richiede; quei dati vivono fuori dal modello e una rimozione fatta dalla GUI li lascia orfani e blocca l'export.** (fatto verificato)
+- Evidenza: sesso, provincia di nascita, grado di parentela codificato, stato civile, codice carica, firma, telefono/email, provincia e codice comune dei beni, natura, tipo cespite, tipo/estremi/data/possesso delle passività sono letti solo da `opzioni.telematico` (`telematico/supplemento.py:1-37`); `static/app.js` non contiene alcun riferimento a `telematico` né a questi campi (`grep`). Solo un client che invia `{"op":"set","sezione":"opzioni",...}` (MCP o API) può valorizzarli. `schema.valida_forma` non controlla `opzioni`, quindi rimuovere un'entità non pulisce `opzioni.telematico.<coll>[<id>]`, e `supplemento.chiavi_non_gestite` trasforma l'orfano in `non_supportato`.
+- Riproduzione (`riproduci4.py`, eseguito sul codice dell'albero di lavoro): bozza tecnica generata; rimozione della passività `ps_medic01` con canale `gui` accettata, `verifica: ok`; nuovo export → `generato False`, `non_supportato ['opzioni.telematico.passivita[ps_medic01]: riferimento a un elemento inesistente: chiave non gestita']`.
+- Impatto: un utente che lavora solo nell'interfaccia non può arrivare a un file esportabile, mentre la barra di stato gli dice «Finalizzabile» (R1); una normale eliminazione di riga dalla GUI rompe un export che prima riusciva, senza che la GUI possa rimediare. Spec. §5 («la compilazione conserva l'accesso ai quadri ministeriali») e A03 (stessa pratica da GUI e MCP con risultato coerente) non sono soddisfatte.
+- Correzione: promuovere questi campi nel modello comune (già proposto in `docs/PROPOSTE_telematico.md`) e renderli editabili nella GUI; nel frattempo rimuovere in cascata le voci di `opzioni.telematico` dell'entità eliminata, nella stessa transazione.
 
 ### Media
 
@@ -102,16 +119,54 @@ Ordinati per gravità all'interno di ciascun blocco; i rilievi sono stati aggiun
 
 **R16 — `opzioni.quadri_attivi` non è validato.** Una stringa (es. `"EF"`) viene iterata carattere per carattere (`quadri.py:196-198`): riproduzione `riproduci3.py` → quadri attivi `['AN','DV']`, nessun errore al salvataggio. Correzione: validare la sezione `opzioni` (tipo lista, valori in `PER_ID`).
 
-**R17 — Doppia arrotondatura nel candidato «esatta» del calcolo.** `telematico/calcolo.py:289-290` arrotonda il totale prima al centesimo e poi all'euro (HALF_UP due volte), mentre il docstring (righe 14-16) la presenta come «nessun arrotondamento intermedio». Per totali esatti con frazione in [0,495; 0,5) il candidato dà l'euro superiore (es. 100,495 → 100,50 → 101, contro 100 applicando una sola volta la regola «per difetto se inferiore a 50 centesimi»). Effetto: al massimo 1 euro e solo in casi limite; poiché anche il candidato del componente arrotonda al centesimo, i due candidati possono concordare e il caso risultare `completato` invece che `divergenza_aperta`. Correzione: arrotondare l'esatto direttamente all'euro, o dichiarare la doppia arrotondatura come parte dell'ipotesi.
+**R17 — Doppia arrotondatura nel candidato «esatta» del calcolo.** `telematico/calcolo.py:289-290` arrotonda il totale prima al centesimo e poi all'euro (HALF_UP due volte), mentre il docstring (righe 14-16) la presenta come «nessun arrotondamento intermedio». Per totali esatti con frazione in [0,495; 0,5) il candidato dà l'euro superiore (es. 100,495 → 100,50 → 101, contro 100 applicando una sola volta la regola «per difetto se inferiore a 50 centesimi»; verificato eseguendo la `_half_up` del commit: `doppia: 101 singola: 100`). Effetto: al massimo 1 euro e solo in casi limite; poiché anche il candidato del componente arrotonda al centesimo, i due candidati possono concordare e il caso risultare `completato` invece che `divergenza_aperta`. Correzione: arrotondare l'esatto direttamente all'euro, o dichiarare la doppia arrotondatura come parte dell'ipotesi.
 
 **R18 — `ripristina_revisione` senza chiave di richiesta e senza controllo del canale.** `servizio.py:180-195`: un doppio clic su «Ripristina» crea due revisioni identiche; `canale` non passa da `_canale`. Effetto solo sulla cronologia (nessuna perdita di dati).
 
 **R19 — Documenti di stato non aggiornati.** `docs/STATO_LAVORI.md` dichiara ancora «Calcolo imposte, XML SUC13 completo, stampa: non ancora disponibili» e «26 test verdi», mentre esistono calcolo ed export (bozza tecnica) e la suite conta 192 test; `docs/PDFA.md:11` usa «controllo locale passato» per un caso con «firma simulata» (secondo `docs/COLLAUDO_CLOUD_WINDOWS.md` una prova su firma simulata è `simulazione`).
 
+## Stato reale delle prove A01-A20 (specifica §12)
+
+Parole: `passato` / `fallito` / `da_collaudare` / `simulazione` come in `docs/COLLAUDO_CLOUD_WINDOWS.md`; «locale» = test automatico nel container, non prova sull'ambiente di destinazione.
+
+| ID | Stato reale | Prova esistente | Prova mancante |
+|---|---|---|---|
+| A01 Installazione Windows | da_collaudare | nessuna nel commit esaminato (`packaging/`, `scripts/windows/` arrivano come WIP in `7076841`, non revisionati) | installazione e avvio su PC Windows senza ambiente di sviluppo |
+| A02 Salvataggio/ripristino | locale parziale | `test_servizio.py:101` confronta dati e revisioni | allegati ed elaborati nel backup (R6), comando di ripristino, verifica d'integrità |
+| A03 GUI e MCP | locale (server MCP reale via stdio) | `test_mcp.py:19` stessa pratica e conflitto | client Claude effettivo su Windows; dati telematici non compilabili dalla GUI (R20) |
+| A04 Doppia richiesta e conflitto | locale passato | `test_servizio.py:17-45`, `test_web.py:36` | protezione degli id e dei campi riservati (R3, R4) |
+| A05 Quote e continuazioni | locale parziale | export: num/den esatti, continuazioni, moduli EA | diritti diversi dal defunto (non supportati); id non stabili (R4); quote di legge (R10) |
+| A06 Franchigie e DN/BI | locale parziale | `test_telematico_calcolo.py` (esempio guida, disabilità, BI) | qualifiche multiple, legatari, inventario reale; confronto con il software ufficiale |
+| A07 Decorrenze | locale parziale | solo regime dal 2025; pre-2025 rifiutato | regole storiche; validazione della data (R8) |
+| A08 Riduzioni/estero/arrotondamenti | non coperto / divergenza aperta | caso di divergenza 9.910/9.911 | riduzioni, estero, criterio ufficiale; R17 |
+| A09 XML e stampa | locale parziale | XSD valido su bozza tecnica | EF/EG/EH (WIP), stampa assente, controllo visivo |
+| A10 Controllo ufficiale | da_collaudare | 2 esecuzioni reali registrate, entrambe negative (`collegamenti/fixture/controllo_reale_20261101/`) | un caso positivo, negativo predisposto, esecuzione su Windows; registrazione manuale non esposta (R11) |
+| A11 PDF/A | da_collaudare (conformità); locale per la conversione | Ghostscript 10.02.1, verificatore strutturale «indicativo» | veraPDF assente: nessun esito `conforme` possibile |
+| A12 Allegati difficili | locale / simulazione (firma simulata) | corpus sintetico, suddivisione | documenti reali firmati/protetti |
+| A13 Acquisizione catastale | da_collaudare | nessuna interfaccia nota | prova autenticata autorizzata |
+| A14 Import catastale ripetuto | simulazione | `test_collegamenti_catasto.py` | dati reali |
+| A15 Ripresa lavorazione | simulazione | catasto su fixture | ripresa reale; un controllo rimasto `in_esecuzione` dopo un crash non ha percorso di ripresa (`controllo.py`, `esegui`: ritorna lo stato senza riprendere) |
+| A16 Invalidazione selettiva | locale passato per export/XSD/controllo | `test_elaborati.py:64`, `test_servizio.py:75` | versione delle regole e allegati effettivi non entrano nell'impronta; stato falso dopo un ripristino (R6) |
+| A17 Preparazione e conferma | simulazione | `test_collegamenti_invio.py` | modulo non collegato a GUI/MCP/servizio |
+| A18 Invio incerto | simulazione | rete interrotta simulata | R12; collaudo reale autorizzato |
+| A19 Ricevute ed esiti | simulazione | associazione per tipo dichiarato | formati reali delle ricevute |
+| A20 Copertura e aggiornamento | parziale | `docs/MATRICE_COPERTURA.md` onesta sul perimetro | «finalizzabile» incoerente con l'export (R1, R2, R10); nessuna procedura di aggiornamento di schema/regole provata su casi di riferimento |
+
 ## Punti aperti
 
-(in compilazione)
+- **Lavoro in corso sul branch.** Durante la revisione sono stati creati due snapshot WIP (`a3d2266`, `7076841`); il secondo aggiunge `telematico/quadri_efgh.py` (EF/EG/EH) e cambia `esporta.py`, con 8 test falliti. R1 andrà rivalutato quando EF/EG/EH saranno integrati, ma la causa (finalizzabilità calcolata in `servizio.verifica` indipendentemente dall'export) resta; R2 è ancora presente nel nuovo `esporta.py` (`PrimaDichiarazione` fissa). Nel nuovo codice, `quadri.py` continua a marcare EF/EH come non supportati: se l'utente li seleziona la pratica è bloccata, se non li seleziona l'export li genera comunque. Va chiarito quale dei due registri comanda.
+- **Impronta dichiarativa** (`servizio.py:32-45`): include tutta la sezione `opzioni` (anche chiavi non dichiarative come eventuali preferenze d'interfaccia) ma non la versione delle regole/XSD né il contenuto degli allegati che finiranno in EG. Spec. §10 chiede di ricontrollare quando cambia «allegato effettivo, opzione o regola rilevante».
+- **`documenti_ref.allegato_id`** è una stringa libera (`schema.py:37`): non è verificato che l'allegato esista né che appartenga alla stessa pratica. Diventa rilevante con la serializzazione di EG.
+- **Annotazioni XSD non implementate** che il controllo ufficiale applicherà, es. coerenza di età per grado (figli non più anziani del defunto, genitori più anziani: annotazione di `GradoParentela`), quote dell'Allegato 5 (R10). Andrebbero elencate in matrice come regole note e non coperte, con un rilievo bloccante o almeno un avviso.
+- **Caricamento dalla GUI** (`web.py:121-129`): nessun limite di dimensione, file letto interamente in memoria. Rischio basso (solo locale, con token), ma su Windows un file molto grande può bloccare il processo.
+- **Ghostscript**: nessun controllo della versione minima; i file ostili sono trattati con `-dSAFER` (corretto). Su Windows andrebbe fissata una versione recente nel pacchetto e verificata la diagnostica (ipotesi, non verificata).
+- **Conflitto 409 nella GUI** (`app.js` `salvaOps`): dopo il conflitto le modifiche locali restano in sospeso e un nuovo «Salva» le applica sopra la revisione altrui senza mostrare quali campi sono stati cambiati nel frattempo. L'utente è avvisato, ma la spec. §6 chiede di non sovrascrivere «silenziosamente» una modifica manuale: utile mostrare il confronto campo per campo.
 
 ## Cosa non ho potuto verificare
 
-(in compilazione)
+- **Esecuzione del controllo ufficiale SUC13.** Ho scaricato i 15 JAR del JNLP (impronte uguali a quelle registrate) ma l'esecuzione di codice esterno è stata negata dai permessi della sessione; quindi non ho rieseguito i 3 test saltati né la prova sulla bozza tecnica citata in `docs/COLLEGAMENTI.md` §1 (R10 si basa su quella dichiarazione dell'area 3). Per riprendere: `SUCCESSIONI_CONTROLLI_SUC13=<cartella JAR> python3 -m pytest -q tests/test_collegamenti_controllo.py tests/test_elaborati.py`.
+- **veraPDF**: non presente; nessuna verifica di conformità PDF/A possibile (come dichiarato dal progetto).
+- **Interfaccia nel browser**: non ho eseguito `tests/e2e/gui_flusso.js` né prove Playwright; i rilievi sull'interfaccia vengono dalla lettura di `static/app.js` e da prove sull'API con il client Starlette.
+- **Client Claude su Windows, installazione Windows, catasto Entratel, invio e ricevute**: fuori dalla portata del container, come dichiarato dal progetto.
+- **Moduli WIP** (`telematico/quadri_efgh.py`, `packaging/`, `scripts/windows/`, modifiche successive a `08c3587`): non revisionati in dettaglio.
+- **`collegamenti/catasto.py`** (437 righe) e `documenti/dimensioni.py`, `documenti/pdfa_strutturale.py`: letti solo per i punti di sicurezza (processi esterni, scrittura sull'originale); non ho rifatto i calcoli di stima delle dimensioni né la logica di importazione catastale.

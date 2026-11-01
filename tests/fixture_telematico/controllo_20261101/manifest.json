@@ -1,0 +1,51 @@
+{
+  "natura": "controllo LOCALE su dati SINTETICI con il componente ufficiale SUC13 2.3.1 (11/03/2026) eseguito in batch senza GUI; NON e' una trasmissione ne' una prova con i servizi dell'Agenzia; collaudo su Desktop Telematico (Windows) da fare",
+  "data": "2026-11-01",
+  "ambiente": {
+    "os": "Linux-6.18.44-fc-v185-x86_64-with-glibc2.39",
+    "java_principale": "openjdk version \"1.8.0_504\" (openjdk-8-jre-headless 8u504-ga-1ubuntu1~24.04.3 estratto con dpkg -x in una cartella di lavoro, non installato; .deb SHA-256 2102eec7636335f8203c6fa8eac613dc853a80134b129a8385f66f805bcf094a)",
+    "java_verifica": "openjdk version \"21.0.12.1\" 2026-08-18 + javax.xml.bind:jaxb-api:2.3.1 (Maven Central, SHA-1 8531ad5ac454cc2deb9d4d32c40c4d7451939b5d, SHA-256 88b955a0df57880a26a74708bc34f74dcaf8ebf4e78843a28b50eae945732b06) nel classpath: .dgn identici a Java 8 per i tre casi",
+    "nota_java": "con Java >= 11 SENZA jaxb-api il componente termina con NoClassDefFoundError javax/xml/bind/DatatypeConverter (it.finanze.entrate.sco.main.GestoreAllegatiXML.trovaEprocessaAllegato) appena la fornitura contiene allegati EG: nessun .dgn",
+    "jar": "15 JAR di ControlloSUC13.jnlp, impronte = successioni.collegamenti.collaudo.IMPRONTE_20261101 (verificate: True)"
+  },
+  "comandi": [
+    "java -Djava.awt.headless=true -Djava.io.tmpdir=<lavoro>/tmp -cp '<jar>/*' it.finanze.entrate.sco.main.MSUC13 in/X.xml out/X.xml out/X.dcm",
+    "java -Djava.awt.headless=true -cp '<jar>/*' it.finanze.entrate.sco.common2013.VisualXml out/X.dgn 1"
+  ],
+  "input_invariato": true,
+  "casi": {
+    "a10_positivo": {
+      "descrizione": "export di tests/telematico_casi.caso_a10() con contesto_caso_a10() (completo=True)",
+      "atteso": "nessuno scarto; unica segnalazione (*) 3345 attestazione non richiesta",
+      "esito_componente": "La dichiarazione puo' essere trasmessa: elaborate 1, scartate 0, con segnalazione di anomalia 1; .dcm prodotto",
+      "file": {
+        "a10_positivo.dgn": "bbc7f4f5a6f3017c73258ee032c4f65d3b68fd902e126c39adf2af81ec9638f2",
+        "a10_positivo.wri": "24f1e9b683666064b462d9f6b7d0c5d9b1582550d35168eb9bbc92ebe1d7d10d",
+        "a10_positivo.xml": "662414ac99b87d6e0ff68cc78f080e2e326fa04ff7c71bb357b1108bc07fa408",
+        "a10_positivo_logSchema.xml": "1d12a62a6c3d85731cb3607090fa6634739538cee6e96f0f79686d640563338b"
+      }
+    },
+    "neg_cf_defunto": {
+      "descrizione": "a10_positivo.xml con CodiceFiscaleDefunto RSSMRA40A01H501W (carattere di controllo errato, errore predisposto)",
+      "atteso": "(***) 1013 campo XXB02 'Codice fiscale del defunto - Codice Fiscale errato'",
+      "esito_componente": "dichiarazione scartata per errori bloccanti",
+      "file": {
+        "neg_cf_defunto.dgn": "bab22fd6ca27d45d65323c47b6ac5e23ba0fad53d71b6c378bcc8d8f76069053",
+        "neg_cf_defunto.wri": "d89f98298832caec2a19ed3a35b6ff6c27ca577a73e230ea9f5449f6e6cddb0d",
+        "neg_cf_defunto.xml": "cc71075593a5105506aab88dd55628c5d644941dde94e2e8ee849fe8fdba2125",
+        "neg_cf_defunto_logSchema.xml": "076a7e31c1b4ebe61b6d4ac75122fc112fdc65ef9cef916583e1e22f7d7f486f"
+      }
+    },
+    "neg_importo_da_versare": {
+      "descrizione": "a10_positivo.xml con Frontespizio/ImportoDaVersare 4434,00 invece di 4435,00 (errore predisposto)",
+      "atteso": "(***) 3376 campo XXB94 'Importo da versare non ammesso' (valore dichiarato 4434,00)",
+      "esito_componente": "dichiarazione scartata per errori bloccanti",
+      "file": {
+        "neg_importo_da_versare.dgn": "acde60c6cc78f0ab53fa5be285204fa7400ab4537abee8ae0d943e126a4fbe80",
+        "neg_importo_da_versare.wri": "b1e3e3866dcbb216478265778cbc8aef92abdbe2d27ed566ae7f2bb04e778153",
+        "neg_importo_da_versare.xml": "e8a2dc50baee2e78f64501747a7ccf2af4fb59fc78d2ce9289eb488709ed2d34",
+        "neg_importo_da_versare_logSchema.xml": "bef3e6938f016b85a15c1071ceea21cd5502496146c38b935a902d80c48a5abe"
+      }
+    }
+  }
+}

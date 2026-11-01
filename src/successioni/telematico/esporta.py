@@ -38,6 +38,7 @@ from .. import quadri as Q
 from .. import valori as V
 from ..schema import Errore
 from . import fonti as FO
+from . import devoluzione_legge as DL
 from . import formati as F
 from . import identificativi as ID
 from . import modello_xsd as M
@@ -74,6 +75,8 @@ class ContestoExport:
     scopo: str = "completo"                # 'completo' | 'bozza_tecnica'
     #: file degli allegati per il quadro EG: allegato_id -> percorso, oppure {"percorso", "nome"} (dall'archivio)
     allegati: dict | None = None
+    #: False: non genera EF, EG, EH (uso interno del calcolo, che legge solo i quadri dei beni e delle passivita')
+    quadri_liquidazione: bool = True
 
 
 @dataclass
@@ -592,6 +595,12 @@ class _Export:
             self.err("QUOTE_DEVOLUZIONE", f"beni[{b['id']}]", f"la somma delle quote di devoluzione e' "
                      f"{somma.numerator}/{somma.denominator}, deve essere 1/1",
                      FO.fonte_annotazione(el + "/Quota/QuotaElementi"))
+        elif righe and self.quote_legge is not None:
+            dich = {self.persona_dev[did]: Fraction(n, den) for _, _, did, n, den in righe}
+            if dich != self.quote_legge:
+                self.err("QUOTA_DI_LEGGE", f"beni[{b['id']}]", "devoluzione per legge: le quote devono seguire "
+                         f"l'allegato 5 ({DL.descrivi(self.quote_legge)}); dichiarate: {DL.descrivi(dich)}",
+                         FO.fonte_annotazione(el + "/Quota") + "; " + DL.FONTE)
         righe.sort()
         out = []
         for (m, r), dir_r, did, n, den in righe:
@@ -713,20 +722,9 @@ class _Export:
             elif bid is not None:
                 self.err("REGOLA_PROGRESSIVO_CESPITE", base + ".bene_id", f"per il tipo {tipo} il cespite di riferimento "
                          "non va indicato", FO.fonte_annotazione(el + "/ProgressivoCespite"))
-            # ripartizione (obbligatoria in presenza di EA): il modello comune ha un solo persona_id
-            self.usa(p, "persona_id")
-            pid = p.get("persona_id")
-            rip = None
-            if self.ea:
-                if pid not in self.pos_ea:
-                    self.err("RIPARTIZIONE_SOGGETTO", base + ".persona_id", "la passivita' va attribuita a un soggetto "
-                             "del quadro EA", FO.fonte_annotazione(el + "/RipartizioneED/Ripartizione"))
-                elif valore is not None:
-                    m, r = self.pos_ea[pid]
-                    rip = {"Ripartizione": [{"IdentificazioneSoggetto": {"Rigo": str(r), "Modulo": str(m)},
-                                             "Quota": {"QuotaElementi": {"QuotaNumeratore": "1", "QuotaDenominatore": "1"},
-                                                       "QuotaValore": F.euro_centesimi(valore)}}]}
-                    self.quota_passivo.setdefault(pid, []).append((p["id"], int(valore)))
+            # ripartizione (obbligatoria in presenza di EA): persona_id (tutta a un soggetto) oppure
+            # opzioni.telematico.passivita[id].ripartizione = [{persona_id, quota}] (proposta P5)
+            rip = self.ripartizione_ed(p, tipo, valore, base, el) if self.ea else None
             riga = {"Tipo": tipo, "Descrizione": descr, "EstremiDocumento": estr, "DataDocumento": dd, "Possesso": poss}
             if None in (tipo, descr, estr, dd, valore) or not poss.get("PossessoDenominatore"):
                 continue
@@ -745,6 +743,69 @@ class _Export:
             self.mappa[pid] = {"coll": "passivita", "quadro": "ED", "modulo": m, "rigo": r,
                                "xpath": f"{_XP_DICH}/suc:QuadroED/suc:Modulo[{m}]/suc:Passivita[{r}]"}
         return {"Modulo": moduli} if moduli else None
+
+    def ripartizione_ed(self, p: dict, tipo, valore, base: str, el: str) -> dict | None:
+        fonte = FO.fonte_annotazione(el + "/RipartizioneED/Ripartizione") + "; " + FO.fonte_fasc1(38, "Ripartizione")
+        self.usa(p, "persona_id", "ripartizione")
+        pid = p.get("persona_id")
+        rip_sup = SUP.attr(self.d, "passivita", p, "ripartizione")
+        voci: list[tuple[str, int, int]] = []
+        if rip_sup is not None:
+            if pid not in (None, ""):
+                self.err("DATI_INCOERENTI", base, "indicare persona_id oppure la ripartizione, non entrambi", fonte)
+                return None
+            if not isinstance(rip_sup, list) or not rip_sup:
+                self.err("VALORE_NON_VALIDO", base + ".ripartizione", "attesa lista di {persona_id, quota}", fonte)
+                return None
+            for i, v in enumerate(rip_sup):
+                try:
+                    if not isinstance(v, dict) or set(v) - {"persona_id", "quota"}:
+                        raise F.ValoreXml("attesi solo persona_id e quota")
+                    n, d = F.quota_grezza(v.get("quota"))
+                    voci.append((v.get("persona_id"), n, d))
+                except (F.ValoreXml, V.ValoreNonValido, AttributeError) as e:
+                    self.err("VALORE_NON_VALIDO", f"{base}.ripartizione[{i}]", str(e), fonte)
+                    return None
+        elif pid not in (None, ""):
+            voci = [(pid, 1, 1)]
+        for vp, _, _ in voci or [(pid, 1, 1)]:
+            if vp not in self.pos_ea:
+                self.err("RIPARTIZIONE_SOGGETTO", base + (".ripartizione" if rip_sup is not None else ".persona_id"),
+                         "la passivita' va attribuita a soggetti del quadro EA", fonte)
+                return None
+        if len({v[0] for v in voci}) != len(voci):
+            self.err("RIPARTIZIONE_DUPLICATA", base + ".ripartizione", "soggetto ripetuto nella ripartizione", fonte)
+            return None
+        somma = sum((Fraction(n, d) for _, n, d in voci), Fraction(0))
+        if somma != 1:
+            self.err("QUOTE_RIPARTIZIONE", base + ".ripartizione", f"somma delle quote {somma}: deve essere 1/1", fonte)
+            return None
+        if len(voci) > 3:
+            self.ns.append(f"{base}: ripartizione fra piu' di tre soggetti (continuazione del quadro ED) non supportata")
+            return None
+        if tipo not in DL.TIPI_PASSIVITA_LIBERE and tipo is not None:
+            dich = {vp: Fraction(n, d) for vp, n, d in voci}
+            if self.quote_legge is not None and dich != self.quote_legge:
+                self.err("QUOTA_DI_LEGGE", base + (".ripartizione" if rip_sup is not None else ".persona_id"),
+                         f"devoluzione per legge: la passivita' di tipo {tipo} va ripartita secondo l'allegato 5 "
+                         f"({DL.descrivi(self.quote_legge)}); dichiarata: {DL.descrivi(dich)}",
+                         FO.fonte_annotazione(el + "/RipartizioneED/Ripartizione/Quota") + "; " + DL.FONTE)
+                return None
+        if valore is None:
+            return None
+        righe = []
+        for vp, n, d in sorted(voci, key=lambda v: self.pos_ea[v[0]]):
+            qv = Fraction(int(valore)) * Fraction(n, d)
+            if qv.denominator != 1:
+                self.ns.append(f"{base}: valore quota della passivita' {valore} x {n}/{d} non intero: l'arrotondamento "
+                               "all'unita' di euro (Fascicolo I p. 38) non ha un criterio indicato")
+                return None
+            m, r = self.pos_ea[vp]
+            righe.append({"IdentificazioneSoggetto": {"Rigo": str(r), "Modulo": str(m)},
+                          "Quota": {"QuotaElementi": {"QuotaNumeratore": str(n), "QuotaDenominatore": str(d)},
+                                    "QuotaValore": F.euro_centesimi(int(qv))}})
+            self.quota_passivo.setdefault(vp, []).append((p["id"], int(qv)))
+        return {"Ripartizione": righe}
 
     def risolvi_progressivi(self, qed: dict | None):
         if not qed:
@@ -1045,6 +1106,14 @@ class _Export:
         self.classifica_persone()
         self.ordina_ea()
         qea = self.quadro_ea()
+        self.quote_legge = None
+        if self.ea and all(self.grado_ea.get(p["id"]) for p in self.ea):
+            self.quote_legge = DL.quote_di_legge({p["id"]: self.grado_ea[p["id"]] for p in self.ea},
+                                                 {p["id"]: self.tipo_ea.get(p["id"]) for p in self.ea})
+            if self.quote_legge is None:
+                self.avv("QUOTE_DI_LEGGE_NON_VERIFICATE", "quadro[EA]", "configurazione di eredi non coperta dal "
+                         "controllo delle quote di legge (coperti: solo figli, solo coniuge, coniuge e figli): le quote "
+                         "di devoluzione non sono verificate dall'export", DL.FONTE)
         beni = self.d.get("beni", [])
         per_q: dict[str, list] = {"EB": [], "EC": [], "ER": []}
         for b in beni:
@@ -1085,10 +1154,11 @@ class _Export:
             except F.ValoreXml as e:
                 self.err("VALORE_NON_VALIDO", "contesto.spazio_utente", str(e), FO.fonte_spec(15))
         # quadri EG, EH, EF (EF dopo una prima serializzazione: il calcolo V-bis legge il file dichiarato)
-        qeg = EFGH.quadro_eg(self) if fr is not None else None
-        qeh = EFGH.quadro_eh(self, fr, qeg) if fr is not None else None
+        liq = fr is not None and ctx.quadri_liquidazione
+        qeg = EFGH.quadro_eg(self) if liq else None
+        qeh = EFGH.quadro_eh(self, fr, qeg) if liq else None
         xml_pre = None
-        if fr is not None and not self.errori and not self.ns:
+        if liq and not self.errori and not self.ns:
             dich_pre = {"@identificativo": ctx.identificativo, "Frontespizio": fr}
             dich_pre.update({k: v for k, v in corpo.items() if v})
             try:
@@ -1100,12 +1170,21 @@ class _Export:
         presenti = [k[6:] for k, v in corpo.items() if v]
         if fr is not None:
             fr["FirmaModello"] = {**{f"Casella{q}": "1" for q in presenti}, "FirmaDichiarante": "1"}
+        if fr is not None and qef is not None:
             ver = EFGH.versamento(self, (fr.get("Presentatore") or {}).get("CodiceFiscale"))
             if ver:
                 fr["Versamento"] = ver
+            if self.totale_da_versare:
+                # annotazione Frontespizio/ImportoDaVersare; il componente ufficiale lo confronta con EF19 + EF24 col. 1
+                # e 2 (QuadroEF.calcolaTotaleDaVersareF24, ispezione javap; messaggio 3376 se diverso)
+                fr["ImportoDaVersare"] = F.euro_centesimi(self.totale_da_versare)
         self.campi_non_esportati()
         self.quadri_attivi()
-        self.quadri_obbligatori(presenti)
+        if ctx.quadri_liquidazione:
+            self.quadri_obbligatori(presenti)
+        else:
+            self.mancanti.append(Errore("QUADRI_LIQUIDAZIONE_ESCLUSI", "quadro[EF,EG,EH]", "esportazione per uso "
+                                        "interno (calcolo): quadri EF, EG, EH non generati", "contesto.quadri_liquidazione"))
         ns = sorted(set(self.ns))
         esito = EsitoExport(xml=None, errori=self.errori, non_supportato=ns, mappa=self.mappa, avvisi=self.avvisi,
                             quadri_mancanti=self.mancanti, completo=False)

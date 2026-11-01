@@ -19,7 +19,8 @@ Struttura::
       "beni":      {<id>: {"provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo",
                            "indirizzo", "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe",
                            "zona_censuaria", "consistenza", "tipo_cespite"}},
-      "passivita": {<id>: {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id"}},
+      "passivita": {<id>: {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id",
+                           "ripartizione": [{"persona_id", "quota"}]}},   # in alternativa a persona_id
     }
 
 Qualsiasi altra chiave e' segnalata come non supportata (nessuna perdita silenziosa). Se in futuro un campo esiste
@@ -35,7 +36,7 @@ CHIAVI = {
     "beni": {"provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo", "indirizzo",
              "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe", "zona_censuaria",
              "consistenza", "tipo_cespite"},
-    "passivita": {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id"},
+    "passivita": {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id", "ripartizione"},
 }
 CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",
                         "tempistica_pagamento", "pagamento_rateale", "dichiara_copie_conformi"}

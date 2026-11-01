@@ -61,8 +61,19 @@ trasmissione ne' prova con i servizi dell'Agenzia.
 - Controllo ufficiale sulla bozza con i nuovi CF: spariti i (***) sui codici fiscali e sul numero di soggetti in
   devoluzione; restano EF/EG/EH obbligatori e quote ER 1/3-2/3 incoerenti con la devoluzione per legge (1/2).
 
+- EF/EG/EH: `telematico/quadri_efgh.py` (nuovo), integrato in `esporta.py`; quote di legge (Allegato 5, sottoinsieme)
+  in `telematico/devoluzione_legge.py`; ripartizione ED da `opzioni.telematico.passivita[id].ripartizione`;
+  ImportoDaVersare e Versamento nel frontespizio.
+- **Controllo ufficiale locale su `caso_a10` (2026-11-01): "La dichiarazione puo' essere trasmessa", 0 scartate,
+  1 con segnalazione (*) attestazione non richiesta; prodotto il `.dcm`.** Serve `jaxb-api-2.3.1.jar` nel classpath
+  con Java 21 (GestoreAllegatiXML usa javax.xml.bind.DatatypeConverter, assente da Java 11): vedi limiti.
+
+- Registrazioni del controllo (Java 8 estratto in scratch; verifica con Java 21 + jaxb-api: .dgn identici) in
+  `tests/fixture_telematico/controllo_20261101/` (+ manifest.json): a10_positivo (solo (*) 3345), neg_cf_defunto
+  ((***) 1013 XXB02), neg_importo_da_versare ((***) 3376 XXB94). Suite completa: 192 passed, 3 skipped.
+
 ### In corso
-- EF/EG/EH in `esporta.py`; caso A10 completo in `tests/telematico_casi.py` (`caso_a10`).
+- `tests/test_telematico_controllo.py` (fixture + prova reale facoltativa), MATRICE, PROPOSTE.
 
 ### Da fare
 1. CF sintetici con carattere di controllo verificato (checkCF_PIVA.jar + controllo); devoluzioni coerenti.

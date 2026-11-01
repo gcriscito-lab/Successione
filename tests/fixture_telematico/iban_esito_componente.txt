@@ -1,0 +1,4 @@
+IT57A0123456789000000001234	isCheckDigitValid=true	CheckIBAN.isCorrect=0
+IT58A0123456789000000001234	isCheckDigitValid=false	CheckIBAN.isCorrect=1I dati non risultano corretti.  Verificare le coordinate bancarie indicate  con quanto riportato sull'estratto conto.
+IT60X0542811101000000123456	isCheckDigitValid=true	CheckIBAN.isCorrect=0
+IT61X0542811101000000123456	isCheckDigitValid=false	CheckIBAN.isCorrect=1I dati non risultano corretti.  Verificare le coordinate bancarie indicate  con quanto riportato sull'estratto conto.

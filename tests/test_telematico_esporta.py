@@ -12,6 +12,8 @@ from successioni.schema import Errore
 from successioni.telematico import fonti, xsd
 from successioni.telematico.esporta import _riferisci, esporta_xml
 
+from successioni.telematico.identificativi import genera_cf_sintetico
+
 from telematico_casi import CF_ANNA, caso_completo, contesto, copia
 
 NS = {"tm": fonti.NS_TM, "suc": fonti.NS_SUC, "reg": fonti.NS_REG}
@@ -25,13 +27,14 @@ def test_caso_sintetico_completo_valido_ma_dichiaratamente_incompleto():
     es = _bozza(caso_completo())
     assert es.errori == [] and es.non_supportato == []
     assert es.xml is not None and xsd.valida_xsd(es.xml) == []
-    # EF (decesso 2025 + immobili), EG (EA presente), EH (codice carica 1): obbligatori ma fuori perimetro
-    assert sorted(e.percorso for e in es.quadri_mancanti) == ["quadro[EF]", "quadro[EG]", "quadro[EH]"]
-    assert all("annotazione dell'elemento Quadro" in e.fonte for e in es.quadri_mancanti)
+    # EF ed EH generati; EG senza allegati: albero genealogico (EA) e documenti delle passivita' (ED) mancanti
+    assert sorted(e.percorso for e in es.quadri_mancanti) == ["quadro[EG].AlberoGenealogico",
+                                                              "quadro[EG].DocumentiPassivita"]
+    assert all("annotazione dell'elemento QuadroEG" in e.fonte for e in es.quadri_mancanti)
     assert es.completo is False
     # in modalita' 'completo' (predefinita) nessun XML parziale presentato come completo
     es2 = esporta_xml(caso_completo(), contesto())
-    assert es2.xml is None and es2.completo is False and len(es2.quadri_mancanti) == 3
+    assert es2.xml is None and es2.completo is False and len(es2.quadri_mancanti) == 2
     assert es2.impronta_xml == es.impronta_xml  # lo stesso file e' stato prodotto e validato, ma non consegnato
 
 
@@ -44,11 +47,9 @@ def test_contenuto_e_totali_ee():
     ee = {e.tag.split("}")[1]: e.text for e in doc.xpath(f"{d}/suc:QuadroEE/*", namespaces=NS)}
     assert ee == {"TotaleValoreImmobili": "141000", "TotaleValoreAltriBeni": "20000", "TotaleAttivo": "161000",
                   "TotalePassivo": "32000", "TotaleValoreAsseEreditarioNetto": "129000"}
-    # valore quota = valore x quota (Fascicolo I p. PDF 24); arrotondamento al centesimo segnalato
+    # valore quota = valore x quota (Fascicolo I p. PDF 24)
     qv = doc.xpath(f"{d}/suc:QuadroER//suc:QuotaValore/text()", namespaces=NS)
-    assert qv == ["6666,67", "13333,33"]
-    assert {a.percorso for a in es.avvisi if a.codice == "ARROTONDAMENTO_VALORE_QUOTA"} == \
-        {"devoluzioni[d_contanna]", "devoluzioni[d_contluca]"}
+    assert qv == ["10000,00", "10000,00"]
     # progressivo cespite del mutuo verso il fabbricato (quadro/rigo/modulo dalla mappa)
     prog = doc.xpath(f"{d}/suc:QuadroED//suc:ProgressivoCespite/*/text()", namespaces=NS)
     assert prog == ["EC", "1", "1"]
@@ -91,22 +92,28 @@ def test_id_stabili_al_riordino_righe():
         assert es.mappa == base.mappa
 
 
-def test_continuazione_oltre_tre_devoluzioni_e_secondo_modulo_ea():
+def _quattro_figli() -> dict:
+    """Caso con quattro figli (CF sintetici validi): per legge 1/4 ciascuno su tutti i beni (Allegato 5)."""
     d = caso_completo()
     tel = d["opzioni"]["telematico"]
-    for i, nome in enumerate(("Bruno", "Carla"), 3):
+    for i, (nome, sesso) in enumerate((("Bruno", "M"), ("Carla", "F")), 3):
         pid = f"p_figlio00{i}"
         d["persone"].append({"id": pid, "_origine": {}, "cognome": "Rossi", "nome": nome,
-                             "codice_fiscale": f"RSSXXX7{i}A01H501Z", "data_nascita": "1975-01-01",
-                             "luogo_nascita": "Roma", "ruolo": "erede"})
-        tel["persone"][pid] = {"sesso": "M", "provincia_nascita": "RM", "grado_parentela": "02"}
-    # la casa va ai quattro figli per 1/4 ciascuno; terreno e conto restano ai primi due
-    d["devoluzioni"] = [x for x in d["devoluzioni"] if x["bene_id"] != "b_casa0001"]
-    for pid in ("p_anna0001", "p_luca0001", "p_figlio003", "p_figlio004"):
-        d["devoluzioni"].append({"id": "d_c" + pid[2:], "_origine": {}, "bene_id": "b_casa0001", "persona_id": pid,
-                                 "quota": "1/4", "diritto": "1"})
-    d["passivita"] = []  # i nuovi figli non devono comparire senza devoluzione: hanno la casa
+                             "codice_fiscale": genera_cf_sintetico("Rossi", nome, sesso, "1975-01-01", "H501"),
+                             "data_nascita": "1975-01-01", "luogo_nascita": "Roma", "ruolo": "erede"})
+        tel["persone"][pid] = {"sesso": sesso, "provincia_nascita": "RM", "grado_parentela": "02"}
+    d["devoluzioni"] = []
+    for bid in ("b_casa0001", "b_terr0001", "b_conto001"):
+        for pid in ("p_anna0001", "p_luca0001", "p_figlio003", "p_figlio004"):
+            d["devoluzioni"].append({"id": f"d_{bid[2:6]}{pid[2:]}", "_origine": {}, "bene_id": bid,
+                                     "persona_id": pid, "quota": "1/4", "diritto": "1"})
+    d["passivita"] = []
     del tel["passivita"]
+    return d
+
+
+def test_continuazione_oltre_tre_devoluzioni_e_secondo_modulo_ea():
+    d = _quattro_figli()
     es = _bozza(d)
     assert es.errori == [] and es.non_supportato == [], (es.errori, es.non_supportato)
     assert xsd.valida_xsd(es.xml) == []
@@ -125,8 +132,8 @@ def test_continuazione_oltre_tre_devoluzioni_e_secondo_modulo_ea():
 def test_casi_non_supportati_non_esportano():
     casi = {}
     d = caso_completo()
-    d["documenti_ref"] = [{"id": "dr_aaaa0001", "_origine": {}, "allegato_id": "x", "tipo_eg": "EG1"}]
-    casi["EG"] = d
+    d["documenti_ref"] = [{"id": "dr_aaaa0001", "_origine": {}, "allegato_id": "x", "tipo_eg": "Testamento"}]
+    casi["EG testamento"] = d
     d = caso_completo()
     d["persone"][2]["ruolo"] = "legatario"
     casi["legatario"] = d
@@ -143,13 +150,13 @@ def test_casi_non_supportati_non_esportano():
     d["opzioni"]["telematico"]["dichiarazione"]["devoluzione_per_legge"] = False
     casi["testamento"] = d
     d = caso_completo()
-    d["opzioni"]["quadri_attivi"] = ["EA", "EB", "EC", "ED", "ER", "EG", "EF"]
-    casi["quadro EF attivo"] = d
+    d["opzioni"]["quadri_attivi"] = ["EA", "EB", "EC", "ED", "ER", "EG", "EN"]
+    casi["quadro EN attivo"] = d
     for nome, dati in casi.items():
         es = _bozza(dati)
         assert es.xml is None, nome
         assert es.non_supportato, nome
-    es = _bozza(casi["EG"])
+    es = _bozza(casi["EG testamento"])
     assert any(s.startswith("documenti_ref[dr_aaaa0001]") for s in es.non_supportato)
 
 
@@ -188,7 +195,8 @@ def test_presentatore_e_impegno():
     doc = etree.fromstring(es.xml)
     # i figli ereditati da reg:ImpegnoATrasmettere_Type sono nel namespace reg
     assert doc.xpath("//suc:ImpegnoATrasmettere/reg:CFintermediario/text()", namespaces=NS) == ["12345678901"]
-    assert doc.xpath("//suc:Presentatore/suc:CodiceFiscale/text()", namespaces={"suc": fonti.NS_SUC}) == [CF_ANNA]
+    assert doc.xpath("//suc:Frontespizio/suc:Presentatore/suc:CodiceFiscale/text()",
+                     namespaces={"suc": fonti.NS_SUC}) == [CF_ANNA]
 
 
 def test_riferimento_errori_xsd_alla_mappa():

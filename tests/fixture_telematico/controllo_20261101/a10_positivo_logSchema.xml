@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><sc:EsitoFornitura xmlns:sc="urn:www.agenziaentrate.gov.it:specificheTecniche:sco:common:v3">
+  <sc:IdentificativoFornitura>/tmp/claude-0/-home-user-Successione/45d852c4-b150-580d-8ea9-929683237c63/scratchpad/a1/tmp/1793567358473719407433394966987.tmp</sc:IdentificativoFornitura>
+  <sc:EsitoXsd>
+    <sc:IdentificativoXsd>fornituraSUC13_v1.xsd</sc:IdentificativoXsd>
+    <sc:WellFormed>true</sc:WellFormed>
+    <sc:Valid>true</sc:Valid>
+    <sc:Completo>true</sc:Completo>
+  </sc:EsitoXsd>
+</sc:EsitoFornitura>
