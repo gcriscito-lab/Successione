@@ -48,6 +48,15 @@ TIFF_COMPRESSIONE = "CCITT Group IV"
 # Indicazione di prassi (Fascicolo 1 p.49).
 DPI_PRASSI = 200
 
+
+
+def limite_byte(mb: float, unita: str = "decimale") -> int:
+    """Converte un limite in MB nell'unita' indicata ('decimale' = 10^6, 'binaria' = 2^20) in byte."""
+    if unita not in UNITA:
+        raise ValueError(f"unita' ammesse: {sorted(UNITA)}")
+    return int(mb * UNITA[unita])
+
+
 FONTE_ALLEGATO = "Specifiche_SUC13_20250702.pdf p.7 par. 2.3 (max 5 MB per file allegato)"
 FONTE_FORNITURA = "Specifiche_SUC13_20250702.pdf p.3 par. 1 (max 40 MB compressi, una sola dichiarazione)"
 FONTE_FORMATI = "Specifiche_SUC13_20250702.pdf p.7 par. 2.3 (TIF/TIFF e PDF/A-1a/1b)"

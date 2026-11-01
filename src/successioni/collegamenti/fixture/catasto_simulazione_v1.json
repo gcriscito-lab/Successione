@@ -1,0 +1,34 @@
+{
+  "_nota": "SIMULAZIONE: dati catastali SINTETICI nel formato interno successioni.catasto.v1 (non e' il formato dell'Agenzia). Servono ai test dell'adattatore; non provano l'interoperabilita' con Entratel.",
+  "formato": "successioni.catasto.v1",
+  "cf_defunto": "RSSMRA40A01H501X",
+  "passi": [
+    {"tipo": "autenticazione_richiesta"},
+    {"tipo": "risultati", "data": "2026-11-01T10:00:00+00:00", "pagina_successiva": "p2", "completo": false,
+     "immobili": [
+       {"catasto": "F", "codice_comune": "H501", "sezione": "", "foglio": "0012", "particella": "345", "subalterno": "7",
+        "categoria": "A/2", "classe": "3", "consistenza": "5 vani", "rendita": "812.34",
+        "indirizzo": "VIA DI PROVA 1", "titolarita": [
+          {"cf": "RSSMRA40A01H501X", "denominazione": "ROSSI MARIO", "diritto": "proprieta", "quota": {"num": 1, "den": 2}},
+          {"cf": "BNCLRA45B41H501Y", "denominazione": "BIANCHI LAURA", "diritto": "proprieta", "quota": {"num": 1, "den": 2}}],
+        "codice_sconosciuto_servizio": "XK-9"},
+       {"catasto": "F", "codice_comune": "H501", "foglio": "12", "particella": "345", "subalterno": "8",
+        "categoria": "C/6", "rendita": "95.00", "graffati": [{"foglio": "12", "particella": "346", "subalterno": "2"}],
+        "titolarita": [{"cf": "RSSMRA40A01H501X", "diritto": "proprieta", "quota": {"num": 1, "den": 1}}]}
+     ]},
+    {"tipo": "sessione_scaduta"},
+    {"tipo": "risultati", "data": "2026-11-01T10:05:00+00:00", "completo": true,
+     "limiti": ["il servizio non restituisce le particelle graffate (avvertenza riportata da un software commerciale, da verificare)"],
+     "immobili": [
+       {"catasto": "T", "codice_comune": "H501", "foglio": "40", "particella": "12", "qualita": "SEMINATIVO",
+        "reddito_dominicale": "10.50", "reddito_agrario": "8.20", "porzione": "AA",
+        "titolarita": [{"cf": "RSSMRA40A01H501X", "diritto": "proprieta", "quota": {"num": 1, "den": 3}}]},
+       {"catasto": "F", "codice_comune": "H501", "foglio": "12", "particella": "345", "subalterno": "8",
+        "categoria": "C/6", "rendita": "95.00", "graffati": [{"foglio": "12", "particella": "346", "subalterno": "2"}],
+        "titolarita": [{"cf": "RSSMRA40A01H501X", "diritto": "proprieta", "quota": {"num": 1, "den": 1}}]},
+       {"catasto": "F", "codice_comune": "F205", "foglio": "3", "particella": "9", "subalterno": "1",
+        "categoria": "A/3", "rendita": "400,00",
+        "titolarita": [{"cf": "VRDGPP50C01F205Z", "diritto": "proprieta", "quota": {"num": 1, "den": 1}}]}
+     ]}
+  ]
+}

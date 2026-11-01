@@ -86,8 +86,11 @@ def analizza_pdf(percorso: Path | str) -> dict:
     out: dict = {"bytes": len(dati), "formato": "sconosciuto"}
     if not dati.startswith(b"%PDF-"):
         if dati[:4] in (b"II*\x00", b"MM\x00*"):
-            return {**out, "formato": "tiff", "esito": "tiff",
-                    "dettaglio": "file TIFF: requisiti in documenti.tiff.verifica_tiff (specifiche p.7)"}
+            from .documenti.tiff import verifica_tiff
+            vt = verifica_tiff(p)
+            return {**out, "formato": "tiff", "esito": "tiff", "pagine": vt.get("pagine"), "verifica_tiff": vt,
+                    "dettaglio": "file TIFF: non si converte in PDF/A; requisiti di Specifiche p.7 verificati in "
+                                 f"modo indicativo ({vt['esito']})"}
         return {**out, "formato": "non_pdf", "esito": "non_pdf"}
     out["formato"] = "pdf"
     try:

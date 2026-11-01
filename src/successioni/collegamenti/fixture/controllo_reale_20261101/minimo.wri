@@ -1,0 +1,25 @@
+Diagnostica risultante dalla validazione dell'archivio
+/tmp/claude-0/-home-user-Successione/45d852c4-b150-580d-8ea9-929683237c63/scratc
+hpad/a3/arch_prova2/lavoro/controlli/ctl_7c52843c8f354827bc991fc9/tmp/1793563100
+0267204313450001336466.tmp
+
+L'archivio sottoposto a controllo non e' conforme allo schema
+fornituraSUC13_v1.xsd ad esso relativo. L'errore determina lo scarto dell'intera
+fornitura.
+
+La validazione dell'archivio ha prodotto la seguente diagnostica:
+
+Diagnostica relativa all'elemento 'Intestazione'
+
+Percorso:
+Intestazione
+
+Messaggio di errore:
+La sequenza di elementi che precedono l'elemento 'CodiceFornitura' non è
+conforme a quella prevista dallo schema, è necessario compilare:
+'TipoFornitore'.
+
+Posizione: riga 2 all'interno dell'elemento 'Intestazione'
+
+********************************************************************************
+

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tm:Messaggio xmlns:tm="www.agenziaentrate.gov.it:specificheTecniche:telent:v1" xmlns:suc="urn:www.agenziaentrate.gov.it:specificheTecniche:sco:suc:v1" xmlns:cm="urn:www.agenziaentrate.gov.it:specificheTecniche:common:v2" xmlns:reg="urn:www.agenziaentrate.gov.it:specificheTecniche:sco:reg:v2">
+  <tm:Intestazione>
+    <tm:CodiceFiscaleFornitore>AAAAAA00A00A000A</tm:CodiceFiscaleFornitore>
+  </tm:Intestazione>
+  <tm:Contenuto CodiceFornitura="SUC13">
+    <suc:Fornitura>
+      <suc:Intestazione>
+        <suc:TipoFornitore>1</suc:TipoFornitore>
+      </suc:Intestazione>
+      <suc:Dichiarazione identificativo="00001">
+        <suc:Frontespizio>
+          <suc:CodiceFiscaleDefunto>BBBBBB00B00B000B</suc:CodiceFiscaleDefunto>
+          <suc:TipoDichiarazione>
+            <suc:PrimaDichiarazione>1</suc:PrimaDichiarazione>
+            <suc:Devoluzione>
+              <suc:DevoluzionePerLegge>1</suc:DevoluzionePerLegge>
+            </suc:Devoluzione>
+          </suc:TipoDichiarazione>
+          <suc:DatiDefunto>
+            <suc:DatiAnagrafici>
+            <reg:Cognome>PROVA</reg:Cognome><reg:Nome>SINTETICO</reg:Nome><reg:Sesso>M</reg:Sesso>
+            <reg:DataNascita>01011950</reg:DataNascita><reg:ComuneNascita>ROMA</reg:ComuneNascita><reg:ProvinciaNascita>RM</reg:ProvinciaNascita>
+          </suc:DatiAnagrafici>
+            <suc:UlterioriDati><suc:DataDecesso>01012026</suc:DataDecesso><suc:StatoCivile>1</suc:StatoCivile></suc:UlterioriDati>
+          </suc:DatiDefunto>
+          <suc:Presentatore>
+            <suc:CodiceFiscale>CCCCCC00C00C000C</suc:CodiceFiscale>
+            <suc:CodiceCarica>1</suc:CodiceCarica>
+            <suc:DatiAnagrafici>
+            <reg:Cognome>PROVA</reg:Cognome><reg:Nome>SINTETICO</reg:Nome><reg:Sesso>M</reg:Sesso>
+            <reg:DataNascita>01011950</reg:DataNascita><reg:ComuneNascita>ROMA</reg:ComuneNascita><reg:ProvinciaNascita>RM</reg:ProvinciaNascita>
+          </suc:DatiAnagrafici>
+            <suc:Telefono>0000000000</suc:Telefono>
+          </suc:Presentatore>
+          <suc:FirmaModello><suc:FirmaDichiarante>1</suc:FirmaDichiarante></suc:FirmaModello>
+        </suc:Frontespizio>
+      </suc:Dichiarazione>
+    </suc:Fornitura>
+  </tm:Contenuto>
+</tm:Messaggio>

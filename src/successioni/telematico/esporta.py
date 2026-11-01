@@ -1,0 +1,1132 @@
+"""Esportazione della pratica nel file telematico SUC13 (perimetro iniziale dichiarato).
+
+Contratto (docs/CONTRATTI_MODULI.md, area 1)::
+
+    esporta_xml(dati, contesto) -> EsitoExport(xml | None, errori, non_supportato, mappa, ...)
+
+PERIMETRO di questa versione (vedi ``PERIMETRO`` e docs/MATRICE_COPERTURA.md):
+- busta tm:Messaggio / tm:Contenuto[@CodiceFornitura='SUC13'] / suc:Fornitura (Specifiche p. 4, 13-15);
+- frontespizio: prima dichiarazione, devoluzione per legge, defunto residente in Italia, dichiarante erede/chiamato
+  (codice carica 1) presente nel quadro EA, firma del dichiarante, impegno alla trasmissione dell'intermediario;
+- EA: eredi (tipo 1) e chiamati (tipo 3) persone fisiche, senza rinuncia, rappresentazione o trust;
+- EB: terreni in Italia non tavolari, natura 'T';  EC: fabbricati in Italia non tavolari con rendita;
+- ER: cespiti BI, CR, DN, AB;  ED: passivita' attribuite a un solo soggetto del quadro EA;
+- devoluzioni con lo stesso diritto del defunto (valore quota = valore x quota, Fascicolo I p. PDF 24);
+- EE: totali calcolati dalle annotazioni XSD.
+Tutto il resto finisce in ``non_supportato`` e l'XML non viene prodotto.
+
+Quadri EF, EG, EH: per le annotazioni dello schema sono obbligatori nella quasi totalita' dei casi reali
+(EF dal 2025 e con EA+immobili, EG con EA, EH salvo codici carica 5/6/7) ma NON sono generati da questa versione.
+Sono riportati in ``quadri_mancanti``: ``completo`` resta False e, con ``scopo='completo'`` (predefinito), ``xml`` e'
+None. Con ``scopo='bozza_tecnica'`` si ottiene l'XML valido allo schema ma dichiaratamente INCOMPLETO, utile per
+prove di schema/anteprima; non va sottoposto al controllo ufficiale come dichiarazione completa ne' trasmesso.
+
+Determinismo: stessi dati e contesto -> stessi byte. Le righe sono ordinate con chiavi derivate dai dati (non
+dall'ordine delle liste), quindi riordinare le collezioni non cambia l'XML ne' la mappa id -> rigo/modulo.
+"""
+from __future__ import annotations
+
+import hashlib
+import re
+from dataclasses import asdict, dataclass, field
+from datetime import date
+from fractions import Fraction
+
+from lxml import etree
+
+from .. import quadri as Q
+from .. import valori as V
+from ..schema import Errore
+from . import fonti as FO
+from . import formati as F
+from . import modello_xsd as M
+from . import supplemento as SUP
+from . import xsd as X
+
+PERIMETRO = {
+    "Frontespizio": "prima dichiarazione; devoluzione per legge; defunto residente in Italia; dichiarante con codice "
+                    "carica 1 presente in EA; firma; impegno alla trasmissione se TipoFornitore=10",
+    "EA": "eredi (1) e chiamati (3), persone fisiche; niente rinuncia, rappresentazione, trust, portatore handicap si",
+    "EB": "terreni in Italia (provincia non tavolare), natura T, con valore",
+    "EC": "fabbricati in Italia (provincia non tavolare), con rendita catastale (categorie non F) e valore",
+    "ER": "tipi cespite BI, CR, DN, AB con valore; beni non esteri",
+    "ED": "passivita' con tipo, documento, possesso e ripartizione a un solo soggetto EA",
+    "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
+    "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; nessuna agevolazione/riduzione",
+}
+QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "ER")
+SCOPI = ("completo", "bozza_tecnica")
+_ID_DICH = re.compile(r"[0-9]{4}[1-9]|[0-9]{3}[1-9][0-9]|[0-9]{2}[1-9][0-9]{2}|[0-9][1-9][0-9]{3}|[1-9][0-9]{4}")
+
+
+@dataclass
+class ContestoExport:
+    """Dati della fornitura che non appartengono alla pratica."""
+    cf_fornitore: str                      # tm:Intestazione/CodiceFiscaleFornitore (Specifiche p. 13)
+    tipo_fornitore: str = "1"              # suc:Intestazione/TipoFornitore: 1 o 10 (Specifiche p. 15)
+    identificativo: str = "00001"          # Dichiarazione/@identificativo (fornitura_v2.xsd Identificativo_Type)
+    data_riferimento: date | None = None   # 'data corrente' per DatoDT_Type; None = oggi
+    impegno_codice: str | None = None      # ImpegnoATrasmettere/ImpegnoATrasmettere (reg:ImpegnoPresentazione_Type)
+    data_impegno: str | None = None        # AAAA-MM-GG
+    spazio_utente: str | None = None
+    scopo: str = "completo"                # 'completo' | 'bozza_tecnica'
+
+
+@dataclass
+class EsitoExport:
+    xml: bytes | None
+    errori: list[Errore]
+    non_supportato: list[str]
+    mappa: dict[str, dict]
+    avvisi: list[Errore] = field(default_factory=list)
+    quadri_mancanti: list[Errore] = field(default_factory=list)
+    completo: bool = False
+    impronta_xml: str | None = None
+    versione: str = FO.VERSIONE_MODULO
+    ambito: str = ("validazione di schema e regole interne del perimetro dichiarato; NON e' il controllo ufficiale "
+                   "dell'Agenzia")
+
+    def asdict(self) -> dict:
+        d = asdict(self)
+        d["xml"] = self.xml.decode("utf-8") if self.xml is not None else None
+        return d
+
+
+# --------------------------------------------------------------------------------------------- codici XSD
+def _norm(s: str) -> str:
+    s = s.lower().replace("'", "").replace("’", "")
+    return re.sub(r"[^a-z0-9]+", "_", s).strip("_")
+
+
+def codice_enum(valore, tipo: str, *, alias_descrizione: bool = False) -> str:
+    """Valore ammesso dall'enumerazione XSD ``tipo``.
+
+    Con ``alias_descrizione`` accetta anche la descrizione normalizzata (es. 'proprieta', 'nuda_proprieta',
+    'usufrutto') ricavata dalla documentazione dell'enumerazione nell'XSD, e la forma a due cifre ('08' -> '8')
+    usata nel Fascicolo I p. PDF 24. Nessun altro alias."""
+    enum = X.enumerazioni(tipo)
+    if V.e_stato(valore):
+        raise F.ValoreXml(f"dato in stato '{valore['stato']}'")
+    s = str(valore).strip() if valore is not None else ""
+    if s in enum:
+        return s
+    if alias_descrizione:
+        if s.isdigit() and s.lstrip("0") in enum:
+            return s.lstrip("0")
+        per_desc = {_norm(d): k for k, d in enum.items()}
+        if _norm(s) in per_desc:
+            return per_desc[_norm(s)]
+    elenco = ", ".join(f"{k} ({d[:40]})" if d else k for k, d in enum.items())
+    raise F.ValoreXml(f"{valore!r} non ammesso; valori ammessi ({tipo}): {elenco}")
+
+
+# --------------------------------------------------------------------------------------------- esportatore
+class _Export:
+    def __init__(self, dati: dict, ctx: ContestoExport):
+        self.d = dati
+        self.ctx = ctx
+        self.oggi = ctx.data_riferimento or date.today()
+        self.errori: list[Errore] = []
+        self.ns: list[str] = []
+        self.avvisi: list[Errore] = []
+        self.mancanti: list[Errore] = []
+        self.mappa: dict[str, dict] = {}
+        self.usati: dict[str, set[str]] = {}
+        self.interni: dict[str, set[str]] = {}
+
+    # ---------------------------------------------------------------- utilita'
+    def err(self, codice, percorso, messaggio, fonte):
+        self.errori.append(Errore(codice, percorso, messaggio, fonte))
+
+    def avv(self, codice, percorso, messaggio, fonte):
+        self.avvisi.append(Errore(codice, percorso, messaggio, fonte))
+
+    def usa(self, ent: dict, *campi):
+        self.usati.setdefault(ent["id"], set()).update(campi)
+
+    def interno(self, ent: dict, *campi):
+        self.interni.setdefault(ent["id"], set()).update(campi)
+
+    def val(self, coll: str, ent: dict, campo: str, conv, *, elemento: str, obbl: bool = True, fonte: str | None = None):
+        """Legge (entita' o supplemento), converte e registra l'uso. ``None`` se assente e facoltativo."""
+        self.usa(ent, campo)
+        v = SUP.attr(self.d, coll, ent, campo)
+        perc = f"{coll}[{ent['id']}].{campo}"
+        f = fonte or FO.fonte_xsd(elemento)
+        if v is None or v == "":
+            if obbl:
+                self.err("DATO_MANCANTE", perc, f"dato obbligatorio per <{elemento.split('/')[-1]}>", f)
+            return None
+        if V.e_stato(v):
+            if v["stato"] == "zero" and not obbl:
+                return None
+            self.err("DATO_NON_DEFINITIVO", perc, f"il dato e' in stato '{v['stato']}': non esportabile", f)
+            return None
+        try:
+            return conv(v)
+        except (F.ValoreXml, V.ValoreNonValido, KeyError, TypeError, ValueError) as e:
+            self.err("VALORE_NON_VALIDO", perc, f"<{elemento.split('/')[-1]}>: {e}", f)
+            return None
+
+    # ---------------------------------------------------------------- anagrafica
+    def anagrafica(self, p: dict, elemento: str) -> dict | None:
+        c = "persone"
+        r = {
+            "Cognome": self.val(c, p, "cognome", lambda v: F.an(v, 80, tipo="AN2"), elemento=elemento + "/Cognome"),
+            "Nome": self.val(c, p, "nome", lambda v: F.an(v, 80, tipo="AN2"), elemento=elemento + "/Nome"),
+            "Sesso": self.val(c, p, "sesso", lambda v: codice_enum(v, "Sesso_Type"), elemento=elemento + "/Sesso"),
+            "DataNascita": self.val(c, p, "data_nascita", lambda v: F.data(v, non_oltre=self.oggi),
+                                    elemento=elemento + "/DataNascita"),
+            "ComuneNascita": self.val(c, p, "luogo_nascita", lambda v: F.an(v, 50), elemento=elemento + "/ComuneNascita"),
+            "ProvinciaNascita": self.val(c, p, "provincia_nascita", lambda v: codice_enum(str(v).upper(), "PN_Type"),
+                                         elemento=elemento + "/ProvinciaNascita"),
+        }
+        return r if all(v is not None for v in r.values()) else None
+
+    # ---------------------------------------------------------------- persone
+    def classifica_persone(self):
+        persone = self.d.get("persone", [])
+        defunti = [p for p in persone if p.get("ruolo") == "defunto"]
+        if len(defunti) != 1:
+            self.err("DEFUNTO_NON_UNICO", "persone", "serve esattamente un soggetto con ruolo 'defunto'",
+                     FO.fonte_xsd("Frontespizio/DatiDefunto"))
+        self.defunto = defunti[0] if len(defunti) == 1 else None
+        self.ea = [p for p in persone if p.get("ruolo") in ("erede", "legatario")]
+        pres = [p for p in persone if p.get("ruolo") == "presentatore"]
+        for p in persone:
+            self.usa(p, "ruolo")
+            if p.get("ruolo") in ("rappresentante", "altro") or p.get("ruolo") is None:
+                self.scartati.add(p["id"])
+                self.ns.append(f"persone[{p['id']}]: ruolo {p.get('ruolo')!r} non serializzabile in questa versione "
+                               "(EA supporta eredi e chiamati; rappresentanti/altri soggetti non ancora mappati)")
+        if len(pres) > 1:
+            self.err("PRESENTATORE_NON_UNICO", "persone", "piu' soggetti con ruolo 'presentatore'",
+                     FO.fonte_xsd("Frontespizio/Presentatore"))
+        rif = SUP.presentatore_sup(self.d).get("persona_id")
+        self.presentatore = None
+        if rif:
+            cand = [p for p in persone if p["id"] == rif]
+            if not cand:
+                self.err("RIFERIMENTO_INESISTENTE", "opzioni.telematico.dichiarazione.presentatore.persona_id",
+                         f"persona {rif} inesistente", "docs/regole/mappa_xsd.md")
+            elif pres:
+                self.err("PRESENTATORE_AMBIGUO", "opzioni.telematico.dichiarazione.presentatore.persona_id",
+                         "indicati sia un riferimento al presentatore sia un soggetto con ruolo 'presentatore'",
+                         "docs/regole/mappa_xsd.md")
+            else:
+                self.presentatore = cand[0]
+        elif pres:
+            self.presentatore = pres[0]
+        else:
+            self.err("PRESENTATORE_MANCANTE", "persone", "manca il dichiarante (ruolo 'presentatore' o riferimento "
+                     "opzioni.telematico.dichiarazione.presentatore.persona_id)", FO.fonte_xsd("Frontespizio/Presentatore"))
+
+    def ordina_ea(self):
+        def chiave(p):
+            return ((p.get("cognome") or "").upper() if isinstance(p.get("cognome"), str) else "",
+                    (p.get("nome") or "").upper() if isinstance(p.get("nome"), str) else "",
+                    (p.get("codice_fiscale") or "").upper() if isinstance(p.get("codice_fiscale"), str) else "",
+                    p["id"])
+        self.ea.sort(key=chiave)
+        self.pos_ea: dict[str, tuple[int, int]] = {}
+        for i, p in enumerate(self.ea):
+            self.pos_ea[p["id"]] = (i // 3 + 1, i % 3 + 1)
+
+    def quadro_ea(self) -> dict | None:
+        if not self.ea:
+            return None
+        legge = True  # unico caso supportato (vedi frontespizio)
+        stato_civile = SUP.dich(self.d, "stato_civile")
+        soggetti, cf_visti, coniugi = [], {}, 0
+        self.tipo_ea: dict[str, str] = {}
+        self.grado_ea: dict[str, str] = {}
+        self.handicap_ea: dict[str, bool] = {}
+        for p in self.ea:
+            base = f"persone[{p['id']}]"
+            el = "QuadroEA/Modulo/Soggetto"
+            cfv = self.val("persone", p, "codice_fiscale", F.cf, elemento=el + "/CodiceFiscale")
+            if cfv:
+                if cfv in cf_visti:
+                    self.ns.append(f"{base}: stesso codice fiscale di persone[{cf_visti[cfv]}] (soggetto su piu' righi "
+                                   "con qualifiche diverse): non supportato")
+                cf_visti[cfv] = p["id"]
+            ruolo = p.get("ruolo")
+            tipo = SUP.attr(self.d, "persone", p, "tipo_soggetto")
+            self.usa(p, "tipo_soggetto")
+            if ruolo == "legatario":
+                self.ns.append(f"{base}: legatario (tipo soggetto 2) ammesso solo con devoluzione per testamento o legge "
+                               "estera (annotazione TipoSoggetto), non supportate in questa versione")
+                tipo = "2"
+            elif tipo is None:
+                tipo = "1"
+            else:
+                try:
+                    tipo = codice_enum(tipo, "TipoSoggetto_Type")
+                except F.ValoreXml as e:
+                    self.err("VALORE_NON_VALIDO", base + ".tipo_soggetto", str(e), FO.fonte_xsd(el + "/TipoSoggetto"))
+                    tipo = None
+                if tipo not in (None, "1", "3"):
+                    self.ns.append(f"{base}: tipo soggetto {tipo} (rinunciatario, trust, altro) non supportato")
+            grado = SUP.attr(self.d, "persone", p, "grado_parentela")
+            self.usa(p, "grado_parentela", "relazione_con_defunto")
+            rel = p.get("relazione_con_defunto")
+            if grado is None and isinstance(rel, str) and rel.strip() in X.enumerazioni("GradoParentela_Type"):
+                grado = rel.strip()
+            elif rel not in (None, ""):
+                self.interno(p, "relazione_con_defunto")
+            if grado is None:
+                self.err("DATO_MANCANTE", base + ".grado_parentela", "grado di parentela (codice dell'allegato 1, es. "
+                         "'02' figlio) obbligatorio", FO.fonte_xsd(el + "/GradoParentela"))
+            else:
+                try:
+                    grado = codice_enum(grado, "GradoParentela_Type")
+                except F.ValoreXml as e:
+                    self.err("VALORE_NON_VALIDO", base + ".grado_parentela", str(e), FO.fonte_xsd(el + "/GradoParentela"))
+                    grado = None
+            if grado == "01":
+                coniugi += 1
+                if stato_civile not in ("2", "3", "5", "7"):
+                    self.err("REGOLA_GRADO_CONIUGE", base + ".grado_parentela", "grado '01' ammesso solo con stato civile "
+                             "del defunto 2, 3, 5 o 7", FO.fonte_annotazione("QuadroEA/Modulo/Soggetto/GradoParentela"))
+            if legge and grado in ("12", "13", "14", "17", "18", "19", "23", "24", "25", "26", "35", "37", "38", "39"):
+                self.err("REGOLA_GRADO_LEGGE", base + ".grado_parentela", f"con devoluzione per legge il grado {grado} "
+                         "non e' ammesso (affini, estranei, enti)", FO.fonte_annotazione(el + "/GradoParentela"))
+            if legge and grado in ("04", "15"):
+                self.ns.append(f"{base}: grado {grado} con devoluzione per legge richiede la sezione 'Successione per "
+                               "rappresentazione', non supportata")
+            if legge and grado == "36" and len(self.ea) > 1:
+                self.err("REGOLA_GRADO_LEGGE", base + ".grado_parentela", "grado 36 (Stato) ammesso solo se unico "
+                         "soggetto del quadro", FO.fonte_annotazione(el + "/GradoParentela"))
+            if grado in ("36", "37", "38", "39"):
+                self.ns.append(f"{base}: soggetti diversi da persone fisiche (denominazione) non supportati")
+            ph = SUP.attr(self.d, "persone", p, "portatore_handicap")
+            self.usa(p, "portatore_handicap")
+            if ph not in (None, False, True):
+                self.err("VALORE_NON_VALIDO", base + ".portatore_handicap", "atteso true/false",
+                         FO.fonte_xsd(el + "/PortatoreHandicap"))
+            if p.get("data_decesso") not in (None, ""):
+                self.ns.append(f"{base}.data_decesso: soggetto EA deceduto (rappresentazione/trasmissione) non supportato")
+                self.usa(p, "data_decesso")
+            ana = self.anagrafica(p, el + "/DatiAnagrafici")
+            s = {"CodiceFiscale": cfv, "TipoSoggetto": tipo, "GradoParentela": grado}
+            if ph is True:
+                s["PortatoreHandicap"] = "1"
+            s["DatiAnagrafici"] = ana
+            self.tipo_ea[p["id"]] = tipo
+            self.grado_ea[p["id"]] = grado
+            self.handicap_ea[p["id"]] = ph is True
+            soggetti.append(s)
+            m, r = self.pos_ea[p["id"]]
+            self.mappa[p["id"]] = {"coll": "persone", "quadro": "EA", "modulo": m, "rigo": r,
+                                   "xpath": f"{_XP_DICH}/suc:QuadroEA/suc:Modulo[{m}]/suc:Soggetto[{r}]"}
+        if coniugi > 1:
+            self.err("REGOLA_GRADO_CONIUGE", "persone", "ammesso un solo rigo con grado di parentela '01'",
+                     FO.fonte_annotazione("QuadroEA/Modulo/Soggetto/GradoParentela"))
+        return {"Modulo": [{"Soggetto": soggetti[i:i + 3]} for i in range(0, len(soggetti), 3)]}
+
+    # ---------------------------------------------------------------- beni
+    def quota_possesso(self, b: dict, elemento: str):
+        self.usa(b, "quota_defunto")
+        q = b.get("quota_defunto")
+        perc = f"beni[{b['id']}].quota_defunto"
+        if q is None or V.e_stato(q):
+            self.err("DATO_MANCANTE", perc, "quota di possesso del defunto obbligatoria", FO.fonte_xsd(elemento))
+            return None, None
+        try:
+            n, d = F.quota_grezza(q)
+            if len(str(d)) > 6:
+                raise F.ValoreXml(f"denominatore {d}: massimo 6 cifre (PossessoDenominatore)")
+            return {"PossessoNumeratore": F.numeratore_possesso(n), "PossessoDenominatore": str(d)}, Fraction(n, d)
+        except (F.ValoreXml, V.ValoreNonValido) as e:
+            self.err("VALORE_NON_VALIDO", perc, str(e), FO.fonte_xsd(elemento))
+            return None, None
+
+    def luogo(self, b: dict, quadro: str, *, indirizzo_obbl: bool) -> dict | None:
+        c, el = "beni", f"Quadro{quadro}/Modulo/{'Terreni' if quadro == 'EB' else 'Fabbricati'}/Luogo"
+        prov = self.val(c, b, "provincia", lambda v: str(v).strip().upper(), elemento=el + "/Provincia")
+        if prov is None:
+            return None
+        if prov == "EE":
+            self.ns.append(f"beni[{b['id']}]: immobile all'estero (provincia EE) non supportato")
+            return None
+        if prov not in X.enumerazioni("PENonTavolare_Type"):
+            if prov in X.enumerazioni("PN_Type"):
+                self.ns.append(f"beni[{b['id']}]: provincia {prov} del sistema tavolare (quadri EL/EM) non supportata")
+            else:
+                self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].provincia", f"sigla provincia {prov!r} non ammessa",
+                         FO.fonte_xsd(el + "/Provincia (reg:PENonTavolare_Type)"))
+            return None
+        it = {
+            "ComuneAmministrativo": self.val(c, b, "comune_amministrativo", lambda v: F.an(v, 50),
+                                             elemento=el + "/Italia/ComuneAmministrativo", obbl=False)
+            or self.val(c, b, "comune", lambda v: F.an(v, 50), elemento=el + "/Italia/ComuneAmministrativo"),
+            "CodiceComune": self.val(c, b, "codice_comune", lambda v: F.an(v, 4 if quadro == "EB" else 5),
+                                     elemento=el + "/Italia/CodiceComune",
+                                     fonte=FO.fonte_xsd(el + "/Italia/CodiceComune") + "; " +
+                                     FO.fonte_fasc1(28, "Codice Comune: codice catastale")),
+        }
+        ind = self.val(c, b, "indirizzo", lambda v: F.an(v, 80), elemento=el + "/Italia/Indirizzo", obbl=indirizzo_obbl,
+                       fonte=FO.fonte_annotazione(f"Quadro{quadro}/Modulo/Fabbricati/Luogo") if indirizzo_obbl else None)
+        if ind:
+            it["Indirizzo"] = ind
+        it["CodiceComuneAmministrativo"] = self.val(c, b, "codice_comune_amministrativo", lambda v: F.an(v, 5),
+                                                    elemento=el + "/Italia/CodiceComuneAmministrativo")
+        self.usa(b, "comune")  # letto come ComuneAmministrativo se comune_amministrativo manca
+        if any(v is None for v in it.values()):
+            return None
+        return {"Provincia": prov, "Italia": it}
+
+    def catastali(self, b: dict, quadro: str) -> dict | None:
+        c = "beni"
+        el = f"Quadro{quadro}/Modulo/{'Terreni/DatiTerreni' if quadro == 'EB' else 'Fabbricati/DatiFabbricati'}/DatiCatastali"
+        r = {"Foglio": self.val(c, b, "foglio", lambda v: F.an(str(v), 4), elemento=el + "/Foglio"),
+             "Particella": self.val(c, b, "particella", lambda v: F.an(str(v), 5, tipo="PART"), elemento=el + "/Particella")}
+        sub = self.val(c, b, "subalterno", lambda v: F.an(str(v), 4), elemento=el + "/Subalterno", obbl=False)
+        if sub:
+            r["Subalterno"] = sub
+        return r if all(v is not None for v in r.values()) else None
+
+    def diritto_defunto(self, b: dict, tipo: str, elemento: str):
+        return self.val("beni", b, "diritto", lambda v: codice_enum(v, tipo, alias_descrizione=True), elemento=elemento,
+                        fonte=FO.fonte_xsd(elemento + f" ({tipo})"))
+
+    def valore_bene(self, b: dict, elemento: str):
+        def conv(v):
+            s = F.euro_intero(v)
+            if len(s) > 13:
+                raise F.ValoreXml(f"{s}: massimo 13 cifre (Valore)")
+            return s
+        return self.val("beni", b, "valore", conv, elemento=elemento,
+                        fonte=FO.fonte_xsd(elemento) + "; " + FO.fonte_fasc1(22, "Valore: base imponibile della quota del "
+                                                                              "defunto, arrotondata all'unita' di euro"))
+
+    def riga_eb(self, b: dict) -> dict | None:
+        c, el = "beni", "QuadroEB/Modulo/Terreni"
+        for campo in ("sezione", "categoria"):
+            if b.get(campo) not in (None, ""):
+                self.usa(b, campo)
+                self.ns.append(f"beni[{b['id']}].{campo}: campo non previsto dal tracciato dei terreni "
+                               "(reg:DatiCatastali_Type / reg:DatiCatastaliTerreni_Type)")
+        luogo = self.luogo(b, "EB", indirizzo_obbl=False)
+        cat = self.catastali(b, "EB")
+        natura = self.val(c, b, "natura", lambda v: codice_enum(str(v).upper(), "CodiciNatura_Type"),
+                          elemento=el + "/DatiTerreni/DatiTerreni/Natura")
+        if natura and natura != "T":
+            self.ns.append(f"beni[{b['id']}].natura={natura}: solo natura 'T' supportata in questa versione")
+        dt: dict = {}
+        sup = SUP.attr(self.d, c, b, "superficie")
+        self.usa(b, "superficie")
+        if sup:
+            try:
+                if not isinstance(sup, dict) or set(sup) - SUP.CHIAVI_SUPERFICIE:
+                    raise F.ValoreXml("attesa {'ettari','are','centiare'}")
+                s = {k2: F.euro_intero(str(sup[k1])) for k1, k2 in (("ettari", "SuperficieEttari"), ("are", "SuperficieAre"),
+                                                                    ("centiare", "SuperficieCentiare"))
+                     if sup.get(k1) not in (None, 0, "0")}
+                if s:
+                    dt["Superficie"] = s
+            except (F.ValoreXml, V.ValoreNonValido) as e:
+                self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].superficie", str(e),
+                         FO.fonte_xsd(el + "/DatiTerreni/DatiTerreni/Superficie"))
+        dt["Natura"] = natura
+        rd = self.val(c, b, "reddito_dominicale", F.euro_centesimi, elemento=el + "/DatiTerreni/DatiTerreni/RedditoDominicale",
+                      obbl=False)
+        if rd is None and b.get("rendita") not in (None, ""):
+            rd = self.val(c, b, "rendita", F.euro_centesimi, elemento=el + "/DatiTerreni/DatiTerreni/RedditoDominicale")
+            if rd:
+                self.avv("INTERPRETAZIONE_RENDITA_TERRENO", f"beni[{b['id']}].rendita",
+                         "per un terreno il campo 'rendita' e' esportato come Reddito dominicale (unico reddito previsto "
+                         "dal tracciato EB)", FO.fonte_xsd(el + "/DatiTerreni/DatiTerreni/RedditoDominicale"))
+        else:
+            self.usa(b, "rendita")
+        if rd:
+            dt["RedditoDominicale"] = rd
+        poss, fposs = self.quota_possesso(b, el + "/Possesso")
+        dir_p = self.diritto_defunto(b, "CodiciDirittoImmobili_Type", el + "/CodiceDiritto_P")
+        tip = self.val(c, b, "tipologia_terreno", lambda v: codice_enum(v, "TerrenoEdificabile_Type"),
+                       elemento=el + "/TipologiaTerreno", fonte=FO.fonte_annotazione(el + "/TipologiaTerreno"))
+        valore = self.valore_bene(b, el + "/Valore")
+        if None in (luogo, cat, natura, poss, dir_p, tip, valore):
+            return None
+        self.diritto_bene[b["id"]] = dir_p
+        self.valore_beni[b["id"]] = int(valore)
+        return {"Luogo": luogo, "DatiTerreni": {"DatiCatastali": cat, "DatiTerreni": dt}, "Possesso": poss,
+                "CodiceDiritto_P": dir_p, "TipologiaTerreno": tip, "Valore": valore}
+
+    def riga_ec(self, b: dict) -> dict | None:
+        c, el = "beni", "QuadroEC/Modulo/Fabbricati"
+        eld = el + "/DatiFabbricati/DatiFabbricati"
+        luogo = self.luogo(b, "EC", indirizzo_obbl=True)
+        cat = self.catastali(b, "EC")
+        df: dict = {}
+        sez = self.val(c, b, "sezione", lambda v: F.an(str(v), 3), elemento=eld + "/SezioneUrbana", obbl=False)
+        if sez:
+            df["SezioneUrbana"] = sez
+        zona = self.val(c, b, "zona_censuaria", lambda v: F.an(str(v), 3), elemento=eld + "/ZonaCensuaria", obbl=False)
+        if zona:
+            df["ZonaCensuaria"] = zona
+        categ = self.val(c, b, "categoria", lambda v: codice_enum(str(v).upper().replace("/", ""),
+                                                                  "CodiciCategoriaCatastale_Type"),
+                         elemento=eld + "/CategoriaCatastale", fonte=FO.fonte_annotazione(eld + "/CategoriaCatastale"))
+        df["CategoriaCatastale"] = categ
+        classe = self.val(c, b, "classe", lambda v: F.an(str(v), 2), elemento=eld + "/Classe", obbl=False)
+        if classe:
+            df["Classe"] = classe
+        richiede_consistenza = bool(categ) and categ[0] in "ABC"
+        cons = self.val(c, b, "consistenza", F.euro_centesimi, elemento=eld + "/Consistenza", obbl=richiede_consistenza,
+                        fonte=FO.fonte_annotazione(eld + "/Consistenza"))
+        if cons and not richiede_consistenza and categ:
+            self.err("REGOLA_CONSISTENZA", f"beni[{b['id']}].consistenza", f"la consistenza non va indicata per la "
+                     f"categoria {categ}", FO.fonte_annotazione(eld + "/Consistenza"))
+        elif cons:
+            df["Consistenza"] = cons
+        categoria_f = bool(categ) and categ.startswith("F")
+        rend = self.val(c, b, "rendita", F.euro_centesimi, elemento=eld + "/RenditaCatastale", obbl=not categoria_f,
+                        fonte=FO.fonte_annotazione(eld + "/RenditaCatastale") + " (rendita proposta/DeterminazioneRendita "
+                        "non supportata)")
+        if rend and categoria_f:
+            self.err("REGOLA_RENDITA", f"beni[{b['id']}].rendita", f"la rendita non va indicata per la categoria {categ}",
+                     FO.fonte_annotazione(eld + "/RenditaCatastale"))
+        elif rend:
+            df["RenditaCatastale"] = rend
+        poss, fposs = self.quota_possesso(b, el + "/Possesso")
+        dir_p = self.diritto_defunto(b, "CodiciDirittoImmobili_Type", el + "/CodiceDiritto_P")
+        valore = self.valore_bene(b, el + "/Valore")
+        if None in (luogo, cat, categ, poss, dir_p, valore):
+            return None
+        self.diritto_bene[b["id"]] = dir_p
+        self.valore_beni[b["id"]] = int(valore)
+        return {"Luogo": luogo, "DatiFabbricati": {"DatiCatastali": cat, "DatiFabbricati": df}, "Possesso": poss,
+                "CodiceDiritto_P": dir_p, "Valore": valore}
+
+    def riga_er(self, b: dict) -> dict | None:
+        c, el = "beni", "QuadroER/Modulo/Rendite"
+        for campo in ("comune", "sezione", "foglio", "particella", "subalterno", "categoria", "rendita"):
+            if b.get(campo) not in (None, ""):
+                self.usa(b, campo)
+                self.ns.append(f"beni[{b['id']}].{campo}: campo catastale non previsto per i beni del quadro ER")
+        tc = self.val(c, b, "tipo_cespite", lambda v: codice_enum(str(v).upper(), "TipoCespite_Type"),
+                      elemento=el + "/TipoCespite", fonte=FO.fonte_xsd(el + "/TipoCespite") + "; " +
+                      FO.fonte_fasc1(33, "Tipo cespite; CR comprende le somme depositate in conto corrente"))
+        if tc == "GD":
+            self.ns.append(f"beni[{b['id']}].tipo_cespite=GD: legato di cosa genericamente determinata non supportato")
+        descr = self.val(c, b, "descrizione", lambda v: F.an(v, 250), elemento=el + "/Descrizione")
+        poss, fposs = self.quota_possesso(b, el + "/Possesso")
+        dir_p = self.diritto_defunto(b, "CodiciDirittoNonImmobili", el + "/CodiceDiritto_P")
+        valore = self.valore_bene(b, el + "/Valore")
+        if None in (tc, descr, poss, dir_p, valore):
+            return None
+        self.diritto_bene[b["id"]] = dir_p
+        self.valore_beni[b["id"]] = int(valore)
+        self.tipo_cespite[b["id"]] = tc
+        return {"TipoCespite": tc, "Descrizione": descr, "Possesso": poss, "CodiceDiritto_P": dir_p, "Valore": valore}
+
+    def devoluzioni_bene(self, b: dict, quadro: str) -> list[dict]:
+        """Righe della sezione devoluzione del bene, ordinate per posizione EA (annotazione IdentificazioneSoggetto:
+        'in ordine progressivo')."""
+        tipo_rip = "CodiciDirittoNonImmobiliDevoluzione" if quadro == "ER" else "CodiciDiritto_Type"
+        el = f"Quadro{quadro}/Modulo/{_RIGA[quadro]}/Devoluzione{quadro}/Devoluzione"
+        devs = [d for d in self.d.get("devoluzioni", []) if d.get("bene_id") == b["id"]]
+        righe, somma, persone_viste = [], Fraction(0), set()
+        dir_def = self.diritto_bene.get(b["id"])
+        valore = self.valore_beni.get(b["id"])
+        if not devs:
+            self.err("DEVOLUZIONE_MANCANTE", f"beni[{b['id']}]", "in presenza del quadro EA la sezione devoluzione "
+                     "deve essere compilata", FO.fonte_annotazione(f"Quadro{quadro}/Modulo/{_RIGA[quadro]}/Devoluzione{quadro}"))
+            return []
+        for d in devs:
+            self.usa(d, "bene_id", "persona_id", "quota", "diritto")
+            perc = f"devoluzioni[{d['id']}]"
+            pid = d.get("persona_id")
+            if pid not in self.pos_ea:
+                self.err("DEVOLUZIONE_SOGGETTO", perc + ".persona_id", "il beneficiario deve essere un soggetto del "
+                         "quadro EA (erede o chiamato)", FO.fonte_annotazione(el + "/IdentificazioneSoggetto"))
+                continue
+            if pid in persone_viste:
+                self.err("DEVOLUZIONE_DUPLICATA", perc, "lo stesso beneficiario compare piu' volte sullo stesso bene con "
+                         "lo stesso diritto", FO.fonte_annotazione(el + "/IdentificazioneSoggetto"))
+            persone_viste.add(pid)
+            try:
+                n, den = F.quota_grezza(d.get("quota"))
+            except (F.ValoreXml, V.ValoreNonValido, AttributeError) as e:
+                self.err("VALORE_NON_VALIDO", perc + ".quota", f"quota di devoluzione: {e}", FO.fonte_xsd(el + "/Quota"))
+                continue
+            try:
+                dir_r = codice_enum(d.get("diritto"), tipo_rip, alias_descrizione=True)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", perc + ".diritto", str(e), FO.fonte_xsd(el + "/CodiceDiritto_Rip"))
+                continue
+            if dir_def is not None and dir_r != dir_def:
+                self.ns.append(f"{perc}: diritto devoluto {dir_r} diverso dal diritto del defunto {dir_def} (il valore "
+                               "quota richiede le regole di valutazione dei diritti, Fascicolo I p. PDF 24): non supportato")
+                continue
+            somma += Fraction(n, den)
+            righe.append((self.pos_ea[pid], dir_r, d["id"], n, den))
+        if righe and somma != 1:
+            self.err("QUOTE_DEVOLUZIONE", f"beni[{b['id']}]", f"la somma delle quote di devoluzione e' "
+                     f"{somma.numerator}/{somma.denominator}, deve essere 1/1",
+                     FO.fonte_annotazione(el + "/Quota/QuotaElementi"))
+        righe.sort()
+        out = []
+        for (m, r), dir_r, did, n, den in righe:
+            qv = None
+            if valore is not None:
+                cent, esatto = F.frazione_a_centesimi(Fraction(valore) * Fraction(n, den))
+                qv = F.euro_centesimi(cent)
+                self.quota_valore[did] = cent
+                if not esatto:
+                    self.avv("ARROTONDAMENTO_VALORE_QUOTA", f"devoluzioni[{did}]",
+                             f"valore quota {valore} x {n}/{den} non esatto al centesimo: arrotondato a {qv} "
+                             "(ROUND_HALF_UP, scelta implementativa entro la tolleranza dell'annotazione QuotaValore)",
+                             FO.fonte_annotazione(el + "/Quota/QuotaValore") + "; " + FO.fonte_fasc1(24, "Valore quota"))
+            quota = {"QuotaElementi": {"QuotaNumeratore": str(n), "QuotaDenominatore": str(den)}}
+            if qv is not None:
+                quota["QuotaValore"] = qv
+            out.append({"_id": did, "IdentificazioneSoggetto": {"Rigo": str(r), "Modulo": str(m)}, "Quota": quota,
+                        "CodiceDiritto_Rip": dir_r})
+        return out
+
+    # ---------------------------------------------------------------- quadri beni
+    def quadro_beni(self, quadro: str, beni: list[dict], costruttore) -> dict | None:
+        """Righe del quadro con continuazioni (max 3 devoluzioni per rigo) e impaginazione in moduli."""
+        if not beni:
+            return None
+        righe: list[tuple[str, dict, list]] = []  # (id bene, dati rigo, devoluzioni del rigo)
+        for b in beni:
+            r = costruttore(b)
+            if r is None:  # errori gia' registrati sul bene: le sue devoluzioni non si valutano
+                for d in self.d.get("devoluzioni", []):
+                    if d.get("bene_id") == b["id"]:
+                        self.scartati.add(d["id"])
+                continue
+            devs = self.devoluzioni_bene(b, quadro) if self.ea else []
+            blocchi = [devs[i:i + 3] for i in range(0, len(devs), 3)] or [[]]
+            for k, blocco in enumerate(blocchi):
+                righe.append((b["id"], r if k == 0 else {}, blocco, k < len(blocchi) - 1))
+        per_mod = _PER_MODULO[quadro]
+        moduli = []
+        for i, (bid, dati_rigo, blocco, cont) in enumerate(righe):
+            m, rr = i // per_mod + 1, i % per_mod + 1
+            if i % per_mod == 0:
+                moduli.append({_RIGA[quadro]: []})
+            riga = dict(dati_rigo)
+            if blocco or cont:
+                sez = {"Devoluzione": [{k: v for k, v in dv.items() if k != "_id"} for dv in blocco]}
+                if cont:
+                    sez["Continuazione"] = "1"
+                riga[f"Devoluzione{quadro}"] = sez
+            moduli[-1][_RIGA[quadro]].append(riga)
+            xp = f"{_XP_DICH}/suc:Quadro{quadro}/suc:Modulo[{m}]/suc:{_RIGA[quadro]}[{rr}]"
+            if dati_rigo:
+                self.mappa[bid] = {"coll": "beni", "quadro": quadro, "modulo": m, "rigo": rr, "xpath": xp,
+                                   "righi_continuazione": []}
+            else:
+                self.mappa[bid]["righi_continuazione"].append({"modulo": m, "rigo": rr, "xpath": xp})
+            for pos, dv in enumerate(blocco, 1):
+                self.mappa[dv["_id"]] = {"coll": "devoluzioni", "quadro": quadro, "modulo": m, "rigo": rr,
+                                         "posizione": pos,
+                                         "xpath": f"{xp}/suc:Devoluzione{quadro}/suc:Devoluzione[{pos}]"}
+        return {"Modulo": moduli} if moduli else None
+
+    # ---------------------------------------------------------------- passivita'
+    def quadro_ed(self) -> dict | None:
+        pas = self.d.get("passivita", [])
+        if not pas:
+            return None
+        el = "QuadroED/Modulo/Passivita"
+
+        def chiave(p):
+            s = SUP.sup(self.d).get("passivita", {}).get(p["id"], {})
+            return (str(s.get("tipo") or ""), str(s.get("data_documento") or ""), str(p.get("descrizione") or ""), p["id"])
+        righe = []
+        for p in sorted(pas, key=chiave):
+            c, base = "passivita", f"passivita[{p['id']}]"
+            tipo = self.val(c, p, "tipo", lambda v: codice_enum(str(v), "CodiciPassivita_Type"), elemento=el + "/Tipo")
+            descr = self.val(c, p, "descrizione", lambda v: F.an(v, 250), elemento=el + "/Descrizione",
+                             fonte=FO.fonte_annotazione(el + "/Descrizione"))
+            estr = self.val(c, p, "estremi_documento", lambda v: F.an(v, 50), elemento=el + "/EstremiDocumento",
+                            fonte=FO.fonte_annotazione(el + "/EstremiDocumento"))
+            dd = self.val(c, p, "data_documento", lambda v: F.data(v, non_oltre=self.oggi), elemento=el + "/DataDocumento",
+                          fonte=FO.fonte_annotazione(el + "/DataDocumento"))
+            valore = self.val(c, p, "importo", F.euro_intero, elemento=el + "/Possesso/Valore",
+                              fonte=FO.fonte_xsd(el + "/Possesso/Valore") + "; " + FO.fonte_fasc1(38, "Valore: quota del "
+                                                                                                   "defunto, all'unita' di euro"))
+            poss: dict = {}
+            if tipo == "11":
+                self.ns.append(f"{base}: passivita' di tipo 11 (legato/onere) non supportata")
+            q = SUP.attr(self.d, c, p, "possesso")
+            self.usa(p, "possesso")
+            if q is None:
+                self.err("DATO_MANCANTE", base + ".possesso", "quota del defunto nella passivita' obbligatoria (es. 1/1)",
+                         FO.fonte_annotazione(el + "/Possesso") + "; " + FO.fonte_fasc1(38, "Quota del defunto"))
+            else:
+                try:
+                    n, d = F.quota_grezza(q)
+                    if len(str(d)) > 6:
+                        raise F.ValoreXml("denominatore oltre 6 cifre")
+                    poss = {"PossessoNumeratore": str(n), "PossessoDenominatore": str(d)}
+                except (F.ValoreXml, V.ValoreNonValido, AttributeError) as e:
+                    self.err("VALORE_NON_VALIDO", base + ".possesso", str(e), FO.fonte_xsd(el + "/Possesso"))
+            if valore is not None:
+                poss["Valore"] = valore
+                if tipo == "2" and int(valore) > 1033:
+                    self.err("REGOLA_SPESE_FUNERARIE", base + ".importo", "spese funerarie: importo massimo 1033",
+                             FO.fonte_annotazione(el + "/Possesso/Valore"))
+            prog = None
+            bid = SUP.attr(self.d, c, p, "bene_id")
+            self.usa(p, "bene_id")
+            if tipo in ("3", "4", "5", "7"):
+                if bid is None:
+                    self.err("DATO_MANCANTE", base + ".bene_id", f"per il tipo {tipo} va indicato il cespite di "
+                             "riferimento (quadro/rigo/modulo)", FO.fonte_annotazione(el + "/ProgressivoCespite"))
+                else:
+                    prog = {"_bene": bid, "_pas": p["id"]}
+            elif bid is not None:
+                self.err("REGOLA_PROGRESSIVO_CESPITE", base + ".bene_id", f"per il tipo {tipo} il cespite di riferimento "
+                         "non va indicato", FO.fonte_annotazione(el + "/ProgressivoCespite"))
+            # ripartizione (obbligatoria in presenza di EA): il modello comune ha un solo persona_id
+            self.usa(p, "persona_id")
+            pid = p.get("persona_id")
+            rip = None
+            if self.ea:
+                if pid not in self.pos_ea:
+                    self.err("RIPARTIZIONE_SOGGETTO", base + ".persona_id", "la passivita' va attribuita a un soggetto "
+                             "del quadro EA", FO.fonte_annotazione(el + "/RipartizioneED/Ripartizione"))
+                elif valore is not None:
+                    m, r = self.pos_ea[pid]
+                    rip = {"Ripartizione": [{"IdentificazioneSoggetto": {"Rigo": str(r), "Modulo": str(m)},
+                                             "Quota": {"QuotaElementi": {"QuotaNumeratore": "1", "QuotaDenominatore": "1"},
+                                                       "QuotaValore": F.euro_centesimi(valore)}}]}
+                    self.quota_passivo.setdefault(pid, []).append((p["id"], int(valore)))
+            riga = {"Tipo": tipo, "Descrizione": descr, "EstremiDocumento": estr, "DataDocumento": dd, "Possesso": poss}
+            if None in (tipo, descr, estr, dd, valore) or not poss.get("PossessoDenominatore"):
+                continue
+            if prog:
+                riga["ProgressivoCespite"] = prog
+            if rip:
+                riga["RipartizioneED"] = rip
+            righe.append((p["id"], riga))
+            self.valore_passivita[p["id"]] = int(valore)
+        moduli = []
+        for i, (pid, riga) in enumerate(righe):
+            m, r = i // 3 + 1, i % 3 + 1
+            if i % 3 == 0:
+                moduli.append({"Passivita": []})
+            moduli[-1]["Passivita"].append(riga)
+            self.mappa[pid] = {"coll": "passivita", "quadro": "ED", "modulo": m, "rigo": r,
+                               "xpath": f"{_XP_DICH}/suc:QuadroED/suc:Modulo[{m}]/suc:Passivita[{r}]"}
+        return {"Modulo": moduli} if moduli else None
+
+    def risolvi_progressivi(self, qed: dict | None):
+        if not qed:
+            return
+        for modulo in qed["Modulo"]:
+            for riga in modulo["Passivita"]:
+                prog = riga.get("ProgressivoCespite")
+                if not prog:
+                    continue
+                bid, pas = prog.pop("_bene"), prog.pop("_pas")
+                ref = self.mappa.get(bid)
+                tipo = riga.get("Tipo")
+                if not ref or ref.get("coll") != "beni":
+                    self.err("RIFERIMENTO_INESISTENTE", f"passivita[{pas}].bene_id", f"il cespite {bid} non e' "
+                             "esportato in questa dichiarazione",
+                             FO.fonte_annotazione("QuadroED/Modulo/Passivita/ProgressivoCespite"))
+                    continue
+                if tipo == "3" and ref["quadro"] not in ("EB", "EC"):
+                    self.err("REGOLA_PROGRESSIVO_CESPITE", f"passivita[{pas}].bene_id", "per il tipo 3 (mutui) il "
+                             "cespite deve essere un immobile (EB, EC)",
+                             FO.fonte_annotazione("QuadroED/Modulo/Passivita/ProgressivoCespite/Quadro"))
+                prog.update({"Quadro": ref["quadro"], "Rigo": str(ref["rigo"]), "Mod": str(ref["modulo"])})
+
+    # ---------------------------------------------------------------- EE
+    def quadro_ee(self) -> dict | None:
+        """Totali dalle annotazioni XSD di QuadroEE (nessun bene aziendale o agevolazione A nel perimetro)."""
+        imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC"))
+        altri = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "ER")
+        passivo = sum(self.valore_passivita.values())
+        attivo = imm + altri
+        if not (imm or altri or passivo):
+            return None
+        ee: dict = {}
+        if imm:
+            ee["TotaleValoreImmobili"] = str(imm)
+        if altri:
+            ee["TotaleValoreAltriBeni"] = str(altri)
+        if attivo:
+            ee["TotaleAttivo"] = str(attivo)
+        if passivo:
+            ee["TotalePassivo"] = str(passivo)
+        netto = attivo - passivo
+        if netto:
+            ee["TotaleValoreAsseEreditarioNetto"] = F.intero_con_segno(netto)
+        else:
+            self.avv("EE_NETTO_ZERO", "quadro[EE]", "asse netto pari a zero: DatoNU_Type non ammette 0, elemento omesso",
+                     FO.fonte_xsd("QuadroEE/TotaleValoreAsseEreditarioNetto"))
+        self.mappa["quadro:EE"] = {"coll": None, "quadro": "EE", "xpath": f"{_XP_DICH}/suc:QuadroEE",
+                                   "totali": dict(ee)}
+        return ee
+
+    # ---------------------------------------------------------------- frontespizio
+    def frontespizio(self, quadri_presenti: list[str]) -> dict | None:
+        el = "Frontespizio"
+        dft = self.defunto
+        if dft is None:
+            return None
+        cfd = self.val("persone", dft, "codice_fiscale", F.cf, elemento=el + "/CodiceFiscaleDefunto")
+        ddec = self.val("persone", dft, "data_decesso", lambda v: F.data_iso(v), elemento=el + "/DatiDefunto/UlterioriDati/DataDecesso")
+        if ddec:
+            dnasc = F.data_iso(dft["data_nascita"]) if isinstance(dft.get("data_nascita"), str) and \
+                re.match(r"^\d{4}-\d{2}-\d{2}$", dft["data_nascita"]) else None
+            if ddec <= date(2006, 10, 2) or (dnasc and ddec < dnasc) or ddec > self.oggi:
+                self.err("REGOLA_DATA_DECESSO", f"persone[{dft['id']}].data_decesso", "la data del decesso deve essere "
+                         "successiva al 2 ottobre 2006, non anteriore alla nascita e non futura",
+                         FO.fonte_annotazione(el + "/DatiDefunto/UlterioriDati/DataDecesso"))
+        self.data_decesso = ddec
+        if dft.get("relazione_con_defunto") not in (None, ""):
+            self.usa(dft, "relazione_con_defunto")
+            self.ns.append(f"persone[{dft['id']}].relazione_con_defunto: campo non applicabile al defunto")
+        ana_d = self.anagrafica(dft, el + "/DatiDefunto/DatiAnagrafici")
+        stato_civ = SUP.dich(self.d, "stato_civile")
+        try:
+            stato_civ = codice_enum(stato_civ, "StatoCivile_Type") if stato_civ is not None else None
+        except F.ValoreXml as e:
+            self.err("VALORE_NON_VALIDO", "opzioni.telematico.dichiarazione.stato_civile", str(e),
+                     FO.fonte_xsd(el + "/DatiDefunto/UlterioriDati/StatoCivile"))
+            stato_civ = None
+        if SUP.dich(self.d, "stato_civile") is None:
+            self.err("DATO_MANCANTE", "opzioni.telematico.dichiarazione.stato_civile", "stato civile del defunto "
+                     "obbligatorio", FO.fonte_xsd(el + "/DatiDefunto/UlterioriDati/StatoCivile"))
+        # devoluzione: solo per legge
+        legge = SUP.dich(self.d, "devoluzione_per_legge")
+        if legge is not True:
+            self.ns.append("opzioni.telematico.dichiarazione.devoluzione_per_legge: solo la devoluzione per legge e' "
+                           "supportata (testamento e legge estera non ancora mappati); indicare true")
+        # presentatore
+        pres = self.presentatore
+        pres_x = None
+        psup = SUP.presentatore_sup(self.d)
+        carica = psup.get("codice_carica")
+        try:
+            carica = codice_enum(carica, "CodiciCarica_Type") if carica is not None else None
+        except F.ValoreXml as e:
+            self.err("VALORE_NON_VALIDO", "opzioni.telematico.dichiarazione.presentatore.codice_carica", str(e),
+                     FO.fonte_xsd(el + "/Presentatore/CodiceCarica"))
+            carica = None
+        if carica is None:
+            self.err("DATO_MANCANTE", "opzioni.telematico.dichiarazione.presentatore.codice_carica",
+                     "codice carica del dichiarante obbligatorio", FO.fonte_xsd(el + "/Presentatore/CodiceCarica"))
+        elif carica != "1":
+            self.ns.append(f"opzioni.telematico.dichiarazione.presentatore.codice_carica={carica}: supportato solo il "
+                           "codice 1 (erede, chiamato all'eredita')")
+        self.codice_carica = carica
+        if pres is not None:
+            cfp = self.val("persone", pres, "codice_fiscale", F.cf, elemento=el + "/Presentatore/CodiceFiscale")
+            if cfp and cfd and cfp == cfd:
+                self.err("REGOLA_PRESENTATORE", f"persone[{pres['id']}].codice_fiscale", "il dichiarante deve essere "
+                         "diverso dal defunto", FO.fonte_annotazione(el + "/Presentatore/CodiceFiscale"))
+            in_ea = [p for p in self.ea if isinstance(p.get("codice_fiscale"), str)
+                     and p["codice_fiscale"].strip().upper() == cfp]
+            if carica == "1" and not in_ea:
+                self.err("REGOLA_PRESENTATORE", f"persone[{pres['id']}]", "con codice carica 1 il dichiarante deve essere "
+                         "presente nel quadro EA come erede o chiamato", FO.fonte_annotazione(el + "/Presentatore/CodiceCarica"))
+            if pres.get("ruolo") == "presentatore" and in_ea:
+                gemello = in_ea[0]
+                for campo in ("cognome", "nome", "data_nascita", "luogo_nascita"):
+                    if (pres.get(campo) or "") != (gemello.get(campo) or ""):
+                        self.err("PRESENTATORE_INCOERENTE", f"persone[{pres['id']}].{campo}", f"diverso dal soggetto EA "
+                                 f"persone[{gemello['id']}] con lo stesso codice fiscale", "controllo interno")
+                self.avv("PERSONA_DUPLICATA", f"persone[{pres['id']}]", f"il dichiarante e' registrato anche come "
+                         f"persone[{gemello['id']}]: preferire il riferimento opzioni.telematico.dichiarazione.presentatore"
+                         ".persona_id (proposta in docs/PROPOSTE_telematico.md)", "docs/PROPOSTE_telematico.md")
+            if pres.get("ruolo") == "presentatore":
+                for campo in ("relazione_con_defunto", "data_decesso"):
+                    if pres.get(campo) not in (None, ""):
+                        self.usa(pres, campo)
+                        self.interno(pres, campo)
+            ana_p = self.anagrafica(pres, el + "/Presentatore/DatiAnagrafici")
+            tel = psup.get("telefono")
+            mail = psup.get("email")
+            pres_x = {"CodiceFiscale": cfp, "CodiceCarica": carica, "DatiAnagrafici": ana_p}
+            try:
+                if tel:
+                    pres_x["Telefono"] = F.telefono(tel)
+                if mail:
+                    pres_x["Email"] = F.email(mail)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", "opzioni.telematico.dichiarazione.presentatore", str(e),
+                         FO.fonte_xsd(el + "/Presentatore/Telefono|Email"))
+            if not tel and not mail:
+                self.err("DATO_MANCANTE", "opzioni.telematico.dichiarazione.presentatore", "indicare almeno telefono "
+                         "o email del dichiarante", FO.fonte_annotazione(el + "/Presentatore/Telefono"))
+            self.mappa["presentatore"] = {"coll": "persone", "id": pres["id"], "quadro": "Frontespizio",
+                                          "xpath": f"{_XP_DICH}/suc:Frontespizio/suc:Presentatore"}
+        if SUP.dich(self.d, "firma_dichiarante") is not True:
+            self.err("FIRMA_MANCANTE", "opzioni.telematico.dichiarazione.firma_dichiarante", "la casella firma del "
+                     "dichiarante deve essere confermata esplicitamente (true)", FO.fonte_xsd(el + "/FirmaModello/FirmaDichiarante"))
+        self.mappa[dft["id"]] = {"coll": "persone", "quadro": "Frontespizio",
+                                 "xpath": f"{_XP_DICH}/suc:Frontespizio/suc:DatiDefunto"}
+        n1 = sum(1 for t in self.tipo_ea.values() if t == "1")
+        n3 = sum(1 for t in self.tipo_ea.values() if t == "3")
+        n2 = sum(1 for t in self.tipo_ea.values() if t == "2")
+        ben = {k: str(v) for k, v in (("NumeroEredi", n1), ("NumeroChiamati", n3), ("NumeroLegatari", n2)) if v}
+        firma = {f"Casella{q}": "1" for q in quadri_presenti}
+        firma["FirmaDichiarante"] = "1"
+        fr = {"CodiceFiscaleDefunto": cfd,
+              "TipoDichiarazione": {"PrimaDichiarazione": "1", "Devoluzione": {"DevoluzionePerLegge": "1"}}}
+        if ben:
+            fr["Beneficiari"] = ben
+        fr["DatiDefunto"] = {"DatiAnagrafici": ana_d, "UlterioriDati": {
+            "DataDecesso": F.data(dft["data_decesso"]) if ddec else None, "StatoCivile": stato_civ}}
+        fr["Presentatore"] = pres_x
+        fr["FirmaModello"] = firma
+        imp = self.impegno(pres_x["CodiceFiscale"] if pres_x else None)
+        if imp:
+            fr["ImpegnoATrasmettere"] = imp
+        return fr
+
+    def impegno(self, cf_presentatore: str | None) -> dict | None:
+        """ImpegnoATrasmettere: obbligatorio se TipoFornitore=10 e CF fornitore diverso dal richiedente; altrimenti
+        non puo' essere presente (annotazione Frontespizio/ImpegnoATrasmettere)."""
+        ctx = self.ctx
+        fonte = FO.fonte_annotazione("Frontespizio/ImpegnoATrasmettere")
+        try:
+            cff = F.cf(ctx.cf_fornitore)
+        except F.ValoreXml as e:
+            self.err("VALORE_NON_VALIDO", "contesto.cf_fornitore", str(e), FO.fonte_spec(13, "§3.2.1"))
+            return None
+        if ctx.tipo_fornitore == "10" and cf_presentatore and cff != cf_presentatore:
+            if ctx.impegno_codice not in ("1", "2") or not ctx.data_impegno:
+                self.err("DATO_MANCANTE", "contesto.impegno", "con TipoFornitore 10 e fornitore diverso dal dichiarante "
+                         "servono codice impegno (1|2) e data impegno", fonte)
+                return None
+            try:
+                di = F.data(ctx.data_impegno, non_oltre=self.oggi)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", "contesto.data_impegno", str(e), fonte)
+                return None
+            return {"CFintermediario": cff, "ImpegnoATrasmettere": ctx.impegno_codice, "DataImpegno": di,
+                    "FirmaIntermediario": "1"}
+        if ctx.impegno_codice or ctx.data_impegno:
+            self.err("REGOLA_IMPEGNO", "contesto.impegno", "l'impegno alla trasmissione si indica solo con TipoFornitore "
+                     "10 e fornitore diverso dal dichiarante", fonte)
+        return None
+
+    # ---------------------------------------------------------------- controlli finali
+    def campi_non_esportati(self):
+        """Nessuna perdita silenziosa: ogni campo valorizzato e non usato finisce in non_supportato."""
+        for coll in ("persone", "beni", "devoluzioni", "passivita"):
+            for e in self.d.get(coll, []):
+                if e["id"] in self.scartati:
+                    continue
+                usati = self.usati.get(e["id"], set())
+                for k, v in e.items():
+                    if k in ("id", "_origine") or v in (None, "") or k in usati:
+                        continue
+                    if V.e_stato(v) and v["stato"] in ("assente", "non_applicabile"):
+                        continue
+                    self.ns.append(f"{coll}[{e['id']}].{k}: dato presente ma non serializzato da questa versione")
+        for eid, campi in sorted(self.interni.items()):
+            coll = next((c for c in ("persone", "beni") if any(x["id"] == eid for x in self.d.get(c, []))), "?")
+            for k in sorted(campi):
+                self.avv("DATO_INTERNO_NON_ESPORTATO", f"{coll}[{eid}].{k}", "campo di lavoro interno senza elemento "
+                         "corrispondente nel tracciato: non esportato (classificazione in docs/regole/mappa_xsd.md)",
+                         "docs/regole/mappa_xsd.md")
+        if self.d.get("note"):
+            self.avv("DATO_INTERNO_NON_ESPORTATO", "note", "note interne della pratica: non fanno parte del dichiarato",
+                     "src/successioni/schema.py (SEZIONI)")
+        for e in self.d.get("documenti_ref", []):
+            self.ns.append(f"documenti_ref[{e['id']}]: quadro EG (documenti e allegati) non ancora serializzato")
+        self.ns.extend(f"{p}: chiave non gestita" for p in SUP.chiavi_non_gestite(self.d))
+
+    def quadri_attivi(self):
+        att = Q.attivi(self.d)
+        for q in sorted(att):
+            if q in Q.SEMPRE_ATTIVI or q in QUADRI_ESPORTABILI or q == "EG" and not self.d.get("documenti_ref"):
+                continue
+            self.ns.append(f"quadro[{q}]: selezionato nella pratica ma non serializzato da questa versione")
+        for coll in ("persone", "beni", "passivita"):
+            for e in self.d.get(coll, []):
+                q = Q.quadro_di(coll, e)
+                if q and q not in att and q not in Q.SEMPRE_ATTIVI:
+                    self.err("DATI_IN_QUADRO_NON_ATTIVO", f"{coll}[{e['id']}]", f"dati nel quadro {q} non selezionato: "
+                             "attivare il quadro o rimuovere i dati", "src/successioni/quadri.py (registro dei quadri)")
+
+    def quadri_obbligatori(self, presenti: list[str]):
+        """Quadri resi obbligatori dalle annotazioni XSD ma fuori dal perimetro di questa versione."""
+        immobili = any(q in presenti for q in ("EB", "EC"))
+        dal_2025 = self.data_decesso is not None and self.data_decesso >= date(2025, 1, 1)
+        if dal_2025 or ("EA" in presenti and immobili):
+            self.mancanti.append(Errore("QUADRO_OBBLIGATORIO_NON_SUPPORTATO", "quadro[EF]",
+                                        "il quadro EF (liquidazione imposte; dal 2025 anche sezione V-bis imposta di "
+                                        "successione) e' obbligatorio per questa pratica ma non e' generato da questa "
+                                        "versione", FO.fonte_annotazione("QuadroEF") + "; " +
+                                        FO.fonte_annotazione("QuadroEF/SezioneVBis_ImpostaSuccessione")))
+        if "EA" in presenti:
+            self.mancanti.append(Errore("QUADRO_OBBLIGATORIO_NON_SUPPORTATO", "quadro[EG]", "il quadro EG e' obbligatorio "
+                                        "in presenza del quadro EA ma non e' generato da questa versione",
+                                        FO.fonte_annotazione("QuadroEG")))
+        if self.codice_carica not in ("5", "6", "7"):
+            self.mancanti.append(Errore("QUADRO_OBBLIGATORIO_NON_SUPPORTATO", "quadro[EH]", "il quadro EH e' obbligatorio "
+                                        "(dichiarazione non integrativa, codice carica diverso da 5, 6, 7) ma non e' "
+                                        "generato da questa versione", FO.fonte_annotazione("QuadroEH")))
+
+    # ---------------------------------------------------------------- orchestrazione
+    def esegui(self) -> EsitoExport:
+        ctx = self.ctx
+        if ctx.scopo not in SCOPI:
+            self.err("CONTESTO_NON_VALIDO", "contesto.scopo", f"valori ammessi: {SCOPI}", "docs/CONTRATTI_MODULI.md")
+        if ctx.tipo_fornitore not in ("1", "10"):
+            self.err("VALORE_NON_VALIDO", "contesto.tipo_fornitore", "TipoFornitore ammette 1 o 10",
+                     FO.fonte_spec(15, "§3.3.1"))
+        if not isinstance(ctx.identificativo, str) or not _ID_DICH.fullmatch(ctx.identificativo):
+            self.err("VALORE_NON_VALIDO", "contesto.identificativo", "5 cifre, non tutte zero (Identificativo_Type)",
+                     "fornitura_v2.xsd Identificativo_Type")
+        self.diritto_bene: dict[str, str] = {}
+        self.valore_beni: dict[str, int] = {}
+        self.quadro_bene: dict[str, str] = {}
+        self.tipo_cespite: dict[str, str] = {}
+        self.quota_valore: dict = {}
+        self.quota_passivo: dict = {}
+        self.valore_passivita: dict[str, int] = {}
+        self.scartati: set[str] = set()
+        self.tipo_ea, self.codice_carica, self.data_decesso = {}, None, None
+
+        self.classifica_persone()
+        self.ordina_ea()
+        qea = self.quadro_ea()
+        beni = self.d.get("beni", [])
+        per_q: dict[str, list] = {"EB": [], "EC": [], "ER": []}
+        for b in beni:
+            self.usa(b, "tipo")
+            q = Q.quadro_di("beni", b)
+            per_q[q].append(b)
+            self.quadro_bene[b["id"]] = q
+            for campo in ("provenienza",):
+                if b.get(campo) not in (None, ""):
+                    self.usa(b, campo)
+                    self.interno(b, campo)
+            if q in ("EB", "EC") and b.get("descrizione") not in (None, ""):
+                self.usa(b, "descrizione")
+                self.interno(b, "descrizione")
+        qeb = self.quadro_beni("EB", sorted(per_q["EB"], key=_chiave_immobile), self.riga_eb)
+        qec = self.quadro_beni("EC", sorted(per_q["EC"], key=_chiave_immobile), self.riga_ec)
+        qer = self.quadro_beni("ER", sorted(per_q["ER"], key=lambda b: (
+            str(SUP.attr(self.d, "beni", b, "tipo_cespite") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_er)
+        if self.ea:
+            assegnati = {d.get("persona_id") for d in self.d.get("devoluzioni", [])}
+            for p in self.ea:
+                if p["id"] not in assegnati:
+                    self.err("SOGGETTO_SENZA_DEVOLUZIONE", f"persone[{p['id']}]", "ogni soggetto del quadro EA deve "
+                             "comparire nella devoluzione di almeno un bene", FO.fonte_annotazione("QuadroEA/Modulo/Soggetto"))
+        elif self.d.get("devoluzioni"):
+            self.err("DEVOLUZIONE_SENZA_EA", "devoluzioni", "la sezione devoluzione non puo' essere presente senza "
+                     "quadro EA", FO.fonte_annotazione("QuadroEB/Modulo/Terreni/DevoluzioneEB/Devoluzione"))
+        qed = self.quadro_ed()
+        self.risolvi_progressivi(qed)
+        qee = self.quadro_ee()
+        corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroER": qer}
+        presenti = [k[6:] for k, v in corpo.items() if v]
+        fr = self.frontespizio(presenti)
+        self.campi_non_esportati()
+        self.quadri_attivi()
+        self.quadri_obbligatori(presenti)
+        ns = sorted(set(self.ns))
+        esito = EsitoExport(xml=None, errori=self.errori, non_supportato=ns, mappa=self.mappa, avvisi=self.avvisi,
+                            quadri_mancanti=self.mancanti, completo=False)
+        if self.errori or ns:
+            return esito
+        dich = {"@identificativo": ctx.identificativo, "Frontespizio": fr}
+        dich.update({k: v for k, v in corpo.items() if v})
+        intest = {"TipoFornitore": ctx.tipo_fornitore}
+        if ctx.spazio_utente:
+            try:
+                intest["SpazioUtente"] = F.an(ctx.spazio_utente)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", "contesto.spazio_utente", str(e), FO.fonte_spec(15))
+                return esito
+        try:
+            xml = serializza(F.cf(ctx.cf_fornitore), intest, dich)
+        except M.ErroreModello as e:  # errore di programma: struttura non prevista dallo schema
+            self.err("ERRORE_SERIALIZZAZIONE", "/", str(e), FO.fonte_xsd())
+            return esito
+        err_xsd = X.valida_xsd(xml)
+        if err_xsd:
+            esito.errori = self.errori + _riferisci(err_xsd, self.mappa)
+            return esito
+        esito.completo = not self.mancanti
+        esito.impronta_xml = hashlib.sha256(xml).hexdigest()
+        if esito.completo or ctx.scopo == "bozza_tecnica":
+            esito.xml = xml
+        return esito
+
+
+_RIGA = {"EB": "Terreni", "EC": "Fabbricati", "ER": "Rendite"}
+_PER_MODULO = {"EB": 2, "EC": 2, "ER": 4}
+_XP_DICH = "/tm:Messaggio/tm:Contenuto/suc:Fornitura/suc:Dichiarazione"
+
+
+def _naturale(s) -> str:
+    s = str(s or "").strip().upper()
+    return s.zfill(12) if s.isdigit() else s
+
+
+def _chiave_immobile(b: dict):
+    return (str((b.get("comune") or "")).upper(), _naturale(b.get("sezione")), _naturale(b.get("foglio")),
+            _naturale(b.get("particella")), _naturale(b.get("subalterno")), b["id"])
+
+
+def serializza(cf_fornitore: str, intestazione: dict, dichiarazione: dict) -> bytes:
+    """Busta tm:Messaggio + suc:Fornitura; ordine e namespace dei figli ricavati dagli XSD (modello_xsd)."""
+    tm, suc = FO.NS_TM, FO.NS_SUC
+    root = etree.Element(f"{{{tm}}}Messaggio", nsmap=FO.NSMAP)
+    ti = etree.SubElement(root, f"{{{tm}}}Intestazione")
+    etree.SubElement(ti, f"{{{tm}}}CodiceFiscaleFornitore").text = cf_fornitore
+    cont = etree.SubElement(root, f"{{{tm}}}Contenuto")
+    cont.set("CodiceFornitura", "SUC13")  # Specifiche p. 4 e p. 14
+    forn = etree.SubElement(cont, f"{{{suc}}}Fornitura")
+    el_forn, ctx_forn = M.modello().el[(suc, "Fornitura")]
+    M.costruisci(etree.SubElement(forn, f"{{{suc}}}Intestazione"), _ct_locale(el_forn, ctx_forn, "Intestazione"),
+                 intestazione, "/Fornitura/Intestazione")
+    M.costruisci(etree.SubElement(forn, f"{{{suc}}}Dichiarazione"), M.radice_suc(), dichiarazione,
+                 "/Fornitura/Dichiarazione")
+    corpo = etree.tostring(root, encoding="UTF-8", xml_declaration=False, pretty_print=True)
+    return b'<?xml version="1.0" encoding="UTF-8"?>\n' + corpo
+
+
+def _ct_locale(el, ctx: "M.CT", nome: str) -> "M.CT":
+    """complexType anonimo dell'elemento locale ``nome`` dentro un elemento globale (qui suc:Fornitura)."""
+    xs = "{http://www.w3.org/2001/XMLSchema}"
+    for e in el.iter(f"{xs}element"):
+        if e.get("name") == nome:
+            return M.CT(e.find(f"{xs}complexType"), ctx.tns, ctx.nsmap)
+    raise M.ErroreModello(f"elemento {nome} non trovato")
+
+
+def _norm_xpath(p: str) -> list[str]:
+    out = []
+    for seg in p.strip("/").split("/"):
+        out.append(seg if seg.endswith("]") else seg + "[1]")
+    return out
+
+
+def _riferisci(errori: list[Errore], mappa: dict) -> list[Errore]:
+    """Associa gli errori XSD (XPath) all'elemento interno della mappa con il prefisso piu' lungo."""
+    voci = [(k, _norm_xpath(v["xpath"]), v) for k, v in mappa.items() if v.get("xpath")]
+    out = []
+    for e in errori:
+        segs = _norm_xpath(e.percorso) if e.percorso.startswith("/") else []
+        best = None
+        for k, xp, v in voci:
+            if len(xp) <= len(segs) and segs[:len(xp)] == xp and (best is None or len(xp) > len(best[1])):
+                best = (k, xp, v)
+        if best and best[2].get("coll"):
+            ident = best[2].get("id", best[0])
+            e = Errore(e.codice, f"{best[2]['coll']}[{ident}] @ {e.percorso}", e.messaggio, e.fonte)
+        out.append(e)
+    return out
+
+
+def esporta_xml(dati: dict, contesto: ContestoExport) -> EsitoExport:
+    """Esporta la pratica nel tracciato SUC13. Vedi la documentazione del modulo per perimetro e limiti."""
+    return _Export(dati, contesto).esegui()

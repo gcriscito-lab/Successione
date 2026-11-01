@@ -158,7 +158,21 @@ def _legge(e) -> tuple[str, str, str]:
     if m:
         return "XSD_VALORE_NON_AMMESSO", (f"valore {m.group(1)!r} non ammesso per <{nome}>; valori ammessi: "
                                           f"{_pulisci(m.group(2))}"), nome
-    return cod, _pulisci(msg.split(": ", 1)[-1] if msg.startswith("Element") else msg), nome
+    m = re.search(r"'(.*)' is not a valid value of the (?:union|atomic|local union|local atomic) type '([^']*)'", msg)
+    if m:
+        tipo = _pulisci(m.group(2))
+        try:
+            ammessi = ", ".join(enumerazioni(tipo)) if tipo else ""
+        except KeyError:
+            ammessi = ""
+        return "XSD_VALORE_NON_AMMESSO", (f"valore {m.group(1)!r} non ammesso per <{nome}> (tipo {tipo or 'locale'})"
+                                          + (f"; valori ammessi: {ammessi}" if ammessi else "")), nome
+    m = re.search(r"\[facet '(maxLength|minLength|length)'\] The value has a length of '(\d+)'; this (?:exceeds|underruns|"
+                  r"differs from) the allowed (?:maximum |minimum )?length of '(\d+)'", msg)
+    if m:
+        return "XSD_LUNGHEZZA", f"<{nome}>: lunghezza {m.group(2)}, ammessa {m.group(1)} {m.group(3)}", nome
+    testo = _pulisci(msg.split(": ", 1)[-1] if msg.startswith("Element") else msg)
+    return cod, (f"<{nome}>: {testo}" if nome else testo), nome
 
 
 def valida_xsd(xml: bytes) -> list[Errore]:

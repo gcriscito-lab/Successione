@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><sc:EsitoFornitura xmlns:sc="urn:www.agenziaentrate.gov.it:specificheTecniche:sco:common:v3">
+  <sc:IdentificativoFornitura>/tmp/claude-0/-home-user-Successione/45d852c4-b150-580d-8ea9-929683237c63/scratchpad/a3/arch_prova2/lavoro/controlli/ctl_7c52843c8f354827bc991fc9/tmp/17935631000267204313450001336466.tmp</sc:IdentificativoFornitura>
+  <sc:EsitoXsd>
+    <sc:IdentificativoXsd>fornituraSUC13_v1.xsd</sc:IdentificativoXsd>
+    <sc:WellFormed>true</sc:WellFormed>
+    <sc:Valid>false</sc:Valid>
+    <sc:EsitoIntestazione>
+      <sc:DiagnosticoXsd>
+        <sc:ReturnCode>24</sc:ReturnCode>
+        <sc:Message>La sequenza di elementi che precedono l'elemento 'CodiceFornitura' non è conforme a quella prevista dallo schema, è necessario compilare: 'TipoFornitore'.</sc:Message>
+        <sc:Path>DocumentNode/Intestazione[1]</sc:Path>
+        <sc:Line>2</sc:Line>
+        <sc:Col>99</sc:Col>
+      </sc:DiagnosticoXsd>
+    </sc:EsitoIntestazione>
+    <sc:Completo>true</sc:Completo>
+  </sc:EsitoXsd>
+</sc:EsitoFornitura>

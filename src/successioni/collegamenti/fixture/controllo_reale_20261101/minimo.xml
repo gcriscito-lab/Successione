@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tm:Messaggio xmlns:tm="www.agenziaentrate.gov.it:specificheTecniche:telent:v1" xmlns:suc="urn:www.agenziaentrate.gov.it:specificheTecniche:sco:suc:v1" xmlns:cm="urn:www.agenziaentrate.gov.it:specificheTecniche:common:v2">
+  <tm:Intestazione>
+    <tm:CodiceFiscaleFornitore>AAAAAA00A00A000A</tm:CodiceFiscaleFornitore>
+  </tm:Intestazione>
+  <tm:Contenuto CodiceFornitura="SUC13">
+    <suc:Fornitura>
+      <suc:Intestazione>
+        <cm:CodiceFornitura>SUC13</cm:CodiceFornitura>
+        <suc:TipoFornitore>1</suc:TipoFornitore>
+      </suc:Intestazione>
+    </suc:Fornitura>
+  </tm:Contenuto>
+</tm:Messaggio>

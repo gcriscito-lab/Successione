@@ -12,6 +12,9 @@ Origine dell'elenco di regole: la norma ISO 19005-1:2005 non e' presente in ``fo
 quelle della tabella pubblica delle regole PDF/A-1 di veraPDF ("PDFA Part 1 rules", wiki del repository
 veraPDF-validation-profiles, consultata il 2026-11-01), che riporta per ogni regola la clausola ISO 19005-1.
 Le regole contrassegnate "prudenziale" sono scelte di cautela del progetto, non requisiti accertati.
+Tabella riletta il 2026-11-01 da
+https://raw.githubusercontent.com/wiki/veraPDF/veraPDF-validation-profiles/PDFA-Part-1-rules.md
+(identificativi delle regole e condizioni di prova riportati nei messaggi).
 """
 from __future__ import annotations
 
@@ -21,7 +24,8 @@ from pathlib import Path
 from lxml import etree
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
-from pypdf.generic import ArrayObject, DictionaryObject, IndirectObject, StreamObject
+from pypdf.generic import (ArrayObject, ByteStringObject, DictionaryObject, FloatObject, IndirectObject,
+                           NameObject, NumberObject, StreamObject, TextStringObject)
 
 NS_PDFAID = "http://www.aiim.org/pdfa/ns/id/"
 
@@ -55,8 +59,15 @@ CONTROLLI_ESEGUITI = {
                         "AP con solo N (6.5.2, 6.5.3)",
     "PDFA_MULTIMEDIA": "nessuna annotazione Screen/3D/RichMedia - prudenziale (tipi non definiti in PDF 1.4)",
     "PDFA_FORM": "NeedAppearances assente o false; ogni widget con AP (6.9)",
-    "PDFA_IMMAGINI": "niente Alternates, OPI, Interpolate true, XObject PS/Ref (6.2.4, 6.2.5, 6.2.6, 6.2.7)",
+    "PDFA_IMMAGINI": "niente Alternates, OPI, Interpolate true, BitsPerComponent non ammesso, XObject PS/Ref "
+                     "(6.2.4-1..5, 6.2.5, 6.2.6, 6.2.7)",
+    "PDFA_EXTGSTATE": "ExtGState senza TR e con TR2 solo Default (6.2.8-1/2)",
+    "PDFA_INTENTO": "intento di rendering (RI/Intent) tra i quattro ammessi (6.2.9-1)",
+    "PDFA_ANNOT_COLORE": "annotazioni con C/IC solo se l'OutputIntent e' RGB (6.5.3-3)",
+    "PDFA_LIMITI": "limiti di implementazione sugli OGGETTI (interi, reali, stringhe, nomi, array, dizionari); "
+                   "non sui content stream (6.1.12-1..6)",
     "PDFA_1A_STRUTTURA": "solo livello 1a: MarkInfo/Marked e StructTreeRoot (6.8.2.2-1, 6.8.3.3-1)",
+    "PDFA_1A_TOUNICODE": "solo livello 1a: ogni font con ToUnicode (6.3.8-1)",
 }
 
 CONTROLLI_NON_ESEGUITI = [
@@ -66,10 +77,11 @@ CONTROLLI_NON_ESEGUITI = [
     "corrispondenza fra dizionario Info e proprieta' XMP (6.7.3)",
     "schemi di estensione XMP e conformita' dei tipi delle proprieta' (6.7.8, 6.7.9)",
     "validita' interna del profilo ICC oltre intestazione e spazio colore (6.2.3.2-1)",
-    "limiti di implementazione: dimensioni di stringhe, array, dizionari, annidamento (6.1.12)",
+    "limiti di implementazione nei content stream: annidamento q/Q, componenti DeviceN, CID (6.1.12-7..10)",
     "sintassi minuta: EOL, spaziature, lunghezza reale degli stream (6.1.4, 6.1.7, 6.1.8)",
-    "intento di rendering e funzioni di trasferimento (6.2.8, 6.2.9)",
-    "livello 1a: tag semantici, RoleMap, ToUnicode, lingua (6.8.3, 6.8.4, 6.3.8)",
+    "intento di rendering impostato con l'operatore ri nei content stream (6.2.9-1)",
+    "livello 1a: tag semantici, RoleMap, lingua, corrispondenza Unicode di ogni glifo (6.8.3, 6.8.4, 6.3.8)",
+    "font: sottoinsiemi Type1 con CharSet, CIDFont con CIDSet, CIDToGIDMap, CMap incorporate (6.3.3, 6.3.5-2/3)",
 ]
 
 DICHIARAZIONE = ("Verifica strutturale INDICATIVA: non prova la conformita' PDF/A. "
@@ -79,6 +91,13 @@ AZIONI_VIETATE = {"Launch", "Sound", "Movie", "ResetForm", "ImportData", "JavaSc
 NAMED_AMMESSE = {"NextPage", "PrevPage", "FirstPage", "LastPage"}
 ANNOT_VIETATE = {"Sound", "Movie", "FileAttachment"}                # 6.5.2-1
 ANNOT_MULTIMEDIA_PRUDENZIALI = {"Screen", "3D", "RichMedia"}
+INTENTI_AMMESSI = {"RelativeColorimetric", "AbsoluteColorimetric", "Perceptual", "Saturation"}   # 6.2.9-1
+LIMITE_INTERO = 2147483647            # 6.1.12-1
+LIMITE_REALE = 32767.0                # 6.1.12-2
+LIMITE_STRINGA = 65535                # 6.1.12-3 (byte)
+LIMITE_NOME = 127                     # 6.1.12-4 (byte)
+LIMITE_ARRAY = 8191                   # 6.1.12-5
+LIMITE_DIZIONARIO = 4095              # 6.1.12-6
 ANNOT_NOTE_PDF14 = {"Text", "Link", "FreeText", "Line", "Square", "Circle", "Polygon", "PolyLine", "Highlight",
                     "Underline", "Squiggly", "StrikeOut", "Stamp", "Ink", "Popup", "Widget", "PrinterMark",
                     "TrapNet"}
@@ -99,6 +118,15 @@ def _g(d, k):
         return None
 
 
+def _vero(o) -> bool:
+    """True solo per un booleano PDF vero. ``BooleanObject(True) is True`` e' False: serve il confronto."""
+    o = _r(o)
+    try:
+        return o is not None and not isinstance(o, (DictionaryObject, ArrayObject)) and o == True  # noqa: E712
+    except Exception:
+        return False
+
+
 def _nome(o) -> str | None:
     o = _r(o)
     return str(o)[1:] if o is not None and str(o).startswith("/") else None
@@ -111,8 +139,11 @@ class _Esito:
 
     def ko(self, codice: str, messaggio: str, oggetto: str | None = None, clausola: str | None = None):
         m = self.motivi.setdefault(codice, {"codice": codice, "clausola": clausola or CONTROLLI_ESEGUITI[codice],
-                                            "messaggio": messaggio, "occorrenze": 0, "oggetti": []})
+                                            "messaggio": messaggio, "messaggi": [], "occorrenze": 0, "oggetti": []})
         m["occorrenze"] += 1
+        if messaggio not in m["messaggi"] and len(m["messaggi"]) < 10:   # violazioni diverse con lo stesso codice
+            m["messaggi"].append(messaggio)
+            m["messaggio"] = "; ".join(m["messaggi"])
         if oggetto and len(m["oggetti"]) < 5 and oggetto not in m["oggetti"]:
             m["oggetti"].append(oggetto)
 
@@ -121,8 +152,34 @@ def _oid(ref) -> str | None:
     return f"{ref.idnum} {ref.generation} R" if isinstance(ref, IndirectObject) else None
 
 
-def _percorri(reader: PdfReader):
-    """Visita ogni oggetto raggiungibile dal trailer una volta sola: genera (oggetto, id indiretto)."""
+def _limiti_semplici(es: "_Esito | None", v, rid: str | None):
+    """6.1.12-1..4 su un valore semplice (non nei content stream)."""
+    if es is None:
+        return
+    if isinstance(v, bool):
+        return
+    if isinstance(v, NameObject):
+        if len(str(v)[1:].encode("utf-8", "ignore")) > LIMITE_NOME:
+            es.ko("PDFA_LIMITI", f"nome oltre {LIMITE_NOME} byte (6.1.12-4)", rid)
+    elif isinstance(v, (TextStringObject, ByteStringObject)):
+        try:
+            n = len(v.original_bytes) if hasattr(v, "original_bytes") else len(bytes(v))
+        except Exception:
+            n = len(str(v))
+        if n > LIMITE_STRINGA:
+            es.ko("PDFA_LIMITI", f"stringa di {n} byte oltre {LIMITE_STRINGA} (6.1.12-3)", rid)
+    elif isinstance(v, NumberObject):
+        if not -LIMITE_INTERO - 1 <= int(v) <= LIMITE_INTERO:
+            es.ko("PDFA_LIMITI", "intero fuori dall'intervallo a 32 bit (6.1.12-1)", rid)
+    elif isinstance(v, FloatObject):
+        if abs(float(v)) > LIMITE_REALE:
+            es.ko("PDFA_LIMITI", f"reale oltre +/-{LIMITE_REALE} (6.1.12-2)", rid)
+
+
+def _percorri(reader: PdfReader, es: "_Esito | None" = None):
+    """Visita ogni oggetto raggiungibile dal trailer una volta sola: genera (oggetto, id indiretto).
+
+    Con ``es`` controlla anche i limiti di implementazione dei valori incontrati (6.1.12)."""
     visti: set[int] = set()
     pila: list = [(reader.trailer, None)]
     while pila:
@@ -136,14 +193,23 @@ def _percorri(reader: PdfReader):
         if o is None:
             continue
         if isinstance(o, DictionaryObject):          # include StreamObject
+            if es is not None and len(o) > LIMITE_DIZIONARIO:
+                es.ko("PDFA_LIMITI", f"dizionario con {len(o)} voci, oltre {LIMITE_DIZIONARIO} (6.1.12-6)", rid)
             yield o, rid
-            for v in dict.values(o):
+            for k, v in dict.items(o):
+                _limiti_semplici(es, k, rid)
                 if isinstance(v, (IndirectObject, DictionaryObject, ArrayObject)):
-                    pila.append((v, None))
+                    pila.append((v, rid if not isinstance(v, IndirectObject) else None))
+                else:
+                    _limiti_semplici(es, v, rid)
         elif isinstance(o, ArrayObject):
+            if es is not None and len(o) > LIMITE_ARRAY:
+                es.ko("PDFA_LIMITI", f"array con {len(o)} elementi, oltre {LIMITE_ARRAY} (6.1.12-5)", rid)
             for v in o:
                 if isinstance(v, (IndirectObject, DictionaryObject, ArrayObject)):
-                    pila.append((v, None))
+                    pila.append((v, rid if not isinstance(v, IndirectObject) else None))
+                else:
+                    _limiti_semplici(es, v, rid)
 
 
 def _verifica_icc(es: _Esito, prof, oid: str | None):
@@ -233,14 +299,16 @@ def verifica_strutturale_pdfa(percorso: Path | str, livello: str = "1b") -> dict
         return {**risultato, "esito": "indicativo_ko" if motivi else "indicativo_ok", "motivi": motivi,
                 "avvisi": es.avvisi, "controlli_eseguiti": eseguiti}
 
-    if not dati.startswith(b"%PDF-1."):
-        es.ko("PDFA_HEADER", "il file non inizia con '%PDF-1.n' (non e' un PDF o ha byte iniziali estranei)")
+    intest = re.match(rb"%PDF-1\.\d[ \t]*(\r\n|\r|\n)", dati)
+    if not intest:
+        es.ko("PDFA_HEADER", "il file non inizia con '%PDF-1.n' seguito da fine riga (non e' un PDF/A-1 o ha byte "
+                             "iniziali estranei) (6.1.2-1)")
         return chiudi(["PDFA_HEADER"])
-    riga2 = dati[: dati.find(b"\n", 0, 100) + 1 + 20][dati.find(b"\n", 0, 100) + 1:] if b"\n" in dati[:100] else b""
-    if riga2.startswith(b"%") and sum(1 for b in riga2[1:] if b > 127) < 4:
-        es.ko("PDFA_HEADER_BINARIO", "il commento dopo l'intestazione non ha almeno 4 byte > 127")
-    elif not riga2.startswith(b"%"):
-        es.ko("PDFA_HEADER_BINARIO", "manca il commento binario dopo l'intestazione")
+    riga2 = dati[intest.end():intest.end() + 5]
+    if not riga2.startswith(b"%"):
+        es.ko("PDFA_HEADER_BINARIO", "manca il commento binario subito dopo l'intestazione (6.1.2-2)")
+    elif len(riga2) < 5 or any(b <= 127 for b in riga2[1:5]):
+        es.ko("PDFA_HEADER_BINARIO", "i primi 4 byte del commento dopo l'intestazione non sono tutti > 127 (6.1.2-2)")
     try:
         reader = PdfReader(str(p))
     except (PyPdfError, OSError, ValueError) as e:
@@ -256,8 +324,8 @@ def verifica_strutturale_pdfa(percorso: Path | str, livello: str = "1b") -> dict
         ultimo_eof = dati.rfind(b"%%EOF")
         if ultimo_eof < 0:
             es.ko("PDFA_LEGGIBILITA", "manca %%EOF: file troncato")
-        elif dati[ultimo_eof + 5:].strip(b"\r\n") != b"":
-            es.ko("PDFA_DOPO_EOF", "byte dopo l'ultimo %%EOF (6.1.3-3)")
+        elif dati[ultimo_eof + 5:] not in (b"", b"\n", b"\r", b"\r\n"):
+            es.ko("PDFA_DOPO_EOF", "dati dopo l'ultimo %%EOF oltre un solo fine riga (6.1.3-3)")
         if re.search(rb"/Type\s*/XRef\b", dati) or re.search(rb"/Type\s*/ObjStm\b", dati):
             es.ko("PDFA_XREF_STREAM", "xref stream o object stream presenti (non ammessi, 6.1.4-3)")
         if reader.trailer.get("/ID") is None:
@@ -280,18 +348,22 @@ def verifica_strutturale_pdfa(percorso: Path | str, livello: str = "1b") -> dict
             if _g(nomi, "/JavaScript") is not None:
                 es.ko("PDFA_JAVASCRIPT", "albero Names/JavaScript presente (6.6.1-1)")
         acro = _g(root, "/AcroForm")
-        if isinstance(acro, DictionaryObject) and _g(acro, "/NeedAppearances") is True:
+        if isinstance(acro, DictionaryObject) and _vero(_g(acro, "/NeedAppearances")):
             es.ko("PDFA_FORM", "NeedAppearances true (6.9-1)")
         if livello == "1a":
             mark = _g(root, "/MarkInfo")
-            if not (isinstance(mark, DictionaryObject) and _g(mark, "/Marked") is True):
+            if not (isinstance(mark, DictionaryObject) and _vero(_g(mark, "/Marked"))):
                 es.ko("PDFA_1A_STRUTTURA", "MarkInfo/Marked true assente (6.8.2.2-1)")
             if _g(root, "/StructTreeRoot") is None:
                 es.ko("PDFA_1A_STRUTTURA", "StructTreeRoot assente (6.8.3.3-1)")
         # --- grafo degli oggetti -----------------------------------------------------------------
         device_usati: set[str] = set()
-        for d, rid in _percorri(reader):
-            _controlla_dizionario(es, d, rid, device_usati)
+        annot_colore: list[str | None] = []
+        for d, rid in _percorri(reader, es):
+            _controlla_dizionario(es, d, rid, device_usati, annot_colore, livello)
+        if annot_colore and intent_n != 3:
+            for rid in annot_colore[:5]:
+                es.ko("PDFA_ANNOT_COLORE", "annotazione con C o IC senza OutputIntent RGB (6.5.3-3)", rid)
         if intent_n == 3 and "DeviceCMYK" in device_usati:
             es.ko("PDFA_COLORE_VS_INTENT", "DeviceCMYK usato con un OutputIntent RGB (6.2.3.3-2)")
         if intent_n == 4 and "DeviceRGB" in device_usati:
@@ -330,7 +402,8 @@ def _verifica_outputintent(es: _Esito, root) -> int | None:
     return n_prof
 
 
-def _controlla_dizionario(es: _Esito, d: DictionaryObject, rid: str | None, device_usati: set[str]):
+def _controlla_dizionario(es: _Esito, d: DictionaryObject, rid: str | None, device_usati: set[str],
+                          annot_colore: list | None = None, livello: str = "1b"):
     tipo, sub = _nome(_g(d, "/Type")), _nome(_g(d, "/Subtype"))
     chiavi = set(dict.keys(d))
 
@@ -351,7 +424,20 @@ def _controlla_dizionario(es: _Esito, d: DictionaryObject, rid: str | None, devi
         incorporato = isinstance(fd, DictionaryObject) and bool(
             {"/FontFile", "/FontFile2", "/FontFile3"} & set(dict.keys(fd)))
         if not incorporato:
-            es.ko("PDFA_FONT", f"font non incorporato: {_nome(_g(d, '/BaseFont')) or '?'} (6.3.4-1)", rid)
+            es.ko("PDFA_FONT", f"font non incorporato: {_nome(_g(d, '/BaseFont')) or '?'} (6.3.4-1; prudenziale anche "
+                               "per il testo invisibile, modo di rendering 3, non analizzato)", rid)
+    if livello == "1a" and tipo == "Font" and sub in ("Type1", "MMType1", "TrueType", "Type0", "Type3") \
+            and "/ToUnicode" not in chiavi:
+        es.ko("PDFA_1A_TOUNICODE", f"font senza ToUnicode: {_nome(_g(d, '/BaseFont')) or '?'} (6.3.8-1)", rid)
+
+    # ExtGState: funzioni di trasferimento (6.2.8) e intento di rendering (6.2.9)
+    if tipo == "ExtGState" or chiavi & {"/TR", "/TR2", "/RI"} and not chiavi & {"/Subtype", "/FT"}:
+        if "/TR" in chiavi:
+            es.ko("PDFA_EXTGSTATE", "ExtGState con chiave TR (6.2.8-1)", rid)
+        if "/TR2" in chiavi and _nome(_g(d, "/TR2")) != "Default":
+            es.ko("PDFA_EXTGSTATE", "ExtGState con TR2 diverso da Default (6.2.8-2)", rid)
+        if "/RI" in chiavi and _nome(_g(d, "/RI")) not in INTENTI_AMMESSI:
+            es.ko("PDFA_INTENTO", f"intento di rendering non ammesso: {_nome(_g(d, '/RI'))} (6.2.9-1)", rid)
 
     # trasparenza (6.4)
     sm = _g(d, "/SMask")
@@ -377,8 +463,22 @@ def _controlla_dizionario(es: _Esito, d: DictionaryObject, rid: str | None, devi
     if sub == "Image":
         if "/Alternates" in chiavi:
             es.ko("PDFA_IMMAGINI", "immagine con Alternates (6.2.4-1)", rid)
-        if _g(d, "/Interpolate") is True:
+        if _vero(_g(d, "/Interpolate")):
             es.ko("PDFA_IMMAGINI", "immagine con Interpolate true (6.2.4-3)", rid)
+        bpc = _g(d, "/BitsPerComponent")
+        if bpc is not None:
+            try:
+                bpc = int(bpc)
+            except (TypeError, ValueError):
+                bpc = -1
+            if _vero(_g(d, "/ImageMask")):
+                if bpc != 1:
+                    es.ko("PDFA_IMMAGINI", f"maschera d'immagine con BitsPerComponent {bpc} (6.2.4-5)", rid)
+            elif bpc not in (1, 2, 4, 8):
+                es.ko("PDFA_IMMAGINI", f"immagine con BitsPerComponent {bpc} (6.2.4-4)", rid)
+        if "/Intent" in chiavi and _nome(_g(d, "/Intent")) not in INTENTI_AMMESSI:
+            es.ko("PDFA_INTENTO", f"intento di rendering dell'immagine non ammesso: {_nome(_g(d, '/Intent'))} "
+                                  "(6.2.9-1)", rid)
         cs = _g(d, "/ColorSpace")
         if cs is not None and _nome(cs) in ("DeviceRGB", "DeviceCMYK", "DeviceGray"):
             device_usati.add(_nome(cs))
@@ -429,6 +529,8 @@ def _controlla_dizionario(es: _Esito, d: DictionaryObject, rid: str | None, devi
                 es.ko("PDFA_ANNOTAZIONI", "annotazione senza flag Print (6.5.3-2)", rid)
             if f & (1 | 2 | 32):
                 es.ko("PDFA_ANNOTAZIONI", "annotazione con flag Hidden/Invisible/NoView (6.5.3-2)", rid)
+        if annot_colore is not None and chiavi & {"/C", "/IC"}:
+            annot_colore.append(rid)
         ap = _g(d, "/AP")
         if isinstance(ap, DictionaryObject) and set(dict.keys(ap)) - {"/N"}:
             es.ko("PDFA_ANNOTAZIONI", "dizionario AP con voci diverse da N (6.5.3-4)", rid)

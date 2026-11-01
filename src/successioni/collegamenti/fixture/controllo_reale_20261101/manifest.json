@@ -1,0 +1,84 @@
+{
+ "_nota": "Registrazione di esecuzioni REALI del controllo ufficiale SUC13 su file SINTETICI (codici fiscali fittizi), eseguite nel container di sviluppo Linux. Servono ai test dei lettori del diagnostico; non sono un collaudo sull'ambiente ufficiale Windows/Desktop Telematico (A10 resta da collaudare).",
+ "data": "2026-11-01",
+ "comando": "java -Djava.awt.headless=true -Djava.io.tmpdir=<lavoro>/tmp -cp <15 jar di ControlliSUC13.jnlp> it.finanze.entrate.sco.main.MSUC13 in/<id>.xml out/<id>.xml out/<id>.dcm ; poi it.finanze.entrate.sco.common2013.VisualXml out/<id>.dgn 1",
+ "casi": {
+  "frontespizio": {
+   "file": {
+    "frontespizio.xml": "02d93434bb40cfd329060b31b25465e82960b976b0da16f17e84e98c2a06d710",
+    "frontespizio.dgn": "30e214c547fb1f7c27fe9875d2631f1d5e75b4623acaff60452d3fffe682eb40",
+    "frontespizio_logSchema.xml": "6588bc346d64d6d33cd91188be384f9abdb278c9d542b1d23cd545042ea4fe70",
+    "frontespizio.wri": "23db0f87e89c10e4c6ee8ae99e9e5f2b78c1e55ccfbccd2aabcf6410872424cc"
+   },
+   "input_sha256": "02d93434bb40cfd329060b31b25465e82960b976b0da16f17e84e98c2a06d710",
+   "stato_controllo": "negativo",
+   "esito_adattatore": "fallito",
+   "versione_controllo": "2.3.1",
+   "data_versione": "11/03/2026",
+   "riepilogo": {
+    "elaborate": 1,
+    "senza_segnalazioni": 0,
+    "con_anomalia": 0,
+    "con_errori_confermati": 0,
+    "escluse_assistenza": 0,
+    "scartate_non_rispondenza": 0,
+    "scartate_errori_bloccanti": 1,
+    "solo_entratel": false
+   },
+   "codice_uscita": 0,
+   "avvertenze": [
+    "inizializzazione del modulo di stampa (print-model) fallita su questo Java: il controllo prosegue; equivalenza con l'ambiente ufficiale (Desktop Telematico) da collaudare",
+    "XMLBeans: tabella di enumerazione non trovata (messaggio del componente)"
+   ]
+  },
+  "minimo": {
+   "file": {
+    "minimo.xml": "508e49614695e208bcdaa56b098e4a6dca7699243755592595cc2391bd4a0c78",
+    "minimo.dgn": "9f99ffcfe6a49742ac399b41b1d5fd25551b355e180152bb14fdc4202a1cf333",
+    "minimo_logSchema.xml": "710c0e32d548dc6eaa3428f4a1215c2587bd6c5ef0a0390d63cbe2e4f1e075e2",
+    "minimo.wri": "c4ffd6b185a4e9c4ca5fde0d6e42ea52fca92d1fbb492a031220f5cee6e753f6"
+   },
+   "input_sha256": "508e49614695e208bcdaa56b098e4a6dca7699243755592595cc2391bd4a0c78",
+   "stato_controllo": "negativo",
+   "esito_adattatore": "fallito",
+   "versione_controllo": "2.3.1",
+   "data_versione": "11/03/2026",
+   "riepilogo": {
+    "elaborate": 0,
+    "senza_segnalazioni": 0,
+    "con_anomalia": 0,
+    "con_errori_confermati": 0,
+    "escluse_assistenza": 0,
+    "scartate_non_rispondenza": 0,
+    "scartate_errori_bloccanti": 0,
+    "solo_entratel": false
+   },
+   "codice_uscita": 0,
+   "avvertenze": [
+    "inizializzazione del modulo di stampa (print-model) fallita su questo Java: il controllo prosegue; equivalenza con l'ambiente ufficiale (Desktop Telematico) da collaudare"
+   ]
+  }
+ },
+ "ambiente": {
+  "java": "openjdk version \"21.0.12.1\" 2026-08-18 | OpenJDK Runtime Environment (build 21.0.12.1+1-1-24.04.4-Ubuntu) | OpenJDK 64-Bit Server VM (build 21.0.12.1+1-1-24.04.4-Ubuntu, mixed mode, sharing)",
+  "os": "Linux-6.18.44-fc-v185-x86_64-with-glibc2.39",
+  "jar": {
+   "controlliXMLREG2013.jar": "0b42dfc37e673a4cee65f696bbf84612fee0c898a7a3b0456b661d17dece6a10",
+   "ResSUC13.jar": "2332c71fb3f6db61ed7fe68e7f2f56c18e85015c96aea3c7df905d58dfaf24b5",
+   "print-model-1.2.jar": "a54591289504939e59cf1c3285f3002a1cb3296e65a7fca4d412fc216ef2ff29",
+   "XMLConverterREG.jar": "2b860db1872937e45be4ec6ff849532c0456a88fe57bb1065c4ad7254cc4d4b5",
+   "XMLConverter_PropertiesREG2013.jar": "e396845477cbc0b7628d75d46782748ec5d1452380e21a59af810ed95709f712",
+   "esito.jar": "00202a3a7a8aa8462d7f74e66af9e56a276e3f44b4bc40c6aef5de2cb2429e12",
+   "gson-2.8.9.jar": "cfd7d9ea81a8114325f6d42d0d81570334affce6c02739ce9fba695477d8beb2",
+   "Supporto.jar": "2695c093b2f7542c695ebecbeba47d2467c5d27ba20c01f295c33235129172ca",
+   "checkCF_PIVA.jar": "6069cee20d98e8d23e46c097abc9072d7f9256902c354f74b723fe4c3c7238be",
+   "SUCdom.jar": "f6977bf664ae13650128f264ac3fc1cd2b561e6e7c9d58102efe5f1fffe84c55",
+   "converter-1.1.jar": "ad1a0d583aaed0150b135a7ae6d188b3c02139f8258c56fc733cba581e04f3f3",
+   "suc-converter-1.0.jar": "63b6031083b274a1ed4450326082d1a0bc084eafc0bc9b79ed13f91037e2ac07",
+   "jdom.jar": "ee8f26c77772d7a9704f6600554e8daa7f70242ae6ddc779f74da0e8be0afafa",
+   "xmlbeans-2.3.0.jar": "27be44d92d51602cb29127b09ffb4235d378721a87e62856e5396a8e3a27e552",
+   "file-detector-1.0.jar": "0369ab843995bd30f9a827960969b6bd55ebab7b45a10231d353a0aa229baf21"
+  },
+  "jnlp": "fonti/Programma e controlli/ControlliSUC13.jnlp (sha256 e5fff491dc23ebb52724be9bca14683c13d51b2653476bc7b740c9b3824c4690, identico a https://jws.agenziaentrate.it/jws/registro/2013/ControlliSUC13.jnlp al 2026-11-01)"
+ }
+}

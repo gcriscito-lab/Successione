@@ -1,0 +1,104 @@
+                                                                 Data: 1/11/2026
+Mod. SUC 2013 - Procedura di Controllo delle Dichiarazioni
+Versione 2.3.1 del 11/03/2026
+
+
+
+
+Elenco completo dei diagnostici relativi alla procedura di controllo
+dell'archivio: 
+<<in/ctl_461fe11ba40e416dbfb139a3.xml>>
+
+
+ ---------------------------------------------------------------------- 
+|                   --Descrizione degli errori--                       |
+|                                                                      |
+|(****) Errore che determina lo scarto dell'intera fornitura           |
+|(***)  Errore bloccante che determina lo scarto della dichiarazione.  |
+|       Tale anomalia non consente in ogni caso la trasmissione della  |
+|       dichiarazione                                                  |
+|(***C) Errore di entità rilevante che determina lo scarto della       |
+|       dichiarazione. Qualora, in presenza di tali segnalazioni, si   |
+|       intenda comunque procedere alla trasmissione della             |
+|       dichiarazione, è necessario confermare i dati in essa          |
+|       contenuti, avvalendosi delle funzionalità rese disponibili dal |
+|       software utilizzato per la compilazione. Con la 'conferma' si  |
+|       attesta di aver preso visione delle segnalazioni evidenziate   |
+|(**E)  Errore rilevante (solo mod. 730) che determina l'esclusione    |
+|       dall'assistenza fiscale                                        |
+|(**)   Segnalazione a fronte della quale è stata richiesta la         |
+|       'conferma' della dichiarazione - vedi errori tipo (***C)       |
+|(*)    Segnalazione di anomalia di entità ridotta in presenza della   |
+|       quale la dichiarazione può essere comunque trasmessa           |
+|                                                                      |
+|L'individuazione dei campi segnalati può avvenire in alternativa:     |
+|                                                                      |
+|  .  con una descrizione puntuale del campo (ad es. per i dati        |
+|     anagrafici del dichiarante)                                      |
+|  .  con l'indicazione del quadro, del rigo e della colonna relativi  |
+|     al campo stesso.                                                 |
+|                                                                      |
+ ---------------------------------------------------------------------- 
+
+
+
+====================================================================
+              Dichiarazione relativa a: BBBBBB00B00B000B
+
+(***)
+Quadro EG obbligatorio
+
+
+(***)
+Quadro EH obbligatorio
+
+
+(***)
+Quadro EA obbligatorio
+
+
+(***)
+Dati del Frontespizio:
+Codice fiscale del defunto - Codice Fiscale errato
+ Valore dichiarato: BBBBBB00B00B000B
+
+(***)
+Dati del Frontespizio:
+Codice fiscale di chi presenta il modello - Codice Fiscale errato
+ Valore dichiarato: CCCCCC00C00C000C
+
+(***)
+Dati del Frontespizio:
+Telefono - Il telefono o l'indirizzo di posta elettronica e' obbligatorio
+
+
+(***)
+Dati del Frontespizio:
+Casella quadri compilati: 'EH' - Quadro EH obbligatorio
+
+
+(*)
+Dati del Frontespizio:
+ - Campo "attestazione" del Frontespizio: Non e' stata richiesta l'attestazione
+di avvenuta presentazione della dichiarazione, utile ad es. per lo sblocco di un
+conto corrente (vedi istruzioni per la compilazione)
+
+
+
+
+La dichiarazione è scartata per presenza di errori bloccanti.
+
+
+******************************************************************************
+*                                  RIEPILOGO                                 *
+*                                                                            *
+* Totale dichiarazioni elaborate :     1                                     *
+* di cui:                                                                    *
+*   scartate per errori bloccanti:     1                                     *
+*   scartate per non rispondenza :     0                                     *
+*   con errori confermati        :     0                                     *
+*   con segnalazione di anomalia :     0                                     *
+*   senza segnalazioni           :     0                                     *
+*                                                                            *
+******************************************************************************
+
