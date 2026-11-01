@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Successioni</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="tb">
+  <div class="brand">Successioni</div>
+  <div class="titolo" id="titolo">Nessuna pratica aperta</div>
+  <div class="azioni">
+    <button id="bSalva" class="gh" disabled>Salva</button>
+    <button id="bControlla" class="gh" disabled>Controlla</button>
+    <button id="bStampa" class="gh" disabled title="Disponibile quando l'esportazione dei dati sarà collegata">Stampa</button>
+    <button id="bGenera" class="gh" disabled title="Disponibile quando l'esportazione XML sarà collegata">Genera file</button>
+    <button id="bInvia" class="gh" disabled title="Disponibile dopo il collaudo del collegamento con i servizi dell'Agenzia">Invia</button>
+    <button id="bNuova" class="pil">Nuova dichiarazione</button>
+  </div>
+</header>
+<div id="msg" role="status" aria-live="polite" hidden></div>
+<div class="app" id="app">
+  <aside class="lat" aria-label="Pratiche e quadri">
+    <details class="pratiche" id="dPratiche" open>
+      <summary>Pratiche</summary>
+      <ul id="lista"></ul>
+    </details>
+    <nav id="albero" aria-label="Quadri della dichiarazione"></nav>
+    <div class="info" id="info"></div>
+  </aside>
+  <main id="vista" tabindex="-1">
+    <div class="vuoto" id="vuoto">
+      <h1>Dichiarazioni di successione</h1>
+      <p>Apri una pratica dall'elenco oppure avvia una nuova dichiarazione guidata.</p>
+    </div>
+  </main>
+  <aside class="ins" id="ins" aria-label="Ispettore" hidden></aside>
+</div>
+<footer class="sb" id="sb"></footer>
+
+<dialog id="wiz" aria-labelledby="wizT">
+  <form method="dialog" id="wizForm">
+    <h2 id="wizT">Nuova dichiarazione</h2>
+    <ol class="passi" id="wizPassi"></ol>
+    <div id="wizCorpo"></div>
+    <p class="err" id="wizErr" role="alert"></p>
+    <div class="wiz-az">
+      <button type="button" id="wAnnulla" class="gh">Annulla</button>
+      <span class="sp"></span>
+      <button type="button" id="wIndietro" class="gh">Indietro</button>
+      <button type="button" id="wAvanti" class="pil">Avanti</button>
+    </div>
+  </form>
+</dialog>
+<script src="/static/app.js"></script>
+</body>
+</html>
