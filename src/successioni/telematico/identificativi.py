@@ -64,16 +64,27 @@ def cf_persona_fisica_valido(cf: str) -> bool:
 
 
 # ------------------------------------------------------------------------------------------- generatore sintetico
+# CodiceFiscale.noAccentate: "ÀÈÉÌÒÙàèéìòù" -> "AEEIOUAEEIOU" (javap -constants, costanti #94/#96)
+_ACCENTATE = str.maketrans("ÀÈÉÌÒÙàèéìòù", "AEEIOUAEEIOU")
+# CodiceFiscale(): costanti #25 'AEIOU' (vocali) e #29 'BCDFGHJKLMNPQRSTVWXYZ' (consonanti); gli altri caratteri
+# (spazi, apostrofi, trattini) non contano
+_VOCALI, _CONSONANTI = "AEIOU", "BCDFGHJKLMNPQRSTVWXYZ"
+
+
 def _lettere(s: str) -> str:
-    return "".join(c for c in s.upper() if "A" <= c <= "Z")
+    t = s.translate(_ACCENTATE).upper()
+    altri = sorted({c for c in t if c.isalpha() and not "A" <= c <= "Z"})
+    if altri:
+        raise ValueError(f"{s!r}: lettere {''.join(altri)!r} non gestite dal generatore sintetico")
+    return "".join(c for c in t if "A" <= c <= "Z")
 
 
 def _consonanti(s: str) -> str:
-    return "".join(c for c in _lettere(s) if c not in "AEIOU")
+    return "".join(c for c in _lettere(s) if c in _CONSONANTI)
 
 
 def _vocali(s: str) -> str:
-    return "".join(c for c in _lettere(s) if c in "AEIOU")
+    return "".join(c for c in _lettere(s) if c in _VOCALI)
 
 
 def _parte_cognome(cognome: str) -> str:

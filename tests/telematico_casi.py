@@ -1,18 +1,23 @@
-"""Casi SINTETICI per i test del modulo telematico (dati inventati, codici fiscali solo formalmente plausibili).
+"""Casi SINTETICI per i test del modulo telematico (dati inventati).
 
-Non sono dichiarazioni reali e non vanno mai trasmesse. Il codice fiscale rispetta il pattern di DatoCF_Type ma il
-carattere di controllo non e' verificato: il controllo ufficiale e l'Anagrafe tributaria lo rifiuterebbero.
+Non sono dichiarazioni reali e non vanno mai trasmesse. I codici fiscali sono generati da
+``successioni.telematico.identificativi.genera_cf_sintetico`` (carattere di controllo verificato con i componenti
+ufficiali checkCF_PIVA.jar: tests/fixture_telematico/cf_lotto_esito_componente.txt): sono formalmente validi ma non
+attribuiti a persone reali (non verificati in Anagrafe tributaria).
 """
 from __future__ import annotations
 
 import copy
 from datetime import date
+from pathlib import Path
 
 from successioni.telematico.esporta import ContestoExport
 
-CF_DEFUNTO = "RSSMRA40A01H501W"
-CF_ANNA = "RSSNNA70A41H501X"
-CF_LUCA = "RSSLCU72B02H501Y"
+CF_DEFUNTO = "RSSMRA40A01H501K"   # genera_cf_sintetico("Rossi", "Mario", "M", "1940-01-01", "H501")
+CF_ANNA = "RSSNNA70A41H501J"      # genera_cf_sintetico("Rossi", "Anna", "F", "1970-01-01", "H501")
+CF_LUCA = "RSSLCU72B02H501O"      # genera_cf_sintetico("Rossi", "Luca", "M", "1972-02-02", "H501")
+IBAN_SINTETICO = "IT57A0123456789000000001234"  # ABI/CAB/conto inventati
+FIXTURE = Path(__file__).parent / "fixture_telematico"
 
 
 def caso_completo() -> dict:
@@ -60,8 +65,13 @@ def caso_completo() -> dict:
         "opzioni": {"telematico": {
             "dichiarazione": {"stato_civile": "4", "devoluzione_per_legge": True, "firma_dichiarante": True,
                               "presentatore": {"persona_id": "p_anna0001", "codice_carica": "1",
-                                               "telefono": "0612345678"}},
-            "persone": {"p_defunto1": {"sesso": "M", "provincia_nascita": "RM"},
+                                               "telefono": "0612345678"},
+                              # addebito delle imposte autoliquidate (EF19): IBAN SINTETICO, cifre di controllo
+                              # modulo 97 corrette e accettato da CheckIBAN di controlliXMLREG2013.jar
+                              # (tests/fixture_telematico/iban_esito_componente.txt); titolare = dichiarante
+                              "versamento": {"iban": IBAN_SINTETICO, "cf_titolare": CF_ANNA}},
+            "persone": {"p_defunto1": {"sesso": "M", "provincia_nascita": "RM", "comune_decesso": "Roma",
+                                       "provincia_decesso": "RM"},
                         "p_anna0001": {"sesso": "F", "provincia_nascita": "RM", "grado_parentela": "02"},
                         "p_luca0001": {"sesso": "M", "provincia_nascita": "RM"}},
             "beni": {"b_casa0001": {"provincia": "RM", "codice_comune": "H501", "codice_comune_amministrativo": "H501",
@@ -77,6 +87,35 @@ def caso_completo() -> dict:
         }},
         "note": {"promemoria": "nota interna non esportata"},
     }
+
+
+def caso_a10() -> dict:
+    """Caso base per la prova A10 con il controllo ufficiale (eseguito in locale): come ``caso_completo`` ma con le
+    quote di legge sul conto (due figli: 1/2 ciascuno; il controllo segnala (***) 'Dati di devoluzione non coerenti
+    con quelli relativi agli Eredi' con 1/3 - 2/3) e con gli allegati del quadro EG (albero genealogico EG6 e
+    documenti delle passivita' EG5, PDF sintetici in tests/fixture_telematico/allegati/)."""
+    d = caso_completo()
+    for dv in d["devoluzioni"]:
+        if dv["bene_id"] == "b_conto001":
+            dv["quota"] = {"num": 1, "den": 2}
+    d["documenti_ref"] = [
+        {"id": "dr_albero1", "_origine": {}, "allegato_id": "al_albero", "tipo_eg": "AlberoGenealogico",
+         "finalita": "Albero genealogico (sintetico)"},
+        {"id": "dr_passiv1", "_origine": {}, "allegato_id": "al_passiv", "tipo_eg": "DocumentiPassivita",
+         "finalita": "Fatture spese mediche e contratto di mutuo (sintetici)"},
+    ]
+    d["opzioni"]["telematico"]["dichiarazione"]["dichiara_copie_conformi"] = True
+    return d
+
+
+ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
+                              "nome": "albero_genealogico.pdf"},
+                "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),
+                              "nome": "documenti_passivita.pdf"}}
+
+
+def contesto_caso_a10(**kw) -> ContestoExport:
+    return contesto(allegati=ALLEGATI_A10, **kw)
 
 
 def contesto(**kw) -> ContestoExport:

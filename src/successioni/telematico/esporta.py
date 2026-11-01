@@ -39,7 +39,9 @@ from .. import valori as V
 from ..schema import Errore
 from . import fonti as FO
 from . import formati as F
+from . import identificativi as ID
 from . import modello_xsd as M
+from . import quadri_efgh as EFGH
 from . import supplemento as SUP
 from . import xsd as X
 
@@ -54,7 +56,7 @@ PERIMETRO = {
     "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
     "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; nessuna agevolazione/riduzione",
 }
-QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "ER")
+QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "ER")
 SCOPI = ("completo", "bozza_tecnica")
 _ID_DICH = re.compile(r"[0-9]{4}[1-9]|[0-9]{3}[1-9][0-9]|[0-9]{2}[1-9][0-9]{2}|[0-9][1-9][0-9]{3}|[1-9][0-9]{4}")
 
@@ -70,6 +72,8 @@ class ContestoExport:
     data_impegno: str | None = None        # AAAA-MM-GG
     spazio_utente: str | None = None
     scopo: str = "completo"                # 'completo' | 'bozza_tecnica'
+    #: file degli allegati per il quadro EG: allegato_id -> percorso, oppure {"percorso", "nome"} (dall'archivio)
+    allegati: dict | None = None
 
 
 @dataclass
@@ -120,8 +124,21 @@ def codice_enum(valore, tipo: str, *, alias_descrizione: bool = False) -> str:
     raise F.ValoreXml(f"{valore!r} non ammesso; valori ammessi ({tipo}): {elenco}")
 
 
+def cf_persona(valore) -> str:
+    """DatoCF_Type e, per i codici a 16 caratteri, carattere di controllo corretto (``identificativi``: replica di
+    U1CheckDigit.controllaCheckDigit di checkCF_PIVA.jar, verificata eseguendo il componente). Il controllo ufficiale
+    scarta (***) 'Codice Fiscale errato'. I codici numerici a 11 cifre non sono verificati qui."""
+    s = F.cf(valore)
+    if len(s) == 16 and not ID.cf_persona_fisica_valido(s):
+        raise F.ValoreXml(f"{s}: carattere di controllo errato (atteso {ID.carattere_controllo(s[:15])}) - "
+                          + ID.FONTE_CF)
+    return s
+
+
 # --------------------------------------------------------------------------------------------- esportatore
 class _Export:
+    XP_DICH = "/tm:Messaggio/tm:Contenuto/suc:Fornitura/suc:Dichiarazione"
+
     def __init__(self, dati: dict, ctx: ContestoExport):
         self.d = dati
         self.ctx = ctx
@@ -241,10 +258,11 @@ class _Export:
         self.tipo_ea: dict[str, str] = {}
         self.grado_ea: dict[str, str] = {}
         self.handicap_ea: dict[str, bool] = {}
+        self.soggetti_ea: dict[str, dict] = {}
         for p in self.ea:
             base = f"persone[{p['id']}]"
             el = "QuadroEA/Modulo/Soggetto"
-            cfv = self.val("persone", p, "codice_fiscale", F.cf, elemento=el + "/CodiceFiscale")
+            cfv = self.val("persone", p, "codice_fiscale", cf_persona, elemento=el + "/CodiceFiscale")
             if cfv:
                 if cfv in cf_visti:
                     self.ns.append(f"{base}: stesso codice fiscale di persone[{cf_visti[cfv]}] (soggetto su piu' righi "
@@ -317,6 +335,7 @@ class _Export:
                 s["PortatoreHandicap"] = "1"
             s["DatiAnagrafici"] = ana
             self.tipo_ea[p["id"]] = tipo
+            self.soggetti_ea[p["id"]] = s
             self.grado_ea[p["id"]] = grado
             self.handicap_ea[p["id"]] = ph is True
             soggetti.append(s)
@@ -452,6 +471,7 @@ class _Export:
         valore = self.valore_bene(b, el + "/Valore")
         if None in (luogo, cat, natura, poss, dir_p, tip, valore):
             return None
+        self.comune_bene[b["id"]] = luogo["Italia"]["CodiceComune"]
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
         return {"Luogo": luogo, "DatiTerreni": {"DatiCatastali": cat, "DatiTerreni": dt}, "Possesso": poss,
@@ -498,6 +518,7 @@ class _Export:
         valore = self.valore_bene(b, el + "/Valore")
         if None in (luogo, cat, categ, poss, dir_p, valore):
             return None
+        self.comune_bene[b["id"]] = luogo["Italia"]["CodiceComune"]
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
         return {"Luogo": luogo, "DatiFabbricati": {"DatiCatastali": cat, "DatiFabbricati": df}, "Possesso": poss,
@@ -565,6 +586,7 @@ class _Export:
                                "quota richiede le regole di valutazione dei diritti, Fascicolo I p. PDF 24): non supportato")
                 continue
             somma += Fraction(n, den)
+            self.persona_dev[d["id"]] = pid
             righe.append((self.pos_ea[pid], dir_r, d["id"], n, den))
         if righe and somma != 1:
             self.err("QUOTE_DEVOLUZIONE", f"beni[{b['id']}]", f"la somma delle quote di devoluzione e' "
@@ -578,6 +600,9 @@ class _Export:
                 cent, esatto = F.frazione_a_centesimi(Fraction(valore) * Fraction(n, den))
                 qv = F.euro_centesimi(cent)
                 self.quota_valore[did] = cent
+                self.righe_dev[did] = {"quadro": quadro, "bene_id": b["id"], "persona_id": self.persona_dev[did],
+                                       "diritto": dir_r, "quota_valore": cent,
+                                       "codice_comune": self.comune_bene.get(b["id"])}
                 if not esatto:
                     self.avv("ARROTONDAMENTO_VALORE_QUOTA", f"devoluzioni[{did}]",
                              f"valore quota {valore} x {n}/{den} non esatto al centesimo: arrotondato a {qv} "
@@ -777,7 +802,7 @@ class _Export:
         dft = self.defunto
         if dft is None:
             return None
-        cfd = self.val("persone", dft, "codice_fiscale", F.cf, elemento=el + "/CodiceFiscaleDefunto")
+        cfd = self.val("persone", dft, "codice_fiscale", cf_persona, elemento=el + "/CodiceFiscaleDefunto")
         ddec = self.val("persone", dft, "data_decesso", lambda v: F.data_iso(v), elemento=el + "/DatiDefunto/UlterioriDati/DataDecesso")
         if ddec:
             dnasc = F.data_iso(dft["data_nascita"]) if isinstance(dft.get("data_nascita"), str) and \
@@ -825,7 +850,7 @@ class _Export:
                            "codice 1 (erede, chiamato all'eredita')")
         self.codice_carica = carica
         if pres is not None:
-            cfp = self.val("persone", pres, "codice_fiscale", F.cf, elemento=el + "/Presentatore/CodiceFiscale")
+            cfp = self.val("persone", pres, "codice_fiscale", cf_persona, elemento=el + "/Presentatore/CodiceFiscale")
             if cfp and cfd and cfp == cfd:
                 self.err("REGOLA_PRESENTATORE", f"persone[{pres['id']}].codice_fiscale", "il dichiarante deve essere "
                          "diverso dal defunto", FO.fonte_annotazione(el + "/Presentatore/CodiceFiscale"))
@@ -899,6 +924,15 @@ class _Export:
         except F.ValoreXml as e:
             self.err("VALORE_NON_VALIDO", "contesto.cf_fornitore", str(e), FO.fonte_spec(13, "§3.2.1"))
             return None
+        if len(cff) == 16 and not ID.cf_persona_fisica_valido(cff):
+            msg = (f"codice fiscale del fornitore {cff}: carattere di controllo errato (atteso "
+                   f"{ID.carattere_controllo(cff[:15])})")
+            if ctx.scopo == "completo":
+                self.err("VALORE_NON_VALIDO", "contesto.cf_fornitore", msg, ID.FONTE_CF)
+            else:
+                self.avv("CF_FORNITORE_NON_VALIDO", "contesto.cf_fornitore", msg + ": ammesso solo nella bozza tecnica",
+                         ID.FONTE_CF)
+        self.fornitore_diverso_da_dichiarante = bool(cf_presentatore) and cff != cf_presentatore
         if ctx.tipo_fornitore == "10" and cf_presentatore and cff != cf_presentatore:
             if ctx.impegno_codice not in ("1", "2") or not ctx.data_impegno:
                 self.err("DATO_MANCANTE", "contesto.impegno", "con TipoFornitore 10 e fornitore diverso dal dichiarante "
@@ -924,7 +958,7 @@ class _Export:
     # ---------------------------------------------------------------- controlli finali
     def campi_non_esportati(self):
         """Nessuna perdita silenziosa: ogni campo valorizzato e non usato finisce in non_supportato."""
-        for coll in ("persone", "beni", "devoluzioni", "passivita"):
+        for coll in ("persone", "beni", "devoluzioni", "passivita", "documenti_ref"):
             for e in self.d.get(coll, []):
                 if e["id"] in self.scartati:
                     continue
@@ -944,17 +978,15 @@ class _Export:
         if self.d.get("note"):
             self.avv("DATO_INTERNO_NON_ESPORTATO", "note", "note interne della pratica: non fanno parte del dichiarato",
                      "src/successioni/schema.py (SEZIONI)")
-        for e in self.d.get("documenti_ref", []):
-            self.ns.append(f"documenti_ref[{e['id']}]: quadro EG (documenti e allegati) non ancora serializzato")
         self.ns.extend(f"{p}: chiave non gestita" for p in SUP.chiavi_non_gestite(self.d))
 
     def quadri_attivi(self):
         att = Q.attivi(self.d)
         for q in sorted(att):
-            if q in Q.SEMPRE_ATTIVI or q in QUADRI_ESPORTABILI or q == "EG" and not self.d.get("documenti_ref"):
+            if q in Q.SEMPRE_ATTIVI or q in QUADRI_ESPORTABILI:
                 continue
             self.ns.append(f"quadro[{q}]: selezionato nella pratica ma non serializzato da questa versione")
-        for coll in ("persone", "beni", "passivita"):
+        for coll in ("persone", "beni", "passivita", "documenti_ref"):
             for e in self.d.get(coll, []):
                 q = Q.quadro_di(coll, e)
                 if q and q not in att and q not in Q.SEMPRE_ATTIVI:
@@ -962,23 +994,24 @@ class _Export:
                              "attivare il quadro o rimuovere i dati", "src/successioni/quadri.py (registro dei quadri)")
 
     def quadri_obbligatori(self, presenti: list[str]):
-        """Quadri resi obbligatori dalle annotazioni XSD ma fuori dal perimetro di questa versione."""
+        """Quadri resi obbligatori dalle annotazioni XSD ma non generati (motivo gia' registrato o dati mancanti)."""
+        gia = {e.percorso for e in self.mancanti}
         immobili = any(q in presenti for q in ("EB", "EC"))
         dal_2025 = self.data_decesso is not None and self.data_decesso >= date(2025, 1, 1)
-        if dal_2025 or ("EA" in presenti and immobili):
+        if (dal_2025 or ("EA" in presenti and immobili)) and "EF" not in presenti and "quadro[EF]" not in gia:
             self.mancanti.append(Errore("QUADRO_OBBLIGATORIO_NON_SUPPORTATO", "quadro[EF]",
                                         "il quadro EF (liquidazione imposte; dal 2025 anche sezione V-bis imposta di "
-                                        "successione) e' obbligatorio per questa pratica ma non e' generato da questa "
-                                        "versione", FO.fonte_annotazione("QuadroEF") + "; " +
+                                        "successione) e' obbligatorio per questa pratica ma non e' stato generato",
+                                        FO.fonte_annotazione("QuadroEF") + "; " +
                                         FO.fonte_annotazione("QuadroEF/SezioneVBis_ImpostaSuccessione")))
-        if "EA" in presenti:
+        if "EA" in presenti and "EG" not in presenti and not any(p.startswith("quadro[EG]") for p in gia):
             self.mancanti.append(Errore("QUADRO_OBBLIGATORIO_NON_SUPPORTATO", "quadro[EG]", "il quadro EG e' obbligatorio "
-                                        "in presenza del quadro EA ma non e' generato da questa versione",
+                                        "in presenza del quadro EA ma non e' stato generato (nessun allegato)",
                                         FO.fonte_annotazione("QuadroEG")))
-        if self.codice_carica not in ("5", "6", "7"):
+        if self.codice_carica not in ("5", "6", "7") and "EH" not in presenti:
             self.mancanti.append(Errore("QUADRO_OBBLIGATORIO_NON_SUPPORTATO", "quadro[EH]", "il quadro EH e' obbligatorio "
                                         "(dichiarazione non integrativa, codice carica diverso da 5, 6, 7) ma non e' "
-                                        "generato da questa versione", FO.fonte_annotazione("QuadroEH")))
+                                        "stato generato", FO.fonte_annotazione("QuadroEH")))
 
     # ---------------------------------------------------------------- orchestrazione
     def esegui(self) -> EsitoExport:
@@ -1000,6 +1033,14 @@ class _Export:
         self.valore_passivita: dict[str, int] = {}
         self.scartati: set[str] = set()
         self.tipo_ea, self.codice_carica, self.data_decesso = {}, None, None
+        self.comune_bene: dict[str, str] = {}
+        self.righe_dev: dict[str, dict] = {}
+        self.persona_dev: dict[str, str] = {}
+        self.soggetti_ea: dict[str, dict] = {}
+        self.handicap_ea: dict[str, bool] = {}
+        self.fornitore_diverso_da_dichiarante = False
+        self.totale_da_versare = 0
+        self.defunto = self.presentatore = None
 
         self.classifica_persone()
         self.ordina_ea()
@@ -1037,6 +1078,31 @@ class _Export:
         corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroER": qer}
         presenti = [k[6:] for k, v in corpo.items() if v]
         fr = self.frontespizio(presenti)
+        intest = {"TipoFornitore": ctx.tipo_fornitore}
+        if ctx.spazio_utente:
+            try:
+                intest["SpazioUtente"] = F.an(ctx.spazio_utente)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", "contesto.spazio_utente", str(e), FO.fonte_spec(15))
+        # quadri EG, EH, EF (EF dopo una prima serializzazione: il calcolo V-bis legge il file dichiarato)
+        qeg = EFGH.quadro_eg(self) if fr is not None else None
+        qeh = EFGH.quadro_eh(self, fr, qeg) if fr is not None else None
+        xml_pre = None
+        if fr is not None and not self.errori and not self.ns:
+            dich_pre = {"@identificativo": ctx.identificativo, "Frontespizio": fr}
+            dich_pre.update({k: v for k, v in corpo.items() if v})
+            try:
+                xml_pre = serializza(F.cf(ctx.cf_fornitore), intest, dich_pre)
+            except (M.ErroreModello, F.ValoreXml) as e:
+                self.err("ERRORE_SERIALIZZAZIONE", "/", str(e), FO.fonte_xsd())
+        qef = EFGH.quadro_ef(self, xml_pre) if fr is not None and xml_pre is not None else None
+        corpo.update({"QuadroEF": qef, "QuadroEG": qeg, "QuadroEH": qeh})
+        presenti = [k[6:] for k, v in corpo.items() if v]
+        if fr is not None:
+            fr["FirmaModello"] = {**{f"Casella{q}": "1" for q in presenti}, "FirmaDichiarante": "1"}
+            ver = EFGH.versamento(self, (fr.get("Presentatore") or {}).get("CodiceFiscale"))
+            if ver:
+                fr["Versamento"] = ver
         self.campi_non_esportati()
         self.quadri_attivi()
         self.quadri_obbligatori(presenti)
@@ -1047,13 +1113,6 @@ class _Export:
             return esito
         dich = {"@identificativo": ctx.identificativo, "Frontespizio": fr}
         dich.update({k: v for k, v in corpo.items() if v})
-        intest = {"TipoFornitore": ctx.tipo_fornitore}
-        if ctx.spazio_utente:
-            try:
-                intest["SpazioUtente"] = F.an(ctx.spazio_utente)
-            except F.ValoreXml as e:
-                self.err("VALORE_NON_VALIDO", "contesto.spazio_utente", str(e), FO.fonte_spec(15))
-                return esito
         try:
             xml = serializza(F.cf(ctx.cf_fornitore), intest, dich)
         except M.ErroreModello as e:  # errore di programma: struttura non prevista dallo schema

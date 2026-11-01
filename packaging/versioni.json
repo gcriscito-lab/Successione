@@ -1,0 +1,30 @@
+{
+  "nota": "Versioni fissate del pacchetto Windows. Aggiornare solo dopo prova sui casi di riferimento (docs/INSTALLAZIONE_WINDOWS.md, par. Aggiornamenti).",
+  "python": {
+    "versione": "3.13.17",
+    "url": "https://www.python.org/ftp/python/3.13.17/python-3.13.17-embed-amd64.zip",
+    "sha256": "9e35319bffedab8b36ad44d8f377cb4f1733bcec257a0b6d04d94f01486ddb38",
+    "verifica": "SHA-256 confrontato con la tabella dei file di https://www.python.org/downloads/release/python-31317/ il 2026-11-01",
+    "pth": "python313._pth"
+  },
+  "piattaforma_wheel": {
+    "platform": "win_amd64",
+    "python_version": "3.13",
+    "implementation": "cp",
+    "abi": "cp313"
+  },
+  "ambiente_marcatori_windows": {
+    "os_name": "nt",
+    "sys_platform": "win32",
+    "platform_system": "Windows",
+    "platform_machine": "AMD64",
+    "platform_python_implementation": "CPython",
+    "implementation_name": "cpython",
+    "python_version": "3.13",
+    "python_full_version": "3.13.17",
+    "implementation_version": "3.13.17",
+    "platform_release": "",
+    "platform_version": "",
+    "extra": ""
+  }
+}

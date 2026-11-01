@@ -9,8 +9,13 @@ Struttura::
 
     opzioni.telematico = {
       "dichiarazione": {"stato_civile", "devoluzione_per_legge", "firma_dichiarante",
-                         "presentatore": {"persona_id", "codice_carica", "telefono", "email"}},
-      "persone":   {<id>: {"sesso", "provincia_nascita", "tipo_soggetto", "grado_parentela", "portatore_handicap"}},
+                         "presentatore": {"persona_id", "codice_carica", "telefono", "email"},
+                         "versamento": {"iban", "cf_titolare"},          # Frontespizio/Versamento (EF19 > 0)
+                         "tempistica_pagamento",                        # EF18ter col. 1 (1 | 2)
+                         "pagamento_rateale",                           # EF18ter col. 2-3 (non supportato)
+                         "dichiara_copie_conformi"},                    # EH FlagPassivita (lettera l)
+      "persone":   {<id>: {"sesso", "provincia_nascita", "tipo_soggetto", "grado_parentela", "portatore_handicap",
+                           "comune_decesso", "provincia_decesso"}},    # luogo del decesso: EH DatiDefunto/Decesso
       "beni":      {<id>: {"provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo",
                            "indirizzo", "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe",
                            "zona_censuaria", "consistenza", "tipo_cespite"}},
@@ -25,13 +30,16 @@ from __future__ import annotations
 from .. import valori as V
 
 CHIAVI = {
-    "persone": {"sesso", "provincia_nascita", "tipo_soggetto", "grado_parentela", "portatore_handicap"},
+    "persone": {"sesso", "provincia_nascita", "tipo_soggetto", "grado_parentela", "portatore_handicap",
+                "comune_decesso", "provincia_decesso"},
     "beni": {"provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo", "indirizzo",
              "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe", "zona_censuaria",
              "consistenza", "tipo_cespite"},
     "passivita": {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id"},
 }
-CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore"}
+CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",
+                        "tempistica_pagamento", "pagamento_rateale", "dichiara_copie_conformi"}
+CHIAVI_VERSAMENTO = {"iban", "cf_titolare"}
 CHIAVI_PRESENTATORE = {"persona_id", "codice_carica", "telefono", "email"}
 CHIAVI_SUPERFICIE = {"ettari", "are", "centiare"}
 CHIAVI_TOP = set(CHIAVI) | {"dichiarazione"}
@@ -79,4 +87,7 @@ def chiavi_non_gestite(dati: dict) -> list[str]:
     out += [f"opzioni.telematico.dichiarazione.{k}" for k in d if k not in CHIAVI_DICHIARAZIONE]
     out += [f"opzioni.telematico.dichiarazione.presentatore.{k}" for k in presentatore_sup(dati)
             if k not in CHIAVI_PRESENTATORE]
+    v = d.get("versamento")
+    if isinstance(v, dict):
+        out += [f"opzioni.telematico.dichiarazione.versamento.{k}" for k in v if k not in CHIAVI_VERSAMENTO]
     return sorted(out)

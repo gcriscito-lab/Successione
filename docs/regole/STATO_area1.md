@@ -52,10 +52,17 @@ per errori bloccanti (***), piu' casi negativi con errore predisposto. Controllo
 trasmissione ne' prova con i servizi dell'Agenzia.
 
 ### Fatto
-- (in avvio) letto lo stato precedente.
+- CF: `identificativi.py` verificato ESEGUENDO checkCF_PIVA.jar su 30 soggetti sintetici + 3 negativi
+  (`tests/fixture_telematico/cf_lotto.tsv`, esito originale `cf_lotto_esito_componente.txt`): primi 15 caratteri
+  uguali a `CodiceFiscale.getCodiceFiscale` (che accoda sempre 'A': il 16o carattere NON e' calcolato da quella
+  classe) e `U1CheckDigit.controllaCheckDigit`=true. Aggiunta la tabella accenti di `noAccentate`.
+  `VerificaComponenti.java` ha la modalita' `lotto`.
+- `tests/telematico_casi.py`: CF sintetici validi (RSSMRA40A01H501K, RSSNNA70A41H501J, RSSLCU72B02H501O).
+- Controllo ufficiale sulla bozza con i nuovi CF: spariti i (***) sui codici fiscali e sul numero di soggetti in
+  devoluzione; restano EF/EG/EH obbligatori e quote ER 1/3-2/3 incoerenti con la devoluzione per legge (1/2).
 
 ### In corso
-- Verifica di `telematico/identificativi.py` e `tests/fixture_telematico/VerificaComponenti.java` (tentativo interrotto).
+- EF/EG/EH in `esporta.py`; caso A10 completo in `tests/telematico_casi.py` (`caso_a10`).
 
 ### Da fare
 1. CF sintetici con carattere di controllo verificato (checkCF_PIVA.jar + controllo); devoluzioni coerenti.

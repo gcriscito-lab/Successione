@@ -8,7 +8,7 @@ from __future__ import annotations
 from successioni.telematico.calcolo import calcola, calcola_da_xml
 from successioni.telematico.esporta import esporta_xml
 
-from telematico_casi import caso_completo, contesto
+from telematico_casi import CF_ANNA, CF_LUCA, caso_completo, contesto
 
 
 def _fratelli() -> dict:
@@ -129,7 +129,7 @@ def test_franchigia_disabilita_e_presunzione_esclusa_con_beni_inventariati():
     d["opzioni"]["telematico"]["beni"]["b_conto001"]["tipo_cespite"] = "BI"
     r = calcola(d)
     v = {b.codice_fiscale: _valori(b) for b in r.beneficiari}
-    anna, luca = v["RSSNNA70A41H501X"], v["RSSLCU72B02H501Y"]
+    anna, luca = v[CF_ANNA], v[CF_LUCA]
     assert anna["FR"] == "1500000" and anna["QN"] == "0"  # guida p. 3: 1.500.000 a prescindere dal grado
     assert luca["FR"] == "0" and luca["PR"] == "0"         # cugino: nessuna franchigia; BI -> niente presunzione
     assert luca["ISL"] == "6006.36"                        # 100106 x 6%

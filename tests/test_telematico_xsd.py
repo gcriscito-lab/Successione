@@ -67,7 +67,7 @@ def test_errore_predisposto_ordine_sequenza(xml_valido):
 
 
 def test_elemento_obbligatorio_mancante(xml_valido):
-    rotto = xml_valido.replace(b"<suc:CodiceFiscaleDefunto>RSSMRA40A01H501W</suc:CodiceFiscaleDefunto>", b"")
+    rotto = xml_valido.replace(b"<suc:CodiceFiscaleDefunto>RSSMRA40A01H501K</suc:CodiceFiscaleDefunto>", b"")
     err = xsd.valida_xsd(rotto)
     assert any("CodiceFiscaleDefunto" in e.messaggio for e in err), err
 
