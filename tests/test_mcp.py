@@ -69,3 +69,23 @@ def test_mcp_annotazioni_prefisso_e_paginazione(tmp_path):
                 pag = dati(await s.call_tool("successioni_elenca_pratiche", {"limit": 2}))
                 assert pag["totale"] == 3 and len(pag["elementi"]) == 2 and pag["has_more"] and pag["next_offset"] == 2
     anyio.run(scenario)
+
+
+def test_mcp_stato_quadri_e_blocco_non_supportati(tmp_path):
+    base = tmp_path / "dati"
+    param = StdioServerParameters(command=sys.executable, args=["-m", "successioni.mcp_server"],
+                                  env={"SUCCESSIONI_DATA": str(base), "PATH": "/usr/bin:/bin"})
+
+    async def scenario():
+        from mcp.client.session import ClientSession
+        async with stdio_client(param) as (r, w):
+            async with ClientSession(r, w) as s:
+                await s.initialize()
+                pid = dati(await s.call_tool("successioni_crea_pratica", {"titolo": "X", "chiave_richiesta": "k"}))["pratica_id"]
+                await s.call_tool("successioni_aggiorna_pratica", {"pratica_id": pid, "revisione_attesa": 1, "chiave_richiesta": "u",
+                    "operazioni": [{"op": "set", "sezione": "opzioni", "campi": {"quadri_attivi": ["EA", "EN"]}}]})
+                st = dati(await s.call_tool("successioni_stato_quadri", {"pratica_id": pid}))
+                assert st["finalizzabile"] is False
+                assert {q["id"]: q["stato"] for q in st["quadri"]}["EN"] == "non_supportato"
+                assert any(x["codice"] == "QUADRO_NON_SUPPORTATO" and x["quadro"] == "EN" for x in st["rilievi"])
+    anyio.run(scenario)

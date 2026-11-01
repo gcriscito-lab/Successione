@@ -115,6 +115,11 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         return sv.verifica(pratica_id)
 
     @tool
+    def stato_quadri(pratica_id: str) -> dict:
+        """Stato di ogni quadro (vuoto, compilato, rilievi, non supportato, non selezionato) con i rilievi e il quadro di appartenenza. Dice se la pratica è finalizzabile nel perimetro supportato; non è il controllo ufficiale."""
+        return sv.quadri(pratica_id)
+
+    @tool
     def file_in_ingresso() -> list[str]:
         """File che l'utente ha messo nella cartella d'ingresso e che possono essere acquisiti."""
         return sorted(p.name for p in sv.cartella_ingresso.iterdir() if p.is_file())
