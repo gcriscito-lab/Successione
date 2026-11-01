@@ -12,7 +12,7 @@ dependencies = [
   "uvicorn>=0.30",
 ]
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "httpx"]
 [project.scripts]
 successioni = "successioni.cli:main"
 successioni-mcp = "successioni.mcp_server:main"
@@ -24,3 +24,5 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+[tool.setuptools.package-data]
+successioni = ["static/*.html"]
