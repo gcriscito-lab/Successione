@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jnlp spec="1.0+" codebase="https://jws.agenziaentrate.it/jws/registro/2013/" href="ControlliSUC13.jnlp">
+	<information>
+		<title>Controlli Dichiarazione di successione</title>
+		<icon href="logo.gif" kind="default" />
+		<vendor>Agenzia delle Entrate</vendor>
+		<homepage href="https://jws.agenziaentrate.it" />
+		<description>Controlli Dichiarazione di successione</description>
+		<offline-allowed/>
+		<shortcut> 
+			<menu submenu="Atti registro"/>
+		</shortcut>  
+	</information>
+	<information os="Linux">   
+		<title>Controlli Dichiarazione di successione</title>
+		<icon href="logo.gif" kind="default" />
+		<homepage href="https://jws.agenziaentrate.it" />
+		<offline-allowed/>
+		<shortcut> 
+			<desktop/> 
+		</shortcut>  
+	</information>
+	<offline-allowed/>
+	<security>
+		<all-permissions/> 
+	</security>
+	<update check="always" policy="always"/>
+	<resources>
+		<j2se version="1.7+" initial-heap-size="512M" max-heap-size="1024M" href="http://java.sun.com/products/autodl/j2se"/>
+		<jar href="controlliXMLREG2013.jar"/>
+		
+		<jar href="SUC13/ResSUC13.jar"/>
+		<jar href="print-model-1.2.jar"/>
+		
+		<jar href="XMLConverterREG.jar"/>
+		<jar href="XMLConverter_PropertiesREG2013.jar"/>
+		<jar href="esito.jar"/>
+		<jar href="gson-2.8.9.jar"/>
+		<!--
+			<jar href="calcoloHash.jar"/>
+		-->
+		<jar href="../../Supporto.jar"/>
+		<jar href="checkCF_PIVA.jar"/>
+		<jar href="SUC13/SUCdom.jar"/>
+		<jar href="converter-1.1.jar"/>
+		<jar href="suc-converter-1.0.jar"/>
+		<jar href="jdom.jar"/>
+		<jar href="xmlbeans-2.3.0.jar"/>
+		<jar href="file-detector-1.0.jar"/>
+	</resources>
+	<application-desc main-class="it.finanze.entrate.sco.applet.AControlliSUC2013">
+		<argument>jws</argument>
+		<argument>https://jws.agenziaentrate.it/jws/registro/2013/</argument>
+	</application-desc>
+</jnlp>
