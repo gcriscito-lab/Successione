@@ -53,3 +53,31 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 
 ## Come il coordinatore integra
 Controllo dei file toccati rispetto all'elenco consentito, lettura della patch, applicazione su ramo temporaneo, `python3 -m pytest -q`, prova nel browser dove pertinente, poi avanzamento in avanti sul branch di sessione, senza forzature.
+
+
+---
+
+## Esecuzione sul PC con FreeLLMAPI locale (lanciatore)
+FreeLLMAPI gira sul tuo PC (`http://127.0.0.1:31415/v1`): il cloud non lo raggiunge, quindi gli agenti vanno lanciati **da te**.
+Il lanciatore `scripts/agenti_gratuiti/lancia.py` usa solo la libreria standard. Il modello non esegue comandi: restituisce modifiche in JSON,
+che il lanciatore applica in una copia isolata (`git worktree`), rifiutando ogni file non elencato nel compito, e poi esegue le verifiche con i
+propri comandi. La chiave si legge dall'ambiente e non viene mai scritta nei risultati. Serve `git`; per C1 e C6 anche `node`.
+
+PowerShell, dalla cartella del repository (clone del branch `claude/successioni-dichiarazioni-app-fhcwbe`):
+
+```powershell
+python -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -e ".[test]"
+$env:FREELLMAPI_BASE_URL = "http://127.0.0.1:31415/v1"
+$env:FREELLMAPI_KEY = Read-Host "Chiave FreeLLMAPI"      # si digita nel terminale, mai in chat
+python scripts\agenti_gratuiti\lancia.py --modelli       # elenca i modelli disponibili
+$env:FREELLMAPI_MODEL = "<uno dei nomi elencati>"
+python scripts\agenti_gratuiti\lancia.py C2 --dry-run    # mostra file consentiti e verifiche, senza chiamare il servizio
+python scripts\agenti_gratuiti\lancia.py C2              # un compito alla volta (C1..C6)
+```
+
+Risultato in `build\agenti\<compito>-<data>\`: `consegna.patch` e `CONSEGNA.md` (con gli esiti **reali** delle verifiche; le note del modello sono
+dichiarazioni non verificate). Per provare la patch: `git apply --check build\agenti\...\consegna.patch`. Poi mandala al coordinatore per la revisione.
+
+Attenzione alla riservatezza: un servizio gratuito può inoltrare i prompt a fornitori esterni. Il repository contiene solo dati sintetici e documenti
+pubblici; non usare il lanciatore su cartelle con dati reali. Il lanciatore è provato qui solo con un servizio finto in locale (`tests/test_agenti_gratuiti.py`):
+la prova con FreeLLMAPI reale è **da fare sul tuo PC**.
