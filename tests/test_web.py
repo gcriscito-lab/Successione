@@ -65,3 +65,9 @@ def test_api_elaborati_stati_e_nessun_xml_parziale(ctx):
     st = c.get(f"/api/pratiche/{pid}/elaborati", params={"t": T}).json()
     assert st["export"]["stato"] == "aggiornato" and st["xsd"]["stato"] == "valido" and st["trasmissione"]["stato"] == "non_preparata"
     assert c.post(f"/api/pratiche/{pid}/esporta", json={"scopo": "x"}, params={"t": T}).status_code == 422
+
+
+def test_r13_aiuti_sul_valore_della_quota_del_defunto(ctx):
+    _, c = ctx
+    a = c.get("/api/schema", params={"t": T}).json()["aiuti"]
+    assert "QUOTA DEL DEFUNTO" in a["beni.valore"] and "intero" in a["beni.valore"]

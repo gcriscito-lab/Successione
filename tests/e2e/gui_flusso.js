@@ -23,7 +23,7 @@ const { ok } = require('./verifiche');
   await pg.locator('#ins .rl li button').first().click(); await pg.waitForTimeout(200);
   ok((await pg.locator('#vista tbody tr[aria-selected=true]').count()) === 1, 'il rilievo seleziona la riga');
   await pg.locator('#ins [aria-label=foglio]').fill('512'); await pg.locator('#ins [aria-label=particella]').fill('88'); await pg.locator('#ins [aria-label=quota_defunto]').fill('1/1');
-  await pg.click('#ins .az .pil'); await pg.waitForSelector('#msg.o'); await pg.click('#bControlla'); await pg.waitForTimeout(300);
+  await pg.click('#ins .az .pil'); await pg.waitForFunction(() => document.querySelector('#msg').textContent.includes('Salvato (revisione 3)')); await pg.click('#bControlla'); await pg.waitForTimeout(300);
   ok((await pg.textContent('#ins')).includes('Nessun rilievo'), 'dopo la correzione nessun rilievo');
   await pg.click('#ins [role=tab]:nth-child(4)'); await pg.waitForSelector('#ins .rv'); ok((await pg.locator('#ins .rv').count()) >= 3, 'cronologia con le revisioni');
   await pg.click('#bGenera'); await pg.waitForSelector('#ins [aria-label="Codice fiscale del fornitore"]');

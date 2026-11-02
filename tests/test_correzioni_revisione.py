@@ -103,3 +103,23 @@ def test_r9_json_malformato_422_e_host_di_prova_non_ammesso(tmp_path):
     assert r.status_code == 422 and r.json()["codice"] == "RICHIESTA_NON_VALIDA"
     r = c2.post("/api/pratiche", json={}, params={"t": "T"})                     # manca 'titolo'
     assert r.status_code == 422
+
+
+def test_r20_dati_dell_export_ora_sono_campi_del_modello(sv):
+    """Sesso, provincia, codici comune ecc. si impostano con gli stessi strumenti degli altri campi (GUI e MCP)."""
+    pid = sv.crea_pratica("X")["pratica_id"]
+    sv.aggiorna(pid, 1, [up("persone", "p_aaaa1111", cognome="A", sesso="F", provincia_nascita="RM", grado_parentela="02"),
+                         up("beni", "b_bbbb2222", tipo="fabbricato", codice_comune="H501", classe="3", reddito_dominicale="12.34")])
+    d = sv.leggi(pid)["dati"]
+    assert d["persone"][0]["sesso"] == "F" and d["beni"][0]["codice_comune"] == "H501"
+    with pytest.raises(DatiNonValidi):                       # valore non ammesso per il sesso: errore sul campo
+        sv.aggiorna(pid, 2, [up("persone", "p_aaaa1111", sesso="X")])
+
+
+def test_r20_il_valore_dell_entita_ha_precedenza_su_opzioni_telematico(sv):
+    from successioni.telematico import supplemento as SU
+    pid = sv.crea_pratica("X")["pratica_id"]
+    sv.aggiorna(pid, 1, [up("persone", "p_aaaa1111", cognome="A", sesso="F"),
+                         {"op": "set", "sezione": "opzioni", "campi": {"telematico": {"persone": {"p_aaaa1111": {"sesso": "M"}}}}}])
+    d = sv.leggi(pid)["dati"]
+    assert SU.attr(d, "persone", d["persone"][0], "sesso") == "F"

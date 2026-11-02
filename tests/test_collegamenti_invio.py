@@ -280,3 +280,21 @@ def test_formati_multifile_dal_manuale():
     with pytest.raises(DatiNonValidi):
         I.richiesta_download("R02", "T1000400")
     assert "runInvio.bat|.sh" in I.MULTIFILE["comandi"]["invio"]
+
+
+def test_r12_esi_con_esito_negativo_non_sblocca_un_nuovo_invio(ctx):
+    """Un .esi con resultCode diverso da 00 non prova il mancato ricevimento: l'esito resta incerto, niente doppio invio."""
+    ad = I.InvioAdattatore(ctx["arch"], TrasportoCheCade())
+    c = confermata(ctx, ad)
+    with pytest.raises(RuntimeError):
+        ad.trasmetti(c.job_id, chiave_richiesta="x")
+    tid = ad.job.id_da_chiave(I.TIPO_TENTATIVO, "x")
+    ad2 = I.InvioAdattatore(Archivio(ctx["arch"].base), I.TrasportoSimulato())
+    esi = ('{"tipoOperazione":"INVIO","resultCode":"05","startDate":"01112026173448","endDate":"01112026173448",'
+           '"fileName":"SUC13_prova.ccf","versioneApplicazione":"1.7.6 "}\n')
+    r = ad2.riconcilia(tid, evidenze={"esi": esi})
+    assert r.stato == I.ESITO_INCERTO and "non prova" in (r.azione_richiesta or "") and "NON reinviare" in r.azione_richiesta
+    with pytest.raises(ReinvioNonAmmesso):                   # nessun nuovo tentativo finche' non c'e' una verifica esplicita
+        ad2.trasmetti(c.job_id, chiave_richiesta="y")
+    r2 = ad2.riconcilia(tid, evidenze={"non_trasmesso": True, "verificato_su": "Ricerca ricevute, 02/11/2026"})
+    assert r2.stato == I.NON_TRASMESSO                       # solo la dichiarazione esplicita sblocca

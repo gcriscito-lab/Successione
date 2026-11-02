@@ -473,7 +473,9 @@ class InvioAdattatore:
         else:  # incerto / sconosciuto
             patch.update({"errore_rete": resp.motivo if resp.tipo == "incerto" else t["risultato"].get("errore_rete"),
                           "candidati": resp.candidati,
-                          "azione_richiesta": "Esito incerto: NON reinviare. Riconciliare consultando protocolli ed "
+                          "azione_richiesta": "Esito incerto: NON reinviare. "
+                                              + (resp.motivo + " " if resp.tipo == "sconosciuto" and resp.motivo else "")
+                                              + "Riconciliare consultando protocolli ed "
                                               "esiti (Ricerca ricevute, Multifile R01/R02, file .esi)."})
             nuovo = ESITO_INCERTO if t["stato"] == IN_TRASMISSIONE else None
             self.job.transizione(tid, da, nuovo, patch=patch, nota=f"esito {resp.tipo}")
@@ -527,7 +529,13 @@ class InvioAdattatore:
                 if r.get("resultCode") == "00" and r.get("protocollo"):
                     return RispostaInvio("accettato", protocollo=r["protocollo"]), prova
                 if r.get("resultCode") and r.get("resultCode") != "00":
-                    return RispostaInvio("non_trasmesso", motivo=f"INVIO con resultCode {r['resultCode']}"), prova
+                    # Un esito negativo di Multifile NON prova che il file non sia stato ricevuto (puo' essere stato ricevuto e
+                    # scartato): resta incerto, niente nuovo tentativo senza una verifica esplicita dell'utente.
+                    return (RispostaInvio("sconosciuto", motivo=(
+                        f"Multifile ha registrato un esito negativo per l'INVIO (resultCode {r['resultCode']}), che non prova "
+                        "che il file non sia stato ricevuto: verificare nelle ricevute e nello stato degli invii, poi riconciliare "
+                        "con {'protocollo': ...} oppure, solo dopo la verifica, con {'non_trasmesso': True, 'verificato_su': '...'}")),
+                            prova)
         if ev.get("stato_invii"):
             st = leggi_stato_invii(ev["stato_invii"])
             cand = [{k: x.get(k) for k in ("protocollo", "tipoFornitura", "data", "stato", "nomeFile",

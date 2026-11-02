@@ -24,18 +24,40 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         "cognome": "str", "nome": "str", "codice_fiscale": "cf", "data_nascita": "data",
         "luogo_nascita": "str", "ruolo": "enum:" + "|".join(RUOLI_PERSONA),
         "relazione_con_defunto": "str", "data_decesso": "data",
+        # Dati richiesti dall'export XML (prima solo in opzioni.telematico): se presenti qui hanno la precedenza.
+        "sesso": "enum:M|F", "provincia_nascita": "str", "tipo_soggetto": "str", "grado_parentela": "str",
+        "comune_decesso": "str", "provincia_decesso": "str",
     },
     "beni": {
         "tipo": "enum:" + "|".join(TIPI_BENE), "descrizione": "str",
         "comune": "str", "sezione": "str", "foglio": "str", "particella": "str", "subalterno": "str",
         "categoria": "str", "rendita": "importo", "valore": "importo",
         "diritto": "str", "quota_defunto": "quota", "provenienza": "str",
+        "provincia": "str", "codice_comune": "str", "comune_amministrativo": "str", "codice_comune_amministrativo": "str",
+        "indirizzo": "str", "natura": "str", "tipologia_terreno": "str", "reddito_dominicale": "importo", "classe": "str",
+        "zona_censuaria": "str", "consistenza": "str", "tipo_cespite": "str",
     },
     "devoluzioni": {
         "bene_id": "ref:beni", "persona_id": "ref:persone", "quota": "quota", "diritto": "str",
     },
-    "passivita": {"descrizione": "str", "importo": "importo", "persona_id": "ref:persone"},
+    "passivita": {"descrizione": "str", "importo": "importo", "persona_id": "ref:persone",
+                  "tipo": "str", "estremi_documento": "str", "data_documento": "data", "possesso": "quota",
+                  "bene_id": "ref:beni"},
     "documenti_ref": {"allegato_id": "str", "tipo_eg": "str", "finalita": "str", "persona_id": "ref:persone"},
+}
+# Aiuti contestuali mostrati nell'interfaccia e restituiti dall'MCP: spiegano campi che si prestano a errori di inserimento.
+AIUTI: dict[str, str] = {
+    "beni.valore": "Valore in euro interi della QUOTA DEL DEFUNTO (base imponibile), non dell'intero bene. "
+                   "Esempio: immobile da 200.000 euro posseduto per 1/2: indicare 100.000. Indicare l'intero valore raddoppia attivo e imposta.",
+    "beni.quota_defunto": "Frazione del bene posseduta dal defunto (es. 1/2). Non è la quota dell'erede.",
+    "beni.rendita": "Rendita catastale in euro, con il punto decimale (es. 1240.50).",
+    "devoluzioni.quota": "Quota dell'erede sul diritto del defunto (es. 1/3). È un dato diverso dalla quota del defunto sul bene.",
+    "persone.sesso": "M o F, come richiesto dal file telematico.",
+    "persone.grado_parentela": "Codice del grado di parentela con il defunto, come nelle istruzioni del quadro EA (es. 02).",
+    "beni.codice_comune": "Codice catastale del comune (4 caratteri, es. H501).",
+    "beni.natura": "Natura del terreno secondo le istruzioni del quadro EB (es. T).",
+    "persone.codice_fiscale": "16 caratteri. Il carattere di controllo viene verificato in esportazione.",
+    "passivita.importo": "Importo in euro, con il punto decimale. Indicare la parte di debito che grava sul defunto.",
 }
 SEZIONI = {"opzioni": None, "note": None}  # sezioni libere (dict), non esportate se interne
 

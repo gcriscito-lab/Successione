@@ -236,11 +236,14 @@ function insDati(ins) {
   ins.append(h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)));
   for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e", style: "color:var(--er);margin:0 0 6px" }, x.messaggio));
   for (const [c, kind] of Object.entries(campi)) {
-    ins.append(h("div", { class: "rg" }, h("label", {}, c.replaceAll("_", " ")), campoInput(q.coll, id, c, kind, valRiga(r, c), (campo, v) => {
+    const w = campoInput(q.coll, id, c, kind, valRiga(r, c), (campo, v) => {
       if (r.nuova) r.nuova.campi[campo] = v;
       else { const d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} }; d.campi[campo] = v; S.dirty.set(r.key, d); }
       renderVista(); aggiornaBottoni(); renderSb();
-    })));
+    });
+    const aiuto = (S.schema.aiuti || {})[q.coll + "." + c];
+    if (aiuto) w.append(h("div", { class: "mut", style: "font-size:11.5px;margin-top:2px" }, aiuto));
+    ins.append(h("div", { class: "rg" }, h("label", {}, c.replaceAll("_", " ")), w));
   }
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
   if (r.nuova || S.dirty.has(r.key)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));
@@ -397,8 +400,9 @@ async function salvaOps(ops, confermate) {
   try {
     const r = await post("/api/pratiche/" + S.P.pratica_id + "/aggiorna", { revisione_attesa: S.P.revisione, operazioni: ops, chiave: crypto.randomUUID() });
     const d = new Date(); S.salvata = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-    msg("Salvato (revisione " + r.revisione + ").", "o");
-    await ricarica(); if (confermate) confermate(); render(); await caricaPratiche(); return true;
+    await ricarica(); if (confermate) confermate(); render();
+    msg("Salvato (revisione " + r.revisione + ").", "o");   // dopo il ricaricamento: il messaggio non anticipa lo stato mostrato
+    await caricaPratiche(); return true;
   } catch (e) {
     if (e.dati && e.dati.errori) msg(e.dati.errori.map(x => x.percorso + ": " + x.messaggio).join(" | "), "e");
     else if (e.stato === 409) { msg("La pratica è stata modificata altrove (" + e.message + "). Le tue modifiche non sono state applicate: controlla i dati aggiornati e salva di nuovo.", "e"); await ricarica(); render(); }

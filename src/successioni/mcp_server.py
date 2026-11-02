@@ -73,7 +73,7 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
     @tool
     def schema_dati() -> dict[str, Any]:
         """Collezioni, campi e tipi ammessi (str, cf, data, quota, importo, enum, ref)."""
-        return {"collezioni": S.COLLEZIONI, "sezioni": list(S.SEZIONI),
+        return {"collezioni": S.COLLEZIONI, "aiuti_campi": S.AIUTI, "sezioni": list(S.SEZIONI),
                 "stati_dato": ["assente", "zero", "non_applicabile", "da_confermare"],
                 "operazioni": {"upsert": "{op, coll, id?, campi}", "remove": "{op, coll, id}",
                                "set": "{op, sezione, campi}"},
