@@ -36,6 +36,7 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 
 ## C4. Test aggiuntivi su valori, schema e servizio
 **File:** `tests/test_valori_schema_extra.py` (nuovo).
+**Contesto:** `src/successioni/valori.py`, `src/successioni/schema.py`.
 **Cosa fare:** casi limite per `valori.py` e `schema.valida_campo`: quote con denominatore 0 o negative, importi con virgola, float, stringhe vuote; date 29 febbraio valide e non; stati del dato (`assente`, `zero`, `non_applicabile`, `da_confermare`); riferimenti inesistenti; `Servizio.aggiorna` con chiave di richiesta ripetuta e con contenuto diverso.
 **Accettazione:** almeno 25 asserzioni significative, tutte verdi; nessun test che passi per il motivo sbagliato (ogni caso negativo verifica il **codice** dell'errore, non solo che ci sia un errore).
 

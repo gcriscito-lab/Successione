@@ -60,7 +60,9 @@ def leggi_compito(cid: str) -> dict:
     ammessi = re.findall(r"`([^`]+)`", riga.group(1))
     ammessi = [a for a in ammessi if "/" in a or "." in a]
     nuovi = {a for a in ammessi if re.search(rf"`{re.escape(a)}`\s*\(nuov[oi]\)", riga.group(1))}
-    return {"id": cid, "testo": blocco, "ammessi": ammessi, "nuovi": nuovi}
+    ctx = re.search(r"\*\*Contesto(?: di sola lettura)?:\*\*(.*)", blocco)
+    contesto = [c for c in re.findall(r"`([^`]+)`", ctx.group(1)) if "/" in c or "." in c] if ctx else []
+    return {"id": cid, "testo": blocco, "ammessi": ammessi, "nuovi": nuovi, "contesto": contesto}
 
 
 def percorso_sicuro(rel: str, ammessi: list[str]) -> str | None:
@@ -163,6 +165,22 @@ def contesto_file(lavoro: Path, ammessi: list[str]) -> str:
     return "\n\n".join(parti)
 
 
+def contesto_lettura(lavoro: Path, contesto: list[str]) -> str:
+    """File di SOLA LETTURA mostrati al modello: non sono modificabili (percorso_sicuro li rifiuta)."""
+    parti, tot = [], 0
+    base = lavoro.resolve()
+    for rel in contesto:
+        p = (lavoro / rel).resolve()
+        if base not in p.parents or not p.is_file():
+            continue
+        t = p.read_text(encoding="utf-8")
+        tot += len(t.encode("utf-8"))
+        if tot > LIMITE_CONTESTO_BYTE:
+            break
+        parti.append(f"### {rel} (SOLA LETTURA)\n```\n{t}\n```")
+    return "\n\n".join(parti)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("compito", nargs="?", help="C1..C6 (vedi docs/COMPITI_PER_AGENTI_GRATUITI.md)")
@@ -205,7 +223,9 @@ def main(argv=None) -> int:
         try:
             messaggi = [{"role": "system", "content": REGOLE_SISTEMA},
                         {"role": "user", "content": comp["testo"] + "\n\nFile consentiti (e loro contenuto attuale):\n\n"
-                         + contesto_file(lavoro, comp["ammessi"])}]
+                         + contesto_file(lavoro, comp["ammessi"])
+                         + ("\n\nFile di sola lettura (NON inventare nomi, funzioni, codici di errore o campi che qui non compaiono):\n\n"
+                            + contesto_lettura(lavoro, comp["contesto"]) if comp["contesto"] else "")}]
             toccati, esiti, errori_tot, note = set(), [], [], ""
             for it in range(1, a.max_iter + 1):
                 try:
