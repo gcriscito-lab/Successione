@@ -1,0 +1,55 @@
+# Compiti per agenti gratuiti (FreeLLMAPI o simili)
+
+Pacchetto di lavoro delimitato, pensato per modelli meno affidabili: compiti piccoli, file consentiti dichiarati, criteri di accettazione verificabili da un comando. Il coordinatore rivede ogni consegna prima di integrarla.
+
+## Regole per chi esegue (valgono per ogni compito)
+1. Lavora su una copia del repository, branch `claude/successioni-dichiarazioni-app-fhcwbe`, partendo dal commit indicato dal coordinatore.
+2. Tocca **solo** i file elencati nel compito. Niente altri file, niente `fonti/`, niente `docs/regole/`.
+3. Dati **solo sintetici**. Mai dati reali di persone, mai credenziali, chiavi o token nel codice, nei log o nei documenti.
+4. Nessuna regola fiscale dalla memoria. Se un compito ne richiede una, fermati e annotala in `docs/DOMANDE_PER_IL_COORDINATORE.md`: non inventarla.
+5. Non saltare né indebolire test per farli passare. Se un test è sbagliato, spiegalo.
+6. Consegna una patch (`git format-patch`) con un file `CONSEGNA.md`: cosa hai fatto, file toccati, comandi eseguiti con esito reale, cosa non hai potuto verificare.
+7. Non fare push. Un compito alla volta.
+
+Verifica di base per tutti: `python3 -m pytest -q` deve restare verde (oggi 263 passati, 8 saltati per componenti esterni non configurati).
+
+## Cosa NON affidare a questi agenti
+Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, sicurezza dell'interfaccia e dell'MCP. Restano al coordinatore o a un revisore forte.
+
+---
+
+## C1. Maschera «Dati della dichiarazione» nel frontespizio
+**Perché:** stato civile, codice carica, contatti e versamento oggi si impostano solo da MCP o API (rilievo R20 aperto).
+**File consentiti:** `src/successioni/static/app.js`, `src/successioni/static/app.css`, `tests/e2e/gui_flusso.js` (solo per aggiungere verifiche).
+**Cosa fare:** nella scheda «Dati generali» aggiungere una sezione «Dati della dichiarazione» con i campi di `opzioni.telematico.dichiarazione` elencati in `src/successioni/telematico/supplemento.py` (`stato_civile`, `devoluzione_per_legge`, `firma_dichiarante`, `presentatore.persona_id`, `presentatore.codice_carica`, `presentatore.telefono`, `presentatore.email`, `versamento.iban`, `versamento.cf_titolare`, `tempistica_pagamento`). Salvataggio con l'operazione `{op:"set", sezione:"opzioni", campi:{telematico:<oggetto completo aggiornato>}}`: **leggere l'oggetto corrente e modificare solo le chiavi toccate**, senza perdere `persone`, `beni`, `passivita`. I codici ammessi non vanno inventati: mostrare un campo di testo con il suggerimento «codice come da istruzioni del frontespizio».
+**Accettazione:** `node --check src/successioni/static/app.js`; nel browser (metodo di `.claude/skills/webapp-testing`) il valore inserito sopravvive a ricaricamento pagina e alla modifica di una persona; una verifica nuova in `tests/e2e/gui_flusso.js`; nessun errore JavaScript.
+
+## C2. Manuale breve per il professionista
+**File:** `docs/MANUALE_BREVE.md` (nuovo).
+**Cosa fare:** istruzioni in linguaggio semplice, senza tecnicismi: avvio, nuova dichiarazione guidata, quadri, controlli, scheda File («bozza tecnica» che cosa significa), allegati e PDF/A («non verificato» senza veraPDF), backup e ripristino (`successioni backup <cartella>` e `successioni ripristina <backup> --destinazione <cartella nuova>`), dove sono i dati, cosa il programma NON fa (nessun invio, quadri non supportati). Fonti dei fatti: `docs/BETA_DA_REVISIONARE.md`, `docs/STATO_area4.md`, `scripts/windows/LEGGIMI.txt`, `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+**Accettazione:** nessuna funzione citata che non esista (ogni comando verificabile con `--help`); massimo 3 pagine; nessun elenco di sigle senza spiegazione.
+
+## C3. Guida all'installazione e configurazione MCP
+**File:** `docs/INSTALLAZIONE_WINDOWS.md`, `docs/CONFIGURAZIONE_MCP.md` (nuovi).
+**Cosa fare:** ricavare dal contenuto già scritto in `docs/STATO_area4.md`, `scripts/windows/` e `packaging/`. Per MCP: comando e variabili d'ambiente reali (`python -m successioni.mcp_server`, `SUCCESSIONI_DATA`), come verificare che gli strumenti con prefisso `successioni_` siano visibili, cosa succede se il client si chiude (lo stato è nei dati). Citare la documentazione ufficiale del client con URL e data solo se consultata davvero; altrimenti scrivere «da verificare».
+**Accettazione:** ogni comando e percorso citato esiste nel repository; sezione finale «Da collaudare su Windows» coerente con `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+
+## C4. Test aggiuntivi su valori, schema e servizio
+**File:** `tests/test_valori_schema_extra.py` (nuovo).
+**Cosa fare:** casi limite per `valori.py` e `schema.valida_campo`: quote con denominatore 0 o negative, importi con virgola, float, stringhe vuote; date 29 febbraio valide e non; stati del dato (`assente`, `zero`, `non_applicabile`, `da_confermare`); riferimenti inesistenti; `Servizio.aggiorna` con chiave di richiesta ripetuta e con contenuto diverso.
+**Accettazione:** almeno 25 asserzioni significative, tutte verdi; nessun test che passi per il motivo sbagliato (ogni caso negativo verifica il **codice** dell'errore, non solo che ci sia un errore).
+
+## C5. Insieme di domande di valutazione per l'MCP
+**File:** `docs/valutazione_mcp.xml` (nuovo).
+**Cosa fare:** 10 domande in stile `.claude/skills/mcp-builder/reference/evaluation.md` che un assistente deve risolvere usando gli strumenti `successioni_*` su dati sintetici (es. «quante persone con ruolo erede ha la pratica X», «quali quadri hanno rilievi», «la pratica è finalizzabile e perché»), con risposta attesa verificabile. Includere i dati di partenza come operazioni `aggiorna_pratica`.
+**Accettazione:** ogni domanda ha una sola risposta corretta, indipendente dal tempo, verificabile con una query sull'archivio.
+
+## C6. Verifica di accessibilità dell'interfaccia
+**File:** `src/successioni/static/app.js`, `src/successioni/static/app.css`, `tests/e2e/accessibilita.js` (nuovo).
+**Cosa fare:** uso completo da tastiera (albero dei quadri, tabella, ispettore, procedura guidata, finestra di dialogo con focus che rientra al chiudere), etichette associate ai campi, contrasti sufficienti in tema chiaro e scuro, ordine di tabulazione sensato. Un test Playwright che percorra il flusso solo con tastiera.
+**Accettazione:** il test passa; nessuna regressione in `tests/e2e/gui_flusso.js`; elenco in `CONSEGNA.md` dei punti non risolti.
+
+---
+
+## Come il coordinatore integra
+Controllo dei file toccati rispetto all'elenco consentito, lettura della patch, applicazione su ramo temporaneo, `python3 -m pytest -q`, prova nel browser dove pertinente, poi avanzamento in avanti sul branch di sessione, senza forzature.
