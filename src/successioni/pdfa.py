@@ -190,10 +190,18 @@ def converti_in_pdfa(src: Path | str, dst: Path | str, livello: str = "1b", *,
     if not gs or not icc:
         raise StrumentoMancante("Ghostscript o profilo ICC sRGB non trovati (SUCCESSIONI_GS / SUCCESSIONI_ICC)")
     src, dst = Path(src), Path(dst)
+    if src.resolve() == dst.resolve():
+        raise ValueError("il derivato deve avere un percorso diverso dall'originale")
     modello = "DeviceGray" if scala_di_grigi else "DeviceRGB"
     strategia = "Gray" if scala_di_grigi else "RGB"
     with tempfile.TemporaryDirectory() as t:
-        icc_ps = icc.replace("\\", "/")
+        # Ghostscript Windows rifiuta alcuni percorsi assoluti oltre MAX_PATH,
+        # anche quando Python puo' leggerli. Lavora su copie con nomi brevi:
+        # l'originale e i percorsi dell'utente non entrano nel programma PostScript.
+        lavoro = Path(t)
+        shutil.copyfile(src, lavoro / 'input.pdf')
+        shutil.copyfile(icc, lavoro / 'srgb.icc')
+        icc_ps = 'srgb.icc'
         deff = Path(t) / "successioni_pdfa_def.ps"
         ps = ("%!\n/ICCProfile (" + icc_ps + ") def\n[/_objdef {icc_PDFA} /type /stream /OBJ pdfmark\n"
               "[{icc_PDFA} <</N 3>> /PUT pdfmark\n[{icc_PDFA} ICCProfile (r) file /PUT pdfmark\n"
@@ -216,15 +224,19 @@ def converti_in_pdfa(src: Path | str, dst: Path | str, livello: str = "1b", *,
                      "-dColorImageDownsampleThreshold=1.0", "-dGrayImageDownsampleThreshold=1.0",
                      "-dAutoFilterColorImages=false", "-dColorImageFilter=/DCTEncode",
                      "-dAutoFilterGrayImages=false", "-dGrayImageFilter=/DCTEncode"]
-        deff.write_text(ps)
+        deff.write_text(ps, encoding='ascii')
         cmd = [gs, "-dPDFA=1", "-dBATCH", "-dNOPAUSE", "-dNOOUTPUTFONTS=false",
                f"-sColorConversionStrategy={strategia}", f"-sProcessColorModel={modello}",
                "-dPDFACompatibilityPolicy=1", "-sDEVICE=pdfwrite", "-dSAFER", *extra,
-               f"--permit-file-read={icc}", f"-sOutputFile={dst}", str(deff), str(src)]
-        pr = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+               "--permit-file-read=srgb.icc", "-sOutputFile=derivato.pdf", deff.name, 'input.pdf']
+        pr = subprocess.run(cmd, cwd=lavoro, capture_output=True, text=True, timeout=timeout)
+        testo = (pr.stdout or "") + "\n" + (pr.stderr or "")
+        abortita = "PDF/A processing aborted" in testo
+        generato = lavoro / 'derivato.pdf'
+        ok = pr.returncode == 0 and generato.is_file() and generato.stat().st_size > 0 and not abortita
+        if ok:
+            shutil.copyfile(generato, dst)
     testo = (pr.stdout or "") + "\n" + (pr.stderr or "")
-    abortita = "PDF/A processing aborted" in testo
-    ok = pr.returncode == 0 and dst.exists() and dst.stat().st_size > 0 and not abortita
     font = [{"nome": m.group(1), "sostituto": Path(m.group(2).strip()).name} for m in _RE_FONT.finditer(testo)]
     avvisi_gs = [ln.strip() for ln in testo.splitlines()
                  if re.search(r"warning|\*\*\*\*|error|abort", ln, re.I)][:10]

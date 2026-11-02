@@ -628,16 +628,23 @@ class ControlloJar(_BaseControllo):
             if pp.exists():
                 letti[ruolo] = pp.read_bytes()
                 artefatti.append(self.deposito.salva_bytes(letti[ruolo], pp.name, ruolo))
-        hash_dopo = sha256_file(lavoro / "in" / nome)
+        copia_input = lavoro / "in" / nome
+        hash_dopo = sha256_file(copia_input) if copia_input.exists() else None
+        # Con produzione DCM il componente ufficiale puo' consumare la copia di
+        # lavoro dopo il controllo positivo. L'originale resta nel deposito.
+        consumata = hash_dopo is None and produci_dcm and "file_controllato_dcm" in letti
+        deposito_invariato = sha256_bytes(self.deposito.leggi(art_in)) == inp['xml_sha256']
         extra = {"modalita": "esecuzione_jar", "codice_uscita": p.codice_uscita, "durata_s": p.durata_s,
-                 "scaduto": p.scaduto, "input_modificato_dal_componente": hash_dopo != inp["xml_sha256"],
+                 "scaduto": p.scaduto, "input_modificato_dal_componente": not consumata and hash_dopo != inp["xml_sha256"],
+                 "copia_lavoro_consumata": consumata, "input_deposito_invariato": deposito_invariato,
                  "classe": CLASSE_CONTROLLO, "dcm_prodotto": "file_controllato_dcm" in letti,
                  "simulato": self.simulato}
         patch = self._completa_con_diagnostici(j, dgn_b=letti.get("diagnostico_dgn"), log_b=letti.get("esito_schema"),
                                                wri_b=letti.get("rapporto_wri"), reale=not self.simulato, extra=extra,
                                                artefatti=artefatti, avvertenze=avvertenze)
-        if p.scaduto or "diagnostico_dgn" not in letti:
+        if p.scaduto or "diagnostico_dgn" not in letti or not deposito_invariato or extra['input_modificato_dal_componente']:
             patch["motivi"] = patch["motivi"] + [("tempo massimo superato" if p.scaduto else
+                                                 "input alterato o copia di lavoro scomparsa senza DCM" if not deposito_invariato or extra['input_modificato_dal_componente'] else
                                                  f"il componente non ha prodotto il .dgn (uscita {p.codice_uscita})")]
             patch["stato_controllo"] = "non_verificabile"
             patch["esito"] = (Esito.SIMULAZIONE if self.simulato else Esito.FALLITO).value

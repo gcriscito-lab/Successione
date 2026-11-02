@@ -6,6 +6,7 @@ Stato: **beta tecnica per la revisione. Non è utilizzabile su una pratica reale
 Nota successiva al congelamento: il rapporto sul commit `2e2b503` e' in
 `docs/REVISIONE_ESTERNA_CODEX.md`; le correzioni CE01-CE10 e le nuove prove Windows sono
 in `docs/CORREZIONI_CODEX.md`. I risultati storici sotto non sono un collaudo della versione corretta.
+Il successivo collaudo locale Windows con veraPDF e SUC13 e' in `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 
 ## In una riga
 Archivio, interfaccia locale, MCP, PDF/A e file XML funzionano e sono provati nel cloud Linux. Un caso sintetico ha superato il controllo ufficiale SUC13 in locale, secondo la registrazione dell'agente (non ancora riprodotta da chi coordina). Mancano i collaudi su Windows, con veraPDF, con Entratel e con i servizi dell'Agenzia.

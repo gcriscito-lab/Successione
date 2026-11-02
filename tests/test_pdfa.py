@@ -18,7 +18,11 @@ def crea_pdf(p, pagine=3):
 
 
 def estrai_testo(p):
-    return subprocess.run(["pdftotext", str(p), "-"], capture_output=True, text=True).stdout
+    if shutil.which('pdftotext'):
+        return subprocess.run(["pdftotext", '-enc', 'UTF-8', str(p), "-"], capture_output=True,
+                              text=True, encoding='utf-8', check=True).stdout
+    # Poppler e' facoltativo nel prodotto: anche senza, il testo deve essere verificato.
+    return '\n'.join(pg.extract_text() or '' for pg in PdfReader(p).pages)
 
 
 def test_non_pdf_e_danneggiato_e_protetto(tmp_path):

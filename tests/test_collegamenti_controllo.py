@@ -149,6 +149,27 @@ def test_positivo_simulato_non_diventa_mai_passato(arch, tmp_path):
     assert r.dettaglio["stato_controllo"] == "positivo" and r.esito is Esito.SIMULAZIONE
 
 
+def test_dcm_consumo_copia_lavoro_non_perde_input_originale(arch, tmp_path):
+    class ConsumaCopia(EsecutoreFinto):
+        def __call__(self, argv, cwd, timeout):
+            p = super().__call__(argv, cwd, timeout)
+            if C.CLASSE_CONTROLLO in argv:
+                i = argv.index(C.CLASSE_CONTROLLO)
+                (Path(cwd) / argv[i + 3]).write_bytes(b'DCM sintetico')
+                (Path(cwd) / argv[i + 1]).unlink()
+            return p
+
+    originale = (FIX / 'frontespizio.xml').read_bytes()
+    ctl = C.ControlloJar(arch, ambiente_finto(tmp_path), esecutore=ConsumaCopia(DGN_POSITIVO_SIMULATO.encode(), LOG_VALIDO))
+    r = ctl.esegui(FIX / 'frontespizio.xml', produci_dcm=True)
+    assert r.stato == 'completato' and r.esito is Esito.SIMULAZIONE
+    reg = ctl.job.leggi(r.job_id)['risultato']
+    assert reg['copia_lavoro_consumata'] and reg['input_deposito_invariato']
+    assert not reg['input_modificato_dal_componente']
+    art = next(a for a in r.artefatti if a['ruolo'] == 'input_controllo')
+    assert ctl.deposito.leggi(art) == originale
+
+
 def test_tempo_scaduto_non_verificabile(arch, tmp_path):
     r = C.ControlloJar(arch, ambiente_finto(tmp_path), esecutore=EsecutoreFinto(None, None, scaduto=True)).esegui(
         FIX / "frontespizio.xml")

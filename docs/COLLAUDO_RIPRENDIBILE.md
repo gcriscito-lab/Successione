@@ -1,5 +1,8 @@
 # Collaudo riprendibile dei collegamenti sul PC Windows del professionista
 
+Aggiornamento 2026-11-02: controllo ufficiale locale Windows positivo e due negativi predisposti verificati;
+rapporto `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`. Entratel e invii/ricevute reali restano da collaudare.
+
 Procedure per A10, A13, A14, A15, A18, A19 (`docs/02_SPECIFICA_E_COLLAUDO.md` §12). Ogni passo scrive nello stesso
 archivio dell'app (cartella `SUCCESSIONI_DATA`, predefinita `%LOCALAPPDATA%\Successioni`) e stampa un JSON con
 `esito` (passato | fallito | da_collaudare | simulazione) e `job_id`. Se una prova si interrompe, si riprende dal
@@ -35,7 +38,7 @@ collaudo controllo --xml <FILE_CON_ERRORE_PREDISPOSTO>
 ```
 
 **Dati di prova.** (a) Negativo noto: `frontespizio.xml` (sintetico). (b) Positivo: un XML completo, sintetico
-(export dell'app quando EF/EG/EH saranno coperti) oppure il file di una pratica effettiva autorizzata — il controllo
+(export dell'app nel perimetro EF/EG/EH oggi coperto) oppure il file di una pratica effettiva autorizzata — il controllo
 e' locale, nulla viene inviato. (c) Errore predisposto: copia di (b) con il carattere di controllo del codice
 fiscale del defunto alterato.
 
@@ -83,8 +86,10 @@ mano, campi sconosciuti segnalati.
 
 Durante A13 (stato `attesa_utente` o `sessione_scaduta`) chiudere l'app e il client MCP; riaprire e lanciare
 `collaudo stato --job <JOB>`: atteso lo stesso stato, le pagine e gli originali gia' acquisiti, nessun risultato
-inventato. Per il controllo: interrompere `collaudo controllo` durante l'esecuzione; il job resta `in_esecuzione`
-(diagnosi visibile), un nuovo controllo con un'altra chiave non altera il precedente.
+inventato. Per il controllo locale, `ControlloJar.riprendi(job_id)` rileva il processo interrotto con il lock,
+recupera i byte congelati e ripete il controllo nello stesso job con una nuova cartella di lavoro. Un controllo
+ancora attivo non viene duplicato. `collaudo stato` e' sola lettura; la ripresa e' nell'API dell'adattatore.
+Il componente puo' consumare la copia di lavoro quando produce DCM: l'originale nel deposito resta invariato.
 
 ## A18 — Invio con esito incerto
 

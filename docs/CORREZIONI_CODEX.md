@@ -1,5 +1,8 @@
 # Correzioni della revisione esterna Codex
 
+Aggiornamento successivo: i collaudi locali Windows del 2 novembre, con veraPDF e SUC13 reali,
+sono in `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`. I risultati sotto descrivono la verifica del 1 novembre.
+
 1 novembre 2026. Base: `2e2b503d1bb4a22c6ae499600846e2c70d5bdb56`, branch
 `claude/successioni-dichiarazioni-app-fhcwbe`. Il rapporto originale
 `REVISIONE_ESTERNA_CODEX.md` resta invariato e descrive quella beta, prima delle correzioni.

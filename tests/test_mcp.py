@@ -141,7 +141,8 @@ def test_mcp_suddividi_allegato_oltre_limite(tmp_path):
     c.save()
     assert f.stat().st_size > 5_000_000
     param = StdioServerParameters(command=sys.executable, args=["-m", "successioni.mcp_server"],
-                                  env={"SUCCESSIONI_DATA": str(base), "PATH": "/usr/bin:/bin"})
+                                  env={"SUCCESSIONI_DATA": str(base), "PATH": os.environ.get('PATH', ''),
+                                       "SUCCESSIONI_GS": pdfa.trova_gs(), "SUCCESSIONI_ICC": pdfa._icc()})
 
     async def scenario():
         from mcp.client.session import ClientSession

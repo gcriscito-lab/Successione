@@ -279,7 +279,12 @@ def _esegui(xml: bytes, lavoro: Path) -> tuple[str, dict, str, bool]:
                    capture_output=True, timeout=600, check=False)
     subprocess.run(base + [C.CLASSE_RAPPORTO, "out/F.dgn", "1"], cwd=lavoro, env=env, capture_output=True,
                    timeout=600, check=False)
-    assert (lavoro / "in" / "F.xml").read_bytes() == xml  # il componente non modifica l'ingresso
+    # Il componente puo' consumare la copia di lavoro nel produrre il DCM.
+    copia = lavoro / 'in' / 'F.xml'
+    if copia.exists():
+        assert copia.read_bytes() == xml
+    else:
+        assert (lavoro / 'out' / 'F.dcm').is_file()
     dgn = C.leggi_dgn(C.decodifica((lavoro / "out" / "F.dgn").read_bytes()))
     ef = C.leggi_esito_fornitura((lavoro / "out" / "F_logSchema.xml").read_bytes())
     stato, _ = C.valuta(dgn, ef)

@@ -1,13 +1,14 @@
 # Documenti, allegati EG e PDF/A (area 2)
 
-Aggiornato: 2026-11-01. Codice: `src/successioni/pdfa.py`, `src/successioni/allegati.py`, `src/successioni/documenti/`.
+Aggiornato: 2026-11-02. Collaudo Windows e correzioni: `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+Codice: `src/successioni/pdfa.py`, `src/successioni/allegati.py`, `src/successioni/documenti/`.
 Test: `tests/test_pdfa.py`, `tests/test_documenti_*.py`. Stato riprendibile: `docs/STATO_area2.md`.
 
 | Requisito | Stato | Evidenza |
 |---|---|---|
 | A11 conversione PDF -> PDF/A-1b, pagine e testo conservati, originale invariato | **controllo locale passato** (Ghostscript 10.02.1, Linux) | `tests/test_documenti_corpus.py`, `tests/test_pdfa.py` |
-| A11 validazione con validatore indipendente (veraPDF) | **da_collaudare** | veraPDF non installabile in questo ambiente; procedura al par. 9 |
-| A11 non conforme respinto | controllo locale passato con il verificatore **indicativo**; con veraPDF **da_collaudare** | `test_a11_non_conforme_respinto_e_mai_conforme_senza_validatore` |
+| A11 validazione con validatore indipendente (veraPDF) | **passato sul corpus sintetico Windows** | 2026-11-02: veraPDF 1.30.3, Ghostscript 10.08.0, 9 derivati conformi, 15 originali invariati; vedi rapporto Windows |
+| A11 non conforme respinto | **passato con veraPDF sul corpus sintetico** | font non incorporati, ordinario e falso PDF/A respinti; `test_a11_collaudo_reale_verapdf` eseguito |
 | A12 protetto / danneggiato / non PDF / firmato con esito esplicito | controllo locale passato (corpus sintetico, firma **simulata**) | `test_a12_*` |
 | A12 riduzione, suddivisione e soglie senza perdita | controllo locale passato | `tests/test_documenti_dimensioni.py` |
 | Accettazione degli allegati da parte dell'Agenzia (CIVIS / software di controllo) | **da_collaudare** | nessuna prova con i servizi dell'Agenzia |
@@ -141,7 +142,8 @@ a 200 dpi.
 
 ## 9. Procedura riprendibile: veraPDF sul PC del professionista e collaudo A11
 
-Stato finché non eseguita: **da_collaudare**. Non serve nessuna credenziale; non si inviano file all'esterno.
+Procedura eseguita sul corpus sintetico il 2026-11-02: **passato localmente**. Restano da collaudare il corpus
+professionale reale e CIVIS. Non serve nessuna credenziale per la prova locale; non si inviano file all'esterno.
 
 1. **Prerequisiti**: programma Successioni installato (Python dell'app); Ghostscript per Windows (`gswin64c --version`;
    se non è nel PATH impostare `SUCCESSIONI_GS` con il percorso completo di `gswin64c.exe`); un Java Runtime
@@ -180,3 +182,4 @@ Stato finché non eseguita: **da_collaudare**. Non serve nessuna credenziale; no
 | Data | Postazione | veraPDF | Ghostscript | Corpus sintetico | Insieme reale (n, anteprima) | CIVIS | Esito A11 |
 |---|---|---|---|---|---|---|---|
 | 2026-11-01 | container Linux (sviluppo) | assente | 10.02.1 | controlli locali passati, esiti `non_verificato` | non eseguito | non eseguito | **da_collaudare** |
+| 2026-11-02 | Windows 11, collaudo Codex | 1.30.3 | 10.08.0 | 15 originali invariati, 9 derivati conformi e negativi attesi confermati | non eseguito; anteprima sulle 3 pagine sintetiche | non eseguito | **passato sul corpus sintetico** |
