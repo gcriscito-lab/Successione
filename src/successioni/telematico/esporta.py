@@ -693,11 +693,15 @@ class _Export:
                               fonte=FO.fonte_xsd(el + "/Possesso/Valore") + "; " + FO.fonte_fasc1(38, "Valore: quota del "
                                                                                                    "defunto, all'unita' di euro"))
             poss: dict = {}
-            if tipo == "11":
-                self.ns.append(f"{base}: passivita' di tipo 11 (legato/onere) non supportata")
             q = SUP.attr(self.d, c, p, "possesso")
             self.usa(p, "possesso")
-            if q is None:
+            if tipo == "11":
+                # tipo 11 (legato o altro onere): Valore = valore del legato (Fascicolo I p. 38); il possesso non va valorizzato
+                if q is not None:
+                    self.err("REGOLA_POSSESSO_TIPO_11", base + ".possesso", "con tipo passivita' 11 il possesso non va "
+                             "valorizzato (il valore e' quello del legato o dell'onere)",
+                             FO.fonte_annotazione(el + "/Possesso/PossessoNumeratore"))
+            elif q is None:
                 self.err("DATO_MANCANTE", base + ".possesso", "quota del defunto nella passivita' obbligatoria (es. 1/1)",
                          FO.fonte_annotazione(el + "/Possesso") + "; " + FO.fonte_fasc1(38, "Quota del defunto"))
             else:
@@ -729,7 +733,7 @@ class _Export:
             # opzioni.telematico.passivita[id].ripartizione = [{persona_id, quota}] (proposta P5)
             rip = self.ripartizione_ed(p, tipo, valore, base, el) if self.ea else None
             riga = {"Tipo": tipo, "Descrizione": descr, "EstremiDocumento": estr, "DataDocumento": dd, "Possesso": poss}
-            if None in (tipo, descr, estr, dd, valore) or not poss.get("PossessoDenominatore"):
+            if None in (tipo, descr, estr, dd, valore) or (tipo != "11" and not poss.get("PossessoDenominatore")):
                 continue
             if prog:
                 riga["ProgressivoCespite"] = prog

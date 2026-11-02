@@ -46,3 +46,8 @@ Il calcolo era gia' predisposto; mancava lo sblocco in esportazione. Fatto: EA t
 senza testamento), regole sui gradi «per legge» limitate alla devoluzione per legge. Caso sintetico: legatario estraneo (grado 35), terreno 10.000 euro,
 imposta dovuta con tempistica 1, riferimento entro 12 mesi: controllo SUC13 locale positivo (solo anomalia 3345), come il caso base.
 Restano: rappresentanti di legatario (carica 3), esecutore (7), trustee (9), qualifiche multiple, ED tipo 11, testamento estero, secondo testamento.
+
+## Aggiornamento 2026-11-02 (notte): ED tipo 11
+Fascicolo I p. 38: per il tipo 11 il valore e' quello del legato; XSD (PossessoNumeratore/Denominatore): non valorizzare. Implementato con errore
+`REGOLA_POSSESSO_TIPO_11` se il possesso e' indicato; ripartizione libera (gia' prevista). Corretta una perdita silenziosa: la riga senza denominatore
+del possesso veniva scartata senza segnalazioni (ora solo per i tipi diversi da 11). Controllo SUC13 locale positivo (anomalia 3345 come il caso base).

@@ -141,6 +141,17 @@ def caso_testamento_legatario() -> dict:
     return d
 
 
+def caso_testamento_legato() -> dict:
+    """``caso_testamento_legatario`` con un legato (passivita' tipo 11, 2.000 euro) a carico dei due figli eredi, 1/2 ciascuno."""
+    d = caso_testamento_legatario()
+    d["passivita"].append({"id": "ps_legato1", "_origine": {}, "descrizione": "Legato di somma di denaro (sintetico)",
+                           "importo": "2000"})
+    d["opzioni"]["telematico"]["passivita"]["ps_legato1"] = {
+        "tipo": "11", "estremi_documento": "Testamento olografo (sintetico)", "data_documento": "2024-06-01",
+        "ripartizione": [{"persona_id": "p_anna0001", "quota": "1/2"}, {"persona_id": "p_luca0001", "quota": "1/2"}]}
+    return d
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),

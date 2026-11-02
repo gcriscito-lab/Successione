@@ -6,7 +6,7 @@ from successioni.telematico import fonti
 from successioni.telematico.esporta import esporta_xml
 from datetime import date
 
-from telematico_casi import caso_testamento, caso_testamento_legatario, contesto_caso_a10
+from telematico_casi import caso_testamento, caso_testamento_legato, caso_testamento_legatario, contesto_caso_a10
 from test_telematico_controllo import NS, _esegui, _motivo_salto
 
 D = "/tm:Messaggio/tm:Contenuto/suc:Fornitura/suc:Dichiarazione"
@@ -83,5 +83,35 @@ def test_legatario_senza_testamento_e_incoerente():
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 def test_reale_controllo_ufficiale_locale_legatario(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es_legatario().xml, tmp_path)
+    assert stato == "positivo", (stato, dgn["diagnostici"])
+    assert sorted((d["codice"], d["gravita"]) for d in dgn["diagnostici"]) == [("3345", 4)], dgn["diagnostici"]
+
+
+def _es_legato():
+    return esporta_xml(caso_testamento_legato(), contesto_caso_a10(data_riferimento=date(2025, 9, 1)))
+
+
+def test_xml_completo_con_passivita_tipo_11():
+    es = _es_legato()
+    assert es.errori == [] and es.non_supportato == [] and es.quadri_mancanti == [], (es.errori, es.non_supportato)
+    doc = etree.fromstring(es.xml)
+    pas = doc.xpath(D + "/suc:QuadroED//suc:Passivita[suc:Tipo='11']", namespaces=NS)
+    assert len(pas) == 1
+    poss = pas[0].xpath("suc:Possesso/*", namespaces=NS)
+    assert [etree.QName(x).localname for x in poss] == ["Valore"]  # nessun numeratore/denominatore (annotazione XSD)
+    assert pas[0].xpath("suc:Possesso/suc:Valore/text()", namespaces=NS) == ["2000"]
+    assert len(pas[0].xpath("suc:RipartizioneED/suc:Ripartizione", namespaces=NS)) == 2
+
+
+def test_tipo_11_con_possesso_e_un_errore():
+    d = caso_testamento_legato()
+    d["opzioni"]["telematico"]["passivita"]["ps_legato1"]["possesso"] = "1/1"
+    es = esporta_xml(d, contesto_caso_a10(data_riferimento=date(2025, 9, 1)))
+    assert es.xml is None and any(e.codice == "REGOLA_POSSESSO_TIPO_11" for e in es.errori)
+
+
+@pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+def test_reale_controllo_ufficiale_locale_legato(tmp_path):
+    stato, dgn, wri, dcm = _esegui(_es_legato().xml, tmp_path)
     assert stato == "positivo", (stato, dgn["diagnostici"])
     assert sorted((d["codice"], d["gravita"]) for d in dgn["diagnostici"]) == [("3345", 4)], dgn["diagnostici"]
