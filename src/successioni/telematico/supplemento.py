@@ -39,7 +39,11 @@ CHIAVI = {
     "passivita": {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id", "ripartizione"},
 }
 CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",
-                        "tempistica_pagamento", "pagamento_rateale", "dichiara_copie_conformi"}
+                        "tempistica_pagamento", "pagamento_rateale", "dichiara_copie_conformi",
+                        "devoluzione_per_testamento", "testamento"}
+# Sezione Testamento del frontespizio (annotazioni XSD: Pubblicazione, Registrazione, TestamentoEstero)
+CHIAVI_TESTAMENTO = {"estero", "pubblico_ufficiale", "data_pubblicazione", "ufficio_registrazione", "serie",
+                     "numero_registrazione", "sottonumero_registrazione", "data_registrazione"}
 CHIAVI_VERSAMENTO = {"iban", "cf_titolare"}
 CHIAVI_PRESENTATORE = {"persona_id", "codice_carica", "telefono", "email"}
 CHIAVI_SUPERFICIE = {"ettari", "are", "centiare"}
@@ -88,6 +92,9 @@ def chiavi_non_gestite(dati: dict) -> list[str]:
     out += [f"opzioni.telematico.dichiarazione.{k}" for k in d if k not in CHIAVI_DICHIARAZIONE]
     out += [f"opzioni.telematico.dichiarazione.presentatore.{k}" for k in presentatore_sup(dati)
             if k not in CHIAVI_PRESENTATORE]
+    tst = d.get("testamento")
+    if isinstance(tst, dict):
+        out += [f"opzioni.telematico.dichiarazione.testamento.{k}" for k in tst if k not in CHIAVI_TESTAMENTO]
     v = d.get("versamento")
     if isinstance(v, dict):
         out += [f"opzioni.telematico.dichiarazione.versamento.{k}" for k in v if k not in CHIAVI_VERSAMENTO]

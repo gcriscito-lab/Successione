@@ -349,36 +349,45 @@ function schedaPersona(titolo, ruolo, vis) {
   return g;
 }
 /* Dati della dichiarazione: opzioni.telematico.dichiarazione. I codici non sono proposti dal programma: vanno presi dalle istruzioni del frontespizio. */
-const CAMPI_DICH = [
-  ["stato_civile", "stato civile"], ["devoluzione_per_legge", "devoluzione per legge"], ["firma_dichiarante", "firma del dichiarante"],
+const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore booleano nel modello), altrimenti testo
+  ["stato_civile", "stato civile"], ["devoluzione_per_legge", "devoluzione per legge", "bool"], ["firma_dichiarante", "firma del dichiarante", "bool"],
   ["tempistica_pagamento", "tempistica del pagamento"],
   ["presentatore.persona_id", "presentatore: id persona"], ["presentatore.codice_carica", "presentatore: codice carica"],
   ["presentatore.telefono", "presentatore: telefono"], ["presentatore.email", "presentatore: email"],
   ["versamento.iban", "versamento: IBAN"], ["versamento.cf_titolare", "versamento: codice fiscale del titolare"],
+  ["devoluzione_per_testamento", "devoluzione per testamento", "bool"], ["testamento.estero", "testamento estero", "bool"],
+  ["testamento.pubblico_ufficiale", "testamento: pubblico ufficiale"], ["testamento.data_pubblicazione", "testamento: data pubblicazione (AAAA-MM-GG)"],
+  ["testamento.ufficio_registrazione", "testamento: ufficio di registrazione"], ["testamento.serie", "testamento: serie"],
+  ["testamento.numero_registrazione", "testamento: numero registrazione"], ["testamento.sottonumero_registrazione", "testamento: sottonumero"],
+  ["testamento.data_registrazione", "testamento: data registrazione (AAAA-MM-GG)"],
 ];
 function sezioneDatiDichiarazione() {
   const tel = (S.P.dati.opzioni || {}).telematico || {};
   const dich = tel.dichiarazione || {};
   const leggi = (chiave) => chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
   const sez = h("section", { class: "grp" }, h("h2", {}, "Dati della dichiarazione"),
-    h("div", { class: "nota", style: "margin:8px 14px" }, "Codici come da istruzioni del frontespizio. Usare solo dati sintetici in prova."));
+    h("div", { class: "nota", style: "margin:8px 14px" }, "Codici come da istruzioni del frontespizio. Usare solo dati sintetici in prova. La devoluzione per testamento non e' ancora esportabile: la pratica resta non finalizzabile."));
   const inputs = {};
-  for (const [chiave, etichetta] of CAMPI_DICH) {
-    const v = leggi(chiave);
-    const inp = h("input", { id: "dd_" + chiave.replace(".", "_"), "aria-label": etichetta, value: v == null ? "" : String(v) });
+  for (const [chiave, etichetta, tipo] of CAMPI_DICH) {
+    const v = leggi(chiave); const id = "dd_" + chiave.replaceAll(".", "_");
+    let inp;
+    if (tipo === "bool") {
+      inp = h("select", { id, "aria-label": etichetta }, h("option", { value: "" }, "(non indicato)"), h("option", { value: "si" }, "si'"), h("option", { value: "no" }, "no"));
+      inp.value = v === true ? "si" : v === false ? "no" : "";
+    } else inp = h("input", { id, "aria-label": etichetta, value: v == null ? "" : String(v) });
     inputs[chiave] = inp;
-    sez.append(h("div", { class: "rg" }, h("label", { for: inp.id }, etichetta), inp));
+    sez.append(h("div", { class: "rg" }, h("label", { for: id }, etichetta), inp));
   }
   sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "dd_salva", onclick: async () => {
     // legge l'oggetto corrente e modifica solo le chiavi toccate: persone, beni e passivita' dell'oggetto restano intatti
     const nuovo = JSON.parse(JSON.stringify(tel)); const d = nuovo.dichiarazione = nuovo.dichiarazione || {};
-    for (const [chiave] of CAMPI_DICH) {
+    for (const [chiave, , tipo] of CAMPI_DICH) {
       const val = inputs[chiave].value.trim(); const parti = chiave.split("."); let o = d;
       for (const p of parti.slice(0, -1)) o = o[p] = o[p] || {};
       const ultimo = parti[parti.length - 1];
-      if (val === "") delete o[ultimo]; else o[ultimo] = val;
+      if (val === "") delete o[ultimo]; else o[ultimo] = tipo === "bool" ? val === "si" : val;
     }
-    for (const g of ["presentatore", "versamento"]) if (d[g] && !Object.keys(d[g]).length) delete d[g];
+    for (const g of ["presentatore", "versamento", "testamento"]) if (d[g] && !Object.keys(d[g]).length) delete d[g];
     if (!Object.keys(d).length) delete nuovo.dichiarazione;
     await salvaOps([{ op: "set", sezione: "opzioni", campi: { telematico: nuovo } }]);
   } }, "Salva dati della dichiarazione")));

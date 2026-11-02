@@ -744,6 +744,52 @@ class _Export:
                                "xpath": f"{_XP_DICH}/suc:QuadroED/suc:Modulo[{m}]/suc:Passivita[{r}]"}
         return {"Modulo": moduli} if moduli else None
 
+    def valida_testamento(self, el: str, ddec) -> None:
+        """Controlla i dati della sezione Testamento (frontespizio). La devoluzione per testamento NON e' ancora
+        esportabile (legatari EA, EG Testamento, EH, quote libere): se indicata, la bozza resta bloccata."""
+        perc = "opzioni.telematico.dichiarazione"
+        fonte = FO.fonte_annotazione(el + "/Devoluzione/Testamento")
+        flag = SUP.dich(self.d, "devoluzione_per_testamento")
+        sez = SUP.dich(self.d, "testamento")
+        if flag is not True:
+            if sez:
+                self.err("DATI_INCOERENTI", perc + ".testamento", "la sezione Testamento non va compilata se la devoluzione "
+                         "per testamento non e' selezionata", fonte)
+            return
+        self.ns.append(perc + ".devoluzione_per_testamento: devoluzione per testamento non ancora esportabile "
+                       "(legatari EA, documento di testamento EG, EH, quote libere): vedi docs/regole/PIANO_testamento_legatari.md")
+        if not isinstance(sez, dict) or not sez:
+            self.err("DATO_MANCANTE", perc + ".testamento", "la sezione Testamento e' obbligatoria con la devoluzione per "
+                     "testamento", fonte)
+            return
+        if sez.get("estero") is True:
+            return
+        date_ = {}
+        for k in ("data_pubblicazione", "data_registrazione"):
+            try:
+                date_[k] = F.data_iso(sez.get(k))
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", f"{perc}.testamento.{k}", str(e), fonte)
+        for k, lim in (("pubblico_ufficiale", 50), ("ufficio_registrazione", None), ("serie", 2), ("numero_registrazione", 6)):
+            v = sez.get(k)
+            if v in (None, ""):
+                self.err("DATO_MANCANTE", f"{perc}.testamento.{k}", "obbligatorio se il testamento non e' estero", fonte)
+            elif lim and len(str(v)) > lim:
+                self.err("VALORE_NON_VALIDO", f"{perc}.testamento.{k}", f"al massimo {lim} caratteri", fonte)
+        sn = sez.get("sottonumero_registrazione")
+        if sn not in (None, "") and len(str(sn)) > 3:
+            self.err("VALORE_NON_VALIDO", perc + ".testamento.sottonumero_registrazione", "al massimo 3 caratteri", fonte)
+        dp, dr = date_.get("data_pubblicazione"), date_.get("data_registrazione")
+        if dp and ddec and dp < ddec:
+            self.err("REGOLA_DATA_PUBBLICAZIONE", perc + ".testamento.data_pubblicazione",
+                     "la data di pubblicazione deve essere maggiore o uguale alla data del decesso", fonte)
+        if dr and dp and dr < dp:
+            self.err("REGOLA_DATA_REGISTRAZIONE", perc + ".testamento.data_registrazione",
+                     "la data di registrazione deve essere maggiore o uguale alla data di pubblicazione", fonte)
+        if dr and ddec and dr < ddec:
+            self.err("REGOLA_DATA_REGISTRAZIONE", perc + ".testamento.data_registrazione",
+                     "la data di registrazione deve essere maggiore o uguale alla data del decesso", fonte)
+
     def ripartizione_ed(self, p: dict, tipo, valore, base: str, el: str) -> dict | None:
         fonte = FO.fonte_annotazione(el + "/RipartizioneED/Ripartizione") + "; " + FO.fonte_fasc1(38, "Ripartizione")
         self.usa(p, "persona_id", "ripartizione")
@@ -891,7 +937,8 @@ class _Export:
         legge = SUP.dich(self.d, "devoluzione_per_legge")
         if legge is not True:
             self.ns.append("opzioni.telematico.dichiarazione.devoluzione_per_legge: solo la devoluzione per legge e' "
-                           "supportata (testamento e legge estera non ancora mappati); indicare true")
+                           "supportata (legge estera non ancora mappata); indicare true")
+        self.valida_testamento(el, ddec)
         # presentatore
         pres = self.presentatore
         pres_x = None
