@@ -30,7 +30,8 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 **Accettazione:** nessuna funzione citata che non esista (ogni comando verificabile con `--help`); massimo 3 pagine; nessun elenco di sigle senza spiegazione.
 
 ## C3. Guida all'installazione e configurazione MCP
-**File:** `docs/INSTALLAZIONE_WINDOWS.md`, `docs/CONFIGURAZIONE_MCP.md` (nuovi).
+**File:** `docs/INSTALLAZIONE_WINDOWS.md` (nuovo). `docs/CONFIGURAZIONE_MCP.md` esiste gia': non toccarlo.
+**Contesto:** `scripts/windows/LEGGIMI.txt`, `docs/STATO_area4.md`, `docs/CONFIGURAZIONE_MCP.md`, `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 **Cosa fare:** ricavare dal contenuto già scritto in `docs/STATO_area4.md`, `scripts/windows/` e `packaging/`. Per MCP: comando e variabili d'ambiente reali (`python -m successioni.mcp_server`, `SUCCESSIONI_DATA`), come verificare che gli strumenti con prefisso `successioni_` siano visibili, cosa succede se il client si chiude (lo stato è nei dati). Citare la documentazione ufficiale del client con URL e data solo se consultata davvero; altrimenti scrivere «da verificare».
 **Accettazione:** ogni comando e percorso citato esiste nel repository; sezione finale «Da collaudare su Windows» coerente con `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 
@@ -42,11 +43,13 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 
 ## C5. Insieme di domande di valutazione per l'MCP
 **File:** `docs/valutazione_mcp.xml` (nuovo).
+**Contesto:** `src/successioni/mcp_server.py`, `src/successioni/schema.py`, `docs/CONFIGURAZIONE_MCP.md`. Usare solo gli strumenti `successioni_*` e i campi dello schema reali; `id` delle righe assegnati dal sistema (non inventarli).
 **Cosa fare:** 10 domande in stile `.claude/skills/mcp-builder/reference/evaluation.md` che un assistente deve risolvere usando gli strumenti `successioni_*` su dati sintetici (es. «quante persone con ruolo erede ha la pratica X», «quali quadri hanno rilievi», «la pratica è finalizzabile e perché»), con risposta attesa verificabile. Includere i dati di partenza come operazioni `aggiorna_pratica`.
 **Accettazione:** ogni domanda ha una sola risposta corretta, indipendente dal tempo, verificabile con una query sull'archivio.
 
 ## C6. Verifica di accessibilità dell'interfaccia
 **File:** `src/successioni/static/app.js`, `src/successioni/static/app.css`, `tests/e2e/accessibilita.js` (nuovo).
+**Contesto:** `tests/e2e/gui_flusso.js`.
 **Cosa fare:** uso completo da tastiera (albero dei quadri, tabella, ispettore, procedura guidata, finestra di dialogo con focus che rientra al chiudere), etichette associate ai campi, contrasti sufficienti in tema chiaro e scuro, ordine di tabulazione sensato. Un test Playwright che percorra il flusso solo con tastiera.
 **Accettazione:** il test passa; nessuna regressione in `tests/e2e/gui_flusso.js`; elenco in `CONSEGNA.md` dei punti non risolti.
 
