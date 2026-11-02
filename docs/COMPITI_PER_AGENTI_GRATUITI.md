@@ -53,6 +53,13 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 **Cosa fare:** uso completo da tastiera (albero dei quadri, tabella, ispettore, procedura guidata, finestra di dialogo con focus che rientra al chiudere), etichette associate ai campi, contrasti sufficienti in tema chiaro e scuro, ordine di tabulazione sensato. Un test Playwright che percorra il flusso solo con tastiera.
 **Accettazione:** il test passa; nessuna regressione in `tests/e2e/gui_flusso.js`; elenco in `CONSEGNA.md` dei punti non risolti.
 
+## C7. Estratti dalle fonti sui legatari (solo citazioni)
+**Perche':** il coordinatore deve implementare il testamento con legatari e non puo' ricavare le regole dalla memoria.
+**File:** `docs/regole/LEGATARI_estratti.md` (nuovo).
+**Contesto:** `docs/regole/_estratto_fonti_legatari.txt` (pagine dei PDF ufficiali che contengono la parola «legatar», con intestazione `===== SIGLA pag. N =====`).
+**Cosa fare:** per ciascuno dei sei argomenti (1 franchigie e aliquote per i legatari; 2 presunzione su denaro, gioielli e mobilia e legatari; 3 documenti da allegare per testamento e legatari; 4 codici carica 2, 3, 7, 9 del dichiarante; 5 quote e devoluzioni in presenza di testamento; 6 passivita' ED tipo 11, legati e oneri) elencare fino a 8 punti. Ogni punto ha: la citazione LETTERALE copiata dal testo (massimo 40 parole, tra virgolette), la sigla e il numero di pagina dell'intestazione sotto cui compare. NON riformulare, NON calcolare, NON dedurre: se un argomento non compare nel testo scrivere «non trovato nel contesto».
+**Accettazione:** il coordinatore verifica con uno script che ogni citazione compaia alla lettera nella pagina indicata; le citazioni non trovate fanno scartare il punto.
+
 ---
 
 ## Come il coordinatore integra

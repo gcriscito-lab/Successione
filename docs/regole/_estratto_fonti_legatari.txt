@@ -1,0 +1,1678 @@
+===== FASCICOLO_I pag. 1 =====
+genzia
+
+                           ntrate
+
+Dichiarazione di successione
+e domanda di volture catastali
+
+                                    FASCICOLO 1
+
+                    I. ISTRUZIONI GENERALI
+
+                        COS’È IL MODELLO DI SUCCESSIONE E DOMANDA DI VOLTURE CATASTALI
+                        CHI È OBBLIGATO A PRESENTARE LA DICHIARAZIONE
+                        CHI NON DEVE PRESENTARE LA DICHIARAZIONE
+                        MODALITÀ E TERMINI DI PRESENTAZIONE
+                        QUALI DOCUMENTI OCCORRONO
+                        QUALI QUADRI COMPILARE
+                        I SOGGETTI OBBLIGATI AL PAGAMENTO
+                        QUALI TRIBUTI BISOGNA PAGARE
+                        CONVENZIONI CONTRO LA DOPPIA IMPOSIZIONE
+
+                    II. ISTRUZIONI PER LA COMPILAZIONE DELLA
+                    DICHIARAZIONE
+
+                        Dati generali
+                        Quadro EA – Eredi, chiamati, legatari e altri soggetti
+                        Quadro EB – Attivo ereditario catasto terreni
+                        Quadro EC – Attivo ereditario catasto fabbricati
+                        Quadro ER – Rendite, Crediti e altri beni
+                        Quadro ED – Passività e altri oneri
+                        Quadro EE – Prospetto riepilogativo asse ereditario
+                        Quadro EF – Liquidazione delle imposte e altri tributi
+                        Quadro EG – Elenco documenti, certiﬁcati e dichiarazioni sostitutive
+
+                                          da allegare alla dichiarazione
+                        Quadro EH – Dichiarazioni sostitutive, agevolazioni e riduzioni
+                        Quadro EI – Dichiarazioni utili alla voltura catastale – discordanza dati intestatario
+
+                                        e passaggi intermedi non convalidati da atti legali
+
+                    ALLEGATI
+
+                        Allegato 1 – Grado di parentela
+                        Allegato 2 – Agevolazioni e riduzioni
+                        Allegato 3 – Codici categoria e natura
+                        Allegato 4 – Codice diritto
+                        Allegato 5 – Devoluzione
+
+===== FASCICOLO_I pag. 2 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+I. ISTRUZIONI GENERALI
+
+COS’È IL MODELLO DI SUCCESSIONE E DOMANDA DI VOLTURE CATASTALI
+
+Il presente modello deve essere utilizzato per adempiere agli obblighi ﬁscali in materia di imposta di successione.
+Nel caso in cui il decesso sia avvenuto in data anteriore al 3 ottobre 2006 deve essere utilizzato il
+precedente modello. Per le dichiarazioni integrative, sostitutive o modiﬁcative di una dichiarazione
+presentata con il precedente modello occorre continuare ad utilizzare tale modulistica seguendo le
+relative modalità di presentazione.
+
+N.B. Se alla data di presentazione della dichiarazione di successione fanno parte dell’asse ereditario fabbricati
+regolarmente dichiarati in Catasto e privi di classamento (ad esempio manca la categoria e/o classe dell’immobile),
+occorre aggiornarne i dati catastali prima di presentare la dichiarazione, proponendo la richiesta di classamento
+(ex art. 12 del D.L. n. 70/1988) presso l’ufﬁcio provinciale – territorio nella cui circoscrizione ricadono tali beni. A
+seguito dell’avvenuta attribuzione dei dati dell’immobile, la dichiarazione potrà essere inviata telematicamente.
+Con la presentazione del modello di successione, salvo casi particolari, le volture catastali verranno eseguite in
+automatico salvo diversa indicazione del contribuente. Nel caso di immobili ricadenti nei territori ove vige il sistema
+del Libro fondiario (Sistema Tavolare), per quelli gravati da “Oneri reali”, nei casi di eredità giacente/eredità
+amministrata e di trust, la dichiarazione non consente di eseguire la voltura catastale in via automatica, i cui
+adempimenti continuano ad essere svolti presso i competenti ufﬁci dell’Agenzia delle entrate (tranne per le provincie
+autonome di Trento e Bolzano dove gli ufﬁci catastali sono gestiti dalle relative provincie autonome). Con riguardo
+agli immobili ricadenti nei Comuni nei quali vige il regime del Libro fondiario gestiti dall’Agenzia delle entrate, il
+singolo contribuente può presentare la domanda di voltura tramite il servizio “Voltura catastale web” (disponibile nel
+sito dell’Agenzia all’interno dell’area riservata) che consente di pagare anche le relative somme dovute (non è possibile
+presentare la richiesta di voltura in via telematica tramite il sistema Voltura catastale web per gli immobili ricadenti nei
+territori delle provincie autonome di Trento e Bolzano).
+
+Il modello “Dichiarazione di successione e domanda di volture catastali”, conforme a quello approvato con
+provvedimento del Direttore dell’Agenzia delle entrate, è disponibile sul sito Internet www.agenziaentrate.gov.it,
+unitamente ad uno speciﬁco prodotto software per la compilazione con cui è possibile calcolare e versare
+telematicamente le somme dovute in autoliquidazione, nonché inviare e stampare il modello.
+
+L’imposta di successione è dovuta in relazione:
+• ai trasferimenti di beni e diritti per causa di morte, compresi i trasferimenti derivanti da trust e da altri vincoli di
+
+    destinazione, nonché la costituzione di diritti reali di godimento, la rinuncia a diritti reali o di credito e la
+    costituzione di rendite o pensioni;
+• ai casi di immissione nel possesso dei beni dell’assente e di dichiarazione di morte presunta;
+• a tutti i beni e diritti trasferiti, anche se esistenti all’estero, nel caso in cui alla data di apertura della successione
+    la persona deceduta era residente in Italia. In caso contrario, l’imposta è dovuta limitatamente ai beni e diritti
+    esistenti in Italia. Per i trust e gli altri vincoli di destinazione, l’imposta è dovuta in relazione a tutti i beni e diritti
+    trasferiti ai beneﬁciari, qualora il disponente sia residente nello Stato al momento della separazione patrimoniale.
+    In caso di disponente non residente, l’imposta è dovuta limitatamente ai beni e diritti esistenti nel territorio dello
+    Stato, trasferiti al beneﬁciario.
+
+Pertanto, nell’attivo ereditario rientrano:
+• beni immobili e diritti reali su beni immobili;
+• i beni mobili e i titoli al portatore di qualsiasi specie posseduti dal defunto o depositati presso altri a suo
+
+    nome;
+• denaro, gioielli e mobilia per un importo pari al dieci per cento del valore netto imponibile dell’asse ereditario,
+
+    salvo che da inventario non ne risulti l’esistenza per un importo diverso;
+• rendite, pensioni e crediti;
+• aziende, quote sociali, azioni o obbligazioni;
+• navi, imbarcazioni e aeromobili che non fanno parte di aziende.
+
+Gli oneri a carico degli eredi, chiamati all’eredità e dei legatari relativi a prestazioni rivolte a soggetti terzi determinati
+individualmente sono da considerarsi legati disposti in favore del beneﬁciario e quindi sono soggetti all’imposta di
+
+ 2
+
+===== FASCICOLO_I pag. 3 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+successione.
+Non vanno indicati in dichiarazione, in quanto non concorrono a formare l’attivo ereditario:
+• i beni e i diritti iscritti a nome del defunto nei pubblici registri, quando è provato con atto pubblico, scrittura
+
+    privata autenticata, provvedimento giurisdizionale o altro atto scritto avente data certa, che egli ne aveva perduto
+    la titolarità;
+• azioni e titoli nominativi intestati al defunto, alienati anteriormente all’apertura della successione con atto
+    autentico o girata autenticata;
+• le indennità di ﬁne rapporto in caso di morte del prestatore di lavoro (artt. 1751 e 2122 c.c.) e le indennità
+    spettanti per diritto agli eredi in forza di assicurazioni previdenziali obbligatorie o stipulate dal defunto;
+• i crediti verso lo Stato, gli enti pubblici territoriali e gli enti pubblici che gestiscono forme obbligatorie di
+    previdenza e di assistenza sociale, compresi quelli per il rimborso di imposte o di contributi, ﬁno a quando non
+    siano riconosciuti con provvedimenti dell’amministrazione debitrice;
+• i crediti ceduti allo Stato entro la data di presentazione della dichiarazione di successione;
+• i veicoli iscritti nel pubblico registro automobilistico.
+
+    Non si considerano compresi nell’attivo ereditario ma devono essere indicati nella dichiarazione di
+    successione:
+    • i beni culturali, sottoposti a vincolo precedentemente alla data di apertura della successione, sui quali
+
+        sono stati assolti gli obblighi di conservazione e protezione;
+    • i crediti contestati giudizialmente alla data di apertura della successione, ﬁno a quando la loro sussistenza
+
+        non sia riconosciuta con provvedimento giurisdizionale o con transazione.
+
+    È inoltre consigliabile indicare:
+    • i titoli del debito pubblico (ivi compresi BOT e CCT), compresi i corrispondenti titoli del debito pubblico
+
+        emessi dagli Stati appartenenti all’Unione Europea e dagli Stati aderenti all’Accordo sullo Spazio
+        Economico europeo;
+    • gli altri titoli di Stato, garantiti dallo Stato o equiparati (compresi i corrispondenti titoli del debito pubblico
+        emessi dagli Stati appartenenti all’Unione Europea e dagli Stati aderenti all’Accordo sullo Spazio
+        Economico europeo), nonché ogni altro bene o diritto dichiarato esente dall’imposta da norme di legge.
+        È bene precisare che i titoli emessi da enti e organismi internazionali costituiti in base ad accordi
+        internazionali resi esecutivi in Italia, sono equiparati a tutti gli effetti ﬁscali ai titoli dello Stato italiano.
+    L’indicazione dei titoli esenti è, quindi, opzionale ed ha valenza esclusiva nei rapporti con gli operatori ﬁnanziari.
+
+CHI È OBBLIGATO A PRESENTARE LA DICHIARAZIONE
+
+Devono presentare la dichiarazione:
+• I chiamati all’eredità. Con l’apertura della successione sono individuati tutti i soggetti (persona ﬁsica o
+
+    giuridica), che non hanno ancora accettato l’eredità, ai quali potenzialmente può essere trasmesso il
+    patrimonio complessivo del defunto (beni, diritti e obblighi), oppure una sua quota.
+I chiamati all’eredità, come anche i legatari, sono esonerati dall’obbligo di presentare la dichiarazione se, anterior-
+mente alla scadenza del termine di presentazione, hanno rinunziato all’eredità (o al legato, in caso di legatari) o
+non essendo nel possesso dei beni ereditari, hanno chiesto la nomina di un curatore dell’eredità e ne hanno informato
+l’ufﬁcio dell’Agenzia delle entrate competente per la lavorazione della dichiarazione, allegando copia autentica
+della dichiarazione di rinunzia all’eredità o copia dell’istanza di nomina autenticata dal cancelliere del tribunale.
+• Gli eredi. La qualità di erede, in senso civilistico, si acquista con l’accettazione, espressa o tacita, dell’eredità, il
+   cui effetto risale al momento dell’apertura della successione.
+• I legatari. Il legatario è destinatario di uno o più beni oppure uno o più diritti, determinati dal defunto con il
+   testamento. Così, ad esempio, la persona a cui il defunto lascia un quadro è un legatario e non un erede. Il legato
+   si acquista senza bisogno di accettazione.
+
+N.B. I legatari, nel presentare la dichiarazione, sono obbligati ad indicare oltre ai dati del defunto e ai propri
+dati, anche tutte le informazioni riguardanti l’oggetto del proprio legato; inoltre devono indicare, tramite
+allegazione nel quadro EG, i dati dei chiamati all’eredità, il loro grado di parentela o afﬁnità con il defunto e le
+eventuali accettazioni o rinunzie intervenute.
+
+                                                                                                                                     3
+
+===== FASCICOLO_I pag. 4 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+• I rappresentanti legali degli eredi o dei legatari;
+
+• Gli immessi nel possesso temporaneo dei beni dell’assente. Se una persona è scomparsa e non se ne hanno
+     più notizie da almeno due anni, può essere richiesto, al tribunale del suo ultimo domicilio o della sua ultima
+     residenza, che ne sia dichiarata l’assenza. Dopo questa sentenza, chi sarebbe stato erede o legatario del soggetto
+     dichiarato assente può domandare al tribunale di entrare in possesso temporaneo dei beni dello scomparso;
+
+• Gli amministratori dell’eredità. L’amministratore dell’eredità è previsto dal codice civile in casi particolari,
+     come ad esempio, quando il testamento designa un erede sotto condizione sospensiva (ad esempio se per
+     diventare “erede” occorre che accada un evento futuro ed incerto previsto nel testamento);
+
+• I curatori dell’eredità giacente. Il curatore dell’eredità giacente è nominato dal Tribunale quando il “chiamato
+     all’eredità” non ha accettato l’eredità e non è nel possesso dei beni ereditari; il curatore ha il compito di
+     amministrare il patrimonio ereditario ﬁno a quando l’eredità viene accettata;
+
+• Gli esecutori testamentari. L’esecutore testamentario è il soggetto a cui il defunto può dare il compito di
+     curare le sue ultime volontà, espresse nel testamento.
+
+• I trustee (in caso di trust testamentario). Il trust è un istituto giuridico nel quale vengono trasferiti i beni del
+     disponente (o settlor), nel caso di specie il de cuius, afﬁnché vengano amministrati e gestiti, generalmente in
+     favore di altri soggetti (beneﬁciari), qualora presenti, a cui l’amministratore (trustee) dovrà trasferirli dopo un
+     dato periodo di tempo o una volta raggiunto un determinato scopo. Nella dichiarazione non possono essere
+     rappresentati i casi di trust di scopo “puro” (trust in cui i beneﬁciari non sono identiﬁcabili) e i casi in cui non tutti
+     i beni ereditari sono stati conferiti nel trust (ipotesi miste); in queste ipotesi occorre presentare le dichiarazioni
+     tramite modello 4.
+
+Se più soggetti sono obbligati alla presentazione della dichiarazione in relazione alla medesima successione, è
+sufﬁciente che la presenti uno solo di essi.
+I soggetti obbligati alla presentazione della dichiarazione, ad esclusione dei legatari, devono dare una descrizione
+analitica di tutti i beni e diritti compresi nell’attivo ereditario con i rispettivi valori, compresi quelli oggetto di
+legato, qualora presente.
+
+CHI NON DEVE PRESENTARE LA DICHIARAZIONE
+
+La dichiarazione non deve essere presentata:
+1) Se l’eredità è devoluta al coniuge e ai parenti in linea retta del defunto e l’attivo ereditario (valore lordo dei beni):
+
+     – Ha un valore non superiore a 100.000 euro;
+     – Non comprende beni immobili o diritti reali immobiliari.
+
+Tali condizioni si devono veriﬁcare contemporaneamente e devono rimanere invariate anche nei casi in cui, in un
+secondo momento, altri beni o diritti entrino nell’attivo ereditario. Pertanto, ad esempio, nel caso in cui a seguito di
+un rimborso ﬁscale si superi la soglia dei 100.000 euro, sussisterà l’obbligo alla presentazione della dichiarazione
+ed i relativi termini decorrono dalla comunicazione del rimborso.
+
+2) Se tutti gli aventi diritto rinunciano all’eredità o al legato, oppure, non essendo nel possesso dei beni ereditari,
+     chiedono la nomina di un curatore dell’eredità, prima del termine previsto per la presentazione della
+     dichiarazione di successione.
+
+MODALITÀ E TERMINI DI PRESENTAZIONE
+
+La dichiarazione va presentata esclusivamente in via telematica tramite i servizi telematici dell’Agenzia delle entrate:
+• direttamente dal dichiarante;
+• dagli intermediari abilitati, come ad esempio professionisti e Caf.
+La trasmissione telematica del modello di dichiarazione può essere effettuata dal singolo contribuente anche per il
+tramite di un ufﬁcio dell’Agenzia delle entrate. La lavorazione della dichiarazione, così inviata, viene effettuata
+dall’ufﬁcio nella cui circoscrizione era l’ultima residenza del defunto.
+
+  ATTENZIONE La presentazione cartacea del modello (conforme a quello approvato) è consentita in via
+  eccezionale unicamente ai residenti all’estero, se impossibilitati alla trasmissione telematica.
+  Il modello deve essere inviato all’ufﬁcio incaricato della lavorazione, tramite raccomandata o altro mezzo
+  equivalente dal quale risulti con certezza la data di spedizione e si considera presentato il giorno in cui viene
+  consegnato all’ufﬁcio postale.
+
+4
+
+===== FASCICOLO_I pag. 5 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+N.B. •Se la residenza del defunto è all’estero (o non è nota), ed egli non ha mai risieduto in Italia, l’ufﬁcio di
+           riferimento per la lavorazione della dichiarazione è l’ufﬁcio territoriale di Roma 6 – Eur – Torrino, della
+           Direzione provinciale II di Roma.
+
+        •Se il defunto ha risieduto in Italia, prima di risiedere all’estero, l’ufﬁcio di riferimento per la lavorazione
+           della dichiarazione è quello individuato presso la Direzione provinciale competente in relazione all’ultima
+           residenza nota in Italia.
+
+L’Agenzia delle entrate rende disponibile sul sito internet www.agenziaentrate.gov.it un programma software gratuito
+per la compilazione e l’invio telematico della dichiarazione, nonché per la sola compilazione e stampa della stessa
+qualora, per la sua trasmissione, il contribuente intende avvalersi dell’ufﬁcio dell’Agenzia delle entrate.
+La dichiarazione inviata per via telematica, si considera presentata nel momento in cui è conclusa la ricezione dei
+dati da parte dell’Agenzia delle entrate. La prova della presentazione è data dalla ricevuta trasmessa, sempre per
+via telematica, dall’Agenzia stessa (2° ricevuta).
+
+Informazioni di maggior dettaglio sono disponibili sul sito Internet dell’Agenzia delle entrate www.agenziaentrate.gov.it.
+
+RICEVUTE TELEMATICHE
+Il servizio telematico restituisce, immediatamente dopo l’invio, una prima ricevuta che attesta l’avvenuta trasmissione
+del ﬁle.
+A seguito dei controlli formali sui dati riportati nel modello, è rilasciata una seconda ricevuta.
+Tale ricevuta indica gli estremi di registrazione e la Direzione provinciale nella cui circoscrizione ricade l’ufﬁcio
+incaricato della lavorazione della dichiarazione: in caso di esito positivo costituisce la prova dell’avvenuta
+presentazione, nonché registrazione del modello, in caso di esito negativo, invece, fornisce le segnalazioni ed i motivi
+dell’eventuale scarto della dichiarazione.
+Dal momento della registrazione della dichiarazione decorrono 30 giorni per presentare la domanda di volture
+presso i competenti ufﬁci nei casi in cui in dichiarazione sia stata espressa la volontà di non avvalersi della voltura
+automatica o quando la stessa non sia possibile in via automatica.
+In caso di utilizzo dell’addebito in conto corrente per il pagamento delle imposte dovute, il sistema telematico rilascia
+una terza ricevuta che attesta l’esito del pagamento.
+Successivamente ai controlli effettuati dall’ufﬁcio, il servizio telematico fornirà, con ulteriore ricevuta, una copia
+semplice della dichiarazione di successione, contenente gli estremi di registrazione che sarà resa disponibile sia
+nella sezione “Ricevute e altre comunicazioni dell’Agenzia – Ricerca documenti”, sia nella sezione “Dati del Registro
+- Successioni telematiche” del “Cassetto ﬁscale” del dichiarante e dei beneﬁciari presenti nel quadro EA (ad
+esclusione dei legatari che potranno visionare solo la dichiarazione da loro presentata con riferimento al proprio
+legato). L’eventuale attestazione di avvenuta presentazione della dichiarazione (copia conforme) può essere
+richiesta in qualsiasi ufﬁcio dell’Agenzia delle entrate, pagando le relative somme dovute, oppure in dichiarazione,
+barrando lo speciﬁco campo presente nel frontespizio. In questo caso verrà rilasciata, nella sezione “Ricevute e altre
+comunicazioni dell’Agenzia - Ricerca documenti” dell’area autenticata del sito dell’Agenzia, una sola attestazione.
+Nel caso di incompletezza o irregolarità dei dati inseriti nella dichiarazione, l’ufﬁcio incaricato della lavorazione invierà al
+dichiarante una richiesta di regolarizzazione. Con l’avvenuta regolarizzazione o in caso di regolarità, la copia semplice
+della dichiarazione di successione con gli estremi di registrazione è resa disponibile con le modalità sopra indicate.
+Tale copia non può essere utilizzata in luogo dell’attestazione di avvenuta presentazione della dichiarazione (copia
+conforme).
+Inoltre, il sistema telematico fornirà una quinta ricevuta, contenente l’esito della domanda di volture catastali, sempre
+che il contribuente non abbia espresso in dichiarazione la volontà di non avvalersi della voltura automatica.
+
+L’esito della domanda può essere di tre tipi:
+a) tutti gli immobili sono stati volturati;
+
+b) solo parte degli immobili sono stati volturati (in questo caso verranno forniti i dati degli immobili per i quali sono
+    state riscontrate le incongruenze tali da non permettere il perfezionamento delle operazioni di voltura);
+
+c) nessun immobile è stato volturato.
+
+Tutte le ricevute sono rese disponibili all’interno della sezione “Ricerca ricevute” presente nell’area autenticata del
+sito internet dell’Agenzia (la ricevuta di regolarità a cui è allegata la copia semplice della dichiarazione presentata
+e l’attestazione di avvenuta presentazione della dichiarazione, qualora richiesta in dichiarazione, vengono rese
+disponibili nella sezione “Ricevute e altre comunicazioni dell’Agenzia” alla voce “Ricerca documenti”).
+
+                                                             5
+
+===== FASCICOLO_I pag. 6 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+TERMINI DI PRESENTAZIONE
+La dichiarazione deve essere presentata entro dodici mesi dalla data del decesso. Tuttavia ci sono alcuni casi per cui
+i dodici mesi non decorrono dalla data del decesso ma da un momento diverso:
+
+a) nel caso in cui sia stato nominato, in seguito all’apertura della successione, un rappresentante legale degli eredi o
+    dei legatari o dei chiamati all’eredità, un curatore dell’eredità giacente, un trustee oppure un esecutore
+    testamentario: i dodici mesi decorrono dalla data in cui questi hanno avuto notizia legale della loro nomina;
+
+b) nel caso di liquidazione giudiziale a carico del defunto in corso al momento dell’apertura della successione o
+    dichiarata entro i successivi sei mesi dal decesso: i dodici mesi decorrono dalla data di chiusura della procedura
+    di liquidazione giudiziale;
+
+c) nel caso in cui i beneﬁciari siano stati immessi nel possesso temporaneo dei beni della persona assente: i dodici
+     mesi decorrono dalla data di immissione nel possesso dei beni;
+
+d) a seguito di sentenza di morte presunta, i dodici mesi decorrono dalla data in cui è divenuta eseguibile la sentenza
+    dichiarativa di morte presunta se non è stata precedentemente richiesta l’immissione nel possesso dei beni dell’assente;
+
+e) nel caso in cui l’eredità è accettata con beneﬁcio d’inventario entro dodici mesi dalla scadenza del termine per
+    la formazione dell’inventario;
+
+f) nel caso di rinunzia all’eredità o al legato, i dodici mesi decorrono dalla data della rinunzia o dalla diversa data
+    in cui gli altri obbligati dimostrino di averne avuto notizia;
+
+g) nel caso di eventi sopravvenuti che modiﬁcano il legato, la ripartizione dell’eredità ovvero che determinano
+    l’applicazione di una imposta superiore rispetto a quella liquidata, i dodici mesi per la presentazione della
+    dichiarazione sostitutiva decorrono dalla data della sopravvenienza o dalla diversa data in cui l’obbligato
+    dimostra di averne avuto notizia;
+
+h) nel caso in cui, per eventi sopravvenuti che modiﬁcano l’attivo ereditario, non sussistono più le condizioni per cui
+    il coniuge ed i parenti in linea retta del defunto erano stati esonerati dalla presentazione della dichiarazione di
+    successione, i dodici mesi decorrono dalla data della sopravvenienza;
+
+i) nel caso di enti non ancora riconosciuti che hanno presentato domanda di riconoscimento entro un anno
+    dall’apertura della successione, i dodici mesi decorrono dalla data in cui hanno avuto notizia legale del
+    riconoscimento ovvero del diniego.
+
+N.B. In caso di dichiarazione omessa si applica una sanzione pari al120 per cento dell’imposta liquidata e se non
+è dovuta imposta si applica la sanzione amministrativa da 250 a 1000 euro; se la dichiarazione è presentata con
+un ritardo non superiore a trenta giorni si applica la sanzione amministrativa del 45 per cento dell’imposta liquidata
+e se non è dovuta imposta si applica la sanzione amministrativa da 150 a 500 euro. La sanzione per tardiva
+presentazione può essere corrisposta in misura ridotta secondo le regole previste in materia di ravvedimento operoso.
+
+QUALI DOCUMENTI OCCORRONO
+
+Con la dichiarazione di successione devono essere presentati anche i seguenti documenti, allegandoli tramite il
+quadro EG:
+
+• l’albero genealogico, dal quale risulti il nome, cognome, luogo e data di nascita del coniuge e dei soggetti
+     beneﬁciari legati al defunto da vincoli di parentela.
+
+• la dichiarazione sostitutiva di atto notorio attestante lo stato di famiglia del defunto, degli eredi e legatari che
+     sono in rapporto di parentela o afﬁnità con il defunto. L’allegazione è obbligatoria nel caso in cui chi presenta
+     la dichiarazione è il curatore dell’eredità giacente (cod. carica 5), l’amministratore dell’eredità (cod. carica 6),
+     l’esecutore testamentario (cod. carica 7) nonché in tutti quei casi in cui le informazioni riguardanti il rapporto di
+     parentela con il defunto, presenti nel quadro EH, non siano esaustive per la corretta rappresentazione dello
+     stato di famiglia. In quest’ultimo caso la dichiarazione sostitutiva di atto notorio deve contenere tutti gli elementi
+     utili al completamento della suddetta rappresentazione.
+
+Qualora ne ricorrano le condizioni:
+• la copia dei documenti di prova delle passività;
+• la copia autentica del documento, avente data anteriore all’apertura della successione, comprovante i debiti del
+
+    defunto esistenti alla data di apertura della successione, ovvero del provvedimento giurisdizionale deﬁnitivo. Se
+    il debito non è certiﬁcato dai suddetti documenti, esso deve risultare da attestazione redatta sul modello conforme
+
+ 6
+
+===== FASCICOLO_I pag. 8 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+• la copia della documentazione necessaria a richiedere l’agevolazione prima casa qualora il contribuente si sia
+   trasferito all’estero per lavoro (ad esempio il contratto di lavoro ovvero la documentazione che attesti l’esistenza
+
+   del rapporto di lavoro).
+
+Per presentare i suddetti documenti, qualora previsto, il dichiarante può compilare il quadro EH che consente di
+rendere agevolmente le dichiarazioni sostitutive di atto notorio necessarie (vedi relative istruzioni alla compilazione).
+Se quest’ultime si riferiscono a documenti già in possesso della pubblica amministrazione, non è necessario allegare
+tale documentazione alla dichiarazione di successione.
+Se a rendere le dichiarazioni sostitutive di atto notorio è uno dei beneﬁciari diversi dal dichiarante, oppure non
+rientrano nelle casistiche previste nel quadro EH, queste dovranno essere allegate alla dichiarazione di successione
+tramite la compilazione del quadro EG.
+Le dichiarazioni devono contenere tutti i dati e le informazioni necessarie a risalire ai relativi documenti già in possesso
+della Pubblica amministrazione.
+Tutti i documenti che non sono in possesso della Pubblica amministrazione devono essere sempre allegati alla
+dichiarazione di successione tramite la compilazione del quadro EG.
+
+DOCUMENTI DA CONSERVARE
+Chi presenta il modello di successione deve conservare i seguenti documenti, oltre a quelli citati nel precedente
+paragrafo ‘QUALI DOCUMENTI OCCORRONO’:
+1) la copia cartacea, sottoscritta, del modello trasmesso, oppure il ﬁle da conservare in maniera conforme alle
+
+     disposizioni normative vigenti in materia di conservazione dei documenti informatici;
+2) gli originali delle dichiarazioni sostitutive di atto notorio rese in allegato alla dichiarazione (se non sottoscritte con
+
+     ﬁrma digitale o non trasformate in copie informatiche di documenti analogici la cui conformità all’originale è attestata
+     da un pubblico ufﬁciale), unitamente alla copia dei documenti d’identità dei soggetti che le hanno sottoscritte;
+3) la ricevuta emessa dal sistema telematico che comprova l’avvenuta presentazione del modello trasmesso
+     (seconda ricevuta);
+4) la copia del modello F24 oppure la ricevuta di avvenuto pagamento telematico delle imposte autoliquidate.
+
+N.B. Se la presentazione della dichiarazione avviene tramite intermediario, questi deve aver cura di conservare
+        l’originale della dichiarazione di successione trasmessa e ﬁrmata dal dichiarante, gli originali delle
+        dichiarazioni sostitutive di atto notorio rese dagli eredi o legatari, nonché copia dei relativi documenti
+        d’identità. Se la presentazione avviene tramite l’ufﬁcio dell’Agenzia delle entrate, gli originali della
+        dichiarazione sottoscritta dal contribuente, delle dichiarazioni sostitutive di atto notorio rese dagli altri
+        beneﬁciari, nonché copia dei relativi documenti d’identità dovranno essere conservati dall’ufﬁcio.
+
+QUALI QUADRI COMPILARE
+
+Il modello di dichiarazione è composto da un frontespizio e da diversi quadri (dal quadro EA al quadro EQ).
+I quadri da compilare necessariamente sono:
+
+Dati generali: nel presente quadro vanno indicati i dati del defunto, l’eventuale presenza di atti di ultima volontà,
+i dati identiﬁcativi del soggetto che presenta la dichiarazione di successione.
+
+Quadro EE: nel quale viene riepilogato il valore dei cespiti, raggruppati per tipologie di beni o diritti (beni immobili,
+aziende, azioni, obbligazioni, altri titoli e quote sociali, navi, aeromobili e imbarcazioni, altri beni), il valore totale
+dell’attivo ereditario, le passività e il valore netto.
+Il valore netto dell’asse ereditario è costituito dalla differenza tra il valore complessivo dei beni e diritti che
+compongono l’attivo ereditario (al momento dell’apertura della successione) e l’importo complessivo delle passività
+deducibili e degli oneri a carico degli eredi e dei legatari.
+
+Quadro EG: nel presente quadro sono elencati i documenti da allegare alla dichiarazione di successione distinti
+per tipologia e per numero.
+
+Quadro EA: deve essere compilato nel caso in cui i beneﬁciari sono singolarmente individuati (ad es. eredi, legatari,
+chiamati all’eredità).
+Nel caso di trust deve essere sempre indicato il codice ﬁscale del trustee.
+In alcuni casi (ad esempio nel caso di eredità giacente) i soggetti beneﬁciari possono non essere individuati o possono
+non essere facilmente individuabili (testamento in favore di nascituro concepito/non concepito al momento
+dell’apertura della successione); in questi casi il curatore dell’eredità giacente deve indicare nel quadro EA il codice
+ﬁscale della curatela, quale beneﬁciaria temporanea dell’eredità e autoliquidare regolarmente le relative imposte e
+
+ 8
+
+===== FASCICOLO_I pag. 9 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+tributi dovuti. Agli amministratori dell’eredità si applicano le stesse regole previste per i curatoti dell’eredità giacente
+(art.644 del c.c.).
+
+Gli altri quadri, diversi da quelli sopra indicati, devono essere compilati solo se ne ricorrono i
+presupposti.
+I quadri EB ed EC devono essere compilati nel caso in cui il defunto era titolare del diritto di proprietà o altro diritto
+reale su beni immobili (terreni e fabbricati) che sono iscritti o devono essere iscritti in Catasto con attribuzione di
+rendita.
+Il quadro ED deve essere compilato in presenza di passività deducibili, quali: debiti del defunto, spese mediche e
+chirurgiche, spese funerarie, nei limiti e alle condizioni speciﬁcate nel relativo paragrafo.
+In questo caso è necessario allegare la relativa documentazione utilizzando l’apposito rigo del quadro EG.
+Il quadro EF deve essere compilato per calcolare in autoliquidazione le somme dovute in relazione ai beni e diritti
+caduti in successione, ivi compresa l’imposta di successione. In presenza di beni immobili (terreni e fabbricati) o diritti
+reali immobiliari, il presente quadro consente di quantiﬁcare i tributi dovuti (imposte ipotecaria e catastale, tasse
+ipotecarie e imposta di bollo ed i tributi speciali per le formalità ipotecarie), necessari per effettuare la trascrizione
+del certiﬁcato di successione e la voltura degli immobili e dei diritti reali immobiliari.
+Il quadro EH deve essere compilato nel caso in cui il dichiarante deve rendere le necessarie dichiarazioni sostitutive
+di atto notorio.
+Il quadro EI va compilato nel caso in cui, in presenza di beni immobili, si riscontrano discordanze tra gli elementi
+identiﬁcativi del soggetto intestatario o dei diritti rappresentati in catasto, rispetto a quelli risultanti in capo al defunto.
+Il presente quadro va compilato anche in presenza di passaggi intermedi non convalidati da atti legali.
+I quadri EL ed EM vanno compilati per comunicare i dati relativi agli immobili (rispettivamente terreni e fabbricati)
+situati nei territori ove vige il sistema Tavolare.
+I quadri EN, EO, EP, EQ, ER riguardano, invece, le aziende, le azioni, le obbligazioni, gli altri titoli e le quote sociali
+oltre che gli aeromobili, le navi, le imbarcazioni, le rendite e pensioni, i crediti e gli altri beni che, eventualmente,
+concorrono a formare l’asse ereditario.
+
+I SOGGETTI OBBLIGATI AL PAGAMENTO
+
+Gli eredi e i chiamati all’eredità, che non hanno ancora accettato ma che sono in possesso di beni ereditari,
+rispondono solidalmente delle somme dovute (da loro e dai legatari).
+Il coerede che ha accettato l’eredità con beneﬁcio d’inventario è obbligato solidalmente al pagamento nel
+limite del valore della propria quota ereditaria.
+I legatari sono, invece, obbligati solo al pagamento delle somme relative al loro legato.
+
+QUALI TRIBUTI BISOGNA PAGARE
+
+Se l’attivo ereditario comprende terreni o fabbricati, in relazione agli immobili e ai diritti reali immobiliari indicati
+nella dichiarazione di successione occorre pagare le imposte ipotecaria, catastale, di bollo, la tassa per i servizi
+ipotecari e catastali, calcolandoli e versandoli entro lo stesso termine previsto per presentare la dichiarazione
+(pagamento in “autoliquidazione”) - quadro EF. Le imposte ipotecarie e catastali, salvo eccezioni, sono dovute in
+misura proporzionale al valore dell’immobile o dei diritti reali sugli stessi.
+
+Per le successioni aperte a partire dal 01/01/2025 il contribuente deve autoliquidare, in sede di compilazione
+della dichiarazione di successione (quadro EF), anche l’imposta di successione, mentre per le successioni aperte
+prima di tale data l’imposta continua ad essere liquidata dagli ufﬁci competenti per la lavorazione.
+In caso di trust testamentario, il trustee può decidere di effettuare il versamento dell’imposta, anticipatamente rispetto
+al momento in cui vengono attribuiti i beni ai beneﬁciari ﬁnali, optando in dichiarazione per tale modalità di
+pagamento, indipendentemente dalla data di apertura della successione.
+Il pagamento dei tributi dovuti per la voltura deve essere effettuato, all’atto della presentazione della dichiarazione
+di successione, salvo nei seguenti casi:
+• immobili ubicati in territori ove vige il sistema del Libro fondiario;
+• volture relative ad eredità giacente/eredità amministrata (cod. carica 5 e 6);
+• volture relative ad eredità conferite in tutto o in parte a un Trust (cod. carica 9);
+• volture riguardanti “Oneri reali”;
+• se non si vuole dar corso alla voltura automatica (relativa casella barrata nel frontespizio).
+
+                                                             9
+
+===== FASCICOLO_I pag. 11 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+II. ISTRUZIONI PER LA COMPILAZIONE
+     DEL MODELLO
+
+Ciascun quadro della dichiarazione, ad eccezione dei quadri EE, EF ed EG, va sempre numerato progressivamente.
+Pertanto, se i righi di ciascun quadro sono sufﬁcienti per una esaustiva compilazione, nel campo in alto a destra
+“Mod. N.” deve essere indicato 001, viceversa nel caso in cui i righi non sono sufﬁcienti e quindi deve essere compilato
+un quadro aggiuntivo nel campo “Mod. N.” deve essere indicato il progressivo 002 - 003 ecc. in dipendenza del
+numero dei quadri aggiuntivi che è necessario utilizzare.
+In alcuni quadri della dichiarazione è presente la sezione “Devoluzione” in cui devono essere indicate, per il singolo
+cespite, le quote di ripartizione fra i soggetti aventi diritto all’eredità.
+Le istruzioni alla compilazione di tale sezione sono comuni a tutti i quadri in cui essa è presente,
+pertanto occorre seguire le indicazioni contenute nel paragrafo “Criteri generali per la compilazione
+della sezione Devoluzione” del quadro EB, tutte le volte in cui è necessario compilarla.
+
+N.B. Il codice ﬁscale del defunto va indicato su ogni foglio del modello di dichiarazione.
+
+DATI GENERALI
+
+In questa parte del modello devono essere indicate alcune informazioni di carattere generale sulla successione.
+
+TIPO DI DICHIARAZIONE
+
+La casella “prima dichiarazione” deve essere barrata nel caso in cui non sia stata presentata una precedente
+dichiarazione relativamente alla medesima successione.
+Se deve essere presentata una dichiarazione sostitutiva di una precedentemente inviata con il nuovo modello
+telematico, per la medesima successione, bisogna compilare la relativa casella “dichiarazione sostitutiva”.
+La modiﬁca del valore indicato nella dichiarazione precedentemente inviata è possibile oltre il termine di
+presentazione della dichiarazione se l’ufﬁcio non ha ancora notiﬁcato l’avviso di liquidazione e/o rettiﬁca della
+maggiore imposta, e comunque non oltre il termine previsto per la notiﬁcazione dell’avviso. Resta in ogni caso fermo
+l’obbligo di presentare una dichiarazione sostitutiva qualora sopravvenga un evento che dia luogo ad un mutamento
+della devoluzione dell’eredità o del legato ovvero ad applicazione dell’imposta in misura superiore.
+
+È utile precisare che la “dichiarazione sostitutiva” deve essere utilizzata anche per modiﬁcare o integrare
+la precedente dichiarazione e quindi deve essere presentata nel caso in cui:
+• occorre inserire nell’asse ereditario altri beni che non sono stati indicati nella dichiarazione principale;
+• sopravviene un evento che dà luogo a mutamento della devoluzione dell’eredità o del legato ovvero ad
+
+    applicazione delle imposte in misura superiore (ad esclusione dei casi in cui successivamente alla
+    presentazione della dichiarazione di successione sopravviene la erogazione di rimborsi ﬁscali, nonché nei casi
+    previsti in materia di alienazione di beni culturali – art. 13, comma 4 del TUS).
+    Nel caso in cui, ai sensi dell’art. 28, c.7 del TUS, il contribuente era esonerato dalla presentazione della
+    dichiarazione, in quanto l’attivo ereditario non comprendeva beni immobili ed aveva un valore inferiore o uguale
+    a 100.000 euro, è obbligatoria la presentazione della dichiarazione qualora il rimborso ﬁscale faccia superare
+    tale soglia d’esonero. In questo caso i termini di presentazione decorrono dalla comunicazione del rimborso.
+• si presenta la necessità di modiﬁcare i dati identiﬁcativi degli eredi, degli immobili, il loro valore, la misura delle
+    quote e/o i diritti.
+
+N.B. La dichiarazione sostitutiva sostituisce integralmente la precedente dichiarazione, pertanto devono essere compilati
+        anche i quadri non soggetti a modiﬁca.
+        Tale dichiarazione può essere inviata telematicamente solo dal dichiarante che ha presentato la precedente
+        dichiarazione che si intende sostituire.
+        Al legatario è data la possibilità di inviare direttamente da casa la dichiarazione in via telematica in relazione
+        all’oggetto del proprio legato, essa costituirà una “prima dichiarazione”, pertanto non sostituirà quella che
+        eventualmente è stata precedentemente presentata da un altro soggetto.
+       Qualora, invece, un soggetto legittimato a presentare la dichiarazione, diverso dal dichiarante o dal legatario,
+       voglia inviare la dichiarazione per la medesima successione, dovrà recarsi presso un ufﬁcio dell’Agenzia delle
+       entrate. Anche in questo caso la dichiarazione non sostituirà quella precedentemente presentata, pertanto costituirà
+       un’ulteriore dichiarazione che si andrà ad afﬁancare alla precedente e saranno dovute le relative imposte.
+
+                                                                                                                                     11
+
+===== FASCICOLO_I pag. 13 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+queste regole possono applicarsi anche per la successione che viene presentata in Italia.
+Detto Regolamento si applica, in genere, a tutti gli aspetti civilistici della successione patrimoniale di una persona
+deceduta, tranne alcuni, quali ad esempio i regimi patrimoniali fra i coniugi.
+
+Eventi eccezionali
+La presente casella deve essere utilizzata se i soggetti obbligati alla presentazione della dichiarazione fruiscono
+delle agevolazioni ﬁscali previste da particolari disposizioni normative emanate a seguito di calamità naturali o di
+altri eventi eccezionali.
+Indicare il codice 1 se a causa di un evento sopravvenuto (ad esempio un evento sismico) il beneﬁciario dell’eredità,
+al momento dell’apertura della successione, si trova in una ipotesi di inidoneità oggettiva (inagibilità) all’utilizzo
+abitativo dell’immobile posseduto per il quale ha già usufruito dell’agevolazione “prima casa”.
+In questo caso il beneﬁciario può richiedere di usufruire nuovamente dell’agevolazione “prima casa” sull’immobile
+ad uso abitativo caduto in successione, rendendo le relative dichiarazioni sostitutive di atto notorio (quadro EH se è
+il dichiarante).
+La condizione di inagibilità deve essere attestata da speciﬁca certiﬁcazione rilasciata dagli organi competenti in cui
+viene precisato che l’immobile non può più essere utilizzato per la sua funzione abitativa. Relativamente a tale
+certiﬁcazione occorre rendere speciﬁca dichiarazione sostitutiva di atto notorio da allegare alla dichiarazione
+(quadro EG).
+
+Data opzione art. 24-bis TUIR
+Indicare la data di decorrenza dell’esercizio di opzione (a partire dal 1° gennaio 2017) per usufruire del regime
+agevolato previsto dalla Legge 11 dicembre 2016, n. 232, comma 158 (Legge di bilancio 2017), secondo cui per le
+successioni aperte nei periodi di validità dell’opzione prevista dall’art. 24-bis del TUIR, l’imposta sulle successioni è
+dovuta limitatamente ai beni e diritti esistenti in Italia al momento della successione.
+L’opzione deve essere stata esercitata dal dante causa (de cuius), che può aver esteso i suoi effetti, ai sensi del comma
+6 dell’art. 24-bis del TUIR, anche ai suoi familiari di cui all’art. 433 del codice civile.
+In dichiarazione vanno indicati solo i beni e diritti che entrano in successione esistenti in Italia, nonché gli immobili
+esteri che si trovano negli Stati e Territori per i quali il de cuius non ha voluto l’applicazione del regime agevolato
+(art. 24-bis, comma 5 TUIR).
+
+Anno/Volume/Numero prima dichiarazione
+Questi campi vanno compilati solo in presenza di dichiarazioni sostitutive (codici 1, 2 o 3 nella casella ‘dichiarazione
+sostitutiva’). In tal caso indicare l’anno, il volume e il numero della precedente dichiarazione di successione che si
+intende sostituire.
+
+BENEFICIARI
+In questa sezione vanno indicati il numero complessivo di eredi/chiamati all’eredità e legatari presenti nel ‘QUADRO EA’.
+Inoltre va barrata la corrispondente casella se l’eredità è stata accettata con beneﬁcio di inventario (come, ad
+esempio, può accadere se il dichiarante è un minore. In questo caso, infatti, l’eredità devoluta ad un minore non si
+può accettare se non con beneﬁcio d’inventario da parte del suo rappresentante legale – ad esempio il genitore
+ovvero tutore - art. 471 c.c. La legge, infatti, prevede che l’accettazione con beneﬁcio d’inventario è obbligatoria in
+alcuni casi particolari per tutelare soggetti giuridicamente più deboli previsti negli articoli 471, 472, 473 del c.c..
+Quindi per i minori e gli interdetti devono essere i genitori o i tutori a compiere l’atto, dopo aver ottenuto il consenso
+del giudice tutelare; gli inabilitati e i minori emancipati, che giuridicamente hanno una limitata capacità di agire,
+possono usufruire del beneﬁcio d’inventario con il consenso dei curatori e del giudice tutelare).
+Allegare, tramite il quadro EG, la documentazione che attesti l’avvenuta accettazione con beneﬁcio d’inventario.
+Il coerede che ha accettato l’eredità con beneﬁcio d’inventario è obbligato solidalmente al pagamento dell’imposta
+di successione nel limite del valore della propria quota di eredità.
+
+DATI DEL DEFUNTO
+In questa sezione vanno indicati i dati anagraﬁci, la data del decesso e lo stato civile del defunto.
+La successione si apre al momento della morte.
+Il campo ‘data decesso’ deve essere utilizzato anche per indicare la data di assenza o morte presunta stabilita dalla
+relativa sentenza.
+
+N.B. Se il defunto è nato all’estero deve essere indicato lo Stato estero di nascita e la sigla “EE” nel campo dedicato
+        alla Provincia.
+
+                                                                                                                                    13
+
+===== FASCICOLO_I pag. 14 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+Residenza estera
+In questa casella occorre indicare:
+• il codice 1 nel caso in cui il defunto non ha mai avuto una residenza in Italia o se la residenza è ignota.
+• il codice 2 se il defunto ha risieduto in parte in Italia ed in parte all’estero.
+Se il defunto residente all’estero non ha mai risieduto in Italia, l’ufﬁcio di riferimento per la lavorazione è l’ufﬁcio
+territoriale di Roma 6 EUR - Torrino, Via Canton, 20 - 00144 Roma della Direzione provinciale II di Roma.
+Se il defunto ha risieduto in Italia, prima di risiedere all’estero, l’ufﬁcio di riferimento è quello individuato presso la
+Direzione provinciale competente in relazione all’ultima residenza nota in Italia. Nel caso in cui il defunto risiedeva
+all’estero, l’imposta è dovuta in relazione ai soli beni e diritti trasferiti ed esistenti sul territorio italiano al momento
+dell’apertura della successione; pertanto i beni e diritti esistenti all’estero non devono essere indicati.
+
+Stato civile
+Riportare nella presente casella i seguenti codici:
+1 – Celibe/nubile
+2 – Coniugato-a in regime di comunione dei beni
+3 – Coniugato-a in regime di separazione dei beni
+4 – Vedovo/a
+5 – Separato/a
+6 – Divorziato- a/Scioglimento dell’unione civile
+7 – Parte dell’unione civile
+
+TESTAMENTO
+In presenza di testamento deve essere compilata la presente sezione, indicando i dati riportati sulla copia del verbale
+di pubblicazione del testamento olografo o del testamento segreto ovvero di richiesta di registrazione/attivazione
+del testamento pubblico. In questi casi indicare il pubblico ufﬁciale, la data di pubblicazione e gli estremi di
+registrazione dell’atto (ufﬁcio, Serie, Numero, Sottonumero e data di registrazione).
+Il testamento deve essere allegato alla dichiarazione di successione utilizzando l’apposito rigo del Quadro EG.
+In caso di più testamenti, in questa sezione occorre indicare i dati del primo testamento, mentre quelli relativi agli
+altri testamenti devono essere riportati negli appositi righi del quadro EH; se vi è compresenza di testamento italiano
+ed estero, in tale sezione occorre indicare i dati di quello italiano.
+
+Testamento estero
+In presenza di almeno un testamento redatto all’estero occorre barrare la presente casella.
+Si precisa che gli atti e i documenti rilasciati da autorità straniere devono essere legalizzati dalle rappresentanze
+diplomatico – consolari italiane all’estero. Tali atti e documenti, ad eccezione di quelli redatti su modelli plurilingue
+previsti da Convenzioni internazionali, devono inoltre essere tradotti in italiano. Le traduzioni devono recare il timbro
+“per traduzione conforme”. Nei paesi dove esiste la ﬁgura giuridica del traduttore ufﬁciale la conformità può essere
+attestata dal traduttore stesso, la cui ﬁrma viene poi legalizzata dall’ufﬁcio consolare.
+Nei Paesi che hanno sottoscritto la Convenzione dell’Aia del 5 ottobre 1961 relativa all’abolizione della
+legalizzazione di atti pubblici stranieri, la necessità di legalizzare gli atti e i documenti rilasciati da autorità straniere
+è sostituita da un’altra formalità: l’apposizione della “postilla” (o apostille).
+Il testamento estero, redatto nella forma del testamento internazionale, previsto dalla Convenzione di Washington
+del 26 ottobre 1973, non necessita né di legalizzazione, né di apostille (Legge 29 novembre 1990, n. 387) ma solo
+della traduzione in italiano.
+
+Il testamento estero e la relativa traduzione in italiano, eseguita da un perito iscritto presso il tribunale ed asseverata
+conforme con giuramento (artt. 30 c. 4 TUS e 11, commi 5 e 6 TUR), devono essere allegati alla dichiarazione
+utilizzando lo speciﬁco rigo del quadro EG. I testamenti presentati agli ufﬁci compresi nei territori dello Stato (ad
+esempio, la provincia di Bolzano), nei quali è ammesso, per legge, l’uso della speciﬁca lingua straniera utilizzata
+per la redazione dell’atto (articolo 11, commi 5 e 6, del D.P.R. 26 aprile 1986, n. 131), non necessitano di traduzione.
+
+RISERVATO A CHI PRESENTA IL MODELLO
+Questa sezione è riservata a chi presenta la dichiarazione di successione (erede, chiamato all’eredità, legatario,
+curatore, tutore, rappresentante, trustee ecc.).
+
+N.B. Se chi presenta la dichiarazione è nato all’estero deve essere indicato lo Stato estero di nascita e la sigla
+        “EE” nel campo dedicato alla Provincia.
+
+ 14
+
+===== FASCICOLO_I pag. 15 =====
+Dichiarazione di successione e domanda di volture catastali                                                     FASCICOLO 1
+
+Nel caso in cui il soggetto che presenta la dichiarazione agisce in nome e per conto di un altro soggetto (ad esempio:
+società, ente, minore, interdetto, ecc) vanno riportati il codice ﬁscale e i dati anagraﬁci del rappresentante legale,
+avendo cura di indicare nell’apposito campo il codice ﬁscale del soggetto rappresentato.
+Il Codice carica identiﬁca la qualiﬁca di chi presenta la dichiarazione, come indicato nella seguente tabella:
+
+CODICI DI CARICA             QUALIFICA DEL SOGGETTO CHE PRESENTA LA DICHIARAZIONE
+
+1                 Erede, chiamato all’eredità
+
+2                 Legatario
+
+3                 Rappresentante legale/negoziale di legatario, tutore di legatario
+
+4                 Rappresentante legale/negoziale, tutore, erede dell’erede *
+
+5                 Curatore dell’eredità giacente
+
+6                 Amministratore dell’eredità
+
+7                 Esecutore testamentario
+
+8                 Persona immessa nel possesso temporaneo dei beni dell’assente
+
+9                 Trustee (soggetto che amministra i beni e i diritti conferiti in trust) o suo rappresentante
+
+* Nelle ipotesi differenti dalla rappresentazione in cui la dichiarazione deve essere presentata da un soggetto che non è erede del de cuius ma
+   del suo erede (ad esempio il coniuge del ﬁglio deceduto del defunto).
+
+Il campo ”Decorrenza termine presentazione” va compilato esclusivamente nei casi in cui il termine per la
+presentazione della dichiarazione decorre da un momento diverso rispetto alla data del decesso.
+Per l’elenco delle varie ipotesi si rimanda al capitolo – ISTRUZIONI GENERALI - ‘MODALITÀ E TERMINI DI
+PRESENTAZIONE’.
+
+RISERVATO AI RESIDENTI ALL’ESTERO
+Se chi presenta la dichiarazione risiede all’estero deve indicare lo Stato estero di residenza, il codice dello Stato estero,
+lo Stato federato, la provincia o la contea all’interno dello Stato estero di residenza, la località di residenza e l’indirizzo
+completo (ad esempio se gli Stati Uniti d’America sono lo Stato estero di residenza, la California potrebbe essere uno
+Stato federato e la località di residenza potrebbe essere San Francisco). La tabella con l’elenco dei codici degli Stati esteri
+è consultabile nell’Appendice del Modello Unico Persone ﬁsiche – Fascicolo 1.
+
+FIRMA DEL MODELLO
+La dichiarazione cartacea va ﬁrmata dal dichiarante. In questa sezione vanno indicati anche i Quadri compilati.
+
+CASI PARTICOLARI
+La presente sezione consente di individuare situazioni o casi particolari, diversi dagli ‘eventi eccezionali’.
+• Dichiaro di non voler dar corso alle conseguenti volture catastali
+
+    Chi presenta la dichiarazione può decidere di non procedere automaticamente alla voltura catastale (ad
+    esempio nei casi vi sia una particolare urgenza nella effettuazione delle volture – in questo caso occorre
+    anticipare le operazioni di voltura presentando la relativa domanda secondo le tradizionali modalità). In questo
+    caso occorre barrare la speciﬁca casella e sottoscrivere l’apposito riquadro. Inoltre, tale casella dovrà essere
+    barrata se ci sono immobili che rientrano nei casi di eredità giacente/eredità amministrata (cod. carica 5 e 6) e
+    di trust (cod. carica 9) per i quali non è possibile effettuare una voltura automatizzata. Si ricorda che il presente
+    modello non consente di eseguire automaticamente le volture catastali, anche, per tutti gli immobili gravati da
+    “Oneri reali” e per gli immobili ricadenti nei territori ove vige il sistema del Libro fondiario (Sistema Tavolare), i
+    cui adempimenti continuano ad essere svolti presso i competenti ufﬁci dell’Agenzia delle entrate (ufﬁci provinciali
+    - territorio) e delle Province autonome di Trento e Bolzano.
+     In tutti i casi nei quali non si procede alla voltura automatica, la domanda di volture deve essere presentata
+    all’ufﬁcio competente o spedita per posta, tramite raccomandata, ovvero PEC, con allegata la seconda ricevuta
+    telematica, rilasciata dopo la presentazione della dichiarazione di successione, nonché copia del documento
+    d’identità in corso di validità del dichiarante. In alternativa il singolo cittadino, anche per il tramite di un suo
+    delegato, può utilizzare il servizio «Voltura catastale web» per effettuare, con i medesimi termini, l’adempimento
+    a seguito dell’avvenuta presentazione della dichiarazione di successione.
+
+                                                                                                                15
+
+===== FASCICOLO_I pag. 17 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+QUADRO EA - Eredi, chiamati, legatari e altri soggetti
+
+In questo quadro vanno indicati i dati degli eredi, dei chiamati all’eredità, dei legatari e degli altri soggetti elencati
+di seguito (“Tipo soggetto”), anche se hanno rinunciato all’eredità.
+Indicare il codice ﬁscale del soggetto beneﬁciario (persona ﬁsica o giuridica).
+In presenza del codice carica “5”, nel quadro EA deve essere indicato il codice ﬁscale della “curatela”.
+
+In presenza di un trust (tipo soggetto ‘5’) indicare il codice ﬁscale del trustee. Nel caso di un trust con più beneﬁciari
+individuati, compilare tanti righi per quanti sono i beneﬁciari ﬁnali.
+Inoltre, occorre precisare che il modello telematico permette di dichiarare i trust che soddisfano le seguenti condizioni:
+• Il Trust deve essere istituito per testamento senza che ci sia attribuzione dei beni ai beneﬁciari ﬁnali che, qualora
+
+    presenti, devono comunque essere indicati;
+• il Trust può non avere beneﬁciari individuati ma comunque individuabili (ad esempio nel caso di testamento in
+
+    favore di nascituro concepito o di non concepito al momento dell’apertura della successione) , in questo caso
+    occorre indicare il grado di parentela Estraneo/a (cod. 35);
+• Il Trustee non deve far parte dei beneﬁciari ﬁnali del trust.
+• Nel testamento tutti i beni ereditari devono essere conferiti nel trust (diversamente, se parte di essi ha una
+    destinazione diversa dal trust, occorre presentare le relative dichiarazioni con modello 4 e non con il modello
+    telematico).
+In tutti gli altri casi occorre rivolgersi all’ufﬁcio territoriale incaricato per la lavorazione (in base all’ultimo domicilio
+ﬁscale del de cuius, coincidente con la residenza anagraﬁca) per effettuare l’adempimento dichiarativo tramite la
+presentazione del modello 4 cartaceo.
+
+Tipo soggetto
+In questa casella indicare:
+
+• il codice ‘1’ nel caso di Erede. È erede il soggetto che accetta l’eredità.
+     Bisogna indicare il codice 1 anche con riferimento al coniuge a cui spetta il diritto di abitazione (legato ex lege)
+     e nei casi in cui il beneﬁciario è erede per “rappresentazione”. L’istituto della rappresentazione permette ai
+     discendenti (legittimi o naturali) di subentrare al proprio ascendente nel caso in cui questi non vuole o non può
+     accettare l’eredità. Nel caso in cui un erede è anche destinatario di un legato, occorre compilare due righi
+     assegnando allo stesso soggetto il codice di riferimento (in un rigo il codice 1 quale erede ed in un altro il codice
+     2 quale legatario). Tuttavia si richiama quanto previsto dall’art. 588 del c.c. con riguardo alle disposizioni a
+     titolo universale e a titolo particolare;
+
+• il codice ‘2’ nel caso di Legatario.
+     Bisogna indicare il codice 2 anche nei casi in cui il beneﬁciario lo è per “rappresentazione”. L’istituto della
+     rappresentazione permette ai discendenti (legittimi o naturali) di subentrare al proprio ascendente nel caso in
+     cui questi non vuole o non può accettare il legato;
+
+• il codice ‘3’ nel caso di Chiamato all’eredità – se il soggetto non ha ancora accettato l’eredità.
+     Deve identiﬁcarsi con il codice 3 anche il soggetto che ha già rinunciato all’eredità; in questo caso occorre barrare
+     la successiva casella “Rinuncia”. Tale codice deve essere indicato anche dal coniuge che rinuncia sia all’eredità
+     che al diritto di abitazione ex lege;
+
+• il codice ‘4’ nel caso di Coniuge/Parte dell’unione civile superstite rinunciatario - se il coniuge superstite
+     ha rinunciato all’eredità e non ha rinunciato al legato ex lege previsto dall’articolo 540 del codice civile. In
+     questo caso mantiene il diritto di abitazione sull’immobile adibito a residenza familiare. Con riferimento al
+     soggetto che si identiﬁca con tale codice, occorre comunque barrare la successiva casella “Rinuncia”;
+
+• il codice ‘5’ nel caso di Trust. Nel caso di un trust con presenza di più soggetti beneﬁciari individuati, compilare
+     tanti righi per quanti sono i beneﬁciari ﬁnali. Il Trust deve essere istituito per testamento senza attribuzione dei
+     beni ai beneﬁciari ﬁnali.
+
+• il codice ‘6’ – Altro.
+
+N.B. Al termine “Coniuge” equivale il termine “Parte dell’unione civile”.
+Rinuncia
+Barrare la casella se il soggetto indicato nel corrispondente rigo, che ha diritto all’eredità, ha rinunciato ad essa (in
+questo caso occorre indicare gli estremi dell’atto di rinuncia nel quadro EH). Diversamente, se tale soggetto è
+beneﬁciario dell’eredità per “rappresentazione”, in quanto, ad esempio, è il rappresentato ad aver rinunciato
+all’eredità, la casella non deve essere barrata.
+
+                                                             17
+
+===== FASCICOLO_I pag. 27 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+(cod. X). Sono ricomprese tra le pertinenze, limitatamente a una per ciascuna categoria, le unità immobiliari
+classiﬁcate o classiﬁcabili nelle categorie catastali C/2, C/6 e C/7, destinate al servizio della casa di abitazione
+oggetto dell’acquisto agevolato.
+
+Pertinenze prima casa: la stessa agevolazione prevista per l’abitazione principale può essere chiesta, avendone
+i requisiti, anche per l’esclusivo trasferimento degli immobili classiﬁcati o classiﬁcabili nelle categorie catastali C/2,
+C/6 e C/7 per i quali si intende istituire un vincolo pertinenziale (codice Y) con un immobile già acquistato fruendo
+dell’agevolazione ‘prima casa’, non ricadente nella presente successione.
+In relazione al medesimo soggetto beneﬁciario l’agevolazione cod. Y, cod. P e cod. X non possono coesistere.
+Il soggetto che richiede l’agevolazione sull’immobile che cade in successione da destinare a pertinenza della casa
+di abitazione oggetto dell’acquisto agevolato non deve avere altra pertinenza, precedentemente acquisita con
+l’agevolazione, della stessa categoria catastale del bene che cade in successione.
+Tuttavia, qualora il soggetto si impegni a trasferire la pertinenza acquistata in precedenza fruendo dei beneﬁci entro
+due anni dall’apertura della successione, potrà richiedere l’agevolazione “prima casa” sulla pertinenza caduta in
+successione della stessa categoria della precedente.
+Per fruire dell’agevolazione, il richiedente deve rendere una dichiarazione sostitutiva di atto notorio, da allegare alla
+dichiarazione di successione (quadro EG), in cui occorre speciﬁcare gli estremi e la data dell’atto di acquisto
+dell’immobile a cui si riferisce la pertinenza; devono, inoltre, essere indicati anche gli estremi catastali sia dell’immobile
+principale in relazione al quale viene costituita la pertinenza sia delle eventuali altre pertinenze ad esso collegate.
+Se per l’immobile che cade in successione non è stato già espresso un vincolo pertinenziale in un precedente atto, il
+soggetto che può fruire dell’agevolazione, nel rendere la dichiarazione sostitutiva di atto notorio, deve anche esprimere
+la volontà di destinare l’immobile caduto in successione a pertinenza di un immobile “prima casa”, non rientrante nell’asse
+ereditario, già di sua proprietà o sul quale vanti un diritto di usufrutto, uso o abitazione.
+Inoltre, deve essere speciﬁcato che il richiedente l’agevolazione non abbia altra pertinenza, precedentemente
+acquisita con l’agevolazione, della medesima categoria del bene che cade in successione, per il quale si intende
+fruire dell’agevolazione “prima casa”; ovvero dichiari che si impegni a trasferirla entro due anni dall’apertura della
+successione. Per l’allegazione di tale documentazione, unitamente al documento d’identità di chi sottoscrive la
+dichiarazione sostitutiva, occorre compilare i relativi campi del quadro EG.
+
+N.B. Ferme restando le suddette condizioni, è possibile chiedere l’agevolazione prima casa sulla sola pertinenza
+(cod. Y) anche quando il nesso pertinenziale viene istituito con un’abitazione “prima casa”, non ricadente in
+successione e di proprietà (ovvero di usufrutto, uso o abitazione) di uno degli eredi/legatari, la cui titolarità è stata
+acquisita in un periodo in cui non esisteva la possibilità di richiedere l’agevolazione prima casa.
+
+Riduzioni art. 25, comma 1, del Tus
+Nei casi di successione aperta entro cinque anni da altra successione/donazione che ha per oggetto gli stessi beni
+e diritti, indicare il relativo codice numerico:
+’1’ – se la successione è aperta entro un anno dalla precedente successione/donazione;
+’2’ – se la successione è aperta entro due anni dalla precedente successione/donazione;
+’3’ – se la successione è aperta entro tre anni dalla precedente successione/donazione;
+‘4’ – se la successione è aperta entro quattro anni dalla precedente successione/donazione;
+’5’ – se la successione è aperta entro cinque anni dalla precedente successione/donazione.
+
+Se nella successione non sono compresi tutti i beni ed i diritti oggetto della precedente successione/donazione,
+oppure ne sono compresi anche altri, la riduzione verrà applicata sulla quota di imposta proporzionale al valore dei
+beni e dei diritti compresi nella precedente successione/donazione.
+
+Continuazione
+Se il numero dei soggetti a cui sono devoluti i singoli beni supera il numero dei campi disponibili, barrare la casella
+“continuazione” e riportare l’indicazione degli ulteriori soggetti nella sezione devoluzione del rigo che segue, senza
+compilare la parte relativa ai dati identiﬁcativi del bene.
+
+Ad esempio: bene descritto nel quadro EB al rigo EB1 devoluto a quattro eredi. I primi tre beneﬁciari andranno indicati
+nella sezione devoluzione del rigo EB1, mentre il quarto beneﬁciario dovrà essere indicato nella sezione devoluzione
+del rigo EB2. In tale rigo non dovranno essere nuovamente riportati i dati del cespite già indicato in EB1.
+
+                                                             27
+
+===== FASCICOLO_I pag. 33 =====
+Dichiarazione di successione e domanda di volture catastali                         FASCICOLO 1
+
+QUADRO ER – Rendite, crediti e altri beni
+
+Il presente quadro deve essere utilizzato per indicare le rendite e le pensioni, i crediti, gli altri beni nonché l’insieme
+dei mobili destinati all’uso o all’ornamento delle abitazioni, compresi i beni culturali non sottoposti al regime di
+tutela.
+
+In relazione ai crediti, rientrano in successione:
+• i crediti fruttiferi;
+• i crediti infruttiferi con scadenza dopo almeno un anno dalla data di apertura della successione;
+• i crediti in natura.
+
+Rientra nei diritti di credito anche il diritto alla liquidazione delle quote di società semplici, in nome collettivo e in
+accomandita semplice, comprese quelle equiparate secondo le disposizioni delle imposte sui redditi. Il valore del
+suddetto diritto di credito è determinato in base al valore, alla data dell’apertura della successione, del patrimonio
+netto della società, risultante dall’ultimo inventario regolarmente redatto ovvero in mancanza di questo, al valore
+complessivo dei beni e diritti appartenenti alla società al netto delle passività (art. 16 TUS).
+
+Tipo cespite
+A seconda del tipo di rendita, credito o bene dichiarato, utilizzare i seguenti codici:
+
+CODICE DA INSERIRE                      TIPOLOGIA DI RENDITE, CREDITI E ALTRI BENI
+
+BI                  beni inventariati.
+
+CR crediti, rimborsi fiscali*, compresi gli interessi legali maturati fino alla data di apertura della successione, censi, rendite, pensioni (comprese nell’attivo ereditario) e somme depositate in conto corrente.
+
+DN                  denaro, gioielli e mobilia non inventariati.
+
+GD                  cosa genericamente determinata** art. 653 c.c.
+
+AB                  altri beni.
+
+* Solo nel caso in cui si era esonerati dalla presentazione della dichiarazione, in quanto l’attivo ereditario non comprendeva beni immobili ed
+    aveva un valore inferiore o uguale a 100.000 euro ed a seguito del rimborso tale soglia sia stata superata. I termini di presentazione della
+    dichiarazione decorrono dalla comunicazione del rimborso.
+
+** Il legato di cosa genericamente determinata (cod. GD) – art 653 cod. civ. - si veriﬁca quando, ad esempio, il de cuius, vedovo, dispone della
+    propria successione con testamento olografo nel quale istituisce eredi universali i propri tre ﬁgli e lega una somma di danaro ad un altro
+    soggetto. Nell’asse ereditario si rinvengono solo immobili senza un conto corrente. Gli eredi devono esporre la situazione in dichiarazione
+    nel seguente modo (trattandosi di un legato obbligatorio).
+    Nel quadro EA deve essere indicato il legatario mentre il suo diritto di credito, che deriva dal legato, deve essere indicato nel presente quadro
+    con il codice GD.
+
+Descrizione
+Descrivere la tipologia di bene.
+Nel caso di somme depositate in conto corrente le informazioni possono essere desunte dalle attestazioni rilasciate
+dagli istituti di credito.
+Ad esempio:
+conto corrente n. XXXXX c/o banca XXXXX, ﬁliale di XXXXX - AG. XX, intestato/cointestato a XXXXX, recante un
+saldo creditore alla data del decesso del 00/00/0000 di € XXXXX.
+
+Possesso del defunto
+Indicare la quota del bene posseduta dal defunto, espressa in una frazione (ad esempio 1/10).
+Se questa quota corrisponde all’intero il rapporto sarà pari a uno (ad esempio 1/1; 100/100; 1000/1000).
+
+Codice diritto
+L’elenco dei codici si trova nella tabella riportata nell’allegato 4 ‘CODICE DIRITTO’.
+
+Bene estero
+Barrare la casella se le rendite, i crediti e gli altri beni sono di natura estera.
+
+                                                                                    33
+
+===== FASCICOLO_I pag. 37 =====
+Dichiarazione di successione e domanda di volture catastali                                                    FASCICOLO 1
+
+CODICE DA INSERIRE                                           PASSIVITÀ O ALTRI ONERI
+
+1 Spese mediche e chirurgiche, per ricoveri, medicinali e protesi sostenute dagli eredi
+                    per conto del defunto negli ultimi sei mesi.
+
+2                   Spese funerarie sostenute dagli eredi, per un importo non superiore a 1.032,91 euro.
+
+3                   Mutui, contratti per l’acquisto di immobili compresi nell’attivo ereditario.
+
+                    Debiti verso banche ed altri intermediari ﬁnanziari (saldi passivi su conti correnti). Nella determinazione del
+
+4                   saldo di conto corrente non bisogna considerare quelle somme relative ad assegni portati all’incasso nei
+
+                    quattro giorni prima dell’apertura della successione.
+
+                    Debiti inerenti l’esercizio di imprese.
+
+5                   * Tali debiti sono deducibili se risultano dalle scritture contabili obbligatorie del defunto regolarmente tenute
+
+                    a norma di legge. Se il defunto non era obbligato alla tenuta delle scritture contabili, sono deducibili quelle
+
+                    somme che risultano nelle scritture contabili dei creditori.
+
+6                   Debiti cambiari
+
+                    Debiti verso lo Stato, enti pubblici territoriali ed enti pubblici che gestiscono forme obbligatorie di previdenza e
+
+7                   di assistenza sociale. Tali debiti sono deducibili qualora il presupposto da cui essi sono derivati si sia veriﬁcato
+
+                    anteriormente alla data di apertura della successione.
+
+                    Rapporto di lavoro subordinato (TFR, trattamenti previdenziali integrativi). I debiti derivanti da rapporti
+
+8                   di lavoro subordinato, compresi quelli relativi al trattamento di ﬁne rapporto ed ai trattamenti
+
+                    previdenziali integrativi sono deducibili anche se il rapporto continua con gli eredi o i legatari.
+
+9 Debiti tributari. Essi sono deducibili anche se accertati dopo la data di apertura della successione, purché
+                   riguardanti un periodo anteriore a tale data.
+
+                    Somme dovute al coniuge divorziato, a seguito di sentenza di scioglimento di matrimonio o
+
+10                  di cessazione di effetti civili dello stesso (o in caso di sentenza di separazione, passata in giudicato,
+
+                    per colpa del coniuge superstite o di entrambi).
+
+11                  Legato o altro onere che grava su una quota ereditaria o sul legato stesso
+
+12                  Altre passività
+
+* Si ricorda che in questa categoria non devono essere ricomprese le passività aziendali al netto delle quali è stato calcolato il valore dell’azienda
+   indicato nel quadro EN e che, pertanto, sono già state escluse nella determinazione della base imponibile dell’imposta di successione.
+
+I debiti cambiari e quelli verso banche e altri intermediari ﬁnanziari, compresi i saldi passivi dei conti correnti, sono
+ammessi in deduzione anche se risultano dalle scritture contabili obbligatorie del trattario, del prenditore, dell’azienda
+o istituto di credito (codice 4).
+La deduzione dei debiti verso banche e altri intermediari ﬁnanziari è subordinata alla produzione di un certiﬁcato,
+rilasciato dall’ente creditore nei successivi trenta giorni dalla richiesta scritta di uno dei soggetti obbligati alla
+presentazione della dichiarazione di successione e controﬁrmato dal capo del servizio o dal contabile addetto.
+I debiti inerenti all’esercizio dell’impresa sono ammessi in deduzione anche se risultano dalle scritture contabili
+obbligatorie, regolarmente tenute (codice 5).
+I debiti verso lo Stato, gli enti pubblici territoriali e gli enti pubblici in genere, che gestiscono forme obbligatorie di
+previdenza e assistenza sociale e i debiti tributari, esistenti alla data di apertura della successione, sono deducibili
+anche se accertati in data posteriore (codice 7).
+I debiti risultanti da provvedimenti giurisdizionali e i debiti verso pubbliche amministrazioni possono essere dimostrati
+entro sei mesi dalla data in cui il relativo provvedimento giurisdizionale o amministrativo è divenuto deﬁnitivo.
+
+N.B. Se al momento dell’apertura della successione si rientra in una delle casistiche individuate dal codice 10, i
+        dati del coniuge beneﬁciario non devono essere inseriti nel quadro EA della dichiarazione.
+
+Si precisa, infatti, che:
+• l coniuge divorziato non può essere erede per legge ma solo a seguito di volontà testamentaria (dopo il divorzio
+
+    i diritti successori tra coniugi cessano); in quest’ultimo caso i suoi dati devono essere indicati nel quadro EA, in
+    quanto erede testamentario o legatario;
+
+                                                                                                                                 37
+
+===== FASCICOLO_I pag. 39 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+QUADRO EE – Prospetto riepilogativo asse ereditario
+
+In questo quadro va riportato il totale dell’attivo ereditario della successione così suddiviso:
+Rigo EE1 - Totale valore immobili
+Va indicato il valore degli immobili inseriti nei quadri ‘EB’, ‘EC’, ‘EL’ ed ‘EM’, ad eccezione dei beni culturali sottoposti
+al regime di tutela anteriormente all’apertura della successione (codice Agevolazione ‘A’ nella sezione devoluzione),
+in quanto esclusi dall’attivo ereditario.
+Non devono essere considerati i beni immobili, intestati al de cuius, che fanno parte di aziende (come nel caso di
+ditte individuali) - casella “bene aziendale” barrata nei relativi quadri e quadro EN compilato.
+Rigo EE2 -Totale valore aziende
+Nel presente campo va riportato il valore delle aziende inserite nel quadro ‘EN’.
+Rigo EE3 - Totale valore azioni, obbligazioni, altri titoli e quote sociali
+Va riportato il valore dei beni inseriti nel quadro ‘EO’.
+Rigo EE4 - Totale valore aeromobili, navi e imbarcazioni
+Va riportato il valore dei beni inseriti nei quadri ‘EP’ ed ‘EQ’.
+Rigo EE5 - Totale valore altri beni
+Va riportato il valore degli altri beni inseriti nel quadro ‘ER’.
+Non vanno riportati i valori relativi ai crediti contestati giudizialmente alla data di apertura della successione, ﬁno a
+quando la loro sussistenza non sia riconosciuta con provvedimento giurisdizionale o con transazione.
+Rigo EE6 - Totale
+Sommare da EE1 a EE5.
+Rigo EE7 - Totale passivo
+Va riportato il valore delle passività e altri oneri inseriti nel quadro ‘ED’.
+Rigo EE8 - Totale valore asse ereditario netto
+Calcolare la differenza tra EE6 e EE7.
+Il valore netto dell’asse ereditario è costituito dalla differenza tra il valore complessivo dei beni e diritti che
+compongono l’attivo ereditario (al momento dell’apertura della successione) e l’importo complessivo delle passività
+deducibili e degli oneri diversi a carico degli eredi e dei legatari.
+Il valore dell’eredità o delle quote ereditarie è determinato, quindi, al netto dei legati e degli altri oneri che gravano
+su di esse, ed allo stesso modo il valore dei legati si deve considerare al netto degli oneri di cui sono gravati.
+
+QUADRO EF – Liquidazione delle imposte e altri tributi
+
+Questo quadro riassume tutti i dati dichiarati, utili ai ﬁni del calcolo delle imposte ipotecarie, catastali, degli altri
+tributi indiretti e dell’imposta di successione.
+Il versamento di tali imposte, ad eccezione dell’imposta di successione per la quale sono previste diverse modalità
+di pagamento, deve avvenire entro gli stessi termini previsti per la presentazione della dichiarazione di successione.
+L’imposta di successione deve essere autoliquidata dal contribuente solo per le successioni aperte a partire dal
+01/01/2025, mentre per quelle aperte prima di tale data l’imposta continua ad essere liquidata dagli ufﬁci
+competenti per la lavorazione.
+In caso di trust testamentario, il trustee può decidere di effettuare il versamento dell’imposta, anticipatamente rispetto
+al momento in cui vengono attribuiti i beni ai beneﬁciari ﬁnali, optando in dichiarazione per tale modalità di
+pagamento, indipendentemente dalla data di apertura della successione.
+Inoltre, si precisa che:
+• Per le successioni aperte dal 1° gennaio 2014, l’imposta ipotecaria e catastale, nel caso in cui sia prevista in
+
+    misura ﬁssa, è pari a 200 euro per ciascuna;
+• Per le successioni aperte tra il 3 ottobre 2006 ed il 31 dicembre 2013, l’imposta ipotecaria e catastale, nel caso
+
+    in cui sia prevista in misura ﬁssa, è pari a 168 euro per ciascuna.
+
+                                                                                                                                    39
+
+===== FASCICOLO_I pag. 49 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+SEZIONE VI – SANZIONI E INTERESSI
+Nel caso in cui la dichiarazione venga inviata oltre i termini di presentazione e prima che avvenga l’accertamento
+d’ufﬁcio, può essere utilizzata la presente sezione per ravvedere il tardivo pagamento dell’imposta di successione,
+delle imposte ipotecarie, catastali e degli altri tributi autoliquidati.
+Il mancato pagamento, in tutto o in parte, dell’imposta di successione e delle imposte ipotecarie, catastali e degli
+altri tributi autoliquidati comporta l’applicazione di una sanzione amministrativa pari al 25 % di ogni importo non
+versato, inoltre per i versamenti effettuati con un ritardo non superiore a novanta giorni, la sanzione è ridotta alla
+metà (articolo 13, comma 1, del D.Lgs. n. 471/1997), tuttavia è possibile effettuare il pagamento dei tributi au-
+toliquidati con una sanzione ridotta (“ravvedimento operoso”, articolo 13 del D.Lgs. n. 472/1997), utilizzando
+la presente sezione. La sanzione è ridotta, sempreché per la violazione non siano stati notiﬁcati i relativi atti di liqui-
+dazione e di accertamento.
+
+In particolare:
+• se il pagamento è effettuato entro 15 gg dalla scadenza la sanzione è pari allo 0,083% delle imposte dovute
+
+    per ogni giorno di ritardo (riduzione della sanzione a 1/15 ulteriormente diminuita a 1/10 - articolo 13,
+    comma 1, lettera a) del dlgs n. 472 del 1997);
+• se il pagamento è effettuato entro 30 gg dalla scadenza la sanzione è pari al 1,25% delle imposte dovute
+    (riduzione della sanzione a 1/10 - articolo 13, comma 1, lettera a) del dlgs n. 472 del 1997);
+• se il pagamento è effettuato entro 90 gg dalla scadenza la sanzione è pari al 1,39% delle imposte dovute
+    (riduzione della sanzione a 1/9 - articolo 13, comma 1, lettera a-bis) del dlgs n. 472 del 1997);
+• se il pagamento è effettuato entro 1 anno dalla scadenza la sanzione è pari al 3,12% delle imposte dovute
+    (riduzione della sanzione a 1/8 - articolo 13, comma 1, lettera b) del dlgs n. 472 del 1997);
+• se il pagamento è effettuato oltre 1 anno dalla scadenza la sanzione è pari al 3,57% delle imposte dovute
+    (riduzione della sanzione a 1/7 - articolo 13, comma 1, lettera b-bis) del dlgs n. 472 del 1997);
+
+Di regola il versamento della sanzione ridotta deve essere eseguito contestualmente alla regolarizzazione del
+pagamento del tributo o della differenza, nonché al pagamento degli interessi moratori dovuti per il ritardo nel
+pagamento (gli interessi moratori, calcolati al tasso legale con maturazione giorno per giorno sui tributi non versati).
+
+QUADRO EG - Elenco documenti, certiﬁcati e dichiarazioni sostitutive da allegare alla
+                    dichiarazione
+
+Questo quadro deve essere utilizzato per allegare ogni tipologia di documento necessario ai ﬁni della corretta
+presentazione della dichiarazione (si veda ad esempio il paragrafo “QUALI DOCUMENTI OCCORRONO”), nonché
+le dichiarazioni sostitutive di atto notorio rese dai beneﬁciari, diversi dal dichiarante come ad esempio quelle
+necessarie a richiedere l’applicazione delle agevolazioni e/o le riduzioni dell’imposta di successione, qualora essi
+siano in possesso dei necessari requisiti per fruirne.
+Eventuali dichiarazioni sostitutive di atto notorio rese dagli interessati, da allegare alla dichiarazione, devono essere
+corredate dalla copia dei documenti d’identità dei soggetti che le hanno sottoscritte, anche quando vengono rese
+dal dichiarante, compilando il quadro EH, ma la trasmissione del modello non viene effettuata direttamente da
+quest’ultimo (ad es. tramite intermediario).
+La documentazione da allegare deve avere una bassa risoluzione (200x200dpi, colore Bianco e Nero), purché
+leggibile, nonché deve essere in formato PDF/A–1a, PDF/A–1b oppure TIF e/o TIFF (sul sito dei servizi telematici
+dell’Agenzia è disponibile un convertitore/validatore dei ﬁle da allegare alla dichiarazione); l’allegazione del
+documento in un formato differente da quelli sopra indicati comporterà lo scarto della dichiarazione.
+
+In ogni caso è obbligatoria l’allegazione:
+• dell’albero genealogico (rigo EG6), dal quale risulti il nome, cognome, luogo e data di nascita del coniuge e
+
+    degli altri soggetti beneﬁciari, legati al defunto da vincoli di parentela;
+• dell’eventuale testamento (nel caso di testamento estero occorre allegare anche la relativa traduzione);
+• dell’atto istitutivo del Trust, del suo statuto e dell’atto dispositivo con il quale il de cuius vincola i beni in trust.
+Inoltre, è obbligatoria l’allegazione della dichiarazione sostitutiva di atto notorio attestante lo stato di famiglia del
+defunto, degli eredi e legatari che sono in rapporto di parentela o afﬁnità con il defunto:
+• nel caso in cui chi presenta la dichiarazione di successione è il curatore dell’eredità giacente (cod. carica 5),
+
+    l’amministratore dell’eredità (cod. carica 6), l’esecutore testamentario (cod. carica 7);
+quando le informazioni riguardanti il rapporto di parentela con il defunto, presenti nel quadro EH, non sono esaustive
+
+                                                                                                                                    49
+
+===== FASCICOLO_I pag. 51 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+QUADRO EH - DICHIARAZIONI SOSTITUTIVE, AGEVOLAZIONI E RIDUZIONI
+
+Il quadro EH deve essere utilizzato da chi presenta il modello, per rendere le dichiarazioni sostitutive di
+certiﬁcazione o di atto di notorietà da allegare alla dichiarazione di successione, nonché per richiedere l’applicazione
+delle agevolazioni sulle imposte ipotecarie e catastali e le riduzioni dell’imposta di successione.
+Le dichiarazioni fornite nel presente quadro sono rese ai sensi degli artt. 46 e 47 del D.P.R. 445/2000, pertanto, in
+caso di dichiarazioni false o mendaci, troveranno applicazione le sanzioni penali previste all’art. 76 testo unico delle
+disposizioni legislative e regolamentari in materia di documentazione amministrativa, approvato con D.P.R. 28
+dicembre 2000, n. 445.
+In tutti quei casi in cui le informazioni riguardanti il rapporto di parentela con il defunto, presenti in tale quadro, non sono
+esaustive per la corretta rappresentazione dello stato di famiglia di questo, degli eredi, chiamati all’eredità e legatari che
+sono in rapporto di parentela o afﬁnità con il defunto, il dichiarante deve allegare, tramite il quadro EG, la dichiarazione
+sostitutiva di atto notorio contenente tutti gli elementi utili al completamento della suddetta rappresentazione.
+Se chi presenta il modello è un Curatore dell’eredità giacente (cod. carica 5), un Amministratore dell’eredità (cod.
+carica 6) oppure un Esecutore testamentario (cod. carica 7), le dichiarazioni sostitutive di certiﬁcazione o di atto di
+notorietà, nonché le richieste di agevolazioni e riduzioni, devono essere allegate alla dichiarazione tramite
+il quadro EG in luogo della compilazione del quadro EH.
+Se il modello non viene trasmesso direttamente dal dichiarante occorre allegare la copia del documento d’identità
+di quest’ultimo.
+
+SEZIONE I - DICHIARAZIONI SOSTITUTIVE
+Il presente quadro deve essere utilizzato da chi presenta il modello, per rendere le dichiarazioni sostitutive di
+certiﬁcazione o di atto di notorietà necessarie alla registrazione della dichiarazione di successione, nonché per
+fornire ulteriori informazioni utili alla liquidazione dell’imposta di successione.
+
+In particolare il richiedente, dopo aver inserito i propri dati anagraﬁci, deve indicare:
+
+a) la data del decesso o gli estremi della sentenza di dichiarazione di morte presunta o di assenza;
+
+b) i dati relativi allo stato di famiglia del defunto, degli eredi, chiamati all’eredità e dei legatari che sono in rapporto
+    di parentela o afﬁnità con il defunto, riportando i dati indicati nel quadro EA. Per gli eredi o per i legatari nati
+    all’estero indicare lo Stato estero di nascita e nel campo relativo alla provincia la sigla “EE”;
+
+c) gli estremi di registrazione degli atti di ultima volontà del defunto ove questi ultimi siano presenti (ufﬁcio, Serie,
+    Numero, Data e Sottonumero se presente). In presenza di testamento redatto all’estero, per cui è stata barrata
+    l’apposita casella presente sul frontespizio, non occorre riportare gli estremi di registrazione. Indipendentemente
+    dal tipo di testamento che è stato redatto occorre allegare l’atto, utilizzando il rigo ‘testamento’ presente nel
+    quadro EG. In caso di più testamenti, se i righi di ciascun quadro non sono sufﬁcienti, compilare un quadro
+    aggiuntivo (in questo caso va indicato nel campo Mod. N. il progressivo 002 - 003 ecc.).
+
+    Si ricorda che ai documenti in lingua straniera deve essere allegata una traduzione in italiano eseguita da un perito
+    iscritto presso il tribunale ed asseverata conforme con giuramento, fatta eccezione per quelli validi anche in lingua
+    straniera (sono gli atti presentati a ufﬁci che fanno parte di territori “bilingue”, come, ad esempio, la provincia di
+    Bolzano - articolo 11, commi 5 e 6, del D.P.R. 26 aprile 1986, n. 131);
+
+d) l’eventuale presenza di accordi di reintegrazione dei diritti di legittima lesi, riportandone gli estremi di registrazione
+    (ufﬁcio, Serie, Numero, Data e Sottonumero se presente). In presenza di più accordi, compilare un quadro
+    aggiuntivo (in questo caso va indicato nel campo Mod. N. il progressivo 002 - 003 ecc.);
+
+e) l’esistenza o meno di eredi, chiamati all’eredità o legatari interdetti, incapaci o portatori di disabilità grave. In
+    caso di erede, chiamato all’eredità o legatario affetto da disabilità grave, indicare gli estremi del verbale dalla
+    commissione per l’accertamento della disabilità di cui all’art. 4 della Legge n. 104 del 1992. In caso di erede,
+    chiamato all’eredità o legatario interdetto o inabilitato riportare gli estremi della sentenza dichiarativa. Riportare
+    il numero del Rigo e del Modulo del quadro EA dove sono indicati i dati anagraﬁci del soggetto interdetto o
+    affetto da handicap grave. Nel caso in cui i soggetti siano più di uno compilare un quadro aggiuntivo (in questo
+    caso va indicato nel campo Mod. N. il progressivo 002 - 003 ecc.);
+
+f) l’assenza o l’eventuale presenza di rinunzie all’eredità, con relativi estremi di registrazione (ufﬁcio, Serie, Numero,
+    Data e Sottonumero se presente). In presenza di più rinunzie, compilare un quadro aggiuntivo (in questo caso va
+    indicato nel campo Mod. N. il progressivo 002 - 003 ecc.);
+
+g) se tra il defunto/a ed il coniuge è stata/non è stata pronunciata una sentenza di separazione passata in giudicato
+    per colpa del coniuge superstite o di entrambi ovvero addebitabile al coniuge superstite o ad entrambi;
+
+h) che non è stata presentata domanda di scioglimento dell’unione civile;
+
+                                                                                                                                     51
+
+===== FASCICOLO_I pag. 58 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+BENI CULTURALI COD. A
+
+Rientrano in tale codiﬁca i beni culturali sottoposti al regime di tutela precedentemente all’apertura della successione, per i quali
+sono stati assolti i conseguenti obblighi di conservazione e protezione.
+L’erede o il legatario deve presentare l’inventario dei beni che ritiene non debbano essere compresi nell’attivo ereditario, con la
+descrizione particolareggiata degli stessi e con ogni notizia idonea alla loro identiﬁcazione, al competente organo periferico del
+Ministero della Cultura, il quale attesta per ogni singolo bene tutelato l’assolvimento degli obblighi di conservazione e protezione
+(art.13 TUS).
+L’attestazione (ovvero dichiarazione di interesse culturale) deve essere presentata in allegato alla dichiarazione di successione
+(quadro EG) o rendendo apposita dichiarazione sostitutiva (quadro EH) nel caso in cui a richiedere di fruire dell’agevolazione
+sia il dichiarante.
+L’alienazione in tutto o in parte dei beni, prima che sia decorso un quinquennio dall’apertura della successione, la loro tentata
+esportazione non autorizzata, il mutamento di destinazione degli immobili non autorizzato e il mancato assolvimento degli
+obblighi prescritti per consentire l’esercizio del diritto di prelazione dello Stato, determinano l’inclusione dei beni nell’attivo
+ereditario. L’Amministrazione della Cultura ne dà immediata comunicazione all’Agenzia delle entrate. Per i territori della regione
+Sicilia e delle province autonome di Trento e di Bolzano, provvedono ai suddetti adempimenti gli organi rispettivamente competenti.
+I beni culturali sottoposti a vincolo precedentemente all’apertura della successione sono esclusi dall’attivo ereditario e sono
+esenti dalla sola imposta di successione.
+L’ufﬁcio accerterà la sussistenza dei requisiti necessari per fruire dell’agevolazione.
+
+TERRENI AGRICOLI “COMPENDIO UNICO” IN ZONE MONTANE COD. C
+
+Rientrano in tale codiﬁca i terreni agricoli in zone montane trasferiti a coltivatori diretti e ad imprenditori agricoli professionali
+che si impegnano a costituire un “compendio unico” ed a coltivarlo o condurlo per almeno 10 anni dal trasferimento, purché
+iscritti alla relativa gestione previdenziale. I terreni agricoli e le relative pertinenze (compresi i fabbricati rurali) che costituiscono
+il compendio unico, sono considerati unità indivisibili per 15 anni dal momento dell’acquisto. Quindi durante tali anni non possono
+essere in nessun caso frazionati, altrimenti ne decade l’agevolazione.
+Analogamente, viene meno l’agevolazione, se il compendio non è interamente compreso nella quota di uno o più coeredi che ne
+richiedano congiuntamente l’attribuzione. Le stesse regole si applicano anche ai piani di ricomposizione fondiaria e di riordino
+fondiario promossi da Regioni, Province, Comuni e Comunità montane.
+Per fruire dell’agevolazione occorre presentare una attestazione, da cui si evinca il possesso dei suddetti requisiti, allegandola
+alla dichiarazione di successione (quadro EG) o rendendo apposita dichiarazione sostitutiva (quadro EH) nel caso in cui a
+richiedere di fruire dell’agevolazione sia il dichiarante.
+In questi casi tali beni sono esenti da imposta di successione, ipotecaria, catastale e di bollo.
+L’ufﬁcio accerterà la sussistenza dei requisiti necessari per fruire dell’agevolazione.
+
+AZIENDE O RAMI DI ESSE, QUOTE SOCIALI ED AZIONI
+FACENTI PARTE DELL’ATTIVO EREDITARIO COD. D
+
+Rientrano in tale codiﬁca i trasferimenti, anche tramite patti di famiglia, di aziende o rami di esse ovvero di quote sociali e azioni,
+effettuati in favore del coniuge e dei discendenti del defunto, a condizione che, per un periodo non inferiore a 5 anni dalla data
+del trasferimento, i beneﬁciari:
+
+• Proseguano l’attività d’impresa, in caso di aziende o rami di esse;
+
+• Detengano il controllo dell’attività d’impresa, in caso di quote o azioni di società di capitali di cui all’art. 73, comma 1, lettera
+   a), del TUIR. Si precisa che, ai sensi dell’art. 3, comma 4 ter, D. lgs 346/1990, il beneﬁcio spetta limitatamente alle
+   partecipazioni mediante le quali attraverso la successione è acquisito il controllo di cui all’art. 2359, comma 1, numero 1) del
+   c.c. della società o integrato quello già esistente. Pertanto, tale ultimo requisito non si applica per le quote di società di persone.
+
+• Detengano la titolarità del diritto, in caso di altre quote sociali.
+
+Per fruire del beneﬁcio occorre rendere apposita dichiarazione sostitutiva di atto notorio da allegare alla dichiarazione di
+successione (quadro EG) nel caso in cui a richiederlo non sia il dichiarante; invece, nel caso in cui a richiedere di fruire
+dell’agevolazione sia il dichiarante occorre compilare la speciﬁca sezione del quadro EH.
+Nei suddetti casi tali trasferimenti non sono soggetti ad imposta di successione e sono esenti dalle imposte ipotecarie
+e catastali.
+Il mancato rispetto delle suddette condizioni comporta la decadenza dal beneﬁcio e il pagamento dell’imposta in misura ordinaria,
+oltre le sanzioni e gli interessi di mora.
+Il beneﬁcio si applica anche ai trasferimenti di azioni e di quote sociali di società residenti in Paesi appartenenti all’Unione europea
+o allo Spazio economico europeo o in Paesi che garantiscono un adeguato scambio di informazioni, alle medesime condizioni
+previste per i trasferimenti di quote sociali e azioni di soggetti residenti.
+
+58
+
+===== FASCICOLO_I pag. 61 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+1) ubicato nel territorio del Comune in cui il beneﬁciario (erede/legatario) ha la propria residenza o dove la stabilisca entro
+     18 mesi dalla data di apertura della successione;
+
+2) ubicato nel territorio del Comune in cui il beneﬁciario (erede/legatario) svolge la propria attività (qualora diverso dalla
+     residenza);
+
+3) ubicato nel territorio del Comune in cui ha sede o esercita l’attività il proprio datore di lavoro, se il beneﬁciario
+     (erede/chiamato/legatario) si è trasferito all’estero per ragioni di lavoro;
+
+4) “prima casa” sul territorio italiano, se il beneﬁciario è un cittadino italiano emigrato all’estero o appartiene al personale in
+    servizio permanente delle forze armate, delle forze di polizia a ordinamento militare e/o civile.
+
+Tali requisiti sono alternativi tra loro.
+
+Inoltre il beneﬁciario ovvero, in caso di più beneﬁciari, almeno uno di essi:
+1) non deve essere titolare esclusivo o in comunione con il coniuge di diritti di proprietà, usufrutto, uso o abitazione di altra casa
+
+     nel territorio del Comune in cui è situato l’immobile acquisito;
+2) non deve essere titolare esclusivo dei diritti di proprietà, usufrutto, uso, abitazione e nuda proprietà, neppure per quote,
+
+     anche in regime di comunione legale, su tutto il territorio nazionale di altra casa acquisita da lui stesso o dal coniuge con le
+     agevolazioni ‘prima casa’, salvo che non si impegni a trasferirla entro due anni dal decesso.
+
+Per le successioni aperte a partire dal 14/06/2023, le persone ﬁsiche che si sono trasferite all’estero per ragioni di lavoro
+possono fruire dell’agevolazione “prima casa” se all’apertura della successione già sussistono contestualmente i seguenti
+requisiti:
+1) il trasferimento all’estero deve essere avvenuto prima di ricevere in successione l’immobile e che l’attività lavorativa abbia
+
+   avuto inizio prima (o contestualmente) del trasferimento all’estero o che almeno se ne siano avuti i presupposti (fermo
+   restando che poi l’attività lavorativa abbia avuto effettivamente inizio nello Stato estero sede del trasferimento). Tali presupposti
+   devono essere oggettivamente riscontrabili e da essi deve risultare con certezza lo svolgimento dell’attività lavorativa all’estero
+   (come, ad esempio, la sottoscrizione di un contratto di lavoro); a tal ﬁne è possibile allegare tramite lo speciﬁco rigo del quadro
+   EG (EG9), dedicato all’agevolazione prima casa, la relativa documentazione, anche se è il dichiarante a richiedere
+   l’agevolazione, avendone i requisiti;
+2) bisogna aver risieduto in Italia per almeno cinque anni o aver svolto, per il medesimo periodo, la propria attività
+   anteriormente all’acquisto dell’immobile. Il quinquennio non deve essere necessariamente inteso in senso continuativo;
+3) l’immobile si trova nel comune di nascita ovvero in quello in cui si aveva la residenza o in cui si svolgeva la propria attività
+   prima del trasferimento.
+   Resta fermo che, per fruire di tale agevolazione, devono ricorrere anche le condizioni indicate nella Sezione II del quadro EH
+   del modello dichiarativo alle lettere b) e c), invece non è richiesto che il contribuente stabilisca la propria residenza nel comune
+   in cui è situato l’immobile acquistato.
+
+A pena di decadenza dal beneﬁcio, la dichiarazione sostitutiva di atto notorio, con la quale il richiedente attesta il possesso dei
+requisiti per fruire dell’agevolazione, deve essere allegata alla dichiarazione di successione (quadro EG), salvo il caso in cui
+questa venga resa utilizzando il quadro EH in quanto il richiedente corrisponde con il dichiarante.
+
+N.B. I beneﬁciari non possono cedere, a titolo oneroso o gratuito, gli immobili per cui si usufruisce dell’agevolazione “prima
+       casa” prima dei cinque anni successivi all’apertura della successione, altrimenti si decade dal beneﬁcio richiesto. Tuttavia,
+       la decadenza dal beneﬁcio non si veriﬁca qualora il richiedente proceda al riacquisto di un’altra unità immobiliare, da
+       destinare ad abitazione principale, entro 2 anni 1 anno dalla cessione.
+       Nel caso in cui il richiedente sia già nella titolarità di altro immobile acquisito con i beneﬁci “ prima casa”, potrà richiedere
+       l’agevolazione sull’immobile caduto in successione qualora si impegni a trasferire l’abitazione pre-posseduta entro 2 anni
+       1 anno dall’apertura della successione (impegnativa da allegare tramite quadro EG se il richiedente l’agevolazione è un
+       soggetto diverso dal dichiarante).
+
+L’agevolazione, viene applicata sul bene indicato come “Prima casa” al quale possono essere collegate ﬁno a 3 pertinenze (cod. X).
+Sono ricomprese tra le suddette pertinenze, limitatamente a una per ciascuna categoria, le unità immobiliari classiﬁcate o classiﬁcabili
+nelle categorie catastali C/2, C/6 e C/7, che siano destinate al servizio della casa di abitazione oggetto dell’acquisto agevolato.
+Le agevolazioni ‘prima casa’, sussistendone le condizioni, si applicano anche per le ipotesi in cui oggetto della successione sono
+abitazioni contigue (cod. Z), destinate a costituire un’unica unità abitativa, oppure se oggetto di successione è un immobile ad
+uso abitativo contiguo ad altra casa di abitazione già acquistata dallo stesso soggetto fruendo dei beneﬁci ‘prima casa’, sempreché
+entrambe costituiscano un’unica unità abitativa. In quest’ultimo caso occorre rendere sempre una dichiarazione sostitutiva di atto
+notorio, da allegare alla dichiarazione di successione, per i cui contenuti si rinvia a quanto indicato nella speciﬁca parte delle
+istruzioni per la compilazione del quadro EG.
+
+                                                                                                                                    61
+
+===== FASCICOLO_I pag. 62 =====
+Dichiarazione di successione e domanda di volture catastali                                           FASCICOLO 1
+
+Per poter fruire dell’agevolazione contraddistinta dal cod. Z, l’immobile risultante dalla riunione delle suddette unità immobiliari
+dovrà essere una casa di abitazione accatastata, ricorrendone i presupposti, nelle categorie che possono beneﬁciare
+dell’agevolazione, con esclusione, dunque, delle categorie catastali A/1, A/8 e A/9.
+Il richiedente l’agevolazione ha l’obbligo di unire catastalmente gli immobili contigui entro 3 anni dalla presentazione della
+dichiarazione, impegnandosi in tal senso rendendo speciﬁca dichiarazione sostitutiva di atto notorio (allegazione tramite quadro
+EG se resa da un soggetto diverso dal dichiarante).
+Se oggetto dell’agevolazione è un immobile che viene destinato a pertinenza relativa ad una “prima casa” già nella titolarità del
+richiedente (codice Y), occorre sempre allegare (quadro EG) una dichiarazione sostitutiva di atto notorio secondo quanto
+speciﬁcato nelle istruzioni alla compilazione della sezione devoluzione relativamente alle agevolazioni/riduzioni.
+Se a causa di un evento sopravvenuto (ad esempio un evento sismico) il beneﬁciario dell’eredità, al momento dell’apertura della
+successione, si trova in una ipotesi di inidoneità oggettiva (inagibilità) all’utilizzo abitativo dell’immobile posseduto per il quale ha
+già usufruito dell’agevolazione “prima casa”, può richiedere di usufruire nuovamente dell’agevolazione “prima casa” sull’immobile
+ad uso abitativo caduto in successione, rendendo le relative dichiarazioni sostitutive di atto notorio (quadro EH se è il dichiarante).
+La condizione di inagibilità deve essere attestata da speciﬁca certiﬁcazione rilasciata dagli organi competenti in cui viene speciﬁcato
+che l’immobile non può più essere utilizzato per la sua funzione abitativa. Relativamente a tale certiﬁcazione occorre rendere speciﬁca
+dichiarazione sostitutiva di atto notorio da allegare alla dichiarazione (quadro EG) anche se è il dichiarante a renderla.
+
+N.B. Si ricorda che in caso di atti falsi e dichiarazioni mendaci si applicano le sanzioni penali previste dall’art. 76 del testo unico
+delle disposizioni legislative e regolamentari in materia di documentazione amministrativa, approvato con D.P.R. n. 445/2000.
+
+    1 -2 -3 - 4 - 5                                           CODICI RIDUZIONI
+            L              beni ricaduti in precedenti successioni/donazioni entro cinque anni;
+           R               beni culturali (vincolo posteriore all’apertura della successione);
+            F              fondi rustici;
+           Q               immobili di impresa artigiana familiare;
+                           aziende, quote società di persone, beni strumentali in comuni montani < 5.000 abitanti.
+
+                QUADRO SINOTTICO DELLE RIDUZIONI RELATIVE ALL’IMPOSTA DI SUCCESSIONE
+
+    TIPOLOGIA                    CODICE       RIDUZIONE               RIFERIMENTO                     BENEFICIARI
+                                                                      NORMATIVO
+
+Beni in precedente               1 - 2 - 3 -  dal 50% al 10%           art. 25      eredi / legatari sugli stessi beni
+successione entro 5 anni            4 - 5           50%               comma 1                  oggetto della
+                                                                       del Tus
+Beni culturali                                                                           successione precedente
+                                                                       art. 25
+(vincolo posteriore alla aper-   L                                    comma 2              Qualsiasi soggetto
+                                                                       del Tus
+tura della successione)                                                            Coniuge, parenti in linea retta, o
+                                                                       art. 25     a fratelli o a sorelle del de cuius a
+Fondi rustici                    R 40%                                comma 3      condizione che l’erede o legata-
+                                           (fino a valore di euro      del Tus
+                                                103.291,00)                                 rio sia coltivatore
+                                                                                      diretto e che la devoluzione
+
+                                                                                          avvenga nell’ambito
+                                                                                    di famiglia diretto - coltivatrice
+
+Immobili di impresa artigiana                 40%                     art. 25      Coniuge, parenti in linea retta
+                                                                                           entro 3° grado
+familiare                        F            (fino a valore di euro  comma 4
+
+                                              103.291,00)             del Tus
+
+Aziende, quote società di
+
+persone, beni strumentali in                                          art. 25                         Coniuge,
+
+Comuni montani < 5.000           Q            40% comma 4 bis parenti entro 3° grado
+
+abitanti nonché in frazioni con                                       del Tus
+
+meno di 1000 abitanti
+
+                           N.B. Al termine “Coniuge” equivale il termine “Parte dell’unione civile”.
+
+62
+
+===== FASCICOLO_I pag. 63 =====
+Dichiarazione di successione e domanda di volture catastali  FASCICOLO 1
+
+BENI RICADUTI IN PRECEDENTI SUCCESSIONI/DONAZIONI
+ENTRO I CINQUE ANNI COD. 1, 2, 3, 4, 5
+
+Rientrano in tali codiﬁche quei beni e diritti ricaduti in precedenti successioni/donazioni avutesi nei cinque anni precedenti l’apertura
+della presente successione. In questi casi l’imposta di successione è ridotta di un importo inversamente proporzionale al tempo trascorso.
+Verrà, quindi, applicata una riduzione di un decimo per ogni anno o frazione di anno trascorso (ad es. se è trascorso un anno da
+un’altra successione o donazione, l’imposta di successione relativamente a quegli stessi beni già oggetto della precedente successione
+o donazione sarà ridotta del 50%; se sono trascorsi due anni, la riduzione è pari al 40% ecc.).
+Se nella successione non sono compresi tutti i beni ed i diritti oggetto della precedente successione/donazione, oppure ne sono
+compresi anche altri, la riduzione verrà applicata sulla quota di imposta proporzionale al valore dei beni e dei diritti compresi
+nella precedente successione/donazione.
+Per fruire della riduzione occorre presentare una attestazione, da cui si evinca il possesso dei suddetti requisiti, allegandola alla
+dichiarazione di successione (quadro EG) o rendendo apposita dichiarazione sostitutiva (quadro EH), nel caso in cui a richiedere
+di fruire della riduzione sia il dichiarante.
+
+BENI CULTURALI COD. L
+
+Rientrano in tale codiﬁca i beni immobili culturali sottoposti al regime di tutela successivamente all’apertura della successione. In
+questi casi l’imposta di successione è ridotta dell’importo proporzionalmente corrispondente al 50% del loro valore.
+L’erede o il legatario deve presentare al competente organo periferico del Ministero della Cultura, l’inventario dei beni per i quali
+ritiene spettante la riduzione, con la descrizione particolareggiata degli stessi e con ogni notizia idonea alla loro identiﬁcazione.
+Il Ministero attesta, per ogni singolo bene, l’esistenza delle caratteristiche previste dalle leggi in materia e l’assolvimento degli
+obblighi di conservazione e protezione.
+L’attestazione (ovvero dichiarazione di interesse culturale) deve essere presentata in allegato alla dichiarazione di successione
+(quadro EG) o rendendo apposita dichiarazione sostitutiva (quadro EH) nel caso in cui a richiedere di fruire della riduzione sia
+il dichiarante.
+L’Amministrazione della Cultura ne dà immediata comunicazione all’Agenzia delle entrate. Per i territori della regione Sicilia e
+delle province autonome di Trento e di Bolzano, provvedono gli organi rispettivamente competenti.
+
+FONDI RUSTICI COD. R
+
+Rientrano in tale codiﬁca i fondi rustici e costruzioni rurali, anche se non insistenti sul fondo, devoluti al coniuge, a parenti in linea
+retta o a fratelli o sorelle del defunto.
+L’imposta dovuta dall’erede o legatario è ridotta dell’importo proporzionalmente corrispondente al 40% della parte del loro
+valore complessivo non superiore a 103.291,00 € (200.000.000 di Lire).
+La riduzione si applica a condizione che l’erede o legatario sia un coltivatore diretto, che la devoluzione avvenga nell’ambito
+della famiglia diretto – coltivatrice, e che l’esistenza di questi requisiti risulta da apposita attestazione dell’ufﬁcio regionale
+competente.
+Si considera diretto – coltivatrice, la famiglia che si dedica direttamente e abitualmente alla coltivazione dei fondi e all’allevamento
+e governo del bestiame, sempreché la complessiva forza lavoro non sia inferiore ad un terzo di quella occorrente per le normali
+necessità di coltivazione del fondo, allevamento e governo del bestiame.
+L’attestazione deve essere allegata alla dichiarazione di successione (quadro EG).
+
+IMMOBILI DI IMPRESA ARTIGIANA FAMILIARE COD. F
+
+Se nell’attivo ereditario sono compresi immobili o parti di immobili adibiti all’esercizio dell’impresa, devoluti al coniuge o a parenti
+in linea retta entro il terzo grado del defunto nell’ambito di una impresa artigiana familiare, come deﬁnita dalla legge 8 agosto
+1985, n. 443, e dall’art. 230 bis del codice civile, l’imposta dovuta dall’erede o legatario al quale sono devoluti è ridotta
+dell’importo proporzionalmente corrispondente al 40% della parte del loro valore complessivo non superiore a 103.291,00 €
+(200.000.000 di Lire), a condizione che l’esistenza dell’impresa familiare artigiana risulti da atto pubblico o scrittura privata
+autenticata (art.5, comma 4, lettera a) del TUIR).
+E’ considerata artigiana l’impresa che ha per scopo prevalente lo svolgimento di un’attività di produzione dei beni, anche
+semilavorati, o di prestazioni di servizi, escluse le attività agricole e le attività di prestazione di servizi commerciali, di
+intermediazione nella circolazione dei beni o ausiliarie di queste ultime, di somministrazione al pubblico di alimenti e bevande,
+salvo il caso in cui siano strumentali all’esercizio dell’impresa.
+L’impresa artigiana può essere costituita anche in forma societaria o di cooperativa, escluse le società per azioni e in accomandita
+per azioni, a condizione che la maggioranza dei soci, ovvero uno nel caso di due soci, svolga in prevalenza lavoro personale,
+anche manuale, nel processo produttivo e che nell’impresa il lavoro abbia funzione preminente sul capitale. In ogni caso
+l’imprenditore artigiano può essere titolare di una sola impresa artigiana.
+
+                                                             63
+
+===== GUIDA_CALCOLO pag. 1 =====
+MODALITA’ DI CALCOLO DELL’IMPOSTA DI
+              SUCCESSIONE (autoliquidazione)
+
+Per le successioni aperte dal 1° gennaio 2025, l’imposta di successione deve essere autoliquidata e
+indicata nella relativa dichiarazione.
+La presente Guida illustra la procedura da seguire per il calcolo della suddetta imposta.
+
+                                                         * * *
+Per procedere al calcolo dell’imposta complessivamente dovuta è necessario determinare e
+sommare l’imposta relativa alle singole quote, per tutti i soggetti indicati nel Quadro EA. Gli
+eredi sono tenuti, in solido, al pagamento dell’imposta complessiva; i legatari, invece, sono tenuti al
+pagamento dell’imposta relativa alla propria quota.
+Per calcolare la singola quota ereditaria (QE) bisogna individuare, in via preliminare, i beni devoluti
+al singolo beneficiario e determinare il valore imponibile complessivo ai fini fiscali.
+Per fare questo è necessario sommare gli importi indicati nel campo “Valore Quota”, presente nella
+sezione devoluzione dei quadri EB, EL, EC, EM, EN, EO, EP, EQ, ER, con esclusione dei righi nei
+quali sia stata richiesta una delle agevolazioni identificate dai codici A, D, C, G, N, E, H, che
+implicano l’esenzione dal pagamento dell’imposta di successione.
+I codici delle agevolazioni sono elencati nell’Allegato 2 delle istruzioni alla compilazione della
+dichiarazione di successione telematica, riportato anche nell’appendice alla presente Guida.
+
+QE (quota ereditaria): somma dei valori delle quote di devoluzione dei cespiti dei quadri EB, EL,
+EC, EM, EN, EO, EP, EQ, ER, con esclusione delle quote con agevolazione A, D, C, G, N, E, H e
+dei cespiti tipo DN (denaro, gioielli e mobilia) del quadro ER.
+Ad esempio, due eredi, fratelli germani del defunto, hanno ricevuto in eredità, in parti uguali:
+
+                                                            1
+
+===== GUIDA_CALCOLO pag. 3 =====
+Riprendendo l’esempio precedente, se nell’asse ereditario è indicata una passività pari a 1.000 euro,
+ripartita tra i due eredi in parti uguali, la quota del passivo (QP) che il singolo erede può dedurre è
+pari a 500 euro.
+
+A questo punto è possibile individuare l’attivo netto (AN) della singola quota, determinato dalla
+somma della Quota ereditaria (QE) e del Denaro (QDN) spettante al singolo beneficiario, al netto
+delle passività (QP) di pertinenza dello stesso soggetto, secondo la seguente formula:
+AN (attivo netto) = QE + QDN – QP
+
+Nell’esempio precedente, due fratelli hanno ricevuto in eredità, in parti uguali, due immobili del
+valore complessivo di 400.000 euro (250.000 + 150.000), denaro per 5.000 euro e passività per 1.000
+euro. L’attivo netto (AN) di ciascuno dei due eredi è uguale a 200.000 (QE) + 2.500 (QDN) – 500
+(QP) = 202.000.
+
+Il risultato ottenuto deve essere depurato dalle franchigie previste dalla legge, in funzione:
+    • del rapporto di parentela esistente tra il defunto e il singolo beneficiario;
+    • dall’eventuale particolare condizione (disabilità) del soggetto beneficiario.
+
+Il rapporto di parentela tra defunto e beneficiario è indicato, all’interno del Quadro EA, mediante
+l’utilizzo di un codice da inserire nel campo “Grado Parentela”.
+
+La tabella completa dei gradi di parentela è disponibile nell’allegato n. 1 delle istruzioni al modello
+di dichiarazione ed è riportata nell’appendice alla presente Guida.
+
+Nel caso in cui il medesimo soggetto sia inserito in dichiarazione con qualifiche diverse (erede e
+legatario), su due o più righi del Quadro EA, la franchigia è unica e deve essere scomputata prima su
+una quota e poi il restante importo deve essere sottratto dalle quote successive, fino al suo completo
+esaurimento.
+
+             FR (franchigia):
+             o 1.000.000 per grado parentela 01 Coniuge, 02 Figlio/a, 03 Genitore, 04 Nipote in linea
+
+                  retta, 05a Nonno/a ramo paterno, 05b Nonno/a ramo materno, 06 Pronipote in linea
+                  retta, 07a Bisavo ramo paterno, 07b Bisavo ramo materno, 08 Figlio/a di pronipote in
+                  linea retta, 09a Trisavo ramo paterno, 09b Trisavo ramo materno;
+             o 100.000 per grado parentela 10 Fratello/sorella germano, 11 Fratello/sorella
+                  unilaterale;
+             o 1.500.000 se portatore di handicap (a prescindere dal grado di parentela).
+
+                                                            3
+
+===== GUIDA_CALCOLO pag. 4 =====
+Nell’esempio di cui sopra, i due eredi, fratelli germani del defunto (codice 10), usufruiscono della
+franchigia di euro 100.000 ciascuno.
+
+È importante ricordare che le franchigie non si sommano tra di loro; pertanto, in presenza di più
+franchigie, deve essere applicata quella più alta.
+
+A questo punto è possibile determinare la quota netta (QN) di ciascun beneficiario, come differenza
+tra l’attivo netto (AN) e la franchigia (FR) ad esso spettante.
+
+QN (quota netta): AN – FR
+
+Nell’esempio, in cui l’attivo netto (AN) è pari a 202.000 euro per ciascun erede, la Quota Netta
+dell’erede (QN), fratello del defunto, sarà pari a 202.000 (AN) - 100.000 (FR) = 102.000 (QN).
+
+Alla quota netta così determinata si applica la presunzione (PR) prevista per legge su denaro, mobilia
+e gioielli, in assenza di beni inventariati (BI) nel quadro ER.
+
+Pertanto, se nella dichiarazione di successione:
+    a) non è indicato alcun importo per denaro, mobilia o gioielli (QDN), il beneficiario applica la
+         presunzione nella misura del 10% della propria quota netta (QN);
+    b) è indicato un importo di denaro, mobilia o gioielli (QDN) inferiore al 10% della quota netta
+         (QN), il beneficiario applica la presunzione del 10% sulla differenza tra quota netta (QN) e
+         denaro, mobilia o gioielli (QDN) e poi dal risultato sottrae il valore della quota di
+         quest’ultimo cespite;
+    c) se nella dichiarazione di successione sono indicati denaro, mobilia o gioielli (QDN) per un
+         ammontare superiore al 10% della quota netta (QN), il beneficiario non applica nessuna
+         presunzione.
+
+La presunzione (PR) è calcolata a condizione che nel Quadro ER non siano stati inseriti cespiti
+identificati dal codice BI (beni inventariati).
+Nel caso in cui venga presentato un inventario analitico (da allegare nel quadro EG), contenente
+l’esatta descrizione di tutti i beni mobili di appartenenza del defunto e la stima del loro valore, viene
+considerato il valore indicato nell’inventario, anche se minore alla presunzione del 10%.
+
+Riepilogando, la presunzione (PR) si calcola solo se il soggetto NON è legatario e se nel quadro
+ER non ci sono cespiti tipo BI per nessun soggetto, secondo la seguente formula:
+PR = [10% (QN – QDN)] – QDN).
+Se il risultato è negativo, vale zero.
+
+Nell’esempio, in cui l’erede, fratello del defunto, riceve una Quota netta (QN) di 102.000 euro, il
+calcolo per determinare la presunzione è il seguente: PR = [10% (102.000 – 2.500)] – 2.500. La
+presunzione (PR) da sommare alla Quota netta (QN) è pari a 7.450 euro.
+
+La quota totale imponibile (QTI), pertanto, è determinata dalla somma della quota netta (QN) e
+della presunzione (PR) su denaro, mobilia e gioielli:
+QTI (quota totale imponibile) = QN + PR
+
+                                                            4
+
+===== GUIDA_CALCOLO pag. 8 =====
+all’estero (IE) rapportata alla quota di devoluzione, così come indicata nel modello, secondo il
+seguente schema:
+
+             IE = imposta versata all’estero * quota di devoluzione
+             se IE >= e ➔ DET.estero = e
+             se IE < e ➔ DET.estero = IE
+
+Nell’esempio precedente, la quota di imposta estera riconosciuta in Italia (e), pari 82,08, euro è
+minore dell’imposta estera pagata per la quota devoluta (500 euro); pertanto, l’imposta pagata
+all’estero ammessa in detrazione (DET.estero) è pari a 82,08 euro.
+
+A questo punto, è possibile determinare l’imposta di successione netta (ISN), come differenza tra
+l’imposta di successione lorda (ISL), le riduzioni (RID) e l’imposta versata all’estero (DET.estero),
+secondo la seguente formula:
+ISN (imposta di successione netta sulla quota) = ISL - RID - DET.estero
+
+Nell’esempio precedente, l’imposta di successione netta sulla quota (ISN) è uguale a 6.567 euro (ISL)
+meno le riduzioni (RID) pari a 2.052,19 euro, meno le imposte versate all’estero pari a 82,08
+(DET.estero), ovvero pari a 4.432,73 euro.
+
+A questo punto abbiamo determinato l’imposta di successione dovuta per la singola quota.
+Per determinare l’imposta complessiva è necessario ripetere le operazioni sopra descritte per tutti i
+soggetti indicati nel Quadro EA. La somma dell’imposta dovuta sulle singole quote determina
+l’ammontare dell’imposta di successione complessiva.
+
+Nell’esempio sopra descritto, in cui sono presenti due eredi, fratelli germani del defunto, l’imposta
+complessivamente dovuta è data dalla somma dell’imposta netta sulle quote devolute a ciascuno di
+essi, pari a 4.432,73 + 4.432,73 = 8.865,46 euro.
+
+Tale importo complessivo (nell’esempio, 8.865,46 euro) deve essere indicato nella sezione V-bis
+del Quadro EF della dichiarazione di successione (rigo EF18-bis col. 2), secondo le indicazioni
+fornite nelle istruzioni alla compilazione.
+
+Gli eredi sono tenuti, in solido, al pagamento dell’imposta; i legatari, invece, sono tenuti al pagamento
+dell’imposta relativa alla propria quota.
+
+                                                            8
