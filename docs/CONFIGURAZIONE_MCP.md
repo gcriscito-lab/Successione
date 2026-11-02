@@ -11,7 +11,7 @@ Il nome va messo **prima** delle opzioni `-e`/`--env`, che altrimenti lo assorbo
 `python scripts\windows\configura_mcp.py` stampa la voce da inserire in `claude_desktop_config.json`; con `--scrivi-claude-desktop` la scrive (copia di sicurezza del file precedente). Poi riavvio completo dell'app. Non ancora provato.
 
 ## Verifica
-Gli strumenti hanno prefisso `successioni_` (18): capacita, schema_dati, crea_pratica, elenca_pratiche, leggi_pratica, aggiorna_pratica, revisioni_pratica, differenze_pratica, verifica_pratica, stato_quadri, esporta_xml, stato_elaborati, controllo_ufficiale, file_in_ingresso, acquisisci_allegato, prepara_pdfa, suddividi_allegato, elenca_allegati.
+Gli strumenti hanno prefisso `successioni_` (20): capacita, schema_dati, crea_pratica, elenca_pratiche, leggi_pratica, aggiorna_pratica, revisioni_pratica, differenze_pratica, verifica_pratica, stato_quadri, esporta_xml, stato_elaborati, controllo_ufficiale, file_in_ingresso, acquisisci_allegato, prepara_pdfa, suddividi_allegato, elenca_allegati, invio_prepara, invio_stato (l'MCP non conferma né trasmette: solo l'app).
 Si legge sempre la pratica prima di modificarla: `aggiorna_pratica` richiede `revisione_attesa` e una `chiave_richiesta` univoca. Gli id delle righe non si scelgono: li assegna il sistema.
 
 ## Se il client si chiude

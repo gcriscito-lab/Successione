@@ -22,15 +22,23 @@ Nella cartella indicata dalla variabile `SUCCESSIONI_DATA`. Per provare il progr
 - Senza veraPDF l'esito è sempre «non verificato», mai «conforme».
 - Gli allegati oltre 5 MB si possono suddividere dalla scheda File.
 
+## Invio (prova simulata)
+Nella scheda File, sezione «Invio»:
+1. **Prepara invio**: congela il file XML completo con il controllo ufficiale locale positivo (servono entrambi).
+2. Controlla impronta, file e fornitore, spunta la verifica e **Conferma questa copia**. La conferma si dà solo nell'app, mai dall'assistente.
+3. **Invia in PROVA (simulata)**: usa un servizio fittizio locale. Non trasmette nulla all'Agenzia delle Entrate e serve solo a provare il percorso (anche rete interrotta e riconciliazione).
+4. **Istruzioni per l'invio reale**: il programma non trasmette. Invia il file con Desktop Telematico / Entratel (credenziali nello strumento ufficiale) e registra poi l'esito con la riconciliazione.
+Un file non si invia due volte: dopo un tentativo, anche incerto, si riconcilia invece di reinviare. Se cambi i dati della pratica, la copia diventa obsoleta.
+
 ## Backup e ripristino
 - `successioni backup <cartella>` copia database e allegati.
 - `successioni ripristina <backup> --destinazione <cartella nuova>` ripristina solo in una cartella nuova: non sovrascrive mai dati esistenti.
 
 ## Cosa il programma NON fa
-- Non invia nulla e non usa credenziali.
-- Quadri non coperti: EI, EL, EM, EN, EO, EP, EQ, agevolazioni e riduzioni, rinunce, legatari, testamento, rateazione. Selezionarli blocca la finalizzazione.
+- Non invia nulla all'Agenzia e non usa credenziali: l'invio nell'app è una prova simulata, quello reale si fa con gli strumenti ufficiali.
+- Quadri non coperti: EI, EL, EM, EN, EO, EP, EQ, agevolazioni e riduzioni, rinunce, rappresentanti di legatari, testamento estero, rateazione. Testamento con eredi e legatari persone fisiche: supportato (controllo locale su dati sintetici). Selezionarli blocca la finalizzazione.
 - La dichiarazione sostitutiva non è finalizzabile.
-- Alcuni dati dell'esportazione (stato civile, codice carica, contatti, versamento) oggi si impostano solo da MCP o API.
+- I dati strutturati di beni e passività (superficie, ripartizione) oggi si impostano solo da MCP o API; i dati della dichiarazione (stato civile, presentatore, versamento, testamento) hanno una maschera nel frontespizio.
 - Nessun esito locale autorizza l'uso su una pratica reale.
 
 Fonti: `docs/BETA_DA_REVISIONARE.md`, `docs/RISPOSTA_ALLA_REVISIONE.md`, `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.

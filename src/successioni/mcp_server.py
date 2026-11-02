@@ -135,6 +135,16 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Esegue in locale il controllo ufficiale SUC13 sul file esportato aggiornato (se Java e componenti sono configurati; altrimenti passaggio manuale tracciato, esito da_collaudare). È un controllo locale: non sostituisce la verifica con i servizi dell'Agenzia e non trasmette nulla."""
         return sv.controllo_ufficiale_pratica(pratica_id)
 
+    @tool(ann=LOCALE)
+    def invio_prepara(pratica_id: str, chiave_richiesta: str) -> dict:
+        """Prepara la copia congelata per l'invio (file XML completo e aggiornato + controllo ufficiale). NON trasmette nulla e NON conferma: la conferma e la trasmissione si danno solo nell'interfaccia dell'app, dal professionista."""
+        return sv.invio_prepara(pratica_id, chiave=chiave_richiesta)
+
+    @tool
+    def invio_stato(pratica_id: str) -> dict:
+        """Copie congelate della pratica con stato, tentativi e prossimo passo richiesto. Una trasmissione in modalita' simulata non e' un invio all'Agenzia."""
+        return sv.invio_stato(pratica_id)
+
     @tool
     def file_in_ingresso() -> list[str]:
         """File che l'utente ha messo nella cartella d'ingresso e che possono essere acquisiti."""

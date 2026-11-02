@@ -322,7 +322,40 @@ async function insFile(ins) {
   ins.append(h("div", { class: "az" }, h("button", { class: "gh", disabled: ex.stato !== "aggiornato" || !ex.generato, title: "Esegue il controllo ufficiale in locale sul file esportato", onclick: async () => {
     try { msg("Controllo in corso…", ""); const r = await post("/api/pratiche/" + S.P.pratica_id + "/controllo-ufficiale", {}); msg("Controllo ufficiale: " + r.stato_controllo.replaceAll("_", " ") + " (" + r.esito.replaceAll("_", " ") + ")" + (r.bozza_tecnica ? ", su bozza tecnica." : "."), r.stato_controllo === "positivo" ? "o" : "e"); } catch (e) { msg(e.message, "e"); }
     renderIns(); } }, "Esegui controllo ufficiale")));
-  ins.append(h("p", { class: "mut", style: "margin-top:10px;font-size:12px" }, "Il controllo ufficiale locale non sostituisce la verifica con i servizi dell'Agenzia. Nessun invio è possibile da qui."));
+  ins.append(h("p", { class: "mut", style: "margin-top:10px;font-size:12px" }, "Il controllo ufficiale locale non sostituisce la verifica con i servizi dell'Agenzia."));
+  await renderInvio(ins, ex);
+}
+/* Invio: copia congelata -> conferma -> trasmissione. La modalita' «prova» usa un servizio FITTIZIO locale: non invia nulla all'Agenzia. */
+async function renderInvio(ins, ex) {
+  const pid = S.P.pratica_id; const base = "/api/pratiche/" + pid + "/invio";
+  ins.append(h("h3", { style: "margin-top:14px" }, "Invio"),
+    h("div", { class: "nota", style: "margin:4px 0" }, "PROVA SIMULATA: il programma non trasmette nulla all'Agenzia delle Entrate. L'invio reale si esegue con gli strumenti ufficiali (modalità manuale) e si registra qui."));
+  let copie = [];
+  try { copie = (await api(base)).copie; } catch (e) { ins.append(h("p", { class: "err" }, e.message)); return; }
+  const ricarica = () => { if (S.tab === "file") renderIns(); };
+  const chiama = async (url, corpo, ok) => { try { const r = await post(url, corpo); msg(ok(r), "o"); } catch (e) { msg(e.message, "e"); } ricarica(); };
+  ins.append(h("div", { class: "az" }, h("button", { class: "pil", disabled: ex.stato !== "aggiornato" || !ex.completo, title: "Congela il file XML completo con il controllo ufficiale associato",
+    onclick: () => chiama(base + "/prepara", { chiave_richiesta: "prep-" + crypto.randomUUID() }, r => "Copia preparata. " + (r.azione_richiesta || "")) }, "Prepara invio")));
+  const c = copie[0];
+  if (!c) { ins.append(h("p", { class: "mut", style: "font-size:12px" }, "Nessuna copia preparata. Serve un file completo e un controllo ufficiale positivo.")); return; }
+  const d = c.dettaglio || {};
+  ins.append(riga_stato("Copia", c.stato, (d.manifest || []).map(m => m.nome + " · " + m.sha256.slice(0, 12)).join(", ")));
+  if (c.azione_richiesta) ins.append(h("div", { class: "nota", style: "margin:6px 0;white-space:pre-wrap" }, c.azione_richiesta));
+  if (c.stato === "preparata") {
+    const sp = h("input", { type: "checkbox", id: "inv_ok" });
+    const bt = h("button", { class: "pil", disabled: true, onclick: () => chiama("/api/invio/" + c.job_id + "/conferma", { impronta: d.impronta_conferma, utente: "professionista" }, () => "Copia confermata.") }, "Conferma questa copia");
+    sp.addEventListener("change", () => { bt.disabled = !sp.checked; });
+    ins.append(h("label", { class: "chk", for: "inv_ok" }, sp, h("span", {}, "Ho verificato il file (impronta " + (d.impronta_conferma || "").slice(0, 12) + "…), il fornitore e il controllo ufficiale")), h("div", { class: "az" }, bt));
+  }
+  if (c.stato === "confermata") {
+    ins.append(h("div", { class: "az" },
+      h("button", { class: "pil", onclick: () => chiama("/api/invio/" + c.job_id + "/trasmetti", { chiave_richiesta: "t-" + crypto.randomUUID(), modalita: "simulata" }, r => (r.avvertenza || "") + " Esito: " + String(r.stato).replaceAll("_", " ")) }, "Invia in PROVA (simulata)"),
+      h("button", { class: "gh", onclick: () => chiama("/api/invio/" + c.job_id + "/trasmetti", { chiave_richiesta: "t-" + crypto.randomUUID(), modalita: "manuale" }, r => r.avvertenza) }, "Istruzioni per l'invio reale")));
+  }
+  if (c.stato === "esito_incerto" || (d.tentativo_corrente && ["esito_incerto", "in_trasmissione"].includes(c.stato))) {
+    ins.append(h("div", { class: "az" }, h("button", { class: "pil", onclick: () => chiama("/api/invio/tentativi/" + d.tentativo_corrente + "/riconcilia", { modalita: "simulata" }, r => "Riconciliazione: " + String(r.stato).replaceAll("_", " ")) }, "Riconcilia (prova)")));
+  }
+  for (const tid of d.tentativi || []) ins.append(h("div", { class: "mut", style: "font-size:12px" }, "Tentativo " + tid + (tid === d.tentativo_corrente ? " (corrente)" : "")));
 }
 function vaiA(r) {
   S.sel = r.quadro;

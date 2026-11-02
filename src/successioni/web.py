@@ -156,8 +156,41 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def converti(request):
         return sv.prepara_pdfa(request.path_params["aid"])
 
+    async def corpo(request):
+        return await request.json() if (await request.body()) else {}
+
+    @api
+    async def invio_stato(request):
+        return sv.invio_stato(request.path_params["pid"])
+
+    @api
+    async def invio_prepara(request):
+        b = await corpo(request)
+        return sv.invio_prepara(request.path_params["pid"], chiave=b.get("chiave_richiesta"))
+
+    @api
+    async def invio_conferma(request):
+        b = await corpo(request)
+        return sv.invio_conferma(request.path_params["cid"], str(b.get("impronta", "")), utente=str(b.get("utente") or "utente"),
+                                 canale="gui")
+
+    @api
+    async def invio_trasmetti(request):
+        b = await corpo(request)
+        return sv.invio_trasmetti(request.path_params["cid"], str(b.get("chiave_richiesta", "")),
+                                  modalita=b.get("modalita", "simulata"), canale="gui")
+
+    @api
+    async def invio_riconcilia(request):
+        b = await corpo(request)
+        return sv.invio_riconcilia(request.path_params["tid"], b.get("evidenze"), modalita=b.get("modalita", "simulata"))
+
     P = "/api/pratiche/{pid}"
     return Starlette(routes=[
+        Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
+        Route("/api/invio/{cid}/conferma", invio_conferma, methods=["POST"]),
+        Route("/api/invio/{cid}/trasmetti", invio_trasmetti, methods=["POST"]),
+        Route("/api/invio/tentativi/{tid}/riconcilia", invio_riconcilia, methods=["POST"]),
         Route("/", home), Route("/static/{nome}", statico), Route("/api/info", info),
         Route("/api/pratiche/{pid}/quadri", quadri), Route("/api/schema", schema_),
         Route("/api/pratiche", elenca), Route("/api/pratiche", crea, methods=["POST"]),

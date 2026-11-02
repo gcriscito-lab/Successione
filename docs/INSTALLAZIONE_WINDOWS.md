@@ -52,7 +52,7 @@ claude mcp add successioni --transport stdio --scope user -e "SUCCESSIONI_DATA=<
 ```
 
 ### Verifica degli strumenti MCP
-Il server MCP espone 18 strumenti con prefisso `successioni_`:
+Il server MCP espone 20 strumenti con prefisso `successioni_`:
 - `successioni_capacita`
 - `successioni_schema_dati`
 - `successioni_crea_pratica`
@@ -71,6 +71,8 @@ Il server MCP espone 18 strumenti con prefisso `successioni_`:
 - `successioni_prepara_pdfa`
 - `successioni_suddividi_allegato`
 - `successioni_elenca_allegati`
+- `successioni_invio_prepara` (prepara la copia da inviare; non conferma e non trasmette)
+- `successioni_invio_stato`
 
 Per verificare la visibilita degli strumenti in Claude Code, eseguire `claude mcp list` e accertarsi che il server `successioni` risulti nello stato `Connected`. Tramite lo strumento `successioni_capacita` e possibile verificare la cartella dati effettivamente in uso (`SUCCESSIONI_DATA`).
 

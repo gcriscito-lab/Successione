@@ -1,0 +1,89 @@
+"""Percorso di invio della pratica: copia congelata, conferma nell'app, trasmissione, riconciliazione.
+
+Due modalita', mai una trasmissione reale dal programma:
+- ``simulata``: servizio fittizio locale (``TrasportoSimulato``) per PROVARE il percorso completo (anche rete interrotta e
+  riconciliazione). L'esito e' sempre ``simulazione``: non dimostra nulla sull'Agenzia.
+- ``manuale``: il programma non invia; restituisce le istruzioni per l'invio con gli strumenti ufficiali (Desktop Telematico /
+  Entratel) e registra poi il protocollo con la riconciliazione. L'esito resta ``da_collaudare``.
+
+La conferma della trasmissione si da' solo dall'interfaccia (canale ``gui``), mai da MCP: l'adattatore lo impone.
+Credenziali e certificati non passano di qui.
+"""
+from __future__ import annotations
+
+from .errori import DatiNonValidi
+
+MODALITA = ("simulata", "manuale")
+
+
+class InvioMixin:
+    def _adattatore_invio(self, modalita: str):
+        from .collegamenti.invio import InvioAdattatore, TrasportoSimulato
+        if modalita not in MODALITA:
+            raise DatiNonValidi("modalita' non ammessa", ammesse=list(MODALITA))
+        if modalita == "simulata":
+            if getattr(self, "_trasporto_simulato", None) is None:   # lato 'server' fittizio: vive quanto il servizio
+                self._trasporto_simulato = TrasportoSimulato()
+            return InvioAdattatore(self.arch, self._trasporto_simulato)
+        return InvioAdattatore(self.arch)
+
+    @staticmethod
+    def _copia_json(r) -> dict:
+        d = r.asdict()
+        d["artefatti"] = [{k: a.get(k) for k in ("ruolo", "nome", "sha256", "bytes")} for a in d.get("artefatti", [])]
+        d["job_id"], d["stato"] = d["dettaglio"].get("job_id"), d["dettaglio"].get("stato")
+        return d
+
+    def invio_prepara(self, pratica_id: str, *, chiave: str | None = None) -> dict:
+        """Congela il file XML completo e aggiornato con il controllo ufficiale associato. Non trasmette nulla."""
+        from .elaborati import TIPO_CONTROLLO
+        st = self.stato_elaborati(pratica_id)
+        exp = st["export"]
+        if exp.get("stato") != "aggiornato" or not exp.get("generato") or not exp.get("completo") or not exp.get("percorso"):
+            raise DatiNonValidi("serve un file XML completo e aggiornato: genera il file (scopo completo) prima di preparare "
+                                "l'invio", stato_export=exp.get("stato"), completo=exp.get("completo"))
+        c = self._job_ultimo(TIPO_CONTROLLO, pratica_id)
+        controllo = None
+        if c and c["input"].get("xml_sha256") == exp.get("xml_sha256"):
+            controllo = c["risultato"].get("job_adattatore")
+        d = self.leggi(pratica_id)
+        forn = (d["dati"].get("opzioni", {}) or {}).get("fornitore", {}) or {}
+        profilo = {k: forn[k] for k in ("cf", "tipo", "impegno_codice", "data_impegno") if forn.get(k)}
+        r = self._adattatore_invio("manuale").prepara(
+            pratica_id, elaborati=[{"percorso": str(self.arch.base / exp["percorso"]), "ruolo": "telematico"}],
+            importi={}, profilo=profilo, controllo_job_id=controllo, revisione=exp.get("revisione"), chiave=chiave)
+        return self._copia_json(r)
+
+    def invio_copia(self, copia_id: str) -> dict:
+        return self._copia_json(self._adattatore_invio("manuale").verifica_validita(copia_id))
+
+    def invio_conferma(self, copia_id: str, impronta_mostrata: str, *, utente: str = "utente", canale: str = "gui") -> dict:
+        """Conferma della specifica copia: ammessa solo dal canale 'gui'."""
+        return self._copia_json(self._adattatore_invio("manuale").conferma(
+            copia_id, impronta_mostrata=impronta_mostrata, utente=utente, canale=canale))
+
+    def invio_trasmetti(self, copia_id: str, chiave_richiesta: str, *, modalita: str = "simulata", canale: str = "gui") -> dict:
+        """Trasmette la copia confermata: ``simulata`` (servizio fittizio) o ``manuale`` (istruzioni, nessun invio)."""
+        r = self._adattatore_invio(modalita).trasmetti(copia_id, chiave_richiesta=chiave_richiesta, canale=canale)
+        out = r.asdict()
+        out["job_id"], out["stato"] = out["dettaglio"].get("job_id"), out["dettaglio"].get("stato")
+        out["modalita"] = modalita
+        out["avvertenza"] = ("PROVA SIMULATA: nessun file e' stato inviato all'Agenzia delle Entrate." if modalita == "simulata"
+                             else "Il programma NON ha trasmesso nulla: segui le istruzioni, poi registra l'esito con la riconciliazione.")
+        return out
+
+    def invio_riconcilia(self, tentativo_id: str, evidenze: dict | None = None, *, modalita: str = "simulata") -> dict:
+        r = self._adattatore_invio(modalita).riconcilia(tentativo_id, evidenze=evidenze)
+        out = r.asdict()
+        out["job_id"], out["stato"] = out["dettaglio"].get("job_id"), out["dettaglio"].get("stato")
+        out["modalita"] = modalita
+        return out
+
+    def invio_stato(self, pratica_id: str) -> dict:
+        """Copie congelate della pratica con i tentativi (dal piu' recente)."""
+        from .collegamenti.invio import TIPO_COPIA
+        ad = self._adattatore_invio("manuale")
+        copie = []
+        for j in ad.job.elenca(TIPO_COPIA, pratica_id):
+            copie.append(self._copia_json(ad.verifica_validita(j["job_id"])))
+        return {"pratica_id": pratica_id, "copie": copie}
