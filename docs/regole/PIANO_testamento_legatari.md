@@ -38,3 +38,11 @@ testamento e vietato senza), EH `PresenzaTestamento` con gli estremi di registra
 (nessuna verifica Allegato 5). Test: `tests/test_telematico_testamento.py`, `tests/test_telematico_testamento_controllo.py`.
 Restano: legatari (EA tipo 2 e rappresentanti, codici carica 2/3/7/9, calcolo per legatari), testamento estero con EG/EH, secondo testamento
 in EH (`RegistrazioneTestamento` fino a 2), ED tipo 11, TipoCespite GD.
+
+## Aggiornamento 2026-11-02 (sera): legatari persone fisiche
+Letta la guida al calcolo (`GUIDA_CALCOLO` pag. 3-4): la franchigia dipende dal grado di parentela (non dalla qualifica); la presunzione su denaro,
+mobilia e gioielli «si calcola solo se il soggetto NON e' legatario»; con qualifiche multiple la franchigia e' unica (non coperto).
+Il calcolo era gia' predisposto; mancava lo sblocco in esportazione. Fatto: EA tipo soggetto 2 con devoluzione per testamento (errore di dato
+senza testamento), regole sui gradi «per legge» limitate alla devoluzione per legge. Caso sintetico: legatario estraneo (grado 35), terreno 10.000 euro,
+imposta dovuta con tempistica 1, riferimento entro 12 mesi: controllo SUC13 locale positivo (solo anomalia 3345), come il caso base.
+Restano: rappresentanti di legatario (carica 3), esecutore (7), trustee (9), qualifiche multiple, ED tipo 11, testamento estero, secondo testamento.

@@ -7,7 +7,9 @@ Requires-Dist: mcp<3,>=2
 Requires-Dist: lxml>=5
 Requires-Dist: pypdf>=5
 Requires-Dist: reportlab>=4
+Requires-Dist: pillow>=10
 Requires-Dist: starlette>=0.40
 Requires-Dist: uvicorn>=0.30
 Provides-Extra: test
 Requires-Dist: pytest; extra == "test"
+Requires-Dist: httpx; extra == "test"

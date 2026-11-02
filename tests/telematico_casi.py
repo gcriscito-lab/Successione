@@ -122,6 +122,25 @@ def caso_testamento() -> dict:
     return d
 
 
+def caso_testamento_legatario() -> dict:
+    """``caso_testamento`` con un legatario estraneo (grado 35) cui va per intero un terreno in piena proprieta'."""
+    d = caso_testamento()
+    d["persone"].append({"id": "p_paolo001", "_origine": {}, "cognome": "Verdi", "nome": "Paolo",
+                         "codice_fiscale": "VRDPLA80C03H501A", "data_nascita": "1980-03-03", "luogo_nascita": "Roma",
+                         "ruolo": "legatario", "relazione_con_defunto": "estraneo"})
+    d["beni"].append({"id": "b_terr0002", "_origine": {}, "tipo": "terreno", "comune": "Roma", "foglio": "11",
+                      "particella": "21", "valore": "10000", "diritto": "1", "quota_defunto": "1/1"})
+    d["devoluzioni"].append({"id": "d_terrpaol", "_origine": {}, "bene_id": "b_terr0002", "persona_id": "p_paolo001",
+                             "quota": "1/1", "diritto": "1"})
+    tel = d["opzioni"]["telematico"]
+    tel["dichiarazione"]["tempistica_pagamento"] = "1"
+    tel["persone"]["p_paolo001"] = {"sesso": "M", "provincia_nascita": "RM", "grado_parentela": "35"}
+    tel["beni"]["b_terr0002"] = {"provincia": "RM", "codice_comune": "H501", "codice_comune_amministrativo": "H501",
+                                 "natura": "T", "tipologia_terreno": "3", "reddito_dominicale": "5.00",
+                                 "superficie": {"ettari": 0, "are": 50, "centiare": 0}}
+    return d
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),

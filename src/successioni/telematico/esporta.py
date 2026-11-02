@@ -255,7 +255,8 @@ class _Export:
     def quadro_ea(self) -> dict | None:
         if not self.ea:
             return None
-        legge = True  # unico caso supportato (vedi frontespizio)
+        # le regole sui gradi valgono solo con devoluzione per legge: con il testamento (senza legge) non si applicano
+        legge = SUP.dich(self.d, "devoluzione_per_legge") is True or SUP.dich(self.d, "devoluzione_per_testamento") is not True
         stato_civile = SUP.dich(self.d, "stato_civile")
         soggetti, cf_visti, coniugi = [], {}, 0
         self.tipo_ea: dict[str, str] = {}
@@ -275,8 +276,10 @@ class _Export:
             tipo = SUP.attr(self.d, "persone", p, "tipo_soggetto")
             self.usa(p, "tipo_soggetto")
             if ruolo == "legatario":
-                self.ns.append(f"{base}: legatario (tipo soggetto 2) ammesso solo con devoluzione per testamento o legge "
-                               "estera (annotazione TipoSoggetto), non supportate in questa versione")
+                if SUP.dich(self.d, "devoluzione_per_testamento") is not True:
+                    self.err("DATI_INCOERENTI", f"persone[{p['id']}].ruolo", "legatario (tipo soggetto 2) ammesso solo con "
+                             "devoluzione per testamento (o legge estera, non ancora mappata)",
+                             FO.fonte_annotazione(el + "/TipoSoggetto"))
                 tipo = "2"
             elif tipo is None:
                 tipo = "1"

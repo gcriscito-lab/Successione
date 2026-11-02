@@ -4,7 +4,9 @@ from lxml import etree
 
 from successioni.telematico import fonti
 from successioni.telematico.esporta import esporta_xml
-from telematico_casi import caso_testamento, contesto_caso_a10
+from datetime import date
+
+from telematico_casi import caso_testamento, caso_testamento_legatario, contesto_caso_a10
 from test_telematico_controllo import NS, _esegui, _motivo_salto
 
 D = "/tm:Messaggio/tm:Contenuto/suc:Fornitura/suc:Dichiarazione"
@@ -49,5 +51,37 @@ def test_allegato_testamento_senza_devoluzione_per_testamento_e_incoerente():
 def test_reale_controllo_ufficiale_locale_testamento(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es().xml, tmp_path)
     # stesso esito del caso base A10: positivo, con la sola anomalia di entita' ridotta 3345 (gravita' 4)
+    assert stato == "positivo", (stato, dgn["diagnostici"])
+    assert sorted((d["codice"], d["gravita"]) for d in dgn["diagnostici"]) == [("3345", 4)], dgn["diagnostici"]
+
+
+def _es_legatario():
+    # entro i dodici mesi dal decesso: le tardive con imposta dovuta restano non finalizzabili
+    return esporta_xml(caso_testamento_legatario(), contesto_caso_a10(data_riferimento=date(2025, 9, 1)))
+
+
+def test_xml_completo_con_legatario():
+    es = _es_legatario()
+    assert es.errori == [] and es.non_supportato == [] and es.quadri_mancanti == [], (es.errori, es.non_supportato)
+    doc = etree.fromstring(es.xml)
+    t = lambda xp: doc.xpath(D + xp, namespaces=NS)
+    assert t("/suc:Frontespizio/suc:Beneficiari/suc:NumeroLegatari/text()") == ["1"]
+    assert t("/suc:Frontespizio/suc:Beneficiari/suc:NumeroEredi/text()") == ["2"]
+    assert "2" in t("/suc:QuadroEA//suc:TipoSoggetto/text()")
+
+
+def test_legatario_senza_testamento_e_incoerente():
+    d = caso_testamento_legatario()
+    dich = d["opzioni"]["telematico"]["dichiarazione"]
+    dich["devoluzione_per_legge"], dich["devoluzione_per_testamento"] = True, False
+    del dich["testamento"]
+    d["documenti_ref"] = [x for x in d["documenti_ref"] if x["tipo_eg"] != "Testamento"]
+    es = esporta_xml(d, contesto_caso_a10(data_riferimento=date(2025, 9, 1)))
+    assert es.xml is None and any(e.codice == "DATI_INCOERENTI" and e.percorso.endswith(".ruolo") for e in es.errori)
+
+
+@pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+def test_reale_controllo_ufficiale_locale_legatario(tmp_path):
+    stato, dgn, wri, dcm = _esegui(_es_legatario().xml, tmp_path)
     assert stato == "positivo", (stato, dgn["diagnostici"])
     assert sorted((d["codice"], d["gravita"]) for d in dgn["diagnostici"]) == [("3345", 4)], dgn["diagnostici"]

@@ -143,7 +143,7 @@ def elenca_modelli(base_url: str, chiave: str, timeout: int = 60) -> list[str]:
 
 def esegui(argv: list[str], cwd: Path, timeout: int = 600) -> tuple[int, str]:
     try:
-        p = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
         return p.returncode, ((p.stdout or "") + (p.stderr or ""))[-3000:]
     except (OSError, subprocess.TimeoutExpired) as e:
         return 127, f"{type(e).__name__}: {e}"
@@ -251,7 +251,7 @@ def main(argv=None) -> int:
                     break
                 messaggi.append({"role": "user", "content": "Correggi. Problemi:\n" + "\n".join(err + falliti)[:5000]})
             subprocess.run(["git", "add", "-A"], cwd=lavoro, capture_output=True)
-            patch = subprocess.run(["git", "diff", "--cached", "--binary"], cwd=lavoro, capture_output=True, text=True).stdout
+            patch = subprocess.run(["git", "diff", "--cached", "--binary"], cwd=lavoro, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
             (out / "consegna.patch").write_text(patch, encoding="utf-8")
         finally:
             subprocess.run(["git", "worktree", "remove", "--force", str(lavoro)], cwd=RADICE, capture_output=True)
