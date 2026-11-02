@@ -744,6 +744,17 @@ class _Export:
                                "xpath": f"{_XP_DICH}/suc:QuadroED/suc:Modulo[{m}]/suc:Passivita[{r}]"}
         return {"Modulo": moduli} if moduli else None
 
+    def devoluzione_fr(self) -> dict:
+        """Frontespizio/TipoDichiarazione/Devoluzione nell'ordine dello schema: Legge, Testamento, sezione Testamento."""
+        out = {}
+        if SUP.dich(self.d, "devoluzione_per_legge") is True or SUP.dich(self.d, "devoluzione_per_testamento") is not True:
+            out["DevoluzionePerLegge"] = "1"
+        if SUP.dich(self.d, "devoluzione_per_testamento") is True:
+            out["DevoluzionePerTestamento"] = "1"
+            if self.testamento_x:
+                out["Testamento"] = self.testamento_x
+        return out
+
     def valida_testamento(self, el: str, ddec) -> None:
         """Controlla i dati della sezione Testamento (frontespizio). La devoluzione per testamento NON e' ancora
         esportabile (legatari EA, EG Testamento, EH, quote libere): se indicata, la bozza resta bloccata."""
@@ -756,13 +767,12 @@ class _Export:
                 self.err("DATI_INCOERENTI", perc + ".testamento", "la sezione Testamento non va compilata se la devoluzione "
                          "per testamento non e' selezionata", fonte)
             return
-        self.ns.append(perc + ".devoluzione_per_testamento: devoluzione per testamento non ancora esportabile "
-                       "(legatari EA, documento di testamento EG, EH, quote libere): vedi docs/regole/PIANO_testamento_legatari.md")
         if not isinstance(sez, dict) or not sez:
             self.err("DATO_MANCANTE", perc + ".testamento", "la sezione Testamento e' obbligatoria con la devoluzione per "
                      "testamento", fonte)
             return
         if sez.get("estero") is True:
+            self.testamento_x = {"TestamentoEstero": "1"}
             return
         date_ = {}
         for k in ("data_pubblicazione", "data_registrazione"):
@@ -776,10 +786,33 @@ class _Export:
                 self.err("DATO_MANCANTE", f"{perc}.testamento.{k}", "obbligatorio se il testamento non e' estero", fonte)
             elif lim and len(str(v)) > lim:
                 self.err("VALORE_NON_VALIDO", f"{perc}.testamento.{k}", f"al massimo {lim} caratteri", fonte)
+        uff = sez.get("ufficio_registrazione")
+        if uff not in (None, ""):
+            try:
+                uff = codice_enum(uff, "UfficioDiRegistrazione_Type")
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", perc + ".testamento.ufficio_registrazione", str(e), fonte)
+                uff = None
+        if sez.get("serie") not in (None, "") and not re.fullmatch(r"[1-4][A-Z]?", str(sez["serie"])):
+            self.err("VALORE_NON_VALIDO", perc + ".testamento.serie", "serie: una cifra da 1 a 4, con lettera maiuscola "
+                     "facoltativa (reg:Serie_Type)", fonte)
+        if sez.get("numero_registrazione") not in (None, "") and not re.fullmatch(r"\d{1,6}", str(sez["numero_registrazione"])):
+            self.err("VALORE_NON_VALIDO", perc + ".testamento.numero_registrazione", "solo cifre, al massimo 6", fonte)
         sn = sez.get("sottonumero_registrazione")
         if sn not in (None, "") and len(str(sn)) > 3:
             self.err("VALORE_NON_VALIDO", perc + ".testamento.sottonumero_registrazione", "al massimo 3 caratteri", fonte)
         dp, dr = date_.get("data_pubblicazione"), date_.get("data_registrazione")
+        if len(date_) == 2 and uff and not any(
+                x.codice == "VALORE_NON_VALIDO" and "testamento" in x.percorso for x in self.errori) and all(
+                sez.get(k) not in (None, "") for k in ("pubblico_ufficiale", "serie", "numero_registrazione")):
+            reg = {"UfficioDiRegistrazione": uff, "Serie": str(sez["serie"]), "NumeroRegistrazione": str(sez["numero_registrazione"])}
+            if sn not in (None, ""):
+                reg["SottonumeroRegistrazione"] = str(sn)
+            reg["DataRegistrazione"] = F.data(sez["data_registrazione"])
+            self.test_reg = reg
+            self.testamento_x = {"Pubblicazione": {"PubblicoUfficiale": F.an(sez["pubblico_ufficiale"], 50),
+                                                   "DataPubblicazioneTestamento": F.data(sez["data_pubblicazione"])},
+                                 "Registrazione": reg}
         if dp and ddec and dp < ddec:
             self.err("REGOLA_DATA_PUBBLICAZIONE", perc + ".testamento.data_pubblicazione",
                      "la data di pubblicazione deve essere maggiore o uguale alla data del decesso", fonte)
@@ -935,9 +968,9 @@ class _Export:
                      "obbligatorio", FO.fonte_xsd(el + "/DatiDefunto/UlterioriDati/StatoCivile"))
         # devoluzione: solo per legge
         legge = SUP.dich(self.d, "devoluzione_per_legge")
-        if legge is not True:
-            self.ns.append("opzioni.telematico.dichiarazione.devoluzione_per_legge: solo la devoluzione per legge e' "
-                           "supportata (legge estera non ancora mappata); indicare true")
+        if legge is not True and SUP.dich(self.d, "devoluzione_per_testamento") is not True:
+            self.ns.append("opzioni.telematico.dichiarazione.devoluzione_per_legge: indicare la devoluzione per legge "
+                           "o per testamento (la legge estera non e' ancora mappata)")
         self.valida_testamento(el, ddec)
         # presentatore
         pres = self.presentatore
@@ -1010,7 +1043,7 @@ class _Export:
         firma = {f"Casella{q}": "1" for q in quadri_presenti}
         firma["FirmaDichiarante"] = "1"
         fr = {"CodiceFiscaleDefunto": cfd,
-              "TipoDichiarazione": {"PrimaDichiarazione": "1", "Devoluzione": {"DevoluzionePerLegge": "1"}}}
+              "TipoDichiarazione": {"PrimaDichiarazione": "1", "Devoluzione": self.devoluzione_fr()}}
         if ben:
             fr["Beneficiari"] = ben
         fr["DatiDefunto"] = {"DatiAnagrafici": ana_d, "UlterioriDati": {
@@ -1149,12 +1182,15 @@ class _Export:
         self.fornitore_diverso_da_dichiarante = False
         self.totale_da_versare = 0
         self.defunto = self.presentatore = None
+        self.testamento_x, self.test_reg = None, None
 
         self.classifica_persone()
         self.ordina_ea()
         qea = self.quadro_ea()
         self.quote_legge = None
-        if self.ea and all(self.grado_ea.get(p["id"]) for p in self.ea):
+        if SUP.dich(self.d, "devoluzione_per_testamento") is True:
+            pass  # con testamento le quote non sono quelle di legge (annotazioni Quota/CodiceDiritto_Rip): nessun controllo
+        elif self.ea and all(self.grado_ea.get(p["id"]) for p in self.ea):
             self.quote_legge = DL.quote_di_legge({p["id"]: self.grado_ea[p["id"]] for p in self.ea},
                                                  {p["id"]: self.tipo_ea.get(p["id"]) for p in self.ea})
             if self.quote_legge is None:

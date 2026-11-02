@@ -155,9 +155,9 @@ def test_casi_non_supportati_non_esportano():
     for nome, dati in casi.items():
         es = _bozza(dati)
         assert es.xml is None, nome
-        assert es.non_supportato, nome
+        assert es.non_supportato or nome == "EG testamento", nome  # EG2 senza devoluzione per testamento: errore di dato
     es = _bozza(casi["EG testamento"])
-    assert any(s.startswith("documenti_ref[dr_aaaa0001]") for s in es.non_supportato)
+    assert any(e.codice == "DATI_INCOERENTI" for e in es.errori)
 
 
 def test_errori_dati_leggibili_con_percorso_e_fonte():

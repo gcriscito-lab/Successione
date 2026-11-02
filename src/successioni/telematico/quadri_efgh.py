@@ -47,7 +47,7 @@ BOLLO_CIRCOSCRIZIONE = 85
 SEZIONI_EG = ("DichSost", "Testamento", "Inventario", "CertificazioneImpostaVersataEstero", "DocumentiPassivita",
               "AlberoGenealogico", "DocumentiIdentita", "Altro", "PrimaCasa", "AgevolazioniImposteIpocatastali",
               "RiduzioniImposteSuccessione")
-EG_SUPPORTATE = {"DichSost", "DocumentiPassivita", "AlberoGenealogico", "DocumentiIdentita", "Altro"}
+EG_SUPPORTATE = {"DichSost", "Testamento", "DocumentiPassivita", "AlberoGenealogico", "DocumentiIdentita", "Altro"}
 
 
 def _snake(nome: str) -> str:
@@ -227,6 +227,10 @@ def quadro_eg(x) -> dict | None:
             x.err("VALORE_NON_VALIDO", perc + ".tipo_eg", f"{dr.get('tipo_eg')!r}: indicare il rigo del quadro EG "
                   f"({', '.join(SEZIONI_EG)} oppure EG1..EG11)", FO.fonte_xsd(el))
             continue
+        if sez == "Testamento" and SUP.dich(x.d, "devoluzione_per_testamento") is not True:
+            x.err("DATI_INCOERENTI", perc + ".tipo_eg", "rigo EG2 (testamento) non ammesso senza devoluzione per testamento",
+                  _fa(el + "/Testamento"))
+            continue
         if sez not in EG_SUPPORTATE:
             x.ns.append(f"{perc}: rigo EG {sez} non supportato in questa versione (testamento, inventario, imposta "
                         "estera, agevolazioni e riduzioni)")
@@ -266,6 +270,10 @@ def quadro_eg(x) -> dict | None:
     if "AlberoGenealogico" in per_sez and len(per_sez["AlberoGenealogico"]) != 1:
         x.err("REGOLA_EG_NUMERO", "documenti_ref", "AlberoGenealogicoNum deve assumere valore 1: indicare un solo "
               "documento per l'albero genealogico", _fa(el + "/AlberoGenealogico/AlberoGenealogicoNum"))
+    testamento = SUP.dich(x.d, "devoluzione_per_testamento") is True
+    if testamento and "Testamento" not in per_sez:
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Testamento", "copia del testamento (rigo EG2) "
+                                 "obbligatoria con la devoluzione per testamento", _fa(el + "/Testamento")))
     if x.valore_passivita and "DocumentiPassivita" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiPassivita", "documenti "
                                  "comprovanti le passivita' (rigo EG5) obbligatori in presenza del quadro ED",
@@ -296,6 +304,16 @@ def quadro_eg(x) -> dict | None:
 
 
 # ============================================================================================== EH
+def _eh_testamento(x) -> dict:
+    """EH, rigo testamento: assenza oppure presenza con gli estremi di registrazione (EH4 = frontespizio)."""
+    if SUP.dich(x.d, "devoluzione_per_testamento") is not True:
+        return {"FlagAssenzaTestamento": "1"}
+    pres = {"FlagTestamento": "1"}
+    if x.test_reg:
+        pres["RegistrazioneTestamento"] = [dict(x.test_reg)]
+    return {"PresenzaTestamento": pres}
+
+
 def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     """Quadro EH, Sezione I (dichiarazioni sostitutive) nel caso di base."""
     el = "QuadroEH/PrimoModulo/SezioneI_DichSost"
@@ -334,7 +352,7 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
         "DatiDefunto": {"DatiAnagrafici": ana_d, "Decesso": {"FlagDeceduto": "1", "DataDecesso": data_dec,
                                                              "Comune": comune, "Provincia": prov}},
         "Dichiarante": {"PresenzaDichiarante": "1"},
-        "Testamento": {"FlagAssenzaTestamento": "1"},
+        "Testamento": _eh_testamento(x),
         "Interdetti": {"FlagAssenzaInterdetti": "1"},
         "Rinuncia": {"FlagAssenzaRinuncia": "1"},
         "FirmaDichiarante": "1",

@@ -2,7 +2,7 @@
 from telematico_casi import caso_completo
 from test_telematico_esporta import _bozza
 
-TEST_OK = {"pubblico_ufficiale": "Notaio Sintetico", "data_pubblicazione": "2025-04-01", "ufficio_registrazione": "AAAA",
+TEST_OK = {"pubblico_ufficiale": "Notaio Sintetico", "data_pubblicazione": "2025-04-01", "ufficio_registrazione": "795",
            "serie": "1T", "numero_registrazione": "123", "data_registrazione": "2025-04-10"}
 
 
@@ -20,11 +20,10 @@ def _errori(d):
     return {(e.percorso, e.codice) for e in _bozza(d).errori}
 
 
-def test_testamento_valido_resta_non_esportabile_ma_senza_errori_di_dato():
+def test_testamento_valido_senza_errori_di_dato():
     es = _bozza(_caso(True, dict(TEST_OK)))
-    assert es.xml is None
-    assert any("devoluzione_per_testamento" in s for s in es.non_supportato)
     assert not [e for e in es.errori if "testamento" in e.percorso]
+    assert not any("devoluzione_per_testamento" in s for s in es.non_supportato)
 
 
 def test_sezione_senza_flag_e_incoerente():

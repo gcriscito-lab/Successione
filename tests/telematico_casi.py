@@ -108,10 +108,25 @@ def caso_a10() -> dict:
     return d
 
 
+def caso_testamento() -> dict:
+    """Successione testamentaria con soli eredi: ``caso_a10`` con devoluzione per testamento (sezione Testamento ed EG2)."""
+    d = caso_a10()
+    dich = d["opzioni"]["telematico"]["dichiarazione"]
+    dich.pop("devoluzione_per_legge", None)
+    dich["devoluzione_per_testamento"] = True
+    dich["testamento"] = {"pubblico_ufficiale": "Notaio Sintetico", "data_pubblicazione": "2025-04-01",
+                          "ufficio_registrazione": "795", "serie": "1T", "numero_registrazione": "123",
+                          "data_registrazione": "2025-04-10"}
+    d["documenti_ref"].append({"id": "dr_testam1", "_origine": {}, "allegato_id": "al_testam", "tipo_eg": "Testamento",
+                               "finalita": "Testamento (sintetico)"})
+    return d
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),
-                              "nome": "documenti_passivita.pdf"}}
+                              "nome": "documenti_passivita.pdf"},
+                "al_testam": {"percorso": str(FIXTURE / "allegati" / "testamento.pdf"), "nome": "testamento.pdf"}}
 
 
 def contesto_caso_a10(**kw) -> ContestoExport:

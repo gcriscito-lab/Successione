@@ -1,4 +1,4 @@
-# Piano: testamento e legatari (non implementato)
+# Piano: testamento e legatari (testamento con soli eredi: fatto; legatari: non implementati)
 
 Stato al 2026-11-02. **Nessuna regola qui sotto e' stata trasformata in codice.** Le citazioni sono le annotazioni dell'XSD ufficiale
 come riportate in `docs/regole/mappa_xsd_albero.md` (numeri di riga di quel file). I valori numerici (quote, franchigie, aliquote per
@@ -29,3 +29,12 @@ vanno fatti **insieme**, e toccano almeno questi punti:
 
 ## Cosa NON si delega agli agenti gratuiti
 Calcolo, quote, esportazione XML, regole di invio. I passi 1 (solo maschere) si possono delegare con file di sola lettura.
+
+## Aggiornamento 2026-11-02
+Fatto e provato (controllo ufficiale SUC13 locale, Java 8, dati sintetici; stesso esito del caso base: positivo con la sola anomalia 3345):
+**successione testamentaria con soli eredi** (tipo soggetto 1): frontespizio `DevoluzionePerTestamento` + sezione `Testamento`
+(pubblicazione e registrazione, ufficio da enumerazione XSD, serie `[1-4][A-Z]?`), EG rigo 2 (`TestamentoNum`/`TestamentoAll`, obbligatorio con
+testamento e vietato senza), EH `PresenzaTestamento` con gli estremi di registrazione uguali al frontespizio, quote di devoluzione libere
+(nessuna verifica Allegato 5). Test: `tests/test_telematico_testamento.py`, `tests/test_telematico_testamento_controllo.py`.
+Restano: legatari (EA tipo 2 e rappresentanti, codici carica 2/3/7/9, calcolo per legatari), testamento estero con EG/EH, secondo testamento
+in EH (`RegistrazioneTestamento` fino a 2), ED tipo 11, TipoCespite GD.
