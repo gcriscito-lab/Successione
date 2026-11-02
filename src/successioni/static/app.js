@@ -348,6 +348,42 @@ function schedaPersona(titolo, ruolo, vis) {
   }
   return g;
 }
+/* Dati della dichiarazione: opzioni.telematico.dichiarazione. I codici non sono proposti dal programma: vanno presi dalle istruzioni del frontespizio. */
+const CAMPI_DICH = [
+  ["stato_civile", "stato civile"], ["devoluzione_per_legge", "devoluzione per legge"], ["firma_dichiarante", "firma del dichiarante"],
+  ["tempistica_pagamento", "tempistica del pagamento"],
+  ["presentatore.persona_id", "presentatore: id persona"], ["presentatore.codice_carica", "presentatore: codice carica"],
+  ["presentatore.telefono", "presentatore: telefono"], ["presentatore.email", "presentatore: email"],
+  ["versamento.iban", "versamento: IBAN"], ["versamento.cf_titolare", "versamento: codice fiscale del titolare"],
+];
+function sezioneDatiDichiarazione() {
+  const tel = (S.P.dati.opzioni || {}).telematico || {};
+  const dich = tel.dichiarazione || {};
+  const leggi = (chiave) => chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
+  const sez = h("section", { class: "grp" }, h("h2", {}, "Dati della dichiarazione"),
+    h("div", { class: "nota", style: "margin:8px 14px" }, "Codici come da istruzioni del frontespizio. Usare solo dati sintetici in prova."));
+  const inputs = {};
+  for (const [chiave, etichetta] of CAMPI_DICH) {
+    const v = leggi(chiave);
+    const inp = h("input", { id: "dd_" + chiave.replace(".", "_"), "aria-label": etichetta, value: v == null ? "" : String(v) });
+    inputs[chiave] = inp;
+    sez.append(h("div", { class: "rg" }, h("label", { for: inp.id }, etichetta), inp));
+  }
+  sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "dd_salva", onclick: async () => {
+    // legge l'oggetto corrente e modifica solo le chiavi toccate: persone, beni e passivita' dell'oggetto restano intatti
+    const nuovo = JSON.parse(JSON.stringify(tel)); const d = nuovo.dichiarazione = nuovo.dichiarazione || {};
+    for (const [chiave] of CAMPI_DICH) {
+      const val = inputs[chiave].value.trim(); const parti = chiave.split("."); let o = d;
+      for (const p of parti.slice(0, -1)) o = o[p] = o[p] || {};
+      const ultimo = parti[parti.length - 1];
+      if (val === "") delete o[ultimo]; else o[ultimo] = val;
+    }
+    for (const g of ["presentatore", "versamento"]) if (d[g] && !Object.keys(d[g]).length) delete d[g];
+    if (!Object.keys(d).length) delete nuovo.dichiarazione;
+    await salvaOps([{ op: "set", sezione: "opzioni", campi: { telematico: nuovo } }]);
+  } }, "Salva dati della dichiarazione")));
+  return sez;
+}
 function renderFront(main) {
   main.append(schedaPersona("Defunto", "defunto", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "data_decesso"]));
   main.append(schedaPersona("Presentatore della dichiarazione", "presentatore", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "relazione_con_defunto"]));
@@ -356,6 +392,7 @@ function renderFront(main) {
   sel.value = tipo; sel.addEventListener("change", () => salvaOps([{ op: "set", sezione: "opzioni", campi: { tipo_dichiarazione: sel.value } }]));
   main.append(h("section", { class: "grp" }, h("h2", {}, "Tipo di dichiarazione"), h("div", { class: "rg" }, h("label", {}, "tipo"), sel),
     tipo === "sostitutiva" ? h("div", { class: "nota", style: "margin:8px 14px" }, "I dati della dichiarazione sostituita non sono ancora gestiti: la sostitutiva non è finalizzabile.") : null));
+  main.append(sezioneDatiDichiarazione());
   const att = new Set(S.P.dati.opzioni.quadri_attivi || S.schema.predefiniti);
   const box = h("section", { class: "grp" }, h("h2", {}, "Quadri da compilare"));
   for (const q of S.schema.quadri.filter(x => x.gruppo !== "frontespizio" && x.id !== "DV")) {
