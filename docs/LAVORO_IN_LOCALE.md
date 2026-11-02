@@ -12,6 +12,8 @@ python -m venv .venv
 pip install -e ".[test]"
 python -m pytest -q
 ```
+Su Windows, se `pytest` dà molti errori `PermissionError [WinError 5] Accesso negato` su `...\AppData\Local\Temp\pytest-of-<utente>` (cartella temporanea
+bloccata o lasciata da un altro processo), usa una cartella temporanea propria: `python -m pytest -q --basetemp="$env:USERPROFILE\pytest-successioni"`.
 Atteso: tutti i test passano; quelli che richiedono componenti esterni (controllo ufficiale SUC13 con Java 8, veraPDF, pacchetto Windows costruito) risultano saltati finché non imposti le variabili descritte in `docs/BETA_DA_REVISIONARE.md` e `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 
 Per avviare il programma: `$env:SUCCESSIONI_DATA = "$env:USERPROFILE\Successioni-prova"; python -m successioni.cli gui`.
