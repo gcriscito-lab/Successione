@@ -42,7 +42,9 @@ _ESEMPIO = {"SUCCESSIONI_JAVA": "java.exe", "SUCCESSIONI_GS": "gswin64c.exe", "S
             "SUCCESSIONI_QPDF": "qpdf.exe", "SUCCESSIONI_ICC": "srgb.icc"}
 MINIMO_TIMEOUT, MASSIMO_TIMEOUT = 10, 7200
 INTERFACCIA_DEFAULT = {"tema": "sistema", "font": "sistema", "dimensione": 14,
-                       "interlinea": "normale", "larghezza_pannello": 360}
+                       "interlinea": "normale", "larghezza_pannello": 360, "larghezza_nav": 240}
+# Intervalli (minimo, massimo) in pixel dei valori numerici; "dimensione" e' la grandezza del carattere.
+INTERVALLI_INTERFACCIA = {"dimensione": (12, 22), "larghezza_pannello": (280, 760), "larghezza_nav": (180, 480)}
 SCELTE_INTERFACCIA = {"tema": ("sistema", "chiaro", "scuro", "seppia"),
                       "font": ("sistema", "segoe", "arial", "verdana", "georgia", "consolas"),
                       "interlinea": ("compatta", "normale", "ampia")}
@@ -58,7 +60,7 @@ def _valida_interfaccia(valori: dict) -> dict:
             if v not in SCELTE_INTERFACCIA[k]:
                 raise DatiNonValidi(f"{k}: valore non ammesso")
         else:
-            minimo, massimo = (12, 22) if k == "dimensione" else (280, 760)
+            minimo, massimo = INTERVALLI_INTERFACCIA[k]
             if isinstance(v, bool) or not isinstance(v, int) or not minimo <= v <= massimo:
                 raise DatiNonValidi(f"{k}: indicare un intero da {minimo} a {massimo}")
     return valori.copy()

@@ -278,7 +278,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route("/api/invio/{cid}/file", scarica_copia),
         Route("/api/invio/{cid}/trasmetti", invio_trasmetti, methods=["POST"]),
         Route("/api/invio/tentativi/{tid}/riconcilia", invio_riconcilia, methods=["POST"]),
-        Route("/", home), Route("/static/{nome}", statico), Route("/api/info", info),
+        Route("/", home), Route("/static/{nome}", statico), Route("/api/info", info), Route("/favicon.ico", lambda richiesta: Response((STATIC / "logo.svg").read_bytes(), media_type="image/svg+xml")),
         Route("/api/pratiche/{pid}/quadri", quadri), Route("/api/schema", schema_),
         Route("/api/pratiche", elenca), Route("/api/pratiche", crea, methods=["POST"]),
         Route(P, leggi), Route(P + "/aggiorna", aggiorna, methods=["POST"]),

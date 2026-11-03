@@ -4,16 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Successioni</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <header class="tb">
+  <button id="bNav" class="gh solo-mobile" aria-label="Apri o chiudi pratiche e quadri" aria-controls="lat" aria-expanded="false">&#9776;</button>
   <button class="brand" id="bHome" title="Pagina iniziale"><img src="/static/logo.svg" alt="" width="30" height="30">Successioni</button>
   <div class="titolo" id="titolo">Nessuna pratica aperta</div>
-  <div class="azioni">
+  <div class="azioni" id="azioni">
     <button id="bSalva" class="gh" disabled>Salva</button>
     <button id="bControlla" class="gh" disabled>Controlla</button>
     <button id="bGenera" class="gh" disabled>File e invio</button>
+    <button id="bMenu" class="gh solo-mobile" aria-label="Altre azioni" aria-controls="azioni" aria-expanded="false">&#8943;</button>
     <button id="bNuova" class="pil">Nuova dichiarazione</button>
     <button id="bImporta" class="pil" title="Riprendi una dichiarazione da un file telematico XML">Importa XML</button>
     <button id="bImpost" class="gh" title="Aspetto, caratteri e strumenti del programma">Impostazioni</button>
@@ -22,7 +25,8 @@
 </header>
 <div id="msg" role="status" aria-live="polite" hidden></div>
 <div class="app" id="app">
-  <aside class="lat" aria-label="Pratiche e quadri">
+  <div id="velo" class="velo" hidden></div>
+  <aside class="lat" id="lat" aria-label="Pratiche e quadri">
     <details class="pratiche" id="dPratiche" open>
       <summary>Pratiche</summary>
       <ul id="lista"></ul>
@@ -30,6 +34,7 @@
     <nav id="albero" aria-label="Quadri della dichiarazione"></nav>
     <div class="info" id="info"></div>
   </aside>
+  <div id="ridimensionaNav" class="ridimensiona" role="separator" aria-label="Larghezza menu dei quadri" aria-orientation="vertical" aria-controls="lat" aria-valuemin="180" aria-valuemax="480" aria-valuenow="240" tabindex="0"></div>
   <main id="vista" tabindex="-1">
     <div class="vuoto" id="vuoto">
       <img class="hero-logo" src="/static/logo.svg" alt="Logo Successioni" width="112" height="112">
@@ -74,5 +79,6 @@
   </form>
 </dialog>
 <script src="/static/app.js"></script>
+<script src="/static/layout.js"></script>
 </body>
 </html>
