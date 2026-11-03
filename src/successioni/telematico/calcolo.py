@@ -189,7 +189,14 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                              _g(1, "QE")))
             continue
         tipo_cespite = None
+        esente_eo = False
         for riga in (x for mod in quad.findall(SUC + "Modulo") for x in mod):
+            if q == "EO":
+                # Titolo esente (TipoTitolo 3 / Possesso/ValoreEsente): il «Valore Quota» comprende il valore esente
+                # (annotazione XSD DevoluzioneSingolaNonImmobili_Type/Quota) ma non e' base imponibile. I righi di
+                # continuazione (senza TipoTitolo) ereditano la natura del rigo precedente.
+                if _testo(riga, "TipoTitolo") is not None:
+                    esente_eo = _testo(riga, "TipoTitolo") == "3" or riga.find(f"{SUC}Possesso/{SUC}ValoreEsente") is not None
             if q == "ER" and _testo(riga, "TipoCespite"):
                 tipo_cespite = _testo(riga, "TipoCespite")
                 bi = bi or tipo_cespite == "BI"
@@ -205,7 +212,8 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                 ide = dv.find(SUC + "IdentificazioneSoggetto")
                 pos = (int(_testo(ide, "Modulo")), int(_testo(ide, "Rigo")))
                 qv = dv.find(f"{SUC}Quota/{SUC}QuotaValore")
-                devs.append((pos, q, tipo_cespite if q == "ER" else None, _num(qv.text if qv is not None else None)))
+                tc = tipo_cespite if q == "ER" else ("ES" if q == "EO" and esente_eo else None)
+                devs.append((pos, q, tc, _num(qv.text if qv is not None else None)))
     passivo = []
     for rip in dich.iter(SUC + "Ripartizione"):
         ide = rip.find(SUC + "IdentificazioneSoggetto")
@@ -246,7 +254,11 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
     tot_comp = Fraction(0)
     for s in sorted(d["soggetti"], key=lambda x: x["pos"]):
         pos = s["pos"]
-        qe = sum((v for p, q, tc, v in d["devoluzioni"] if p == pos and tc != "DN"), Fraction(0))
+        # titoli esenti EO (tc "ES"): non entrano ne' in QE ne' in QDN. Fonti: Fascicolo I p. PDF 3 («ogni altro bene o
+        # diritto dichiarato esente dall'imposta»; indicazione dei titoli esenti «opzionale», con valenza solo verso gli
+        # operatori finanziari) e guida p. 1 (QE = valore imponibile). La guida non elenca il tipo 3 fra le esclusioni
+        # A, D, C, G, N, E, H: l'esclusione e' un'interpretazione dichiarata, riportata nelle note del risultato.
+        qe = sum((v for p, q, tc, v in d["devoluzioni"] if p == pos and tc not in ("DN", "ES")), Fraction(0))
         qdn = sum((v for p, q, tc, v in d["devoluzioni"] if p == pos and tc == "DN"), Fraction(0))
         qp = sum((v for p, v in d["passivo"] if p == pos), Fraction(0))
         an = max(qe + qdn - qp, Fraction(0))
@@ -317,6 +329,10 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
                         "resta <= 10 euro (" + FO.fonte_fasc1(47, "EF18bis colonna 1") + "; " +
                         FO.fonte_annotazione("QuadroEF/SezioneVBis_ImpostaSuccessione/ImpostaCalcolata/ImpostaDaVersare")
                         + ")")
+    if any(tc == "ES" for _, _, tc, _ in d["devoluzioni"]):
+        ris.note.append("Titoli esenti (EO tipo 3) esclusi dalla base imponibile (QE): " + FO.fonte_fasc1(3, "titoli esenti")
+                        + "; " + _g(1, "QE = valore imponibile") + ". La guida non li elenca fra le esclusioni A, D, C, G, N, E, H: "
+                        "interpretazione da confermare.")
     ris.note.append("Gli eredi sono tenuti in solido all'imposta complessiva; i legatari alla propria quota (" +
                     _g(8, "chiusura") + ").")
     return ris

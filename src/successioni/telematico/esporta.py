@@ -58,7 +58,7 @@ PERIMETRO = {
     "EN": "aziende (denominazione, CF, diritto 1/2, valore); immobili aziendali, inventario, beni esteri, agevolazioni non supportati",
     "EP": "aeromobili con valore; beni esteri e riduzioni art. 25 non supportati",
     "EQ": "navi e imbarcazioni con valore; beni esteri e riduzioni art. 25 non supportati",
-    "EO": "titoli quotati (1), non quotati (2), fondi (4) con valore; titoli esenti (3) e beni esteri non supportati",
+    "EO": "titoli quotati (1), non quotati (2), esenti (3, ValoreEsente), fondi (4); beni esteri non supportati",
     "ED": "passivita' con tipo, documento, possesso e ripartizione a un solo soggetto EA",
     "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
     "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; nessuna agevolazione/riduzione",
@@ -814,16 +814,13 @@ class _Export:
         return riga
 
     def riga_eo(self, b: dict) -> dict | None:
-        """Quadro EO, rigo Titoli: quotati (1), non quotati (2), fondi comuni (4). Titoli esenti (3) e beni esteri: non supportati."""
+        """Quadro EO, rigo Titoli: quotati (1), non quotati (2), esenti (3, ValoreEsente), fondi comuni (4). Beni esteri: non supportati."""
         c, el = "beni", "QuadroEO/Modulo/Titoli"
         for campo in ("comune", "sezione", "foglio", "particella", "subalterno", "categoria", "rendita"):
             if b.get(campo) not in (None, ""):
                 self.usa(b, campo)
                 self.ns.append(f"beni[{b['id']}].{campo}: campo catastale non previsto per i titoli del quadro EO")
         tt = self.val(c, b, "tipo_titolo", lambda v: codice_enum(str(v), "Titoli_Type"), elemento=el + "/TipoTitolo")
-        if tt == "3":
-            self.ns.append(f"beni[{b['id']}].tipo_titolo=3: titolo esente (ValoreEsente) non supportato: il valore esente non "
-                           "entra nella base imponibile e richiede le regole di calcolo dedicate")
         cf_em = SUP.attr(self.d, c, b, "codice_fiscale_emittente")
         self.usa(b, "codice_fiscale_emittente")
         out: dict = {"TipoTitolo": tt}
@@ -880,11 +877,18 @@ class _Export:
                 self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].data_documento", str(e), fonte_dd)
         poss, _ = self.quota_possesso(b, el + "/Possesso")
         dir_c = self.diritto_defunto(b, "CodiciDirittoNonImmobili", el + "/CodiceDiritto_C")
-        valore = self.valore_bene(b, el + "/Possesso/Valore")
-        if None in (tt, descr, td, poss, dir_c, valore) or tt == "3":
+        # Titolo esente (TipoTitolo 3): il valore va in Possesso/ValoreEsente e NON in Possesso/Valore (annotazioni XSD
+        # PossessoEO_Type/Valore e /ValoreEsente: l'uno esclude l'altro; Valore «non puo' essere presente se titolo = 3»,
+        # ValoreEsente «obbligatorio se titolo = 3» e «non puo' essere presente se titolo = 1, 2»).
+        esente = tt == "3"
+        el_valore = el + ("/Possesso/ValoreEsente" if esente else "/Possesso/Valore")
+        valore = self.valore_bene(b, el_valore)
+        if None in (tt, descr, td, poss, dir_c, valore):
             return None
         self.diritto_bene[b["id"]] = dir_c
         self.valore_beni[b["id"]] = int(valore)
+        if esente:
+            self.valore_esente_beni[b["id"]] = int(valore)
         riga = {"TipoTitolo": tt}
         for k in ("CodiceFiscale", "Quantita", "CodiceTitolo"):
             if k in out:
@@ -892,7 +896,7 @@ class _Export:
         riga["Descrizione"], riga["TipoDocumento"] = descr, td
         if data_doc:
             riga["DataDocumento"] = data_doc
-        riga["Possesso"] = {**poss, "Valore": valore}
+        riga["Possesso"] = {**poss, ("ValoreEsente" if esente else "Valore"): valore}
         riga["CodiceDiritto_C"] = dir_c
         return riga
 
@@ -1253,6 +1257,13 @@ class _Export:
                              "esportato in questa dichiarazione",
                              FO.fonte_annotazione("QuadroED/Modulo/Passivita/ProgressivoCespite"))
                     continue
+                if bid in self.valore_esente_beni:
+                    # Le fonti non dicono se una passivita' collegata a un titolo esente sia deducibile
+                    # (Fascicolo I p. PDF 36: deducibili i debiti per beni «compresi nell'attivo ereditario»; il titolo
+                    # esente e' «compreso nell'attivo» per l'XSD Titoli_Type 3 ma «esente dall'imposta», Fasc. I p. PDF 3).
+                    self.ns.append(f"passivita[{pas}].bene_id: passivita' collegata al titolo esente {bid}: deducibilita' "
+                                   "non determinabile dalle fonti, non supportato")
+                    continue
                 if tipo == "3" and ref["quadro"] not in ("EB", "EC", "EL", "EM"):
                     self.err("REGOLA_PROGRESSIVO_CESPITE", f"passivita[{pas}].bene_id", "per il tipo 3 (mutui) il "
                              "cespite deve essere un immobile (EB, EC)",
@@ -1527,6 +1538,8 @@ class _Export:
                      "fornitura_v2.xsd Identificativo_Type")
         self.diritto_bene: dict[str, str] = {}
         self.valore_beni: dict[str, int] = {}
+        #: titoli EO tipo 3: compresi in valore_beni (EE3 = Valore + ValoreEsente) ma fuori dall'imponibile
+        self.valore_esente_beni: dict[str, int] = {}
         self.quadro_bene: dict[str, str] = {}
         self.tipo_cespite: dict[str, str] = {}
         self.quota_valore: dict = {}
