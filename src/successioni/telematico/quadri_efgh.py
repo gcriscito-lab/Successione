@@ -31,6 +31,7 @@ from ..schema import Errore
 from . import fonti as FO
 from . import formati as F
 from . import prima_casa as PC
+from . import riduzioni_art25 as RA
 from . import supplemento as SUP
 
 DEC_2025 = date(2025, 1, 1)
@@ -52,7 +53,7 @@ SEZIONI_EG = ("DichSost", "Testamento", "Inventario", "CertificazioneImpostaVers
               "AlberoGenealogico", "DocumentiIdentita", "Altro", "PrimaCasa", "AgevolazioniImposteIpocatastali",
               "RiduzioniImposteSuccessione")
 EG_SUPPORTATE = {"DichSost", "Testamento", "DocumentiPassivita", "AlberoGenealogico", "DocumentiIdentita", "Altro",
-                 "PrimaCasa"}
+                 "PrimaCasa", "RiduzioniImposteSuccessione"}
 
 
 def _snake(nome: str) -> str:
@@ -340,6 +341,23 @@ def quadro_eg(x) -> dict | None:
                                      "di chi sottoscrive la richiesta prima casa (rigo EG7)",
                                      FO.fonte_fasc1(7, "copia del documento d'identita' di chi sottoscrive le dichiarazioni "
                                                     "sostitutive rese da beneficiari diversi dal dichiarante")))
+    if x.ra_eg:
+        # annotazione QuadroEG/RiduzioniImposteSuccessione: obbligatorio con riduzioni L, Q, 1-5 per soggetti diversi dal
+        # dichiarante; Fascicolo I p. PDF 50: rigo EG11 (L, Q, 1-5) e copia del documento d'identita' di chi sottoscrive
+        if "RiduzioniImposteSuccessione" not in per_sez:
+            x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].RiduzioniImposteSuccessione", "richiesta "
+                                     "di riduzioni (L, Q, art. 25 c. 1) di un beneficiario diverso dal dichiarante: allegare "
+                                     "la dichiarazione sostitutiva (rigo EG11)", _fa(el + "/RiduzioniImposteSuccessione") +
+                                     "; " + FO.fonte_fasc1(50, "rigo EG11")))
+        if "DocumentiIdentita" not in per_sez:
+            x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiIdentita", "documento d'identita' "
+                                     "di chi sottoscrive la richiesta di riduzioni (rigo EG7)",
+                                     FO.fonte_fasc1(50, "dichiarazioni sostitutive rese da soggetti diversi dal dichiarante")))
+    if x.ra_altro and "Altro" not in per_sez:
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "codice R (fondi rustici): "
+                                 "l'attestazione dell'ufficio regionale va allegata alla dichiarazione nel quadro EG; la "
+                                 "documentazione senza rigo specifico va nel rigo EG8 'Altro'",
+                                 FO.fonte_fasc1(63, "codice R") + "; " + FO.fonte_fasc1(50, "rigo EG8")))
     if x.fornitore_diverso_da_dichiarante and "DocumentiIdentita" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiIdentita", "il modello non e' "
                                  "trasmesso direttamente dal dichiarante: allegare la copia del suo documento "
@@ -555,6 +573,9 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     elif x.pc_dichiarante is None and SUP.dich(x.d, "prima_casa") is not None:
         x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.prima_casa", "la Sezione II del quadro EH puo' essere "
               "compilata solo con l'agevolazione P richiesta dal dichiarante", _fa("QuadroEH/PrimoModulo/SezioneII_AgevPrimaCasa"))
+    sez4 = RA.sezione_eh(x)
+    if sez4:
+        eh["PrimoModulo"]["SezioneIV_AltreAgevRiduz"] = sez4
     altri = [eredi[i:i + 3] for i in range(3, len(eredi), 3)]
     if altri:
         eh["Modulo"] = [{"SezioneI_DichSost": {"Eredi": blocco}} for blocco in altri]

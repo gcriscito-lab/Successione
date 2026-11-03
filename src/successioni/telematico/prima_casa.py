@@ -80,6 +80,8 @@ def leggi_riga(x, d: dict, b: dict, quadro: str, perc: str) -> str | None:
         x.err("REGOLA_AGEVOLAZIONE_QUADRO", perc + ".agevolazioni", f"il codice {codice} e' ammesso solo nei quadri EC ed EM",
               FO.fonte_annotazione(EL_AGEV))
         return None
+    if codice in ("L", "Q", "R", "F"):
+        return None  # riduzioni dell'imposta di successione: gestite da riduzioni_art25.py
     if codice not in CODICI:
         x.ns.append(f"{perc}.agevolazioni={codice}: agevolazione non supportata in questa versione (supportati P, X, Z"
                     + ("; il codice Y richiede dichiarazione sostitutiva EG9 e regole non coperte dal perimetro" if codice == "Y" else "")

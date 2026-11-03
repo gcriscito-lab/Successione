@@ -43,6 +43,7 @@ from . import formati as F
 from . import identificativi as ID
 from . import modello_xsd as M
 from . import prima_casa as PC
+from . import riduzioni_art25 as RA
 from . import quadri_efgh as EFGH
 from . import supplemento as SUP
 from . import xsd as X
@@ -56,14 +57,15 @@ PERIMETRO = {
     "ER": "tipi cespite BI, CR, DN, AB con valore; beni non esteri",
     "EL": "terreni in province tavolari (BZ, TN, GO, TS) natura T; partita tavolare obbligatoria",
     "EM": "fabbricati in province tavolari (BZ, TN, GO, TS); graffati e determinazione rendita non supportati",
-    "EN": "aziende (denominazione, CF, diritto 1/2, valore); immobili aziendali, inventario, beni esteri, agevolazioni non supportati",
-    "EP": "aeromobili con valore; beni esteri e riduzioni art. 25 non supportati",
-    "EQ": "navi e imbarcazioni con valore; beni esteri e riduzioni art. 25 non supportati",
+    "EN": "aziende (denominazione, CF, diritto 1/2, valore); immobili aziendali, inventario, beni esteri non supportati; agevolazione Q e riduzioni art. 25 (riduzioni_art25.py)",
+    "EP": "aeromobili con valore; beni esteri non supportati; riduzioni art. 25 c. 1 (codici 1-5)",
+    "EQ": "navi e imbarcazioni con valore; beni esteri non supportati; riduzioni art. 25 c. 1 (codici 1-5)",
     "EO": "titoli quotati (1), non quotati (2), esenti (3, ValoreEsente), fondi (4); beni esteri non supportati",
     "ED": "passivita' con tipo, documento, possesso e ripartizione a un solo soggetto EA",
     "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
-    "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; agevolazioni solo prima casa P, X, Z in EC "
-                   "(prima_casa.py), nessuna riduzione",
+    "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; agevolazioni: prima casa P, X, Z in EC "
+                   "(prima_casa.py) e riduzioni dell'imposta di successione L, Q, R, F e art. 25 c. 1 codici 1-5 con "
+                   "valore precedenti successioni (riduzioni_art25.py, docs/regole/riduzioni_art25.md)",
 }
 QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "EL", "EM", "EN", "EO", "EP", "EQ", "ER")
 SCOPI = ("completo", "bozza_tecnica")
@@ -946,6 +948,7 @@ class _Export:
             agev = PC.leggi_riga(self, d, b, quadro, perc)
             if agev:
                 PC.registra(self, d["id"], b["id"], pid, agev, quadro)
+            RA.leggi_riga(self, d, b, quadro, perc, pid)
             somma += Fraction(n, den)
             self.persona_dev[d["id"]] = pid
             righe.append((self.pos_ea[pid], dir_r, d["id"], n, den))
@@ -982,6 +985,8 @@ class _Export:
                         "CodiceDiritto_Rip": dir_r}
             if did in self.agev_dev:
                 riga_dev["Agevolazioni"] = self.agev_dev[did]
+            if did in self.rid_dev:
+                riga_dev["Riduzioni"] = self.rid_dev[did]
             if did in self.righe_dev:
                 self.righe_dev[did]["agevolazione"] = self.agev_dev.get(did)
             out.append(riga_dev)
@@ -1000,6 +1005,7 @@ class _Export:
                     if d.get("bene_id") == b["id"]:
                         self.scartati.add(d["id"])
                 continue
+            RA.valore_prec_succ(self, b, r, quadro)
             devs = self.devoluzioni_bene(b, quadro) if self.ea else []
             blocchi = [devs[i:i + 3] for i in range(0, len(devs), 3)] or [[]]
             for k, blocco in enumerate(blocchi):
@@ -1570,6 +1576,7 @@ class _Export:
         self.testamento_x, self.test_reg = None, None
         self.eh_navi, self.eh_aeromobili, self.ei_beni = [], [], []
         PC.inizializza(self)
+        RA.inizializza(self)
 
         self.classifica_persone()
         self.ordina_ea()
@@ -1615,6 +1622,7 @@ class _Export:
         qer = self.quadro_beni("ER", sorted(per_q["ER"], key=lambda b: (
             str(SUP.attr(self.d, "beni", b, "tipo_cespite") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_er)
         PC.valida(self)
+        RA.valida(self)
         if self.ea:
             assegnati = {d.get("persona_id") for d in self.d.get("devoluzioni", [])}
             for p in self.ea:
