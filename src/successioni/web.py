@@ -83,7 +83,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def schema_(request):
         from .collegamenti.invio import TIPI_RICEVUTA
         return {"collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": S.AIUTI,
-                "tipi_ricevuta": TIPI_RICEVUTA,
+                "strutturati": S.STRUTTURATI, "tipi_ricevuta": TIPI_RICEVUTA,
                 "province_tavolari": list(Q.PROVINCE_TAVOLARI)}
 
     @api

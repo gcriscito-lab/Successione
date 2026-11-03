@@ -141,6 +141,26 @@ function campoInput(coll, id, campo, kind, val, onMod) {
   return h("div", {}, el, err.map(r => h("div", { class: "e" }, r.messaggio)));
 }
 
+/* Campo a scelta guidata (S.schema.strutturati, definito in schema.py): menu con etichette e aiuto della voce scelta.
+   Un valore gia' presente ma non nell'elenco (o uno stato come [da_confermare]) resta visibile e non viene perso. */
+function campoStrutturato(sd, val, onMod, path) {
+  const err = path ? rilievi().filter(r => r.percorso === path) : [];
+  const attuale = val === undefined || val === null ? "" : (typeof val === "object" && val.stato ? "[" + val.stato + "]" : String(val));
+  const el = h("select", { "aria-label": sd.etichetta },
+    h("option", { value: "" }, "(non indicato)"),
+    sd.opzioni.map(o => h("option", { value: o.valore }, o.valore + " — " + o.etichetta)),
+    attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale }, attuale + " (valore non previsto)") : null);
+  el.value = attuale;
+  if (path) el.dataset.path = path;
+  if (err.length) el.classList.add("bad");
+  const dett = h("div", { class: "mut aiuto-voce", style: "font-size:11.5px;margin-top:2px" });
+  const mostraAiuto = () => { const o = sd.opzioni.find(x => x.valore === el.value); dett.textContent = o ? o.aiuto : ""; };
+  const f = () => { mostraAiuto(); onMod(leggi("str", el.value)); };
+  el.addEventListener("change", f);
+  mostraAiuto();
+  return h("div", {}, el, dett, err.map(r => h("div", { class: "e" }, r.messaggio)));
+}
+
 /* ---------- vista centrale ---------- */
 /* Stesso instradamento di quadri.quadro_di (server): le province tavolari arrivano da /api/schema. */
 function quadroBene(e) {
@@ -250,7 +270,8 @@ function insDati(ins) {
   for (const [c, kind] of Object.entries(campi)) {
     const vv = valRiga(r, c);
     if (visibili && !visibili.has(c) && (vv === undefined || vv === null || vv === "")) continue;
-    const w = campoInput(q.coll, id, c, kind, valRiga(r, c), (campo, v) => {
+    const sd = (S.schema.strutturati || {})[q.coll + "." + c];
+    const modificaCampo = (campo, v) => {
       const scrivi = (c2, x) => {
         if (r.nuova) r.nuova.campi[c2] = x;
         else { const d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} }; d.campi[c2] = x; S.dirty.set(r.key, d); }
@@ -262,7 +283,9 @@ function insDati(ins) {
           if (res.testo) msg(res.testo, res.riempiti.length ? "o" : "e");
           if (res.riempiti.length) { renderVista(); renderIns(); aggiornaBottoni(); renderSb(); }
         });
-    });
+    };
+    const w = sd && sd.opzioni ? campoStrutturato(sd, valRiga(r, c), v => modificaCampo(c, v), id ? q.coll + "[" + id + "]." + c : null)
+      : campoInput(q.coll, id, c, kind, valRiga(r, c), modificaCampo);
     const aiuto = (S.schema.aiuti || {})[q.coll + "." + c];
     if (aiuto) w.append(h("div", { class: "mut", style: "font-size:11.5px;margin-top:2px" }, aiuto));
     ins.append(h("div", { class: "rg" }, h("label", {}, c.replaceAll("_", " ")), w));
@@ -280,7 +303,7 @@ function insDati(ins) {
   ins.append(az, h("p", { class: "mut mono", style: "margin-top:10px" }, r.e ? r.e.id : ""));
 }
 function renderStrutturati(ins, q, r) {
-  if (!['beni', 'passivita', 'persone'].includes(q.coll)) return;
+  if (!['beni', 'passivita', 'persone', 'devoluzioni'].includes(q.coll)) return;
   const id = r.e ? r.e.id : r.nuova.id, key = q.coll + ':' + id;
   const base = (((S.P.dati.opzioni.telematico || {})[q.coll] || {})[id]) || {};
   const valore = c => S.supDirty.has(key) && c in S.supDirty.get(key).campi ? S.supDirty.get(key).campi[c] : base[c];
@@ -288,6 +311,16 @@ function renderStrutturati(ins, q, r) {
     const d = S.supDirty.get(key) || { coll: q.coll, id, campi: {} };
     d.campi[c] = v; S.supDirty.set(key, d); aggiornaBottoni(); renderSb();
   };
+  if (q.coll === 'devoluzioni') {
+    const sd = (S.schema.strutturati || {})['devoluzioni.agevolazioni'];
+    const bene = (S.P.dati.beni || []).find(b => b.id === valRiga(r, 'bene_id'));
+    ins.append(h('h3', {}, 'Agevolazione prima casa'));
+    ins.append(campoStrutturato(sd, valore('agevolazioni'), v => scrivi('agevolazioni', v), null));
+    ins.append(h('div', { class: 'mut', style: 'font-size:11.5px;margin-top:4px' }, sd.aiuto));
+    if (bene && quadroBene(bene) !== 'EC')
+      ins.append(h('div', { class: 'nota', style: 'margin:6px 0' }, 'Il bene collegato non è un fabbricato del quadro EC: i codici P, X, Z sono ammessi solo lì e l\'esportazione segnalerà un errore.'));
+    return;
+  }
   if (q.coll === 'persone') {
     const cb = h('input', { type: 'checkbox', 'aria-label': 'portatore handicap', onchange: ev => scrivi('portatore_handicap', ev.target.checked) });
     cb.checked = valore('portatore_handicap') === true;
@@ -541,6 +574,35 @@ function sezioneDatiDichiarazione() {
   } }, "Salva dati della dichiarazione")));
   return sez;
 }
+/* Agevolazione prima casa del dichiarante: opzioni.telematico.dichiarazione.prima_casa (elenco e aiuti: schema.STRUTTURATI). */
+function sezionePrimaCasa() {
+  const dich = ((S.P.dati.opzioni || {}).telematico || {}).dichiarazione || {};
+  const defs = Object.entries(S.schema.strutturati || {}).filter(([k]) => k.startsWith("dichiarazione.prima_casa."));
+  const sez = h("section", { class: "grp", id: "sezPrimaCasa" }, h("h2", {}, "Agevolazione prima casa (Sezione II del quadro EH)"),
+    h("div", { class: "nota", style: "margin:8px 14px" }, "Servono solo se il dichiarante chiede il codice P: il codice si imposta sulla riga di devoluzione (scheda DV, riquadro «Agevolazione prima casa»). Il dichiarante è il presentatore con carica 1 presente nel quadro EA. Fonti: docs/regole/prima_casa.md."));
+  for (const [percorso, sd] of defs) {
+    const chiave = percorso.slice("dichiarazione.".length);   // es. prima_casa.requisito_comune
+    const corrente = S.dichDirty.has(chiave) ? S.dichDirty.get(chiave) : chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
+    const id = "pc_" + chiave.replaceAll(".", "_");
+    const opzioni = sd.tipo === "bool" ? [{ valore: "si", etichetta: "sì" }, { valore: "no", etichetta: "no" }] : sd.opzioni;
+    const attuale = sd.tipo === "bool" ? (corrente === true ? "si" : corrente === false ? "no" : "") : (corrente == null ? "" : String(corrente));
+    const inp = h("select", { id, "aria-label": sd.etichetta }, h("option", { value: "" }, "(non indicato)"),
+      opzioni.map(o => h("option", { value: o.valore }, sd.tipo === "bool" ? o.etichetta : o.valore + " — " + o.etichetta)),
+      attuale && !opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale }, attuale + " (valore non previsto)") : null);
+    inp.value = attuale;
+    const dett = h("div", { class: "mut", style: "font-size:11.5px;margin-top:2px" });
+    const mostraAiuto = () => { const o = sd.tipo === "enum" ? sd.opzioni.find(x => x.valore === inp.value) : null; dett.textContent = o ? o.aiuto : ""; };
+    const modifica = () => {
+      const t = inp.value;
+      S.dichDirty.set(chiave, t === "" ? null : sd.tipo === "bool" ? t === "si" : t);
+      mostraAiuto(); aggiornaBottoni(); renderSb();
+    };
+    inp.addEventListener("change", modifica); mostraAiuto();
+    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut", style: "font-size:11.5px;margin-top:2px" }, sd.aiuto), dett)));
+  }
+  sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "pc_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
+  return sez;
+}
 function renderFront(main) {
   main.append(schedaPersona("Defunto", "defunto", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso", "comune_decesso", "provincia_decesso"]));
   main.append(schedaPersona("Presentatore della dichiarazione", "presentatore", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "relazione_con_defunto"]));
@@ -550,6 +612,7 @@ function renderFront(main) {
   main.append(h("section", { class: "grp" }, h("h2", {}, "Tipo di dichiarazione"), h("div", { class: "rg" }, h("label", {}, "tipo"), sel),
     tipo === "sostitutiva" ? h("div", { class: "nota", style: "margin:8px 14px" }, "I dati della dichiarazione sostituita non sono ancora gestiti: la sostitutiva non è finalizzabile.") : null));
   main.append(sezioneDatiDichiarazione());
+  main.append(sezionePrimaCasa());
   const att = new Set(S.P.dati.opzioni.quadri_attivi || S.schema.predefiniti);
   const box = h("section", { class: "grp" }, h("h2", {}, "Quadri da compilare"));
   for (const q of S.schema.quadri.filter(x => x.gruppo !== "frontespizio" && x.id !== "DV")) {
@@ -618,7 +681,7 @@ async function salvaTutto() {
       for (const p of parti.slice(0, -1)) o = o[p] = o[p] || {};
       if (val === null) delete o[parti.at(-1)]; else o[parti.at(-1)] = val;
     }
-    for (const k of ['presentatore', 'versamento', 'testamento']) if (d[k] && !Object.keys(d[k]).length) delete d[k];
+    for (const k of ['presentatore', 'versamento', 'testamento', 'prima_casa']) if (d[k] && !Object.keys(d[k]).length) delete d[k];
     for (const { coll, id, campi } of supplementi.values()) {
       const ent = (tel[coll] = tel[coll] || {})[id] = ((tel[coll] || {})[id] || {});
       for (const [k, v] of Object.entries(campi)) { if (v === null) delete ent[k]; else ent[k] = v; }
