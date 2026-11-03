@@ -101,6 +101,9 @@ def strutturati() -> dict[str, dict]:
         if opz:
             out[chiave] = {"etichetta": etichetta, "tipo": "enum", "opzioni": opz, "xsd": tipo,
                            "aiuto": f"Codici ufficiali (XSD SUC13, tipo {tipo}). Si salva il codice."}
+    for chiave, m in alias().items():
+        if chiave in out:
+            out[chiave]["alias"] = m
     return out
 
 
@@ -112,4 +115,31 @@ def suggerimenti() -> dict[str, dict]:
         v = voci(tipo)
         if v:
             out[chiave] = {"etichetta": etichetta, "xsd": tipo, "valori": [x["valore"] for x in v]}
+    return out
+
+
+#: Campi per cui l'esportazione accetta anche la descrizione normalizzata («proprieta» per «1»): ``codice_enum(..., alias_descrizione=True)``
+#: in ``telematico/esporta.py`` (diritto_defunto() e devoluzioni). Nessun altro campo ha alias.
+ALIAS_DESCRIZIONE = ("beni.diritto@immobile", "beni.diritto@altro", "devoluzioni.diritto@immobile", "devoluzioni.diritto@altro")
+
+
+def alias() -> dict[str, dict[str, str]]:
+    """{chiave: {alias: codice}}: le scritture alternative gia' ammesse dall'esportazione (stessa normalizzazione di
+    ``esporta._norm``), per riconoscere nei menu un valore come «proprieta» e mostrarlo come «1 — Proprieta'» senza cambiare il dato.
+    Le cifre con zeri iniziali («08» per «8») si riconoscono in interfaccia con la stessa regola dell'esportazione."""
+    from .telematico import xsd as X
+    from .telematico.esporta import _norm
+    out: dict[str, dict[str, str]] = {}
+    for chiave in ALIAS_DESCRIZIONE:
+        tipo = REGOLE[chiave][0]
+        try:
+            enum = X.enumerazioni(tipo)
+        except Exception:
+            continue
+        m: dict[str, str] = {}
+        for k, d in enum.items():
+            if d and _norm(d) not in m:
+                m[_norm(d)] = k
+        if m:
+            out[chiave] = m
     return out

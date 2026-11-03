@@ -56,13 +56,32 @@ async function api(url, opt) {
   return j;
 }
 const post = (u, b) => api(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) });
-function msg(t, tipo) { const m = $("#msg"); m.textContent = t || ""; m.className = tipo || ""; m.hidden = !t; }
+/* Il messaggio e' un riquadro mobile in basso (non sposta il layout) con pulsante di chiusura. Stile aggiunto da qui. */
+document.head.append(h("style", {}, `#msg{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:60;margin:0;max-width:min(760px,calc(100vw - 24px));
+  display:flex;gap:12px;align-items:flex-start;white-space:pre-line;overflow-wrap:anywhere;max-height:40vh;overflow:auto}
+  #msg[hidden]{display:none} #msg .mt{flex:1} #msg .x{flex:none;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;line-height:1;padding:2px 6px}
+  #msg .x::before{content:"\\00d7";font-size:1.3em}`));
+function msg(t, tipo) {
+  const m = $("#msg"); m.className = tipo || ""; m.hidden = !t; m.replaceChildren();
+  if (t) m.append(h("span", { class: "mt" }, t), h("button", { class: "x", "aria-label": "Chiudi il messaggio", title: "Chiudi", onclick: () => msg("") }));
+}
 
 /* ---------- valori ---------- */
+/* Date: all'utente GG/MM/AAAA, nella pratica AAAA-MM-GG (convertite PRIMA dell'invio). Un testo non riconoscibile resta com'e'
+   e il server risponde con il formato atteso. */
+function dataIt(v) { const m = typeof v === "string" && v.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[3] + "/" + m[2] + "/" + m[1] : v; }
+function dataIso(t) {
+  t = String(t).trim();
+  let m = t.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+  if (m) return m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0");
+  m = t.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/);
+  return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : t;
+}
 function mostra(kind, v) {
   if (v === undefined || v === null) return "";
   if (typeof v === "object" && v.stato) return "[" + v.stato + "]";
   if (kind === "quota" && typeof v === "object") return v.num + "/" + v.den;
+  if (kind === "data") return dataIt(String(v));
   return String(v);
 }
 function leggi(kind, t) {
@@ -71,6 +90,8 @@ function leggi(kind, t) {
   if (t === "?") return { stato: "da_confermare" };
   if (/^\[[a-z_]+\]$/.test(t)) return { stato: t.slice(1, -1) };
   if (kind === "quota") { const m = t.match(/^(\d+)\s*\/\s*(\d+)$/); return m ? { num: +m[1], den: +m[2] } : t; }
+  if (kind === "data") return dataIso(t);
+  if (kind === "importo" && /^-?\d+,\d+$/.test(t)) return t.replace(",", ".");   // 12,5 -> 12.5
   return t;
 }
 /* Etichette e ordine dei campi: arrivano da /api/schema (server: etichette.py). Mai il nome interno con i trattini bassi. */
@@ -178,6 +199,19 @@ function struttDi(coll, campo, tipoBene) {
   const ctx = (coll === "beni" || coll === "devoluzioni") ? (["fabbricato", "terreno"].includes(tipoBene) ? "immobile" : "altro") : null;
   return (ctx && s[coll + "." + campo + "@" + ctx]) || s[coll + "." + campo] || null;
 }
+/* Elenchi lunghi di codici ammessi (server: codici.suggerimenti, chiave «coll.campo»): suggerimenti con <datalist>, il campo resta di testo. */
+function listaSuggerimenti(chiave) {
+  const s = ((S.schema || {}).suggerimenti || {})[chiave];
+  if (!s) return null;
+  const id = "dl_" + chiave.replace(/[^a-z0-9]+/gi, "_");
+  if (!document.getElementById(id)) {
+    const dl = h("datalist", { id });
+    for (const v of s.valori) dl.append(h("option", { value: v }));
+    document.body.append(dl);
+  }
+  return id;
+}
+const MAX_LUNGHEZZA = { "beni.nazionalita": 20 };   // XSD: Nazionalita, massimo 20 caratteri (nessun elenco ufficiale: resta testo)
 function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
   const sd = kind === "str" || kind === "cf" ? struttDi(coll, campo, tipoBene) : null;
   if (sd && sd.opzioni) return campoStrutturato(sd, val, v => onMod(campo, v), id ? coll + "[" + id + "]." + campo : null);
@@ -192,7 +226,8 @@ function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
     el = h("select", { "aria-label": campo }, h("option", { value: "" }, ""), (S.P.dati[rc] || []).map(e => h("option", { value: e.id }, etichetta(rc, e))));
     el.value = val || "";
   } else {
-    el = h("input", { "aria-label": campo, autocomplete: "off", class: kind === "cf" ? "mono" : (kind === "importo" || kind === "quota" ? "num" : ""), placeholder: kind === "quota" ? "1/2" : kind === "data" ? "AAAA-MM-GG" : "" });
+    const lista = listaSuggerimenti(coll + "." + campo);
+    el = h("input", { "aria-label": campo, autocomplete: "off", list: lista, maxlength: MAX_LUNGHEZZA[coll + "." + campo], class: kind === "cf" ? "mono" : (kind === "importo" || kind === "quota" ? "num" : ""), placeholder: kind === "quota" ? "1/2" : kind === "data" ? "GG/MM/AAAA" : "" });
     el.value = mostra(kind, val);
   }
   if (path) el.dataset.path = path;
@@ -202,25 +237,42 @@ function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
   return h("div", {}, el, err.map(r => h("div", { class: "e" }, r.messaggio)));
 }
 
+/* Valore gia' presente scritto in un altro modo ma equivalente per l'esportazione: «A/2» e «a2» valgono «A2»; per i diritti la
+   descrizione («proprieta» per «1», regola di esporta.codice_enum con alias_descrizione, elenco in sd.alias dal server); «08» vale «8».
+   Restituisce il codice della voce, oppure il valore cosi' com'e'. Il dato non cambia finche' l'utente non sceglie. */
+const normAlias = x => String(x).toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+function riconosciVoce(sd, attuale) {
+  if (!attuale || sd.opzioni.some(o => o.valore === attuale)) return attuale;
+  const norm = x => String(x).replace(/[\s\/]/g, "").toUpperCase();
+  const gemella = sd.opzioni.find(o => norm(o.valore) === norm(attuale));
+  if (gemella) return gemella.valore;
+  const al = sd.alias || {};
+  for (const k of [attuale, normAlias(attuale)]) if (Object.prototype.hasOwnProperty.call(al, k) && sd.opzioni.some(o => o.valore === al[k])) return al[k];
+  if (/^\d+$/.test(attuale) && sd.opzioni.some(o => o.valore === attuale.replace(/^0+/, ""))) return attuale.replace(/^0+/, "");
+  return attuale;
+}
+const testoVoce = (sd, o) => sd.senza_codice ? o.etichetta : o.valore + " — " + o.etichetta;
+
 /* Campo a scelta guidata (S.schema.strutturati, definito in schema.py): menu con etichette e aiuto della voce scelta.
-   Un valore gia' presente ma non nell'elenco (o uno stato come [da_confermare]) resta visibile e non viene perso. */
+   Un valore gia' presente ma non nell'elenco (o uno stato come [da_confermare]) resta visibile e non viene perso.
+   Il menu occupa la larghezza disponibile, il testo lungo si tronca con «...» e si legge per intero nel suggerimento (title). */
 function campoStrutturato(sd, val, onMod, path) {
   const err = path ? rilievi().filter(r => r.percorso === path) : [];
-  let attuale = val === undefined || val === null ? "" : (typeof val === "object" && val.stato ? "[" + val.stato + "]" : String(val));
-  if (attuale && !sd.opzioni.some(o => o.valore === attuale)) {     // «A/2» e «a2» valgono il codice «A2»: si mostra la voce senza cambiare il dato
-    const norm = x => String(x).replace(/[\s\/]/g, "").toUpperCase();
-    const gemella = sd.opzioni.find(o => norm(o.valore) === norm(attuale));
-    if (gemella) attuale = gemella.valore;
-  }
-  const el = h("select", { "aria-label": sd.etichetta },
+  const grezzo = val === undefined || val === null ? "" : (typeof val === "object" && val.stato ? "[" + val.stato + "]" : String(val));
+  const attuale = riconosciVoce(sd, grezzo);
+  const el = h("select", { "aria-label": sd.etichetta, style: "width:100%;min-width:0;max-width:100%;text-overflow:ellipsis" },
     h("option", { value: "" }, "(non indicato)"),
-    sd.opzioni.map(o => h("option", { value: o.valore }, o.valore + " — " + o.etichetta)),
+    sd.opzioni.map(o => h("option", { value: o.valore, title: testoVoce(sd, o) }, testoVoce(sd, o))),
     attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale }, attuale + " (valore non previsto)") : null);
   el.value = attuale;
   if (path) el.dataset.path = path;
   if (err.length) el.classList.add("bad");
   const dett = h("div", { class: "mut aiuto-voce", style: "font-size:0.8846rem;margin-top:2px" });
-  const mostraAiuto = () => { const o = sd.opzioni.find(x => x.valore === el.value); dett.textContent = o ? o.aiuto : ""; };
+  const mostraAiuto = () => {
+    const o = sd.opzioni.find(x => x.valore === el.value);
+    dett.textContent = o ? o.aiuto : "";
+    el.title = el.selectedOptions[0] ? el.selectedOptions[0].textContent : "";
+  };
   const f = () => { mostraAiuto(); onMod(leggi("str", el.value)); };
   el.addEventListener("change", f);
   mostraAiuto();
@@ -268,6 +320,12 @@ function renderVista() {
   main.scrollTop = y;
 }
 function renderNonSupp(main, q) {
+  if (q.generato) {   // EE, EF, EH, EI: li produce il programma alla generazione del file; non c'e' nulla da compilare ne' da selezionare
+    main.append(h("div", { class: "nota" }, "Il quadro " + q.id + " viene generato dal programma a partire dai dati degli altri quadri: non si compila e non va selezionato."
+      + (q.attivo ? " In questa pratica risulta selezionato (scelta precedente): finche' resta selezionato la dichiarazione non e' finalizzabile." : "")));
+    if (q.attivo) main.append(h("div", { class: "barra" }, h("button", { class: "gh", onclick: () => impostaQuadro(q.id, false) }, "Deseleziona il quadro")));
+    return;
+  }
   main.append(h("div", { class: "nota" }, "Il quadro " + q.id + " non è ancora supportato (" + (q.motivo || "") + "). I dati già inseriti altrove restano conservati; finché il quadro è selezionato la dichiarazione non può essere finalizzata."));
   main.append(h("div", { class: "barra" }, h("button", { class: "gh", onclick: () => impostaQuadro(q.id, !q.attivo) }, q.attivo ? "Deseleziona il quadro" : "Seleziona il quadro (blocca la finalizzazione)")));
 }
@@ -292,6 +350,10 @@ function renderTabella(main, q) {
     q.colonne.forEach((c, j) => {
       const kind = campi[c]; const v = valRiga(r, c);
       let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v);
+      if (c === "grado_parentela" && typeof v === "string" && v) {   // il grado si legge per nome (menu dei codici), non come codice
+        const sdg = struttDi(q.coll, c, null), og = sdg && sdg.opzioni.find(x => x.valore === riconosciVoce(sdg, v));
+        if (og) txt = og.etichetta;
+      }
       if (kind.startsWith("ref:") && v) { const e = (S.P.dati[kind.slice(4)] || []).find(x => x.id === v); if (e) txt = etichetta(kind.slice(4), e); }
       const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
       const td = h("td", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : "", title: txt }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
@@ -308,6 +370,7 @@ function aggiungiRiga(q) {
   const key = "n:" + crypto.randomUUID();
   S.nuove.set(key, { q: q.id, coll: q.coll, id: nuovoId(q.coll), campi: { ...q.preset } });
   S.riga = key; S.tab = "dati"; renderVista(); renderIns(); aggiornaBottoni(); renderSb();
+  if (!q.attivo && q.supportato) msg("Il quadro " + q.id + " non è selezionato: si seleziona da solo quando salvi la nuova riga.", "o");
   const primo = $("#ins .rg input, #ins .rg select"); if (primo) primo.focus();
 }
 /* Tastiera nella tabella (roving tabindex: una sola tappa Tab per tabella). Frecce su/giu, Home e Fine spostano il focus tra le
@@ -353,7 +416,7 @@ function insDati(ins) {
   const q = quadro(); const r = rigaSelezionata();
   if (!q || !q.coll) { ins.append(h("p", { class: "mut" }, q && q.vista === "frontespizio" ? "I dati del frontespizio si modificano nelle schede al centro." : "Questo quadro non ha righe da modificare.")); return; }
   if (!r) { ins.append(h("p", { class: "mut" }, "Seleziona una riga della tabella oppure aggiungine una.")); return; }
-  const campi = S.schema.collezioni[q.coll]; const id = r.e && r.e.id;
+  const campi = S.schema.collezioni[q.coll]; const id = r.e ? r.e.id : r.nuova.id;   // anche le righe nuove hanno data-path (per evidenziare l'errore al salvataggio)
   ins.append(h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)));
   for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e", style: "color:var(--er);margin:0 0 6px" }, x.messaggio));
   const visibili = q.campi ? new Set(q.campi) : (((S.schema.ordine || {})[q.id]) ? new Set(S.schema.ordine[q.id]) : null);   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
@@ -364,6 +427,10 @@ function insDati(ins) {
   for (const c of ordine) { const kind = campi[c];
     const vv = valRiga(r, c);
     if (visibili && !visibili.has(c) && (vv === undefined || vv === null || vv === "")) continue;
+    if (q.coll === "persone" && c === "relazione_con_defunto" && struttDi("persone", "grado_parentela")) {   // duplica il grado (menu): si nasconde se vuota o uguale
+      const rel = String(vv || "").trim();
+      if (!rel || rel === String(valRiga(r, "grado_parentela") || "").trim()) continue;
+    }
     const tipoBene = q.coll === "beni" ? valRiga(r, "tipo")
       : q.coll === "devoluzioni" ? ((S.P.dati.beni || []).find(b => b.id === valRiga(r, "bene_id")) || {}).tipo : null;
     const sd = struttDi(q.coll, c, tipoBene);
@@ -372,9 +439,14 @@ function insDati(ins) {
         if (r.nuova) r.nuova.campi[c2] = x;
         else { const d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} }; d.campi[c2] = x; S.dirty.set(r.key, d); }
       };
+      const gradoPrima = campo === "grado_parentela" ? String(valRiga(r, "grado_parentela") || "") : "";
       scrivi(campo, v);
-      // il grado (menu dei codici) e la «relazione» in tabella dicono la stessa cosa: se la relazione e' vuota la si allinea
-      if (q.coll === "persone" && campo === "grado_parentela" && v && !valRiga(r, "relazione_con_defunto")) scrivi("relazione_con_defunto", v);
+      // il grado (menu dei codici) e la «relazione» dicono la stessa cosa e l'esportazione li confronta: la relazione resta una
+      // nota interna allineata al grado (se vuota o uguale al grado precedente); il campo si vede solo se contiene altro
+      if (q.coll === "persone" && campo === "grado_parentela") {
+        const rel = String(valRiga(r, "relazione_con_defunto") || "").trim();
+        if (!rel || rel === gradoPrima) scrivi("relazione_con_defunto", v || null);
+      }
       renderVista(); aggiornaBottoni(); renderSb();
       if ((q.coll === "beni" && campo === "tipo") || (q.coll === "devoluzioni" && campo === "bene_id")) renderIns();   // cambia l'elenco dei diritti
       if (q.coll === "persone" && campo === "codice_fiscale")
@@ -413,12 +485,25 @@ function renderStrutturati(ins, q, r) {
   if (q.coll === 'devoluzioni') {
     const sd = (S.schema.strutturati || {})['devoluzioni.agevolazioni'];
     const bene = (S.P.dati.beni || []).find(b => b.id === valRiga(r, 'bene_id'));
-    ins.append(h('h3', {}, 'Agevolazione prima casa'));
-    ins.append(campoStrutturato(sd, valore('agevolazioni'), v => scrivi('agevolazioni', v), null));
+    const attuale = String(valore('agevolazioni') || '').toUpperCase();
+    ins.append(h('h3', {}, 'Agevolazione (prima casa, riduzioni)'));
+    ins.append(campoStrutturato(sd, valore('agevolazioni'), v => { scrivi('agevolazioni', v); renderIns(); }, null));
     ins.append(h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:4px' }, sd.aiuto));
-    if (bene && quadroBene(bene) !== 'EC')
+    if (bene && ['P', 'X', 'Z'].includes(attuale) && quadroBene(bene) !== 'EC')
       ins.append(h('div', { class: 'nota', style: 'margin:6px 0' }, 'Il bene collegato non è un fabbricato del quadro EC: i codici P, X, Z sono ammessi solo lì e l\'esportazione segnalerà un errore.'));
+    const rd = (S.schema.strutturati || {})['devoluzioni.riduzioni'];
+    ins.append(h('h3', {}, 'Riduzione art. 25 comma 1'));
+    ins.append(campoStrutturato(rd, valore('riduzioni'), v => scrivi('riduzioni', v), null));
+    ins.append(h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:4px' }, rd.aiuto));
+    if (valore('riduzioni') && bene)
+      ins.append(h('div', { class: 'nota', style: 'margin:6px 0' }, 'Indica anche il valore delle precedenti successioni nel pannello del bene collegato (' + etichetta('beni', bene) + ').'));
     return;
+  }
+  if (q.coll === 'beni') {
+    const vp = (S.schema.strutturati || {})['beni.valore_prec_succ'];
+    const inp = h('input', { id: 'vps_' + id, class: 'num', autocomplete: 'off', 'aria-label': vp.etichetta, value: valore('valore_prec_succ') == null ? '' : String(valore('valore_prec_succ')),
+      oninput: ev => scrivi('valore_prec_succ', leggi('importo', ev.target.value)) });
+    ins.append(h('h3', {}, 'Precedenti successioni o donazioni'), h('div', { class: 'rg' }, h('label', { for: 'vps_' + id }, vp.etichetta), h('div', {}, inp, h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:2px' }, vp.aiuto))));
   }
   if (q.coll === 'persone') {
     const cb = h('input', { type: 'checkbox', 'aria-label': 'portatore handicap', onchange: ev => scrivi('portatore_handicap', ev.target.checked) });
@@ -504,12 +589,12 @@ async function insFile(dest) {
   const impegnoIn = h('select', { 'aria-label': 'Impegno a trasmettere' }, h('option', { value: '' }, 'Non indicato'),
     h('option', { value: '1' }, 'Predisposta dal dichiarante (1)'), h('option', { value: '2' }, 'Predisposta dall’intermediario (2)'));
   impegnoIn.value = profilo.impegno_codice || '';
-  const dataIn = h('input', { 'aria-label': 'Data impegno', placeholder: 'AAAA-MM-GG', value: profilo.data_impegno || '' });
+  const dataIn = h('input', { 'aria-label': 'Data impegno', placeholder: 'GG/MM/AAAA', value: dataIt(profilo.data_impegno || '') });
   const dettagli = h('div', {}, h('label', {}, 'Impegno a trasmettere', impegnoIn), h('label', {}, 'Data impegno', dataIn));
   dettagli.hidden = tipoIn.value !== '10';
   tipoIn.addEventListener('change', () => { modifica('tipo', tipoIn.value); dettagli.hidden = tipoIn.value !== '10'; });
   impegnoIn.addEventListener('change', () => modifica('impegno_codice', impegnoIn.value || null));
-  dataIn.addEventListener('input', () => modifica('data_impegno', dataIn.value.trim() || null));
+  dataIn.addEventListener('input', () => modifica('data_impegno', dataIso(dataIn.value) || null));
   fornitore.append(h('label', {}, 'Codice fiscale del fornitore', cfIn), h('label', {}, 'Tipo fornitore', tipoIn), dettagli,
     h('div', { class: 'az' }, h('button', { class: 'gh', onclick: salvaTutto }, 'Salva profilo')));
   const elaborati = h('section', { class: 'grp' }, h('h2', {}, 'Generazione e controllo'));
@@ -653,16 +738,16 @@ const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore boo
   ["stato_civile", "stato civile"], ["devoluzione_per_legge", "devoluzione per legge", "bool"], ["firma_dichiarante", "firma del dichiarante", "bool"],
   ["tempistica_pagamento", "tempistica del pagamento"],
   ["dichiara_copie_conformi", "dichiarazione di conformità delle copie allegate", "bool"],
-  ["azienda_data_deposito", "azienda: data di deposito (AAAA-MM-GG)"],
+  ["azienda_data_deposito", "azienda: data di deposito"],
   ["azienda_camera_commercio", "azienda: camera di commercio"],
   ["presentatore.persona_id", "Presentatore tra i soggetti della pratica"], ["presentatore.codice_carica", "presentatore: codice carica"],
   ["presentatore.telefono", "presentatore: telefono"], ["presentatore.email", "presentatore: email"],
   ["versamento.iban", "versamento: IBAN"], ["versamento.cf_titolare", "versamento: codice fiscale del titolare"],
   ["devoluzione_per_testamento", "devoluzione per testamento", "bool"], ["testamento.estero", "testamento estero", "bool"],
-  ["testamento.pubblico_ufficiale", "testamento: pubblico ufficiale"], ["testamento.data_pubblicazione", "testamento: data pubblicazione (AAAA-MM-GG)"],
+  ["testamento.pubblico_ufficiale", "testamento: pubblico ufficiale"], ["testamento.data_pubblicazione", "testamento: data pubblicazione"],
   ["testamento.ufficio_registrazione", "testamento: ufficio di registrazione"], ["testamento.serie", "testamento: serie"],
   ["testamento.numero_registrazione", "testamento: numero registrazione"], ["testamento.sottonumero_registrazione", "testamento: sottonumero"],
-  ["testamento.data_registrazione", "testamento: data registrazione (AAAA-MM-GG)"],
+  ["testamento.data_registrazione", "testamento: data registrazione"],
 ];
 function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazione') {
   const tel = (S.P.dati.opzioni || {}).telematico || {};
@@ -690,10 +775,11 @@ function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazi
         sd.opzioni.map(o => h("option", { value: o.valore }, o.valore + " — " + o.etichetta)),
         attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale }, attuale + " (valore non previsto)") : null);
       inp.value = attuale;
-    } else inp = h("input", { id, "aria-label": etichetta, value: v == null ? "" : String(v) });
+    } else inp = h("input", { id, "aria-label": etichetta, autocomplete: "off", list: listaSuggerimenti("dichiarazione." + chiave),
+      placeholder: chiave.includes("data_") ? "GG/MM/AAAA" : "", value: v == null ? "" : chiave.includes("data_") ? dataIt(String(v)) : String(v) });
     const modifica = () => {
       const testo = inp.value.trim();
-      S.dichDirty.set(chiave, testo === "" ? null : tipo === "bool" ? testo === "si" : testo);
+      S.dichDirty.set(chiave, testo === "" ? null : tipo === "bool" ? testo === "si" : chiave.includes("data_") ? dataIso(testo) : testo);
       aggiornaBottoni(); renderSb();
       if (chiave === 'presentatore.persona_id') renderVista();
     };
@@ -737,6 +823,34 @@ function sezionePrimaCasa() {
   sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "pc_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
   return sez;
 }
+/* Sezione IV del quadro EH per le riduzioni dell'art. 25 e i codici L, Q chiesti dal dichiarante:
+   opzioni.telematico.dichiarazione.riduzioni_art25 (elenco, etichette e aiuti: schema.STRUTTURATI, regole: docs/regole/riduzioni_art25.md). */
+function sezioneRiduzioni() {
+  const dich = ((S.P.dati.opzioni || {}).telematico || {}).dichiarazione || {};
+  const defs = Object.entries(S.schema.strutturati || {}).filter(([k]) => k.startsWith("dichiarazione.riduzioni_art25."));
+  const sez = h("section", { class: "grp", id: "sezRiduzioni" }, h("h2", {}, "Riduzioni dell'art. 25 e codici L, Q (Sezione IV del quadro EH)"),
+    h("div", { class: "nota", style: "margin:8px 14px" }, "Servono solo se il dichiarante chiede una riduzione 1-5 oppure L o Q: i codici si impostano sulle righe di devoluzione (scheda DV) e il valore delle precedenti successioni sul bene. Indica la successione precedente OPPURE la donazione precedente. Fonti: docs/regole/riduzioni_art25.md."));
+  for (const [percorso, sd] of defs) {
+    const chiave = percorso.slice("dichiarazione.".length);   // es. riduzioni_art25.l.data
+    const corrente = S.dichDirty.has(chiave) ? S.dichDirty.get(chiave) : chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
+    const id = "ra_" + chiave.replaceAll(".", "_"), isData = sd.formato === "data";
+    let inp;
+    if (sd.tipo === "bool") {
+      inp = h("select", { id, "aria-label": sd.etichetta }, h("option", { value: "" }, "(non indicato)"), h("option", { value: "si" }, "sì"), h("option", { value: "no" }, "no"));
+      inp.value = corrente === true ? "si" : corrente === false ? "no" : "";
+    } else inp = h("input", { id, "aria-label": sd.etichetta, autocomplete: "off", list: sd.suggerimenti ? listaSuggerimenti(sd.suggerimenti) : null,
+      placeholder: isData ? "GG/MM/AAAA" : "", value: corrente == null ? "" : isData ? dataIt(String(corrente)) : String(corrente) });
+    const modifica = () => {
+      const t = inp.value.trim();
+      S.dichDirty.set(chiave, t === "" ? null : sd.tipo === "bool" ? t === "si" : isData ? dataIso(t) : t);
+      aggiornaBottoni(); renderSb();
+    };
+    inp.addEventListener("input", modifica); inp.addEventListener("change", modifica);
+    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut", style: "font-size:0.8846rem;margin-top:2px" }, sd.aiuto))));
+  }
+  sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "ra_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
+  return sez;
+}
 function renderFront(main) {
   main.append(h('p', { class: 'generali-intro' }, 'Compila i dati nell’ordine indicato. Le modifiche si salvano insieme con Salva o Ctrl+S.'));
   const grid = h('div', { class: 'generali-griglia' }); main.append(grid);
@@ -759,15 +873,16 @@ function renderFront(main) {
   const testamento = h('details', { class: 'gruppo-opzionale', open: dich.devoluzione_per_testamento === true || !!dich.testamento }, h('summary', {}, 'Testamento · dati da compilare se presente'),
     sezioneDatiDichiarazione(CAMPI_DICH.filter(([k]) => k.startsWith('testamento.')).map(([k]) => k), 'Estremi del testamento'));
   const primaCasa = h('details', { class: 'gruppo-opzionale', open: !!dich.prima_casa }, h('summary', {}, 'Agevolazione prima casa'), sezionePrimaCasa());
+  const riduzioni = h('details', { class: 'gruppo-opzionale', open: !!dich.riduzioni_art25 }, h('summary', {}, 'Riduzioni art. 25 e codici L, Q'), sezioneRiduzioni());
   const aziende = h('details', { class: 'gruppo-opzionale', open: S.P.dati.beni.some(b => b.tipo === 'azienda') }, h('summary', {}, 'Dati delle aziende · se presenti'),
     sezioneDatiDichiarazione(['azienda_data_deposito', 'azienda_camera_commercio'], 'Deposito e camera di commercio'));
-  main.append(testamento, primaCasa, aziende);
+  main.append(testamento, primaCasa, riduzioni, aziende);
   const att = new Set(S.P.dati.opzioni.quadri_attivi || S.schema.predefiniti);
   const box = h('details', { class: 'gruppo-opzionale' }, h('summary', {}, 'Quadri inclusi nella pratica · ' + att.size + ' selezionati'));
-  for (const q of S.schema.quadri.filter(x => x.gruppo !== 'frontespizio' && x.id !== 'DV')) {
+  for (const q of S.schema.quadri.filter(x => x.gruppo !== 'frontespizio' && x.id !== 'DV' && (!x.generato || att.has(x.id)))) {
     const cb = h('input', { type: 'checkbox', id: 'qa_' + q.id }); cb.checked = att.has(q.id);
     cb.addEventListener('change', () => impostaQuadro(q.id, cb.checked));
-    box.append(h('label', { class: 'chk', for: 'qa_' + q.id }, cb, h('span', {}, q.id + ' — ' + q.titolo + (q.supportato ? '' : ' (generato / copertura limitata)'))));
+    box.append(h('label', { class: 'chk', for: 'qa_' + q.id }, cb, h('span', {}, q.id + ' — ' + q.titolo + (q.supportato ? '' : q.generato ? ' (generato dal programma: scelta precedente da togliere)' : ' (copertura limitata: blocca la finalizzazione)'))));
   }
   main.append(box, h('div', { class: 'barra' }, h('button', { class: 'pil', id: 'dd_salva', onclick: salvaTutto }, 'Salva dati generali')));
 }
@@ -800,6 +915,47 @@ async function renderAllegati(main) {
 }
 
 /* ---------- salvataggio ---------- */
+/* Un errore del server ha un percorso interno (beni[b_e1afbd972a4f].valore): lo si traduce in quadro, riga e campo leggibili,
+   si evidenzia il campo e ci si porta il focus. */
+function quadroDiEntita(coll, e) {
+  if (coll === "persone") return ["defunto", "presentatore"].includes(e.ruolo) ? "AN" : "EA";
+  if (coll === "beni") return quadroBene(e);
+  return { passivita: "ED", documenti_ref: "EG", devoluzioni: "DV" }[coll] || null;
+}
+function descriviErrore(x) {
+  const m = String(x.percorso || "").match(/^([a-z_]+)\[([^\]]+)\](?:\.([a-z_]+))?$/);
+  if (!m || !S.schema.collezioni[m[1]]) return { testo: x.messaggio, x };
+  const [, coll, eid, campo] = m;
+  const nuova = [...S.nuove.values()].find(n => n.id === eid), esistente = (S.P.dati[coll] || []).find(e => e.id === eid);
+  const sporca = [...S.dirty.values()].find(d => d.id === eid);
+  const entita = nuova ? { ...nuova.campi } : { ...(esistente || {}), ...(sporca ? sporca.campi : {}) };
+  const quadroId = nuova ? nuova.q : quadroDiEntita(coll, entita);
+  const chiave = nuova ? [...S.nuove].find(([, n]) => n.id === eid)[0] : "e:" + coll + ":" + eid;
+  let riga = nuova ? "nuova riga" : esistente ? etichetta(coll, esistente) : "";
+  if (!riga || riga === eid) riga = "riga senza descrizione";
+  const nomeCampo = campo ? lbl(coll, campo, quadroId) : null;
+  const dove = (quadroId ? "Quadro " + quadroId + ", " : "") + riga;
+  return { testo: dove + (nomeCampo ? " — " + nomeCampo : "") + ": " + x.messaggio, x, coll, eid, campo, quadroId, chiave,
+           path: campo ? coll + "[" + eid + "]." + campo : null };
+}
+function mostraErroriSalvataggio(errori) {
+  const d = errori.map(descriviErrore);
+  const righe = d.slice(0, 5).map(x => x.testo);
+  if (d.length > 5) righe.push("... e altri " + (d.length - 5) + " errori.");
+  msg("Non salvato: correggi i dati indicati.\n" + righe.join("\n"), "e");
+  const primo = d.find(x => x.chiave && x.quadroId);
+  if (!primo) return;
+  if (primo.quadroId !== S.sel || S.riga !== primo.chiave || S.tab !== "dati") { S.sel = primo.quadroId; S.riga = primo.chiave; S.tab = "dati"; render(); }
+  let focalizzato = false;
+  for (const x of d) {
+    if (!x.path) continue;
+    const el = document.querySelector('[data-path="' + CSS.escape(x.path) + '"]');
+    if (!el) continue;
+    el.classList.add("bad"); el.setAttribute("aria-invalid", "true");
+    if (!(el.parentElement && el.parentElement.querySelector(".e.sv"))) el.after(h("div", { class: "e sv" }, x.x.messaggio));
+    if (!focalizzato) { focalizzato = true; el.scrollIntoView({ block: "center" }); el.focus(); }
+  }
+}
 async function salvaOps(ops, confermate) {
   if (S.writeBusy) { msg("Salvataggio già in corso. Le modifiche restano da salvare.", "e"); return false; }
   S.writeBusy = true; aggiornaBottoni();
@@ -810,7 +966,7 @@ async function salvaOps(ops, confermate) {
     msg("Salvato (revisione " + r.revisione + ").", "o");   // dopo il ricaricamento: il messaggio non anticipa lo stato mostrato
     await caricaPratiche(); return true;
   } catch (e) {
-    if (e.dati && e.dati.errori) msg(e.dati.errori.map(x => x.percorso + ": " + x.messaggio).join(" | "), "e");
+    if (e.dati && e.dati.errori) mostraErroriSalvataggio(e.dati.errori);
     else if (e.stato === 409) { msg("La pratica è stata modificata altrove (" + e.message + "). Le tue modifiche non sono state applicate: controlla i dati aggiornati e salva di nuovo.", "e"); await ricarica(); render(); }
     else msg(e.message, "e");
     return false;
@@ -836,7 +992,8 @@ async function salvaTutto() {
       for (const p of parti.slice(0, -1)) o = o[p] = o[p] || {};
       if (val === null) delete o[parti.at(-1)]; else o[parti.at(-1)] = val;
     }
-    for (const k of ['presentatore', 'versamento', 'testamento', 'prima_casa']) if (d[k] && !Object.keys(d[k]).length) delete d[k];
+    const pota = o => { for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) { pota(o[k]); if (!Object.keys(o[k]).length) delete o[k]; } };
+    pota(d);   // oggetti annidati rimasti vuoti (presentatore, versamento, testamento, prima_casa, riduzioni_art25...)
     for (const { coll, id, campi } of supplementi.values()) {
       const ent = (tel[coll] = tel[coll] || {})[id] = ((tel[coll] || {})[id] || {});
       for (const [k, v] of Object.entries(campi)) { if (v === null) delete ent[k]; else ent[k] = v; }
@@ -844,6 +1001,14 @@ async function salvaTutto() {
     }
     ops.push({ op: 'set', sezione: 'opzioni', campi: { telematico: tel } });
   }
+  // Una riga aggiunta in un quadro non selezionato lo seleziona (altrimenti resta il rilievo «dati in quadro non attivo»)
+  const daAttivare = new Set();
+  for (const n of nuove.values()) {
+    if (!Object.values(n.campi).some(v => v !== null)) continue;
+    const idq = n.coll === "beni" ? quadroBene(n.campi) : n.q, qd = S.Q.quadri.find(x => x.id === idq);
+    if (qd && qd.supportato && !qd.attivo) daAttivare.add(idq);
+  }
+  if (daAttivare.size) ops.unshift({ op: "set", sezione: "opzioni", campi: { quadri_attivi: [...new Set([...(S.P.dati.opzioni.quadri_attivi || S.schema.predefiniti), ...daAttivare])] } });
   for (const d of dirty.values()) ops.push({ op: "upsert", coll: d.coll, id: d.id, campi: { ...d.campi } });
   for (const n of nuove.values()) { const campi = Object.fromEntries(Object.entries(n.campi).filter(([, v]) => v !== null)); if (Object.keys(campi).length) ops.push({ op: "upsert", coll: n.coll, id: n.id, campi }); }
   if (!ops.length) return true;
@@ -906,7 +1071,7 @@ function wizRender() {
   $("#wIndietro").hidden = W.passo === 0; $("#wAvanti").textContent = W.passo === PASSI.length - 1 ? "Crea dichiarazione" : "Avanti";
   const d = W.dati;
   const f = (k, label, ph) => h("div", { class: "campo" }, h("label", { for: "w_" + k }, label), h("input", { id: "w_" + k, value: d[k] || "", placeholder: ph || "", class: k === "codice_fiscale" ? "mono" : "", oninput: ev => { d[k] = ev.target.value; if (k === "codice_fiscale") wizDaCF(ev.target.value); } }));
-  if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nei dati generali."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "AAAA-MM-GG"), f("luogo_nascita", "Comune di nascita"), f("provincia_nascita", "Provincia di nascita", "RM"), f("data_decesso", "Data del decesso", "AAAA-MM-GG"), f("comune_decesso", "Comune del decesso"), f("provincia_decesso", "Provincia del decesso", "RM")), h("div", { id: "w_cf_nota", class: "mut", style: "font-size:0.9231rem;margin-top:8px", "aria-live": "polite" }));
+  if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nei dati generali."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "GG/MM/AAAA"), f("luogo_nascita", "Comune di nascita"), f("provincia_nascita", "Provincia di nascita", "RM"), f("data_decesso", "Data del decesso", "GG/MM/AAAA"), f("comune_decesso", "Comune del decesso"), f("provincia_decesso", "Provincia del decesso", "RM")), h("div", { id: "w_cf_nota", class: "mut", style: "font-size:0.9231rem;margin-top:8px", "aria-live": "polite" }));
   if (W.passo === 1) {
     d.tipo = d.tipo || "originaria";
     for (const [v, t, s] of [["originaria", "Dichiarazione originaria", "Prima dichiarazione per questa successione."], ["sostitutiva", "Dichiarazione sostitutiva", "Sostituisce una dichiarazione già presentata. La gestione dei dati della precedente non è ancora disponibile."]]) {
@@ -916,11 +1081,11 @@ function wizRender() {
   }
   if (W.passo === 2) {
     d.quadri = d.quadri || [...S.schema.predefiniti];
-    c.append(h("p", { class: "mut" }, "Seleziona i quadri da compilare. Potrai cambiare scelta nel frontespizio."));
-    for (const q of S.schema.quadri.filter(x => x.gruppo !== "frontespizio" && x.id !== "DV")) {
+    c.append(h("p", { class: "mut" }, "Seleziona i quadri da compilare. Potrai cambiare scelta nel frontespizio. I quadri EE, EF, EH ed EI non compaiono: li genera il programma."));
+    for (const q of S.schema.quadri.filter(x => x.gruppo !== "frontespizio" && x.id !== "DV" && !x.generato)) {
       const cb = h("input", { type: "checkbox", id: "wq_" + q.id }); cb.checked = d.quadri.includes(q.id);
       cb.addEventListener("change", () => { d.quadri = cb.checked ? [...new Set([...d.quadri, q.id])] : d.quadri.filter(x => x !== q.id); });
-      c.append(h("label", { class: "chk", for: "wq_" + q.id }, cb, h("span", {}, q.id + " — " + q.titolo + (q.supportato ? "" : " (non ancora supportato: blocca la finalizzazione)"))));
+      c.append(h("label", { class: "chk", for: "wq_" + q.id }, cb, h("span", {}, q.id + " — " + q.titolo + (q.supportato ? "" : " (copertura limitata: blocca la finalizzazione)"))));
     }
   }
   if (W.passo === 3) c.append(h("p", {}, "Verrà creata la dichiarazione «" + titoloWiz() + "» con " + (d.quadri || S.schema.predefiniti).length + " quadri selezionati, tipo " + (d.tipo || "originaria") + "."), h("p", { class: "mut" }, "Potrai completare ogni dato nei quadri; i controlli ti mostreranno cosa manca."));
@@ -935,7 +1100,7 @@ async function wizAvanti() {
   const d = W.dati;
   if (W.passo === 0 && !(d.cognome || "").trim()) { $("#wizErr").textContent = "Indica almeno il cognome del defunto."; return; }
   if (W.passo < PASSI.length - 1) { W.passo++; wizRender(); return; }
-  const campi = {}; for (const k of ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso", "comune_decesso", "provincia_decesso"]) if ((d[k] || "").trim()) campi[k] = (k === "codice_fiscale" || k.startsWith('provincia')) ? d[k].trim().toUpperCase() : d[k].trim();
+  const campi = {}; for (const k of ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso", "comune_decesso", "provincia_decesso"]) if ((d[k] || "").trim()) campi[k] = (k === "codice_fiscale" || k.startsWith('provincia')) ? d[k].trim().toUpperCase() : (k.startsWith("data_") ? dataIso(d[k]) : d[k].trim());
   campi.ruolo = "defunto";
   const iniziali = [{ op: "upsert", coll: "persone", campi }, { op: "set", sezione: "opzioni", campi: { tipo_dichiarazione: d.tipo || "originaria", quadri_attivi: d.quadri || S.schema.predefiniti } }];
   try {

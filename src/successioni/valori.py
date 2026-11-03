@@ -26,9 +26,9 @@ def parse_importo(v) -> Decimal:
         raise ValoreNonValido("importo float non ammesso: usare stringa decimale con punto")
     s = str(v).strip()
     if "," in s:
-        raise ValoreNonValido("separatore decimale ',' non ammesso: usare '.'")
+        raise ValoreNonValido("separatore decimale ',' non ammesso: usare il punto (esempio 1234.50)")
     if not re.fullmatch(r"-?\d+(\.\d+)?", s):
-        raise ValoreNonValido(f"importo non valido: {v!r}")
+        raise ValoreNonValido(f"importo non valido: {v!r} (indicare solo cifre, con il punto per i decimali, esempio 1234.50)")
     try:
         return Decimal(s)
     except InvalidOperation as e:  # pragma: no cover
@@ -42,14 +42,14 @@ def parse_quota(v) -> Fraction:
     elif isinstance(v, str) and re.fullmatch(r"\s*\d+\s*/\s*\d+\s*", v):
         n, d = (int(x) for x in v.split("/"))
     else:
-        raise ValoreNonValido(f"quota non valida: {v!r} (usare num/den)")
+        raise ValoreNonValido(f"quota non valida: {v!r} (indicare una frazione come 1/2)")
     if not (isinstance(n, int) and isinstance(d, int)) or isinstance(n, bool) or isinstance(d, bool):
-        raise ValoreNonValido("numeratore e denominatore devono essere interi")
+        raise ValoreNonValido("numeratore e denominatore della quota devono essere numeri interi (esempio 1/2)")
     if d <= 0 or n < 0:
-        raise ValoreNonValido("denominatore > 0 e numeratore >= 0")
+        raise ValoreNonValido("nella quota il denominatore deve essere maggiore di zero e il numeratore non negativo (esempio 1/2)")
     f = Fraction(n, d)
     if f > 1:
-        raise ValoreNonValido("quota maggiore di 1")
+        raise ValoreNonValido("quota maggiore di 1 non ammessa (esempio 1/2)")
     return f
 
 

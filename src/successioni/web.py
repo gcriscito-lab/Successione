@@ -88,9 +88,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     @api
     async def schema_(request):
         from .collegamenti.invio import TIPI_RICEVUTA
-        from . import etichette as E
+        from . import codici, etichette as E
         return {**E.per_api(), "collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": S.AIUTI,
-                "strutturati": strutturati_completi(), "tipi_ricevuta": TIPI_RICEVUTA,
+                "strutturati": strutturati_completi(), "suggerimenti": codici.suggerimenti(), "tipi_ricevuta": TIPI_RICEVUTA,
                 "province_tavolari": list(Q.PROVINCE_TAVOLARI)}
 
     @api
