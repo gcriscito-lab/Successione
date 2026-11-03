@@ -60,7 +60,7 @@ def test_voce_non_impostata(conf):
 
 
 def test_salva_file_e_cartella_aggiorna_file_e_ambiente(conf, tmp_path, monkeypatch):
-    exe = _file(tmp_path)
+    exe = _file(tmp_path, "gswin64c.exe")
     cart = tmp_path / "jar"
     cart.mkdir()
     s = IM.salva({"SUCCESSIONI_GS": exe, "SUCCESSIONI_CONTROLLI_SUC13": str(cart)})
@@ -73,19 +73,19 @@ def test_salva_file_e_cartella_aggiorna_file_e_ambiente(conf, tmp_path, monkeypa
 
 def test_chiavi_estranee_nel_file_si_conservano(conf, tmp_path, monkeypatch):
     conf.write_text(json.dumps({"ALTRO": "valore", "SUCCESSIONI_GS": "vecchio"}), encoding="utf-8")
-    exe = _file(tmp_path)
+    exe = _file(tmp_path, "qpdf.exe")
     IM.salva({"SUCCESSIONI_QPDF": exe})
     assert json.loads(conf.read_text(encoding="utf-8")) == {"ALTRO": "valore", "SUCCESSIONI_GS": "vecchio", "SUCCESSIONI_QPDF": exe}
 
 
 def test_il_file_scritto_e_letto_dall_avviatore(conf, tmp_path, monkeypatch):
-    exe = _file(tmp_path)
+    exe = _file(tmp_path, "verapdf.bat")
     IM.salva({"SUCCESSIONI_VERAPDF": exe, "SUCCESSIONI_CONTROLLI_TIMEOUT": "900"})
     assert A.leggi_configurazione() == {"SUCCESSIONI_VERAPDF": exe, "SUCCESSIONI_CONTROLLI_TIMEOUT": "900"}
 
 
 def test_valore_vuoto_rimuove_dal_file_e_dall_ambiente(conf, tmp_path, monkeypatch):
-    exe = _file(tmp_path)
+    exe = _file(tmp_path, "java.exe")
     IM.salva({"SUCCESSIONI_JAVA": exe})
     s = IM.salva({"SUCCESSIONI_JAVA": "  "})
     assert "SUCCESSIONI_JAVA" not in os.environ and json.loads(conf.read_text(encoding="utf-8")) == {}
@@ -130,7 +130,7 @@ def test_timeout_ai_limiti(conf, valore, monkeypatch):
 
 
 def test_tutto_o_niente(conf, tmp_path):
-    exe = _file(tmp_path)
+    exe = _file(tmp_path, "gswin64c.exe")
     with pytest.raises(DatiNonValidi):
         IM.salva({"SUCCESSIONI_GS": exe, "SUCCESSIONI_QPDF": "C:/non/esiste.exe"})
     assert not conf.exists() and "SUCCESSIONI_GS" not in os.environ
@@ -143,19 +143,26 @@ def test_nessuna_modifica_e_tipo_errato(conf):
 
 
 def test_virgolette_attorno_al_percorso_tolte(conf, tmp_path, monkeypatch):
-    exe = _file(tmp_path)
+    exe = _file(tmp_path, "qpdf.exe")
     IM.salva({"SUCCESSIONI_QPDF": f'"{exe}"'})
     assert json.loads(conf.read_text(encoding="utf-8"))["SUCCESSIONI_QPDF"] == exe
 
 
 def test_scrittura_impossibile_e_segnalata_senza_cambiare_l_ambiente(tmp_path, monkeypatch, conf):
+    un_file = tmp_path / "e_un_file"
+    un_file.write_bytes(b"")
+    monkeypatch.setenv("SUCCESSIONI_CONFIG", str(un_file / "configurazione.json"))     # la cartella madre e' un file: non si puo' creare
+    with pytest.raises(DatiNonValidi, match="impossibile scrivere"):
+        IM.salva({"SUCCESSIONI_QPDF": _file(tmp_path, "qpdf.exe")})
+    assert "SUCCESSIONI_QPDF" not in os.environ
+
+
+def test_il_file_di_configurazione_e_una_cartella(tmp_path, monkeypatch, conf):
     cartella = tmp_path / "e_una_cartella"
     cartella.mkdir()
     monkeypatch.setenv("SUCCESSIONI_CONFIG", str(cartella))
-    monkeypatch.delenv("SUCCESSIONI_QPDF", raising=False)
-    exe = _file(tmp_path)
-    with pytest.raises(DatiNonValidi, match="impossibile scrivere"):
-        IM.salva({"SUCCESSIONI_QPDF": exe})
+    with pytest.raises(DatiNonValidi, match="non e' leggibile"):
+        IM.salva({"SUCCESSIONI_QPDF": _file(tmp_path, "qpdf.exe")})
     assert "SUCCESSIONI_QPDF" not in os.environ
 
 
@@ -165,13 +172,13 @@ def test_senza_variabile_il_file_e_nella_cartella_dei_dati(tmp_path, monkeypatch
     assert IM.file_configurazione() == tmp_path / "d" / "configurazione.json"
 
 
-def test_file_illeggibile_trattato_come_vuoto(conf):
+def test_file_illeggibile_in_lettura_si_mostra_come_vuoto(conf):
     conf.write_text("{ non json", encoding="utf-8")
     assert _voce(IM.stato(), "SUCCESSIONI_GS")["salvato"] is None
 
 
 def test_origine_ambiente_diversa_dal_file(conf, tmp_path, monkeypatch):
-    exe, altro = _file(tmp_path), _file(tmp_path, "altro.exe")
+    exe, altro = _file(tmp_path, "gswin64c.exe"), _file(tmp_path, "gs.exe")
     conf.write_text(json.dumps({"SUCCESSIONI_GS": exe}), encoding="utf-8")
     monkeypatch.setenv("SUCCESSIONI_GS", altro)
     v = _voce(IM.stato(), "SUCCESSIONI_GS")
@@ -205,7 +212,7 @@ def _client(tmp_path):
 
 
 def test_api_legge_e_salva(conf, tmp_path, monkeypatch):
-    exe = _file(tmp_path)
+    exe = _file(tmp_path, "qpdf.exe")
     with _client(tmp_path) as cl:
         r = cl.get("/api/impostazioni?t=sintetico")
         assert r.status_code == 200 and len(r.json()["voci"]) == len(IM.VOCI)
@@ -224,13 +231,31 @@ def test_api_errori_e_token(conf, tmp_path):
     assert not conf.exists()
 
 
-@pytest.mark.parametrize("contenuto", ["[1, 2]", '"testo"', "123", "null"])
-def test_file_con_json_non_oggetto_trattato_come_vuoto(conf, tmp_path, contenuto, monkeypatch):
+@pytest.mark.parametrize("contenuto", ["[1, 2]", '"testo"', "123", "null", '{"SUCCESSIONI_GS": "x",}', "{ non json"])
+def test_file_illeggibile_o_non_oggetto_non_si_sovrascrive(conf, tmp_path, contenuto):
     conf.write_text(contenuto, encoding="utf-8")
     assert IM.stato()["voci"][1]["salvato"] is None
-    exe = _file(tmp_path)
-    IM.salva({"SUCCESSIONI_QPDF": exe})
-    assert json.loads(conf.read_text(encoding="utf-8")) == {"SUCCESSIONI_QPDF": exe}
+    with pytest.raises(DatiNonValidi, match="non e' leggibile|non contiene un oggetto"):
+        IM.salva({"SUCCESSIONI_QPDF": _file(tmp_path, "qpdf.exe")})
+    assert conf.read_text(encoding="utf-8") == contenuto and "SUCCESSIONI_QPDF" not in os.environ
+
+
+@pytest.mark.parametrize("chiave,nome", [("SUCCESSIONI_JAVA", "cmd.exe"), ("SUCCESSIONI_JAVA", "calc.exe"),
+                                         ("SUCCESSIONI_GS", "powershell.exe"), ("SUCCESSIONI_VERAPDF", "verapdf.exe.txt"),
+                                         ("SUCCESSIONI_QPDF", "qpdf2.exe"), ("SUCCESSIONI_ICC", "profilo.exe")])
+def test_il_nome_del_file_deve_essere_quello_dello_strumento(conf, tmp_path, chiave, nome):
+    with pytest.raises(DatiNonValidi, match="nome dello strumento"):
+        IM.salva({chiave: _file(tmp_path, nome)})
+    assert not conf.exists()
+
+
+@pytest.mark.parametrize("chiave,nome", [("SUCCESSIONI_JAVA", "java.exe"), ("SUCCESSIONI_JAVA", "javaw.exe"), ("SUCCESSIONI_JAVA", "JAVA.EXE"),
+                                         ("SUCCESSIONI_GS", "gswin64c.exe"), ("SUCCESSIONI_GS", "gs"), ("SUCCESSIONI_GS", "gswin32c.exe"),
+                                         ("SUCCESSIONI_VERAPDF", "verapdf.bat"), ("SUCCESSIONI_VERAPDF", "verapdf"),
+                                         ("SUCCESSIONI_QPDF", "qpdf.exe"), ("SUCCESSIONI_ICC", "srgb.icc"), ("SUCCESSIONI_ICC", "x.ICM")])
+def test_nomi_ammessi_per_ogni_strumento(conf, tmp_path, chiave, nome):
+    IM.salva({chiave: _file(tmp_path, nome)})
+    assert chiave in json.loads(conf.read_text(encoding="utf-8"))
 
 
 def test_nome_di_comando_nel_path_e_accettato_per_gli_strumenti(conf, monkeypatch):

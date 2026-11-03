@@ -20,6 +20,12 @@ TIPI = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", 
         ".svg": "image/svg+xml"}
 
 
+def strutturati_completi() -> dict:
+    """Campi a scelta guidata: i codici ufficiali generati dagli XSD (`codici.py`) e, con precedenza, le voci scritte a mano."""
+    from . import codici
+    return {**codici.strutturati(), **S.STRUTTURATI}
+
+
 def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: int = 8765,
              ammetti_host_di_prova: bool = False) -> Starlette:
     sv = servizio or Servizio()
@@ -83,7 +89,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def schema_(request):
         from .collegamenti.invio import TIPI_RICEVUTA
         return {"collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": S.AIUTI,
-                "tipi_ricevuta": TIPI_RICEVUTA,
+                "strutturati": strutturati_completi(), "tipi_ricevuta": TIPI_RICEVUTA,
                 "province_tavolari": list(Q.PROVINCE_TAVOLARI)}
 
     @api
@@ -151,7 +157,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def scarica_xml(request):
         xml, j = sv.file_export(request.path_params["pid"], request.query_params.get("job"))
         return Response(xml, media_type="application/xml", headers={"Content-Disposition":
-                        f'attachment; filename="successione_rev{j["input"]["revisione"]}.xml"', "Cache-Control": "no-store"})
+                        f'attachment; filename="successione_rev{j["input"]["revisione"]}{"" if j["risultato"].get("completo") else "_bozza"}.xml"', "Cache-Control": "no-store"})
 
     @api
     async def stampa(request):
@@ -201,7 +207,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def impostazioni_salva(request):
         from . import impostazioni
         b = await request.json()
-        return impostazioni.salva(b["modifiche"])
+        return impostazioni.salva(b.get("modifiche", {}), interfaccia=b.get("interfaccia"))
 
     async def corpo(request):
         return await request.json() if (await request.body()) else {}

@@ -109,7 +109,7 @@ async function runExport(page, praticaId, url = "http://127.0.0.1:8813/?t=t0k") 
   await page.getByLabel('Impegno a trasmettere', { exact: true }).selectOption('2');
   await page.getByLabel('Data impegno', { exact: true }).fill('2026-10-30');
   const risposta = page.waitForResponse(r => r.url().includes('/esporta') && r.request().method() === 'POST');
-  await page.locator('#ins').getByRole('button', { name: 'Genera file', exact: true }).click();
+  await page.locator('#vista').getByRole('button', { name: 'Genera file', exact: true }).click();
   const esito = await (await risposta).json();
   assert.equal(esito.completo, true);
   assert.equal(esito.generato, true);

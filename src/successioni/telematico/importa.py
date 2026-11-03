@@ -49,6 +49,8 @@ _letti = ContextVar("elementi_xml_importati", default=None)
 
 def _t(el, percorso: str) -> str | None:
     r = el.xpath(percorso, namespaces=NS)
+    if len(r) > 1:
+        raise XmlNonImportabile(f"elemento duplicato dove ne e' atteso uno solo: {percorso} ({len(r)} volte)")
     if r and _letti.get() is not None:
         _letti.get().update(r)
     return (r[0].text or "").strip() if r else None
@@ -114,8 +116,10 @@ def _anagrafica(el, base: str) -> dict:
 def _quota(el, percorso: str, cosa: str) -> dict | None:
     n = _t(el, percorso + "Numeratore")
     d = _t(el, percorso + "Denominatore")
-    if n is None or d is None:
+    if n is None and d is None:
         return None
+    if n is None or d is None:
+        raise XmlNonImportabile(f"{cosa}: quota incompleta, manca {'il numeratore' if n is None else 'il denominatore'}")
     return {"num": _intero(n, cosa), "den": _intero(d, cosa)}
 
 

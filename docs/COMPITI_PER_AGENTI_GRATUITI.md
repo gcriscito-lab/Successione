@@ -152,6 +152,108 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 
 ---
 
+## C25. Test dello stato e del salvataggio delle impostazioni
+**File:** `tests/test_impostazioni_extra.py` (nuovo).
+**Contesto:** `src/successioni/impostazioni.py`.
+**Cosa fare:** stato(), _dettaglio, _valida e salva(): timeout ai limiti, voce sola lettura, tipi errati, contenuto del file dopo il salvataggio, variabile SUCCESSIONI_CONFIG. Usare monkeypatch.setenv per SUCCESSIONI_CONFIG e SUCCESSIONI_DATA su tmp_path; dopo salva() ripristinare a mano os.environ delle chiavi toccate (salva scrive in os.environ). Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_impostazioni_extra.py` verde (lo esegue il lanciatore).
+
+## C26. Test del prospetto stampabile
+**File:** `tests/test_stampa_extra.py` (nuovo).
+**Contesto:** `src/successioni/stampa.py`.
+**Cosa fare:** la funzione prospetto: escape HTML di testi con < > & e virgolette, assenza del contenuto Base64, presenza di revisione e SHA-256 passati, input minimi e vuoti. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_stampa_extra.py` verde (lo esegue il lanciatore).
+
+## C27. Test dei lettori elementari dell'importatore XML
+**File:** `tests/test_importa_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/importa.py`.
+**Cosa fare:** le funzioni di conversione (_data, _dec, _intero, _t, _quota) e XmlNonImportabile: date valide e impossibili, numeri con virgola, non numeri, interi con decimali, nodi mancanti. Importarle direttamente dal modulo. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_importa_extra.py` verde (lo esegue il lanciatore).
+
+## C28. Test delle funzioni pure della prima casa
+**File:** `tests/test_prima_casa_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/prima_casa.py`.
+**Cosa fare:** le funzioni pure del modulo (non quelle che richiedono l'intero esportatore): validazioni di codici e categorie, valori limite e messaggi di errore REALI. Non inventare regole fiscali: descrivi solo il comportamento del codice. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_prima_casa_extra.py` verde (lo esegue il lanciatore).
+
+## C29. Test aggiuntivi sulla decodifica del codice fiscale
+**File:** `tests/test_codice_fiscale_extra.py` (nuovo).
+**Contesto:** `src/successioni/codice_fiscale.py`.
+**Cosa fare:** decodifica(): giorni 1 e 31, donne con giorno 41 e 71, tutte le lettere dei mesi, omocodia su singole posizioni, anno bisestile 29 febbraio, ruolo defunto; usare ID.genera_cf_sintetico da successioni.telematico.identificativi per costruire i codici. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_codice_fiscale_extra.py` verde (lo esegue il lanciatore).
+
+## C30. Test dell'archivio
+**File:** `tests/test_archivio_extra.py` (nuovo).
+**Contesto:** `src/successioni/archivio.py`.
+**Cosa fare:** cartella_dati() con SUCCESSIONI_DATA, LOCALAPPDATA e XDG_DATA_HOME (monkeypatch), creazione delle cartelle, transazione con rollback su eccezione, persistenza fra due istanze sulla stessa cartella. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_archivio_extra.py` verde (lo esegue il lanciatore).
+
+## C31. Test degli allegati
+**File:** `tests/test_allegati_extra.py` (nuovo).
+**Contesto:** `src/successioni/allegati.py`.
+**Cosa fare:** solo le parti eseguibili senza strumenti esterni: elenco allegati vuoto, acquisizione di un file di testo o PDF minimo sintetico, hash, rifiuto di file mancanti o troppo grandi se il codice lo prevede. Verifica il comportamento REALE. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_allegati_extra.py` verde (lo esegue il lanciatore).
+
+## C32. Test dell'integrita' dei dati
+**File:** `tests/test_integrita_extra.py` (nuovo).
+**Contesto:** `src/successioni/integrita.py`.
+**Cosa fare:** le funzioni del modulo con dati sintetici validi e alterati: l'alterazione deve essere rilevata con il messaggio reale del codice. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_integrita_extra.py` verde (lo esegue il lanciatore).
+
+## C33. Test dei blocchi
+**File:** `tests/test_blocchi_extra.py` (nuovo).
+**Contesto:** `src/successioni/blocchi.py`.
+**Cosa fare:** il comportamento reale delle funzioni del modulo con input tipici, vuoti e limite. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_blocchi_extra.py` verde (lo esegue il lanciatore).
+
+## C34. Test degli elaborati
+**File:** `tests/test_elaborati_extra.py` (nuovo).
+**Contesto:** `src/successioni/elaborati.py`.
+**Cosa fare:** solo funzioni pure o che lavorano su dati sintetici in memoria o su tmp_path; niente strumenti esterni; casi vuoti, parziali e completi con i messaggi reali. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_elaborati_extra.py` verde (lo esegue il lanciatore).
+
+## C35. Test degli errori del servizio
+**File:** `tests/test_errori_extra.py` (nuovo).
+**Contesto:** `src/successioni/errori.py`.
+**Cosa fare:** le classi di errore: codice, messaggio, asdict() con dettagli aggiuntivi, gerarchia (isinstance), la funzione ora(). Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_errori_extra.py` verde (lo esegue il lanciatore).
+
+## C36. Test della CLI
+**File:** `tests/test_cli_extra.py` (nuovo).
+**Contesto:** `src/successioni/cli.py`.
+**Cosa fare:** main(argv) con argomenti validi e non validi, usando SUCCESSIONI_DATA su tmp_path e capsys; solo sottocomandi che non avviano server ne' aprono browser. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_cli_extra.py` verde (lo esegue il lanciatore).
+
+## C37. Test del deposito degli artefatti e degli hash
+**File:** `tests/test_collegamenti_base_extra.py` (nuovo).
+**Contesto:** `src/successioni/collegamenti/base.py`.
+**Cosa fare:** sha256_bytes, sha256_file, DepositoArtefatti su tmp_path (salvataggio, rilettura, verifica dell'hash, file alterato), con i comportamenti e i messaggi reali. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_collegamenti_base_extra.py` verde (lo esegue il lanciatore).
+
+## C38. Test del convertitore Base64 dei documenti
+**File:** `tests/test_documenti_base64_extra.py` (nuovo).
+**Contesto:** `src/successioni/documenti/base64.py`.
+**Cosa fare:** il comportamento reale delle funzioni di codifica e verifica con dati sintetici: round trip, input vuoto, input non valido, limiti di dimensione se presenti. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_documenti_base64_extra.py` verde (lo esegue il lanciatore).
+
+## C39. Test dell'albero dello schema XSD
+**File:** `tests/test_xsd_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/xsd.py`.
+**Cosa fare:** il caricamento dello schema da fonti/Specifiche tecniche/SUC13_20250702 (fixture con pytest.importorskip o skip se manca) e le funzioni di ricerca di elementi, con asserzioni su elementi noti come QuadroEA e Frontespizio. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_xsd_extra.py` verde (lo esegue il lanciatore).
+
+## C40. Test della mappa XML -> campi
+**File:** `tests/test_mappa_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/mappa.py`.
+**Cosa fare:** il comportamento reale delle funzioni del modulo con dati sintetici e casi limite. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_mappa_extra.py` verde (lo esegue il lanciatore).
+
+## C41. Test degli strumenti MCP: schema degli argomenti
+**File:** `tests/test_mcp_schema_extra.py` (nuovo).
+**Contesto:** `src/successioni/mcp_server.py`.
+**Cosa fare:** l'elenco degli strumenti registrati: nomi unici, descrizioni non vuote, strumenti di trasmissione e conferma ASSENTI (invio reale mai via MCP), strumenti di sola lettura che non modificano la pratica. Usa l'API reale del server MCP gia' usata in tests/test_mcp*.py (leggili in sola lettura). Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_mcp_schema_extra.py` verde (lo esegue il lanciatore).
+
 ## Come il coordinatore integra
 Controllo dei file toccati rispetto all'elenco consentito, lettura della patch, applicazione su ramo temporaneo, `python3 -m pytest -q`, prova nel browser dove pertinente, poi avanzamento in avanti sul branch di sessione, senza forzature.
 

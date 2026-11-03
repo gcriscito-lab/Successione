@@ -8,17 +8,15 @@
 </head>
 <body>
 <header class="tb">
-  <div class="brand">Successioni</div>
+  <button class="brand" id="bHome" title="Pagina iniziale"><img src="/static/logo.svg" alt="" width="30" height="30">Successioni</button>
   <div class="titolo" id="titolo">Nessuna pratica aperta</div>
   <div class="azioni">
     <button id="bSalva" class="gh" disabled>Salva</button>
     <button id="bControlla" class="gh" disabled>Controlla</button>
-    <button id="bStampa" class="gh" disabled title="Disponibile quando l'esportazione dei dati sarà collegata">Stampa</button>
-    <button id="bGenera" class="gh" disabled title="Disponibile quando l'esportazione XML sarà collegata">Genera file</button>
-    <button id="bInvia" class="gh" disabled title="Disponibile dopo il collaudo del collegamento con i servizi dell'Agenzia">Invia</button>
+    <button id="bGenera" class="gh" disabled>File e invio</button>
     <button id="bNuova" class="pil">Nuova dichiarazione</button>
     <button id="bImporta" class="pil" title="Riprendi una dichiarazione da un file telematico XML">Importa XML</button>
-    <button id="bImpost" class="gh" title="Percorsi di Java, controllo SUC13, Ghostscript, veraPDF">Impostazioni</button>
+    <button id="bImpost" class="gh" title="Aspetto, caratteri e strumenti del programma">Impostazioni</button>
     <input type="file" id="fImporta" accept=".xml,.suc,text/xml,application/xml" hidden>
   </div>
 </header>
@@ -34,11 +32,15 @@
   </aside>
   <main id="vista" tabindex="-1">
     <div class="vuoto" id="vuoto">
-      <h1>Dichiarazioni di successione</h1>
-      <p>Apri una pratica dall'elenco oppure avvia una nuova dichiarazione guidata.</p>
+      <img class="hero-logo" src="/static/logo.svg" alt="Logo Successioni" width="112" height="112">
+      <p class="eyebrow">Il tuo spazio di lavoro</p><h1>Successioni</h1>
+      <p>Pratiche, documenti e dichiarazioni.<br>Ogni passaggio, in un unico posto.</p>
+      <div class="home-actions"><button class="pil" id="homeNuova">Nuova dichiarazione</button><button class="gh" id="homeImporta">Importa XML</button></div>
+      <p class="mut">Scegli una pratica dall’elenco per riprendere il lavoro.</p>
     </div>
   </main>
-  <aside class="ins" id="ins" aria-label="Ispettore" hidden></aside>
+  <div id="ridimensiona" class="ridimensiona" role="separator" aria-label="Larghezza pannello dati" aria-orientation="vertical" aria-controls="ins" aria-valuemin="280" aria-valuemax="760" aria-valuenow="360" tabindex="0" hidden></div>
+  <aside class="ins" id="ins" aria-label="Dati della riga selezionata" hidden></aside>
 </div>
 <footer class="sb" id="sb"></footer>
 
@@ -59,9 +61,10 @@
 <dialog id="imp" aria-labelledby="impT">
   <form method="dialog" id="impForm">
     <h2 id="impT">Impostazioni</h2>
-    <p class="mut" id="impFile"></p>
-    <div id="impCorpo"></div>
-    <p class="mut" style="font-size:12px">Qui si salvano solo percorsi. Password, certificati e credenziali dei servizi dell'Agenzia non si inseriscono nel programma.</p>
+    <p class="mut">Personalizza la lettura e lo spazio di lavoro.</p>
+    <div id="impAspetto"></div>
+    <details class="strumenti"><summary>Strumenti e percorsi</summary><p class="mut" id="impFile"></p><div id="impCorpo"></div></details>
+    <p class="mut">Le preferenze restano salvate su questo computer. Password e credenziali non si inseriscono qui.</p>
     <p class="err" id="impErr" role="alert"></p>
     <div class="wiz-az">
       <button type="button" id="iChiudi" class="gh">Chiudi</button>

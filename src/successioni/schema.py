@@ -68,6 +68,84 @@ AIUTI: dict[str, str] = {
     "persone.codice_fiscale": "16 caratteri. Il carattere di controllo viene verificato in esportazione.",
     "passivita.importo": "Importo in euro, con il punto decimale. Indicare la parte di debito che grava sul defunto.",
 }
+AIUTI["beni.tipo_titolo"] = ("Quadro EO: scegli il tipo di titolo. Con «esente» (3) il valore è esente e nel file va in "
+                             "ValoreEsente, non in Valore. I titoli quotati richiedono il codice fiscale dell'emittente.")
+AIUTI["devoluzioni.agevolazioni"] = ("Codice agevolazione prima casa (P, X, Z) della riga di devoluzione: vale solo per i "
+                                     "fabbricati del quadro EC. Vedi il dettaglio per ciascun codice.")
+
+
+def _opz(valore: str, etichetta: str, aiuto: str) -> dict:
+    return {"valore": valore, "etichetta": etichetta, "aiuto": aiuto}
+
+
+#: Maschere dei dati strutturati (opzioni.telematico) che non sono campi del modello comune. Chiave = percorso:
+#: «beni.<campo>» e «devoluzioni.<campo>» = supplemento per riga; «dichiarazione.<chiave>» = opzioni.telematico.dichiarazione.
+#: tipo: enum (opzioni con etichetta e aiuto) | bool (si'/no). Gli aiuti riportano solo cio' che e' nelle fonti: XSD
+#: fornituraSUC13_v1.xsd (SUC13_20250702), Fascicolo I, docs/regole/prima_casa.md. Coerenza con il codice di esportazione
+#: verificata da tests/test_maschere_strutturati.py.
+STRUTTURATI: dict[str, dict] = {
+    "beni.tipo_titolo": {
+        "etichetta": "tipo di titolo", "tipo": "enum", "aiuto": AIUTI["beni.tipo_titolo"],
+        "opzioni": [
+            _opz("1", "quotato in borsa o nel mercato ristretto",
+                 "Richiede il codice fiscale dell'emittente (diverso da quello del defunto e dei soggetti del quadro EA); "
+                 "il codice titolo si indica solo per questo tipo (XSD, annotazioni di Titoli)."),
+            _opz("2", "non quotato in borsa", "Titolo non quotato: valore nel campo «valore»."),
+            _opz("3", "esente compreso nell'attivo ereditario (BOT, CCT, BTP, buoni postali)",
+                 "Titolo ESENTE: il valore è «esente» e viene scritto in ValoreEsente, mai in Valore (XSD, PossessoEO_Type). "
+                 "Entra comunque nei totali del quadro EE (XSD, TotaleValoreTitoli). Un titolo con una parte esente e una "
+                 "imponibile va diviso in due righe. Una passività collegata a un titolo esente blocca l'esportazione: le "
+                 "fonti non dicono se sia deducibile."),
+            _opz("4", "fondo comune d'investimento", "Fondo comune d'investimento: valore nel campo «valore»."),
+        ],
+    },
+    "devoluzioni.agevolazioni": {
+        "etichetta": "agevolazione prima casa", "tipo": "enum", "aiuto": AIUTI["devoluzioni.agevolazioni"] +
+        " Si indica sulla riga del soggetto che chiede il beneficio; si estende a tutti i beneficiari del bene. "
+        "Non cambia l'imposta di successione: restano dovute le imposte ipotecaria e catastale in misura fissa "
+        "(Fascicolo I p. 57). Il codice Y non è supportato.",
+        "opzioni": [
+            _opz("P", "prima casa",
+                 "Casa di abitazione con categoria catastale diversa da A/1, A/8, A/9 (Fascicolo I p. 60); un solo immobile "
+                 "per soggetto (p. 26). Se la chiede il dichiarante, compila le dichiarazioni «Prima casa» nel frontespizio."),
+            _opz("X", "pertinenza",
+                 "Pertinenza C/2, C/6 o C/7, una per categoria, solo se lo stesso soggetto ha anche P (Fascicolo I p. 26-27)."),
+            _opz("Z", "immobile contiguo",
+                 "Immobile contiguo: solo del dichiarante e solo se ha anche P; richiede l'impegno all'unione catastale "
+                 "(un solo Z). Fascicolo I p. 26."),
+        ],
+    },
+    "dichiarazione.prima_casa.dichiara_requisiti": {
+        "etichetta": "prima casa: dichiaro di possedere i requisiti", "tipo": "bool",
+        "aiuto": "Serve solo se il dichiarante chiede P. La Sezione II del quadro EH attesta con la firma il possesso dei "
+                 "requisiti: per esportare va confermato («sì»)."},
+    "dichiarazione.prima_casa.requisito_comune": {
+        "etichetta": "prima casa: requisito nel comune", "tipo": "enum",
+        "aiuto": "Scelta a della Sezione II del quadro EH (modello EH14). Gli altri requisiti (trasferiti all'estero, forze "
+                 "armate, residenti all'estero) non sono supportati.",
+        "opzioni": [
+            _opz("residenza", "ha la residenza nel comune", "Residenza nel comune dell'immobile."),
+            _opz("attivita", "svolge la propria attività nel comune", "Sede della propria attività nel comune dell'immobile."),
+            _opz("stabilire_residenza", "intende stabilire la residenza entro 18 mesi",
+                 "Intenzione di stabilire la residenza nel comune entro 18 mesi."),
+        ]},
+    "dichiarazione.prima_casa.nessuna_altra_casa_comune": {
+        "etichetta": "prima casa: nessuna altra casa nel comune", "tipo": "bool",
+        "aiuto": "Dichiarazione b: non si è titolari di altra casa di abitazione nel comune. È condizione dell'agevolazione: "
+                 "con «no» l'esportazione è bloccata."},
+    "dichiarazione.prima_casa.altra_casa": {
+        "etichetta": "prima casa: altra casa", "tipo": "enum",
+        "aiuto": "Dichiarazioni c/d della Sezione II. La corrispondenza con le lettere è dedotta dal modello e va riletta "
+                 "in sede di collaudo (docs/regole/prima_casa.md).",
+        "opzioni": [
+            _opz("nessuna", "nessuna altra casa acquistata con le agevolazioni", "Dichiarazione c."),
+            _opz("vendita", "impegno a trasferire l'altra casa entro due anni dal decesso", "Dichiarazione d."),
+        ]},
+    "dichiarazione.prima_casa.impegno_unione_catastale": {
+        "etichetta": "prima casa: impegno all'unione catastale", "tipo": "bool",
+        "aiuto": "Obbligatorio («sì») solo con il codice Z: impegno a unire catastalmente gli immobili contigui entro tre "
+                 "anni (dichiarazione i; XSD, FlagContigui)."},
+}
 SEZIONI = {"opzioni": None, "note": None}  # sezioni libere (dict), non esportate se interne
 
 

@@ -2,7 +2,8 @@
 fonti) e tempo massimo del controllo, con stato di rilevamento e salvataggio nel file di configurazione.
 
 Il file e' lo stesso letto dall'avviatore (`scripts/windows/avvia_successioni.py`, variabile `SUCCESSIONI_CONFIG`; in
-mancanza, `configurazione.json` nella cartella dei dati). Contiene SOLO le variabili elencate in `VOCI`: percorsi e un numero.
+mancanza, `configurazione.json` nella cartella dei dati). Contiene le variabili elencate in `VOCI` e le preferenze
+grafiche validate nella sezione `interfaccia` (non diventano variabili d'ambiente).
 Nessuna credenziale, certificato o password vi puo' essere scritto: una chiave non elencata e' rifiutata.
 
 Una modifica vale subito (si aggiorna l'ambiente del processo) e al prossimo avvio; se all'avvio esiste una variabile
@@ -13,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -36,7 +38,47 @@ VOCI: tuple[tuple[str, str, str, str], ...] = (
     ("SUCCESSIONI_FONTI", "Cartella delle fonti ufficiali", "cartella", "Specifiche e moduli dell'Agenzia usati dal programma."),
 )
 CHIAVI = {v[0]: v for v in VOCI}
+_ESEMPIO = {"SUCCESSIONI_JAVA": "java.exe", "SUCCESSIONI_GS": "gswin64c.exe", "SUCCESSIONI_VERAPDF": "verapdf.bat",
+            "SUCCESSIONI_QPDF": "qpdf.exe", "SUCCESSIONI_ICC": "srgb.icc"}
 MINIMO_TIMEOUT, MASSIMO_TIMEOUT = 10, 7200
+INTERFACCIA_DEFAULT = {"tema": "sistema", "font": "sistema", "dimensione": 14,
+                       "interlinea": "normale", "larghezza_pannello": 360}
+SCELTE_INTERFACCIA = {"tema": ("sistema", "chiaro", "scuro", "seppia"),
+                      "font": ("sistema", "segoe", "arial", "verdana", "georgia", "consolas"),
+                      "interlinea": ("compatta", "normale", "ampia")}
+
+
+def _valida_interfaccia(valori: dict) -> dict:
+    if not isinstance(valori, dict):
+        raise DatiNonValidi("preferenze dell'interfaccia: atteso un oggetto")
+    for k, v in valori.items():
+        if k not in INTERFACCIA_DEFAULT:
+            raise DatiNonValidi(f"preferenza dell'interfaccia sconosciuta: {k}")
+        if k in SCELTE_INTERFACCIA:
+            if v not in SCELTE_INTERFACCIA[k]:
+                raise DatiNonValidi(f"{k}: valore non ammesso")
+        else:
+            minimo, massimo = (12, 22) if k == "dimensione" else (280, 760)
+            if isinstance(v, bool) or not isinstance(v, int) or not minimo <= v <= massimo:
+                raise DatiNonValidi(f"{k}: indicare un intero da {minimo} a {massimo}")
+    return valori.copy()
+
+
+def preferenze_interfaccia(contenuto: dict) -> dict:
+    valori = contenuto.get("interfaccia", {})
+    try:
+        return {**INTERFACCIA_DEFAULT, **_valida_interfaccia(valori)}
+    except DatiNonValidi:
+        return INTERFACCIA_DEFAULT.copy()
+# Nome del file ammesso per ciascuno strumento: l'impostazione sceglie QUALE programma eseguire, quindi non si accetta un
+# eseguibile qualunque (es. cmd.exe o calc.exe al posto di Java). Il controllo e' sul nome, non sul contenuto del file.
+NOMI_AMMESSI = {
+    "SUCCESSIONI_JAVA": re.compile(r"java(w)?(\.exe)?", re.I),
+    "SUCCESSIONI_GS": re.compile(r"gs(win(32|64))?c?(\.exe)?", re.I),
+    "SUCCESSIONI_VERAPDF": re.compile(r"verapdf(\.(bat|cmd|exe|sh))?", re.I),
+    "SUCCESSIONI_QPDF": re.compile(r"qpdf(\.exe)?", re.I),
+    "SUCCESSIONI_ICC": re.compile(r".+\.(icc|icm)", re.I),
+}
 
 
 def file_configurazione() -> Path:
@@ -54,6 +96,22 @@ def _leggi_file() -> dict:
     except (OSError, ValueError):
         return {}
     return d if isinstance(d, dict) else {}
+
+
+def _leggi_file_stretto() -> dict:
+    """Come `_leggi_file`, ma un file che esiste e non e' un oggetto JSON valido e' un errore: riscriverlo cancellerebbe in
+    silenzio le impostazioni che contiene."""
+    p = file_configurazione()
+    if not p.exists():
+        return {}
+    try:
+        d = json.loads(p.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as e:
+        raise DatiNonValidi(f"il file di configurazione {p} non e' leggibile ({type(e).__name__}): correggerlo o rimuoverlo "
+                            "prima di salvare, per non perdere le impostazioni che contiene") from None
+    if not isinstance(d, dict):
+        raise DatiNonValidi(f"il file di configurazione {p} non contiene un oggetto JSON: correggerlo o rimuoverlo prima di salvare")
+    return d
 
 
 def _esiste(tipo: str, valore: str) -> bool:
@@ -117,7 +175,7 @@ def stato() -> dict:
                      "salvato": nel_file.get(chiave) if isinstance(nel_file.get(chiave), str) else None,
                      "origine": origine, "a_posto": ok, "dettaglio": descr,
                      "modificabile": tipo != "sola_lettura"})
-    return {"file": str(file_configurazione()), "voci": voci}
+    return {"file": str(file_configurazione()), "voci": voci, "interfaccia": preferenze_interfaccia(nel_file)}
 
 
 def _valida(chiave: str, valore) -> str:
@@ -143,16 +201,23 @@ def _valida(chiave: str, valore) -> str:
         return str(n)
     if not _esiste(voce[2], v):
         raise DatiNonValidi(f"{voce[1]}: {'cartella' if voce[2] == 'cartella' else 'file'} non trovato: {v}", chiave=chiave)
+    nome = NOMI_AMMESSI.get(chiave)
+    if nome is not None and not nome.fullmatch(Path(v).name):
+        raise DatiNonValidi(f"{voce[1]}: il file deve avere il nome dello strumento (es. {_ESEMPIO[chiave]}), non {Path(v).name!r}",
+                            chiave=chiave)
     return v
 
 
-def salva(modifiche: dict) -> dict:
+def salva(modifiche: dict, interfaccia: dict | None = None) -> dict:
     """Applica e salva le modifiche (valore vuoto = rimuove l'impostazione). Tutto o niente: se un valore e' errato non si
     scrive nulla. Restituisce lo stato aggiornato piu' gli eventuali `avvisi`."""
-    if not isinstance(modifiche, dict) or not modifiche:
+    if not isinstance(modifiche, dict) or (not modifiche and not interfaccia):
         raise DatiNonValidi("nessuna modifica indicata")
     nuove = {k: _valida(k, v) for k, v in modifiche.items()}
-    contenuto = _leggi_file()
+    aspetto = _valida_interfaccia(interfaccia) if interfaccia is not None else None
+    contenuto = _leggi_file_stretto()
+    if aspetto is not None:
+        contenuto["interfaccia"] = {**preferenze_interfaccia(contenuto), **aspetto}
     avvisi = []
     for k, v in nuove.items():
         if v:

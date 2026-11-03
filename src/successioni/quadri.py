@@ -14,7 +14,7 @@ QUADRI: list[dict] = [
     {"id": "AN", "titolo": "Dati generali", "gruppo": "frontespizio", "vista": "frontespizio", "supportato": True},
     {"id": "EA", "titolo": "Eredi, chiamati, legatari e altri soggetti", "gruppo": "quadri", "vista": "tabella",
      "coll": "persone", "preset": {"ruolo": "erede"},
-     "colonne": ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "ruolo", "relazione_con_defunto"],
+     "colonne": ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "provincia_nascita", "ruolo", "relazione_con_defunto"],
      "supportato": True},
     {"id": "EB", "titolo": "Attivo ereditario catasto terreni", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
      "preset": {"tipo": "terreno"},
