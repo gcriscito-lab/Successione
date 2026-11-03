@@ -195,6 +195,8 @@ def _caso_voltura_due(ordinato: bool) -> dict:
     d = caso_voltura()
     terr = next(b for b in d["beni"] if b["id"] == "b_terr0001")
     terr["discordanza_intestatario"] = "si"
+    casa = next(b for b in d["beni"] if b["id"] == "b_casa0001")
+    casa["sezione"], casa["zona_censuaria"] = "A", "2"        # SezioneUrbana e ZonaCensuaria di EC, SezioneUrbana nell'EI
     d["opzioni"]["telematico"]["beni"]["b_terr0001"]["estremi_trascrizione"] = [
         {"ufficio": "RM10", "registro_particolare": "777", "anno": "2001"},
         {"ufficio": "RM10", "registro_particolare": "888", "anno": "2002"}]
@@ -396,6 +398,35 @@ def test_ei_sezioni_in_ordine_diverso_da_quello_degli_id():
     non coincide la riesportazione sarebbe diversa e il file si rifiuta (invece di riprodurlo cambiato)."""
     with pytest.raises(XmlNonImportabile, match="ordine degli identificativi"):
         importa_xml(_xml(_caso_voltura_due(False)))
+
+
+def _sezioni_ei(root):
+    return root.xpath("//suc:QuadroEI_new//suc:SezioneII_DatiIntestatario", namespaces=NS)
+
+
+def test_ei_con_sezioni_di_meno_o_duplicate_non_si_importa():
+    root = etree.fromstring(_xml(_caso_voltura_due(True)))
+    assert len(_sezioni_ei(root)) == 2
+    secondo = _sezioni_ei(root)[1]
+    secondo.getparent().remove(secondo)                                  # un immobile con discordanza senza la sua sezione
+    with pytest.raises(XmlNonImportabile, match="1 sezioni II per 2 immobili"):
+        importa_xml(etree.tostring(root))
+    root = etree.fromstring(_xml(_caso_voltura_due(True)))
+    prima, seconda = _sezioni_ei(root)                                    # la seconda sezione rimanda allo stesso immobile della prima
+    seconda.replace(seconda.xpath("suc:Immobile", namespaces=NS)[0], copy.deepcopy(prima.xpath("suc:Immobile", namespaces=NS)[0]))
+    with pytest.raises(XmlNonImportabile, match="corrisponde a 0 beni"):
+        importa_xml(etree.tostring(root))
+
+
+def test_ei_immobile_ambiguo_fra_due_beni_identici():
+    d = caso_voltura()
+    casa = next(b for b in d["beni"] if b["id"] == "b_casa0001")
+    _aggiungi(d, {**{k: v for k, v in casa.items() if k not in ("id", "provenienza")}, "id": "b_casa0002"},
+              dict(d["opzioni"]["telematico"]["beni"]["b_casa0001"]))
+    es = esporta_xml(d, CTX)
+    assert es.xml is not None, (es.errori, es.non_supportato)
+    with pytest.raises(XmlNonImportabile, match="corrisponde a 2 beni"):
+        importa_xml(es.xml)
 
 
 def test_ei_con_piu_estremi_e_sezioni_si_riproduce(sv):
