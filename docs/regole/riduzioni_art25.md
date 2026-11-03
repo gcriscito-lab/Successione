@@ -140,7 +140,7 @@ quadro, gradi non ammessi, dati EH mancanti, allegati obbligatori mancanti (`qua
 
 ## 8. Mutation testing
 
-`python scripts/mutazioni_riduzioni_art25.py` applica 27 mutazioni (coefficienti, soglia, formule esatte e del componente, scale,
+`python scripts/mutazioni_riduzioni_art25.py` applica 28 mutazioni (coefficienti, soglia, formule esatte e del componente, scale,
 regole di esportazione, quadri, gradi, esclusivita', dichiarante/non dichiarante, allegati, limiti di valore) su una copia di
-`src` ed esegue `test_telematico_riduzioni_art25.py` e `test_telematico_calcolo.py`: ogni mutazione deve far fallire almeno un test.
+`src` ed esegue `test_telematico_riduzioni_art25.py` (senza controllo ufficiale, `-o pythonpath` sulla copia): ogni mutazione deve far fallire almeno un test.
 Esito riportato nel rapporto di consegna.

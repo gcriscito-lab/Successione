@@ -704,6 +704,15 @@ def test_scale_del_componente_art25_e_l_q_r_f_con_decimal_indipendente(precision
         base_ = _scala(Dc(600_000) * Dc(1_200_000) / Dc(2_400_000), 6) * r6
         atteso = _scala(_dec(c) * base_, 3)
         assert riduzioni_componente(righe, Fr(ISL_T), Fr(QE_T))["art25"] == Fr(atteso), codice
+    # valori con cifre significative oltre il secondo decimale: la scala a 3 decimali si distingue da quella a 2
+    distinti = 0
+    for codice, c in (("1", 0.5), ("2", 0.4), ("3", 0.3), ("4", 0.2), ("5", 0.1)):
+        righe = [{"qv": Fr(1_200_003), "agev": None, "rid": codice, "valore": Fr(2_400_001), "vps": Fr(600_007)}]
+        base_ = _scala(Dc(600_007) * Dc(1_200_003) / Dc(2_400_001), 6) * r6
+        atteso = _scala(_dec(c) * base_, 3)
+        distinti += atteso != _scala(_dec(c) * base_, 2)
+        assert riduzioni_componente(righe, Fr(ISL_T), Fr(QE_T))["art25"] == Fr(atteso), codice
+    assert distinti >= 1
 
 
 def test_esatta_e_componente_coincidono_entro_un_centesimo_sui_casi_a_mano():

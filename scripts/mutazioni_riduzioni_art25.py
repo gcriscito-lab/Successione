@@ -62,7 +62,8 @@ MUTAZIONI = [
     ("export: protocollo L di 6 caratteri ammesso", RA, "if not 7 <= len(str(l[\"num_protocollo\"])) <= 16:", "if not 6 <= len(str(l[\"num_protocollo\"])) <= 16:"),
     ("export: Q ammesso nel quadro EC", RA, 'QUADRI_SUPPORTATI = {"L": ("EB", "EC", "EL", "EM"), "Q": ("EN", "EO"),',
      'QUADRI_SUPPORTATI = {"L": ("EB", "EC", "EL", "EM"), "Q": ("EC", "EN", "EO"),'),
-    ("export: ValorePrecSucc senza controllo di positivita'", RA, "if len(s) > 13 or int(s) <= 0:", "if len(s) > 13:"),
+    ("export: richiesta L o Q del dichiarante registrata come art. 25", RA,
+     "x.ra_eh.add(\"L\" if r[\"agev\"] == \"L\" else \"Q\" if r[\"agev\"] == \"Q\" else \"art25\")", "x.ra_eh.add(\"art25\")"),
 ]
 
 
@@ -77,12 +78,13 @@ def esegui(numero: int, desc: str, file: str, orig: str, nuovo: str, tmp: Path, 
         return f"ERRORE: il testo originale compare {testo.count(orig)} volte in {file}"
     f.write_text(testo.replace(orig, nuovo, 1), encoding="utf-8")
     env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(dest / "src"), str(RADICE / "tests")]), "TMP": str(tmp),
-           "TEMP": str(tmp), "PYTHONDONTWRITEBYTECODE": "1"}
+           "TEMP": str(tmp), "PYTHONDONTWRITEBYTECODE": "1",
+           "SUCCESSIONI_FONTI": str(RADICE / "fonti")}   # la copia di src non sta accanto a fonti/
     if not reale:
         env.pop("SUCCESSIONI_JAVA", None)
         env.pop("SUCCESSIONI_CONTROLLI_SUC13", None)
-    r = subprocess.run([sys.executable, "-m", "pytest", "tests/test_telematico_riduzioni_art25.py",
-                        "tests/test_telematico_calcolo.py", "-x", "-q", "-p", "no:cacheprovider",
+    r = subprocess.run([sys.executable, "-m", "pytest", "tests/test_telematico_riduzioni_art25.py", "-x", "-q", "-p", "no:cacheprovider",
+                        "-o", f"pythonpath={dest / 'src'}",     # pyproject.toml ha pythonpath=src: va sostituito con la copia mutata
                         f"--basetemp={tmp / ('t%02d' % numero)}"], cwd=RADICE, env=env, capture_output=True, text=True)
     ultima = [r_ for r_ in r.stdout.strip().splitlines() if r_.strip()][-1:] or ["?"]
     return ("UCCISA" if r.returncode != 0 else "SOPRAVVISSUTA") + f" ({ultima[0]})"
