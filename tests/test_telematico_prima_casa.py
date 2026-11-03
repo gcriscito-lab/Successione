@@ -371,9 +371,9 @@ def test_sezione_ii_senza_p_del_dichiarante_e_incoerente():
 
 def test_chiave_non_gestita_nel_supplemento_devoluzioni():
     d = caso_prima_casa()
-    _tel(d)["devoluzioni"]["d_casaanna"]["riduzioni"] = "1"
+    _tel(d)["devoluzioni"]["d_casaanna"]["campo_inesistente"] = "1"
     es = _blocco(d)
-    assert any("devoluzioni[d_casaanna].riduzioni" in s for s in es.non_supportato)
+    assert any("devoluzioni[d_casaanna].campo_inesistente" in s for s in es.non_supportato)
 
 
 def test_imposta_proporzionale_residua_sotto_la_fissa_resta_bloccata():
@@ -427,7 +427,7 @@ def test_importazione_rifiuta_le_agevolazioni():
 
 def test_calcolo_blocca_ancora_le_altre_agevolazioni():
     es = _es(caso_prima_casa())
-    xml = es.xml.replace(b"<suc:Agevolazioni>P</suc:Agevolazioni>", b"<suc:Agevolazioni>L</suc:Agevolazioni>")
+    xml = es.xml.replace(b"<suc:Agevolazioni>P</suc:Agevolazioni>", b"<suc:Agevolazioni>G</suc:Agevolazioni>")
     r = calcola_da_xml(xml)
     assert r.stato != "completato" and any(m.codice == "CALCOLO_NON_SUPPORTATO" for m in r.motivi)
 
