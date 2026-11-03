@@ -163,6 +163,7 @@ def sessione_attiva(base: Path) -> dict | None:
 
 
 def avvia_gui(porta: int | None, apri_browser: bool) -> int:
+    os.environ.setdefault("SUCCESSIONI_CONFIG", str(file_configurazione()))   # la schermata Impostazioni scrive qui
     base = cartella_dati()
     base.mkdir(parents=True, exist_ok=True)
     proteggi_flussi(base / "log")

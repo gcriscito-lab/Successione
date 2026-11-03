@@ -192,6 +192,17 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
             raise ValueError("file troppo grande")
         return sv.importa_xml_telematico(dati, titolo=request.query_params.get("titolo") or None)
 
+    @api
+    async def impostazioni_leggi(request):
+        from . import impostazioni
+        return impostazioni.stato()
+
+    @api
+    async def impostazioni_salva(request):
+        from . import impostazioni
+        b = await request.json()
+        return impostazioni.salva(b["modifiche"])
+
     async def corpo(request):
         return await request.json() if (await request.body()) else {}
 
@@ -252,6 +263,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     P = "/api/pratiche/{pid}"
     return Starlette(routes=[
         Route("/api/codice-fiscale", cf_decodifica), Route("/api/importa", importa, methods=["POST"]),
+        Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
         Route(P + "/ricevute/{tid}", ricevute, methods=["GET", "POST"]),
         Route(P + "/ricevute/{tid}/file/{rid}", ricevuta_file),

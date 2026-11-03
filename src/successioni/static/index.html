@@ -18,6 +18,7 @@
     <button id="bInvia" class="gh" disabled title="Disponibile dopo il collaudo del collegamento con i servizi dell'Agenzia">Invia</button>
     <button id="bNuova" class="pil">Nuova dichiarazione</button>
     <button id="bImporta" class="pil" title="Riprendi una dichiarazione da un file telematico XML">Importa XML</button>
+    <button id="bImpost" class="gh" title="Percorsi di Java, controllo SUC13, Ghostscript, veraPDF">Impostazioni</button>
     <input type="file" id="fImporta" accept=".xml,.suc,text/xml,application/xml" hidden>
   </div>
 </header>
@@ -52,6 +53,20 @@
       <span class="sp"></span>
       <button type="button" id="wIndietro" class="gh">Indietro</button>
       <button type="button" id="wAvanti" class="pil">Avanti</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="imp" aria-labelledby="impT">
+  <form method="dialog" id="impForm">
+    <h2 id="impT">Impostazioni</h2>
+    <p class="mut" id="impFile"></p>
+    <div id="impCorpo"></div>
+    <p class="mut" style="font-size:12px">Qui si salvano solo percorsi. Password, certificati e credenziali dei servizi dell'Agenzia non si inseriscono nel programma.</p>
+    <p class="err" id="impErr" role="alert"></p>
+    <div class="wiz-az">
+      <button type="button" id="iChiudi" class="gh">Chiudi</button>
+      <span class="sp"></span>
+      <button type="button" id="iSalva" class="pil">Salva</button>
     </div>
   </form>
 </dialog>

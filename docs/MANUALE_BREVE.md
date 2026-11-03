@@ -51,3 +51,9 @@ Scrivendo un codice fiscale di persona fisica (16 caratteri) nella procedura gui
 Il pulsante **Importa XML** crea una nuova pratica da un file telematico SUC13 (`.xml`, `.suc` in formato XML), per esempio uno esportato da questo programma. Si importano frontespizio, eredi (EA), terreni (EB), fabbricati (EC), passività (ED) e disponibilità finanziarie (ER). Gli altri quadri sono elencati nel messaggio finale come da reinserire; EE ed EF si ricalcolano. Gli allegati (EG) vanno riacquisiti. I dati letti vanno verificati: l'importazione non è un controllo ufficiale.
 
 I file `.diz` del compilatore ministeriale **non** sono importabili: contengono oggetti dell'interfaccia del compilatore e serve un campione sintetico prodotto dal compilatore per scrivere un lettore affidabile.
+
+## Impostazioni
+
+Il pulsante **Impostazioni** mostra i percorsi degli strumenti esterni e se sono stati trovati: Java e cartella del controllo SUC13 (per il controllo ufficiale locale), Ghostscript, veraPDF, qpdf e profilo colore (per i PDF/A), cartella delle fonti e tempo massimo del controllo. Per la cartella del controllo si vede quanti JAR richiesti mancano.
+
+Il salvataggio è tutto o niente: se un percorso non esiste non si scrive nulla. Il valore vale subito e viene scritto nel file di configurazione indicato in cima alla finestra, lo stesso letto all'avvio dal lanciatore (una variabile d'ambiente esterna con lo stesso nome prevale sul file). Lasciando vuoto un campo l'impostazione si rimuove. La cartella dei dati si vede ma si cambia solo con la variabile `SUCCESSIONI_DATA`, per non nascondere le pratiche esistenti. Qui non si salvano password, certificati né credenziali.

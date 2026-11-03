@@ -51,10 +51,11 @@ const rilievi = () => (S.Q ? S.Q.rilievi : []);
 const quadro = () => S.Q && S.Q.quadri.find(x => x.id === S.sel);
 
 /* ---------- caricamento ---------- */
+const mostraInfo = i => { $("#info").textContent = "Versione " + i.versione + ". Accesso solo da questo computer. PDF/A: Ghostscript " + (i.pdfa.ghostscript ? "presente" : "assente") + ", veraPDF " + (i.pdfa.veraPDF ? "presente" : "non configurato"); };
 async function init() {
   try {
     const i = await api("/api/info");
-    $("#info").textContent = "Versione " + i.versione + ". Accesso solo da questo computer. PDF/A: Ghostscript " + (i.pdfa.ghostscript ? "presente" : "assente") + ", veraPDF " + (i.pdfa.veraPDF ? "presente" : "non configurato");
+    mostraInfo(i);
     S.schema = await api("/api/schema");
     await caricaPratiche(); renderSb(); aggiornaBottoni();
   } catch (e) { msg("Avvio non riuscito: " + e.message, "e"); }
@@ -727,6 +728,37 @@ async function wizAvanti() {
     $("#wizErr").textContent = t;
   }
 }
+
+/* Impostazioni: percorsi degli strumenti esterni (server: /api/impostazioni), con stato di rilevamento. */
+const IMP = { voci: [], iniziali: {} };
+function impRender(s) {
+  IMP.voci = s.voci; IMP.iniziali = Object.fromEntries(s.voci.map(v => [v.chiave, v.valore || ""]));
+  $("#impFile").textContent = "File di configurazione: " + s.file;
+  $("#impCorpo").replaceChildren(...s.voci.map(v => h("div", { class: "campo", style: "margin-bottom:12px" },
+    h("label", { for: "imp_" + v.chiave }, v.etichetta),
+    h("input", { id: "imp_" + v.chiave, class: "mono", value: v.valore || "", disabled: !v.modificabile, placeholder: v.modificabile ? "non impostato" : "" }),
+    h("div", { class: "mut", style: "font-size:12px" }, (v.a_posto ? "✓ " : "✗ ") + v.dettaglio + (v.valore ? " · origine: " + v.origine : "")),
+    h("div", { class: "mut", style: "font-size:12px" }, v.nota))));
+}
+async function impApri() {
+  $("#impErr").textContent = "";
+  try { impRender(await api("/api/impostazioni")); $("#imp").showModal(); }
+  catch (e) { msg("Impostazioni non disponibili: " + e.message, "e"); }
+}
+async function impSalva() {
+  const modifiche = {};
+  for (const v of IMP.voci) if (v.modificabile) { const x = $("#imp_" + v.chiave).value.trim(); if (x !== IMP.iniziali[v.chiave]) modifiche[v.chiave] = x; }
+  if (!Object.keys(modifiche).length) { $("#impErr").textContent = "Nessuna modifica da salvare."; return; }
+  try {
+    const s = await post("/api/impostazioni", { modifiche });
+    impRender(s); $("#impErr").textContent = "";
+    msg("Impostazioni salvate." + (s.avvisi.length ? " " + s.avvisi.join(" ") : ""), "o");
+    try { mostraInfo(await api("/api/info")); } catch (_) { /* riga informativa: aggiornata al prossimo caricamento */ }
+  } catch (e) { $("#impErr").textContent = e.message; }
+}
+$("#bImpost").onclick = impApri;
+$("#iChiudi").onclick = () => $("#imp").close();
+$("#iSalva").onclick = impSalva;
 
 /* Importa un file telematico SUC13 (XML) come nuova pratica: importa solo cio' che il programma sa riprodurre e dice il resto. */
 async function importaXml(file) {
