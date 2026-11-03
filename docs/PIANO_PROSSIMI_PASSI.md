@@ -21,7 +21,7 @@ Criterio: prima cio' che sblocca casi **frequenti** nelle pratiche vere, poi cio
 
 | # | Lavoro | Perche' | Note |
 |---|---|---|---|
-| C1 | **Agevolazione «prima casa»** (codici P, Z, X, Y; Sezione II di EH; diritto di abitazione) | e' presente in moltissime successioni con un fabbricato | leggere Allegato 2 e Fascicolo I; calcolo EF con ipocatastali ridotte; un caso per codice, SUC13 locale |
+| C1 | **Agevolazione «prima casa»** (codici P, Z, X, Y; Sezione II di EH; diritto di abitazione) | e' presente in moltissime successioni con un fabbricato | leggere Allegato 2 e Fascicolo I; calcolo EF con ipocatastali ridotte; un caso per codice, SUC13 locale; **parziale 2026-11-03**: P, X, Z (EC) con EF4 ed EH Sez. II, controllo locale positivo; restano Y, Z senza P, EM, diritto di abitazione, requisiti esteri/forze armate (`docs/regole/prima_casa.md`) |
 | C2 | **Riduzioni art. 25 / precedenti successioni** (`ValorePrecSucc`, `Riduzioni`) | compaiono in EB, EC, EN, EO, EP, EQ, ER | dipende dalle fonti sul calcolo (guida pagg. 5-8) |
 | C3 | **Titoli esenti** (EO tipo 3, `ValoreEsente`) | BOT, CCT, buoni postali sono molto comuni | cambia EE e il calcolo (valore esente fuori dalla base) |
 | C4 | **Piu' comuni nello stesso quadro** (circoscrizioni EF15/EF16) | oggi blocca tutte le successioni con immobili in due comuni | la tabella delle conservatorie e' solo nel componente ufficiale: leggerla a runtime dal JAR configurato dall'utente, senza distribuirla, **da decidere insieme** |

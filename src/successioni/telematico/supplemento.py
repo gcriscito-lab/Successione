@@ -37,14 +37,18 @@ CHIAVI = {
              "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe", "zona_censuaria",
              "consistenza", "tipo_cespite", "estremi_trascrizione", "estremi_registrazione"},
     "passivita": {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id", "ripartizione"},
+    # agevolazioni della sezione devoluzione (docs/regole/prima_casa.md): oggi solo i codici P, X, Z
+    "devoluzioni": {"agevolazioni"},
 }
 CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",
                         "tempistica_pagamento", "pagamento_rateale", "dichiara_copie_conformi",
-                        "devoluzione_per_testamento", "testamento", "azienda_data_deposito", "azienda_camera_commercio"}
+                        "devoluzione_per_testamento", "testamento", "azienda_data_deposito", "azienda_camera_commercio",
+                        "prima_casa"}
 # Sezione Testamento del frontespizio (annotazioni XSD: Pubblicazione, Registrazione, TestamentoEstero)
 CHIAVI_TESTAMENTO = {"estero", "pubblico_ufficiale", "data_pubblicazione", "ufficio_registrazione", "serie",
                      "numero_registrazione", "sottonumero_registrazione", "data_registrazione"}
 CHIAVI_VERSAMENTO = {"iban", "cf_titolare"}
+# Sezione II del quadro EH (agevolazione prima casa): vedi prima_casa.CHIAVI_PRIMA_CASA
 CHIAVI_PRESENTATORE = {"persona_id", "codice_carica", "telefono", "email"}
 CHIAVI_SUPERFICIE = {"ettari", "are", "centiare"}
 CHIAVI_TOP = set(CHIAVI) | {"dichiarazione"}
@@ -95,6 +99,9 @@ def chiavi_non_gestite(dati: dict) -> list[str]:
     tst = d.get("testamento")
     if isinstance(tst, dict):
         out += [f"opzioni.telematico.dichiarazione.testamento.{k}" for k in tst if k not in CHIAVI_TESTAMENTO]
+    pc = d.get("prima_casa")
+    if pc is not None and not isinstance(pc, dict):
+        out.append("opzioni.telematico.dichiarazione.prima_casa: attesa una struttura di chiavi")
     v = d.get("versamento")
     if isinstance(v, dict):
         out += [f"opzioni.telematico.dichiarazione.versamento.{k}" for k in v if k not in CHIAVI_VERSAMENTO]

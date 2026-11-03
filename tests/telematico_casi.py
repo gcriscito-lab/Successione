@@ -246,6 +246,37 @@ def caso_voltura() -> dict:
     return d
 
 
+PRIMA_CASA_DICH = {"dichiara_requisiti": True, "requisito_comune": "residenza", "nessuna_altra_casa_comune": True,
+                   "altra_casa": "nessuna"}
+
+
+def caso_prima_casa() -> dict:
+    """``caso_a10`` con agevolazione prima casa (codice P) richiesta dal dichiarante (Anna) sul fabbricato A/2; il terreno
+    (valore alzato a 30000 perche' l'imposta proporzionale non sia inferiore alla fissa) resta con imposta proporzionale."""
+    d = caso_a10()
+    next(b for b in d["beni"] if b["id"] == "b_terr0001")["valore"] = "30000"
+    d["opzioni"]["telematico"]["devoluzioni"] = {"d_casaanna": {"agevolazioni": "P"}}
+    d["opzioni"]["telematico"]["dichiarazione"]["prima_casa"] = dict(PRIMA_CASA_DICH)
+    return d
+
+
+def aggiungi_fabbricato(d: dict, bid: str, categoria: str, valore: str, sub: str, anna: str | None = None,
+                        luca: str | None = None) -> None:
+    """Aggiunge un fabbricato (EC) devoluto per meta' ad Anna e a Luca; ``anna``/``luca`` = codice agevolazione della riga."""
+    d["beni"].append({"id": bid, "_origine": {}, "tipo": "fabbricato", "comune": "Roma", "foglio": "100",
+                      "particella": "200", "subalterno": sub, "categoria": categoria, "rendita": "100.00", "valore": valore,
+                      "diritto": "proprieta", "quota_defunto": {"num": 1, "den": 1}})
+    d["opzioni"]["telematico"]["beni"][bid] = {"provincia": "RM", "codice_comune": "H501",
+                                               "codice_comune_amministrativo": "H501", "indirizzo": "Via Esempio 1",
+                                               "classe": "2", "consistenza": "20"}
+    for pid, suf, agev in (("p_anna0001", "anna", anna), ("p_luca0001", "luca", luca)):
+        did = f"d_{bid[2:]}_{suf}"
+        d["devoluzioni"].append({"id": did, "_origine": {}, "bene_id": bid, "persona_id": pid,
+                                 "quota": {"num": 1, "den": 2}, "diritto": "1"})
+        if agev:
+            d["opzioni"]["telematico"].setdefault("devoluzioni", {})[did] = {"agevolazioni": agev}
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),

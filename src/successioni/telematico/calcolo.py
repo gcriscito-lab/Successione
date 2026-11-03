@@ -206,7 +206,10 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                                      "agevolazioni non supportati dal calcolo", _g(5, "riduzioni") + "; " +
                                      _g(7, "imposta estera")))
             for dv in riga.iter(SUC + "Devoluzione"):
-                if dv.find(SUC + "Agevolazioni") is not None or dv.find(SUC + "Riduzioni") is not None:
+                # Guida al calcolo p. 1 (QE: esclusi solo i codici A, D, C, G, N, E, H) e p. 5 (riduzioni: solo L, Q, R, F e
+                # art. 25): i codici prima casa P, X, Y, Z non modificano l'imposta di successione (Fascicolo I p. PDF 57,
+                # quadro sinottico: solo imposte ipotecaria e catastale fisse)
+                if _testo(dv, "Agevolazioni") not in (None, "", "P", "X", "Y", "Z") or dv.find(SUC + "Riduzioni") is not None:
                     ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/Devoluzione", "agevolazioni/riduzioni "
                                      "non supportate dal calcolo", _g(5, "riduzioni e agevolazioni")))
                 ide = dv.find(SUC + "IdentificazioneSoggetto")
