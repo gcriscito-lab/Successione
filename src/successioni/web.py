@@ -20,6 +20,12 @@ TIPI = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", 
         ".svg": "image/svg+xml"}
 
 
+def strutturati_completi() -> dict:
+    """Campi a scelta guidata: i codici ufficiali generati dagli XSD (`codici.py`) e, con precedenza, le voci scritte a mano."""
+    from . import codici
+    return {**codici.strutturati(), **S.STRUTTURATI}
+
+
 def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: int = 8765,
              ammetti_host_di_prova: bool = False) -> Starlette:
     sv = servizio or Servizio()
@@ -83,7 +89,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def schema_(request):
         from .collegamenti.invio import TIPI_RICEVUTA
         return {"collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": S.AIUTI,
-                "strutturati": S.STRUTTURATI, "tipi_ricevuta": TIPI_RICEVUTA,
+                "strutturati": strutturati_completi(), "tipi_ricevuta": TIPI_RICEVUTA,
                 "province_tavolari": list(Q.PROVINCE_TAVOLARI)}
 
     @api

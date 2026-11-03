@@ -151,7 +151,16 @@ function renderAlbero() {
 }
 
 /* ---------- campi ---------- */
-function campoInput(coll, id, campo, kind, val, onMod) {
+/* Menu dei codici ufficiali (generati dagli XSD, server: codici.py): chiave «coll.campo», o «coll.campo@immobile|altro» per i
+   diritti, che dipendono dal tipo del bene. Restituisce la definizione o null (il campo resta di testo libero). */
+function struttDi(coll, campo, tipoBene) {
+  const s = S.schema.strutturati || {};
+  const ctx = (coll === "beni" || coll === "devoluzioni") ? (["fabbricato", "terreno"].includes(tipoBene) ? "immobile" : "altro") : null;
+  return (ctx && s[coll + "." + campo + "@" + ctx]) || s[coll + "." + campo] || null;
+}
+function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
+  const sd = kind === "str" || kind === "cf" ? struttDi(coll, campo, tipoBene) : null;
+  if (sd && sd.opzioni) return campoStrutturato(sd, val, v => onMod(campo, v), id ? coll + "[" + id + "]." + campo : null);
   const path = id ? coll + "[" + id + "]." + campo : null;
   const err = path ? rilievi().filter(r => r.percorso === path) : [];
   let el;
@@ -177,7 +186,12 @@ function campoInput(coll, id, campo, kind, val, onMod) {
    Un valore gia' presente ma non nell'elenco (o uno stato come [da_confermare]) resta visibile e non viene perso. */
 function campoStrutturato(sd, val, onMod, path) {
   const err = path ? rilievi().filter(r => r.percorso === path) : [];
-  const attuale = val === undefined || val === null ? "" : (typeof val === "object" && val.stato ? "[" + val.stato + "]" : String(val));
+  let attuale = val === undefined || val === null ? "" : (typeof val === "object" && val.stato ? "[" + val.stato + "]" : String(val));
+  if (attuale && !sd.opzioni.some(o => o.valore === attuale)) {     // «A/2» e «a2» valgono il codice «A2»: si mostra la voce senza cambiare il dato
+    const norm = x => String(x).replace(/[\s\/]/g, "").toUpperCase();
+    const gemella = sd.opzioni.find(o => norm(o.valore) === norm(attuale));
+    if (gemella) attuale = gemella.valore;
+  }
   const el = h("select", { "aria-label": sd.etichetta },
     h("option", { value: "" }, "(non indicato)"),
     sd.opzioni.map(o => h("option", { value: o.valore }, o.valore + " — " + o.etichetta)),
@@ -312,14 +326,19 @@ function insDati(ins) {
   for (const c of ordine) { const kind = campi[c];
     const vv = valRiga(r, c);
     if (visibili && !visibili.has(c) && (vv === undefined || vv === null || vv === "")) continue;
-    const sd = (S.schema.strutturati || {})[q.coll + "." + c];
+    const tipoBene = q.coll === "beni" ? valRiga(r, "tipo")
+      : q.coll === "devoluzioni" ? ((S.P.dati.beni || []).find(b => b.id === valRiga(r, "bene_id")) || {}).tipo : null;
+    const sd = struttDi(q.coll, c, tipoBene);
     const modificaCampo = (campo, v) => {
       const scrivi = (c2, x) => {
         if (r.nuova) r.nuova.campi[c2] = x;
         else { const d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} }; d.campi[c2] = x; S.dirty.set(r.key, d); }
       };
       scrivi(campo, v);
+      // il grado (menu dei codici) e la «relazione» in tabella dicono la stessa cosa: se la relazione e' vuota la si allinea
+      if (q.coll === "persone" && campo === "grado_parentela" && v && !valRiga(r, "relazione_con_defunto")) scrivi("relazione_con_defunto", v);
       renderVista(); aggiornaBottoni(); renderSb();
+      if ((q.coll === "beni" && campo === "tipo") || (q.coll === "devoluzioni" && campo === "bene_id")) renderIns();   // cambia l'elenco dei diritti
       if (q.coll === "persone" && campo === "codice_fiscale")
         suggerisciDaCF(v, r.e ? r.e.ruolo : (r.nuova && r.nuova.campi.ruolo), c2 => valRiga(r, c2), scrivi).then(res => {
           if (res.testo) msg(res.testo, res.riempiti.length ? "o" : "e");
@@ -592,7 +611,7 @@ function schedaPersona(titolo, ruolo, vis) {
   }
   return g;
 }
-/* Dati della dichiarazione: opzioni.telematico.dichiarazione. I codici non sono proposti dal programma: vanno presi dalle istruzioni del frontespizio. */
+/* Dati della dichiarazione: opzioni.telematico.dichiarazione. I codici ufficiali sono proposti come menu (server: codici.py, dagli XSD). */
 const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore booleano nel modello), altrimenti testo
   ["stato_civile", "stato civile"], ["devoluzione_per_legge", "devoluzione per legge", "bool"], ["firma_dichiarante", "firma del dichiarante", "bool"],
   ["tempistica_pagamento", "tempistica del pagamento"],
@@ -625,6 +644,12 @@ function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazi
       inp = h('select', { id, 'aria-label': etichetta }, h('option', { value: '' }, 'Presentatore distinto / non selezionato'),
         S.P.dati.persone.filter(p => p.ruolo !== 'defunto').map(p => h('option', { value: p.id }, etichettaPersona(p))));
       inp.value = v || '';
+    } else if ((S.schema.strutturati || {})["dichiarazione." + chiave]) {
+      const sd = S.schema.strutturati["dichiarazione." + chiave], attuale = v == null ? "" : String(v);
+      inp = h("select", { id, "aria-label": etichetta }, h("option", { value: "" }, "(non indicato)"),
+        sd.opzioni.map(o => h("option", { value: o.valore }, o.valore + " — " + o.etichetta)),
+        attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale }, attuale + " (valore non previsto)") : null);
+      inp.value = attuale;
     } else inp = h("input", { id, "aria-label": etichetta, value: v == null ? "" : String(v) });
     const modifica = () => {
       const testo = inp.value.trim();
