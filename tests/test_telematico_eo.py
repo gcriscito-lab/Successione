@@ -53,6 +53,13 @@ def test_codice_fiscale_emittente_con_cifra_di_controllo_errata():
     assert (P + "codice_fiscale_emittente", "VALORE_NON_VALIDO") in _codici(es)
 
 
+def test_cf_emittente_diverso_da_defunto_ed_eredi():
+    from telematico_casi import CF_ANNA
+    for cf in (CF_ANNA, "RSSMRA40A01H501K"):   # erede del quadro EA; defunto
+        es = _es(lambda b, cf=cf: b.update(tipo_titolo="2", codice_fiscale_emittente=cf))
+        assert (P + "codice_fiscale_emittente", "REGOLA_CF_EMITTENTE") in _codici(es), cf
+
+
 def test_codice_titolo_solo_per_quotati():
     es = _es(lambda b: b.update(codice_titolo="IT0000000019"))
     assert (P + "codice_titolo", "DATI_INCOERENTI") in _codici(es)

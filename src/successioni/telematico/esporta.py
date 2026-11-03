@@ -578,6 +578,13 @@ class _Export:
                 out["CodiceFiscale"] = cf_persona(cf_em)
             except F.ValoreXml as e:
                 self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].codice_fiscale_emittente", str(e), fonte_cf)
+        if out.get("CodiceFiscale"):   # annotazione: diverso dal CF del defunto e da quello dei soggetti del quadro EA
+            propri = {str(p.get("codice_fiscale") or "").strip().upper() for p in self.d.get("persone", [])
+                      if p.get("ruolo") == "defunto" or p in self.ea}
+            if out["CodiceFiscale"] in propri:
+                self.err("REGOLA_CF_EMITTENTE", f"beni[{b['id']}].codice_fiscale_emittente",
+                         "il codice fiscale dell'emittente deve essere diverso da quello del defunto e dei soggetti del quadro EA",
+                         fonte_cf)
         qta = SUP.attr(self.d, c, b, "quantita")
         self.usa(b, "quantita")
         if qta not in (None, ""):
