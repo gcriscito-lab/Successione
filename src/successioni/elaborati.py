@@ -19,6 +19,29 @@ SCOPI = ("completo", "bozza_tecnica")
 
 
 class ElaboratiMixin:
+    def file_export(self, pratica_id: str, job_id: str | None = None) -> tuple[bytes, dict]:
+        """Legge una versione precisa, verificandone appartenenza e integrita'."""
+        self.leggi(pratica_id)
+        if job_id:
+            with self.arch.lettura() as c:
+                r = c.execute("SELECT * FROM job WHERE id=? AND tipo=? AND pratica_id=?",
+                              (job_id, TIPO_EXPORT, pratica_id)).fetchone()
+            if not r:
+                raise DatiNonValidi("esportazione non appartenente alla pratica")
+            j = dict(r); j["risultato"] = json.loads(j["risultato"]); j["input"] = json.loads(j["input"])
+        else:
+            j = self._job_ultimo(TIPO_EXPORT, pratica_id)
+        if not j or not j["risultato"].get("generato"):
+            raise DatiNonValidi("nessun file XML disponibile: genera prima il file")
+        r = j["risultato"]
+        p = (self.arch.base / r["percorso"]).resolve()
+        if not p.is_relative_to((self.arch.base / "elaborati").resolve()) or not p.is_file():
+            raise DatiNonValidi("file XML non disponibile")
+        xml = p.read_bytes()
+        if hashlib.sha256(xml).hexdigest() != r["xml_sha256"]:
+            raise DatiNonValidi("file XML alterato: rigenera l'esportazione")
+        return xml, j
+
     # ------------------------------------------------------------------ persistenza (tabella job)
     def _job_scrivi(self, tipo: str, pratica_id: str, stato: str, inp: dict, ris: dict) -> str:
         jid = "jb_" + uuid.uuid4().hex[:12]
@@ -157,8 +180,15 @@ class ElaboratiMixin:
                    "bozza_tecnica": r.get("bozza_tecnica"), "job_id": c["id"], "job_adattatore": r.get("job_adattatore"),
                    "azione_richiesta": r.get("azione_richiesta") if corrente else None}
         ver = self.verifica(pratica_id)
+        invio = self.invio_stato(pratica_id)["copie"]
+        trasmissione = {"stato": "non_preparata", "nota": "invio reale manuale con strumenti ufficiali"}
+        if invio:
+            copia = invio[0]
+            trasmissione.update(stato=copia["stato"], modalita=copia["dettaglio"].get("modalita"))
+            if trasmissione["modalita"] == "simulata":
+                trasmissione["nota"] = "PROVA SIMULATA: nessun invio all'Agenzia"
         return {"pratica_id": pratica_id, "revisione": d["revisione"], "impronta_dichiarativa": imp,
                 "dati": {"stato": "senza_rilievi" if ver["esito"] == "ok" else "con_rilievi", "rilievi": len(ver["rilievi"])},
                 "export": export, "xsd": xsd, "controllo_ufficiale": ctl,
-                "trasmissione": {"stato": "non_preparata", "nota": "la trasmissione non è disponibile in questa versione"},
+                "trasmissione": trasmissione,
                 "ambito": "stati separati; il controllo ufficiale locale non sostituisce la verifica con i servizi dell'Agenzia"}

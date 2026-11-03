@@ -81,7 +81,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def schema_(request):
+        from .collegamenti.invio import TIPI_RICEVUTA
         return {"collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": S.AIUTI,
+                "tipi_ricevuta": TIPI_RICEVUTA,
                 "province_tavolari": list(Q.PROVINCE_TAVOLARI)}
 
     @api
@@ -146,6 +148,30 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         return sv.stato_elaborati(request.path_params["pid"])
 
     @api
+    async def scarica_xml(request):
+        xml, j = sv.file_export(request.path_params["pid"], request.query_params.get("job"))
+        return Response(xml, media_type="application/xml", headers={"Content-Disposition":
+                        f'attachment; filename="successione_rev{j["input"]["revisione"]}.xml"', "Cache-Control": "no-store"})
+
+    @api
+    async def stampa(request):
+        from .stampa import prospetto
+        pid = request.path_params["pid"]
+        xml, j = sv.file_export(pid, request.query_params.get("job"))
+        r = j["risultato"]
+        return HTMLResponse(prospetto(xml, titolo=sv.leggi(pid)["titolo"], revisione=j["input"]["revisione"],
+                                     sha256=r["xml_sha256"], completo=r["completo"]), headers={"Cache-Control": "no-store"})
+
+    @api
+    async def scarica_copia(request):
+        from .collegamenti.base import DepositoArtefatti
+        ad = sv._adattatore_invio("manuale")
+        j = ad.job.leggi(request.path_params["cid"], "invio_copia")
+        a = next(a for a, m in zip(j["risultato"]["artefatti"], j["input"]["manifest"]) if m["ruolo"] == "telematico")
+        return Response(DepositoArtefatti(sv.arch).leggi(a), media_type="application/xml",
+                        headers={"Content-Disposition": 'attachment; filename="copia_congelata.xml"', "Cache-Control": "no-store"})
+
+    @api
     async def controllo_ufficiale_api(request):
         return sv.controllo_ufficiale_pratica(request.path_params["pid"])
 
@@ -156,6 +182,15 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     @api
     async def converti(request):
         return sv.prepara_pdfa(request.path_params["aid"])
+
+    @api
+    async def importa(request):
+        dati = await request.body()
+        if not dati:
+            raise ValueError("file vuoto")
+        if len(dati) > 20_000_000:
+            raise ValueError("file troppo grande")
+        return sv.importa_xml_telematico(dati, titolo=request.query_params.get("titolo") or None)
 
     async def corpo(request):
         return await request.json() if (await request.body()) else {}
@@ -189,13 +224,39 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     @api
     async def invio_riconcilia(request):
         b = await corpo(request)
-        return sv.invio_riconcilia(request.path_params["tid"], b.get("evidenze"), modalita=b.get("modalita", "simulata"))
+        return sv.invio_riconcilia(request.path_params["tid"], b.get("evidenze"), modalita=b.get("modalita"))
+
+    @api
+    async def ricevute(request):
+        pid, tid = request.path_params["pid"], request.path_params["tid"]
+        if request.method == "GET":
+            return sv.ricevute_stato(pid, tid)
+        q = request.query_params
+        return sv.ricevuta_acquisisci(pid, tid, await request.body(), nome=q.get("nome", "ricevuta"),
+                                     tipo=q["tipo"], esito=q.get("esito") or None)
+
+    @api
+    async def ricevuta_file(request):
+        from .collegamenti.base import DepositoArtefatti
+        pid, tid = request.path_params["pid"], request.path_params["tid"]
+        stato = sv.ricevute_stato(pid, tid)
+        if not any(d["job_id"] == request.path_params["rid"] for d in stato["documenti"]):
+            raise NonTrovato("ricevuta non appartenente al protocollo")
+        j = sv._adattatore_invio("manuale").job.leggi(request.path_params["rid"], "ricevuta_suc13")
+        a = j["risultato"]["artefatti"][0]
+        from urllib.parse import quote
+        return Response(DepositoArtefatti(sv.arch).leggi(a), media_type="application/octet-stream",
+                        headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(a["nome"], safe=""),
+                                 "Cache-Control": "no-store"})
 
     P = "/api/pratiche/{pid}"
     return Starlette(routes=[
-        Route("/api/codice-fiscale", cf_decodifica),
+        Route("/api/codice-fiscale", cf_decodifica), Route("/api/importa", importa, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
+        Route(P + "/ricevute/{tid}", ricevute, methods=["GET", "POST"]),
+        Route(P + "/ricevute/{tid}/file/{rid}", ricevuta_file),
         Route("/api/invio/{cid}/conferma", invio_conferma, methods=["POST"]),
+        Route("/api/invio/{cid}/file", scarica_copia),
         Route("/api/invio/{cid}/trasmetti", invio_trasmetti, methods=["POST"]),
         Route("/api/invio/tentativi/{tid}/riconcilia", invio_riconcilia, methods=["POST"]),
         Route("/", home), Route("/static/{nome}", statico), Route("/api/info", info),
@@ -205,6 +266,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/revisioni", revisioni), Route(P + "/differenze", differenze),
         Route(P + "/ripristina", ripristina, methods=["POST"]),
         Route(P + "/esporta", esporta, methods=["POST"]), Route(P + "/elaborati", elaborati),
+        Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa),
         Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),

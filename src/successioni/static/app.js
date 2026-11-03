@@ -12,7 +12,9 @@ function h(tag, attrs, ...kids) {
 }
 const S = { schema: null, pratiche: [], P: null, Q: null, sel: "AN", riga: null, tab: "dati", dirty: new Map(), nuove: new Map(), salvata: null, writeBusy: false };
 const STATI = { vuoto: "da compilare", compilato: "compilato", rilievi: "rilievi", non_supportato: "non supportato", inattivo: "non selezionato" };
-const nMod = () => S.dirty.size + S.nuove.size;
+S.dichDirty = new Map();
+S.supDirty = new Map();
+const nMod = () => S.dirty.size + S.nuove.size + S.dichDirty.size + S.supDirty.size;
 const nuovoId = coll => ({ persone: "p", beni: "b", devoluzioni: "d", passivita: "ps", documenti_ref: "dr" }[coll]) + "_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const uguale = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -66,7 +68,7 @@ async function caricaPratiche() {
 async function apri(id, sel) {
   if (S.writeBusy) { msg("Salvataggio in corso: attendi prima di cambiare pratica.", "e"); return; }
   if (nMod() && !confirm("Ci sono modifiche non salvate: continuare senza salvarle?")) return;
-  S.dirty.clear(); S.nuove.clear(); S.riga = null; S.tab = "dati"; S.salvata = null;
+  S.dirty.clear(); S.nuove.clear(); S.dichDirty.clear(); S.supDirty.clear(); S.riga = null; S.tab = "dati"; S.salvata = null;
   await ricarica(id);
   S.sel = sel || "AN"; render(); await caricaPratiche();
 }
@@ -97,7 +99,7 @@ function renderSb() {
     nMod() ? h("span", { style: "color:var(--am)" }, nMod() + (nMod() === 1 ? " modifica non salvata" : " modifiche non salvate")) : null,
     n ? h("button", { onclick: () => { S.tab = "controlli"; renderIns(); } }, n + (n === 1 ? " rilievo" : " rilievi")) : h("span", {}, "Nessun rilievo"),
     h("span", {}, S.Q.finalizzabile ? "Finalizzabile" : "Non finalizzabile" + ((S.Q.blocchi_finalizzazione || []).length ? ": file XML completo non generato" : "")),
-    h("span", {}, "Controllo ufficiale: non eseguito")].filter(Boolean));
+    h("span", {}, "Controllo ufficiale: vedi scheda File")].filter(Boolean));
 }
 
 /* ---------- albero dei quadri ---------- */
@@ -264,15 +266,58 @@ function insDati(ins) {
     if (aiuto) w.append(h("div", { class: "mut", style: "font-size:11.5px;margin-top:2px" }, aiuto));
     ins.append(h("div", { class: "rg" }, h("label", {}, c.replaceAll("_", " ")), w));
   }
+  renderStrutturati(ins, q, r);
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
-  if (r.nuova || S.dirty.has(r.key)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));
+  const supKey = q.coll + ':' + (r.e ? r.e.id : r.nuova.id);
+  if (r.nuova || S.dirty.has(r.key) || S.supDirty.has(supKey)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); S.supDirty.delete(supKey); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));
   if (r.e) az.append(h("button", { class: "lk", style: "color:var(--er)", onclick: async () => {
     if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di eliminare la riga.", "e");
     if (confirm("Eliminare la riga?")) await salvaOps([{ op: "remove", coll: q.coll, id }], () => {
-      S.dirty.delete(r.key); S.riga = null;
+      S.dirty.delete(r.key); S.supDirty.delete(supKey); S.riga = null;
     });
   } }, "Elimina riga"));
   ins.append(az, h("p", { class: "mut mono", style: "margin-top:10px" }, r.e ? r.e.id : ""));
+}
+function renderStrutturati(ins, q, r) {
+  if (!['beni', 'passivita', 'persone'].includes(q.coll)) return;
+  const id = r.e ? r.e.id : r.nuova.id, key = q.coll + ':' + id;
+  const base = (((S.P.dati.opzioni.telematico || {})[q.coll] || {})[id]) || {};
+  const valore = c => S.supDirty.has(key) && c in S.supDirty.get(key).campi ? S.supDirty.get(key).campi[c] : base[c];
+  const scrivi = (c, v) => {
+    const d = S.supDirty.get(key) || { coll: q.coll, id, campi: {} };
+    d.campi[c] = v; S.supDirty.set(key, d); aggiornaBottoni(); renderSb();
+  };
+  if (q.coll === 'persone') {
+    const cb = h('input', { type: 'checkbox', 'aria-label': 'portatore handicap', onchange: ev => scrivi('portatore_handicap', ev.target.checked) });
+    cb.checked = valore('portatore_handicap') === true;
+    ins.append(h('label', { class: 'chk' }, cb, 'Portatore di handicap (come documentato)'));
+  }
+  if (q.id === 'EB' || q.id === 'EL') {
+    ins.append(h('h3', {}, 'Superficie'));
+    for (const c of ['ettari', 'are', 'centiare']) {
+      const el = h('input', { 'aria-label': 'superficie ' + c, value: (valore('superficie') || {})[c] ?? '',
+        oninput: ev => { const s = { ...(valore('superficie') || {}) }; const t = ev.target.value.trim(); if (!t) delete s[c]; else s[c] = /^\d+$/.test(t) ? Number(t) : t; scrivi('superficie', Object.keys(s).length ? s : null); } });
+      ins.append(h('label', {}, c, el));
+    }
+  }
+  const tabella = (campo, titolo, campi, predefinito) => {
+    ins.append(h('h3', {}, titolo));
+    const righe = valore(campo) || [];
+    righe.forEach((voce, i) => {
+      const box = h('div', { class: 'grp', style: 'padding:8px;margin:6px 0' });
+      for (const [c, tipo] of campi) box.append(h('label', {}, c.replaceAll('_', ' '), campoInput(q.coll, null, c, tipo, voce[c], (k, v) => {
+        const nuove = structuredClone(valore(campo) || []); nuove[i][k] = v; scrivi(campo, nuove);
+      })));
+      box.append(h('button', { onclick: () => { scrivi(campo, righe.filter((_, j) => j !== i)); renderIns(); } }, 'Rimuovi ' + titolo.toLowerCase()));
+      ins.append(box);
+    });
+    ins.append(h('button', { onclick: () => { scrivi(campo, [...righe, structuredClone(predefinito)]); renderIns(); } }, 'Aggiungi ' + titolo.toLowerCase()));
+  };
+  if (q.coll === 'passivita') tabella('ripartizione', 'Ripartizione', [['persona_id', 'ref:persone'], ['quota', 'quota']], { persona_id: '', quota: '1/1' });
+  if (q.id === 'EB' || q.id === 'EC') {
+    tabella('estremi_trascrizione', 'Trascrizione', [['ufficio', 'str'], ['registro_particolare', 'str'], ['anno', 'str']], {});
+    tabella('estremi_registrazione', 'Registrazione', [['ufficio', 'str'], ['anno', 'str'], ['volume', 'str'], ['numero', 'str']], {});
+  }
 }
 function insControlli(ins) {
   const q = S.Q;
@@ -307,6 +352,9 @@ async function insFile(ins) {
   if (S.tab !== "file") return;
   ins.append(h("p", { class: "mut" }, "Stati separati. Un esito diventa obsoleto solo se cambiano i dati della dichiarazione, non per una nota interna."));
   const ex = st.export, ct = st.controllo_ufficiale;
+  if (ex.generato) ins.append(h("div", { class: "az" },
+    h("a", { href: "/api/pratiche/" + S.P.pratica_id + "/file.xml?job=" + ex.job_id, download: "" }, "Scarica XML"),
+    h("a", { href: "/api/pratiche/" + S.P.pratica_id + "/stampa?job=" + ex.job_id, target: "_blank", rel: "noopener" }, "Stampa prospetto")));
   ins.append(riga_stato("Dati", st.dati.stato, st.dati.rilievi + " rilievi"));
   ins.append(riga_stato("File XML", ex.stato, ex.stato === "non_eseguito" ? null : (ex.generato ? (ex.completo ? "dichiarazione completa" : "bozza tecnica: NON completa e NON trasmissibile") : "non generato: " + (ex.quadri_mancanti.length + ex.non_supportato.length + ex.n_errori) + " motivi")));
   ins.append(riga_stato("Schema XSD", st.xsd.stato, st.xsd.n_errori ? st.xsd.n_errori + " errori" : null));
@@ -334,7 +382,7 @@ async function insFile(ins) {
       } else msg((r.completo ? "File generato e valido per lo schema." : "Bozza tecnica generata (valida per lo schema). " + r.avvertenza)
         + ((r.avvisi || []).length ? " Avvertenze: " + r.avvisi.map(a => a.messaggio).join(" | ") : ""), r.completo ? "o" : "e");
     } catch (e) { msg(e.message, "e"); }
-    renderIns();
+    await ricarica(); render();
   };
   ins.append(h("div", { class: "az" }, h("button", { class: "pil", onclick: () => esegui("completo") }, "Genera file"),
     h("button", { class: "gh", title: "Per i controlli tecnici: valido per lo schema ma incompleto e non trasmissibile", onclick: () => esegui("bozza_tecnica") }, "Genera bozza tecnica")));
@@ -358,6 +406,13 @@ async function renderInvio(ins, ex) {
   const c = copie[0];
   if (!c) { ins.append(h("p", { class: "mut", style: "font-size:12px" }, "Nessuna copia preparata. Serve un file completo e un controllo ufficiale positivo.")); return; }
   const d = c.dettaglio || {};
+  ins.append(h("a", { href: "/api/invio/" + c.job_id + "/file", download: "" }, "Scarica la copia congelata"));
+  ins.append(h("p", { class: "mut" }, "Fornitore: " + JSON.stringify(d.profilo || {}) + " · Importi: " + JSON.stringify(d.importi || {})));
+  const tentativo = (c.tentativi || []).find(t => t.dettaglio.job_id === d.tentativo_corrente);
+  if (tentativo) {
+    ins.append(riga_stato("Tentativo", tentativo.dettaglio.stato, tentativo.dettaglio.modalita + (tentativo.dettaglio.protocollo ? " · " + tentativo.dettaglio.protocollo : "")));
+    if (tentativo.azione_richiesta) ins.append(h("div", { class: "nota", style: "white-space:pre-wrap" }, tentativo.azione_richiesta));
+  }
   ins.append(riga_stato("Copia", c.stato, (d.manifest || []).map(m => m.nome + " · " + m.sha256.slice(0, 12)).join(", ")));
   if (c.azione_richiesta) ins.append(h("div", { class: "nota", style: "margin:6px 0;white-space:pre-wrap" }, c.azione_richiesta));
   if (c.stato === "preparata") {
@@ -371,10 +426,45 @@ async function renderInvio(ins, ex) {
       h("button", { class: "pil", onclick: () => chiama("/api/invio/" + c.job_id + "/trasmetti", { chiave_richiesta: "t-" + crypto.randomUUID(), modalita: "simulata" }, r => (r.avvertenza || "") + " Esito: " + String(r.stato).replaceAll("_", " ")) }, "Invia in PROVA (simulata)"),
       h("button", { class: "gh", onclick: () => chiama("/api/invio/" + c.job_id + "/trasmetti", { chiave_richiesta: "t-" + crypto.randomUUID(), modalita: "manuale" }, r => r.avvertenza) }, "Istruzioni per l'invio reale")));
   }
-  if (c.stato === "esito_incerto" || (d.tentativo_corrente && ["esito_incerto", "in_trasmissione"].includes(c.stato))) {
-    ins.append(h("div", { class: "az" }, h("button", { class: "pil", onclick: () => chiama("/api/invio/tentativi/" + d.tentativo_corrente + "/riconcilia", { modalita: "simulata" }, r => "Riconciliazione: " + String(r.stato).replaceAll("_", " ")) }, "Riconcilia (prova)")));
+  if (tentativo && ["esito_incerto", "in_trasmissione", "attesa_invio_manuale"].includes(tentativo.dettaglio.stato)) {
+    const url = "/api/invio/tentativi/" + d.tentativo_corrente + "/riconcilia";
+    if (tentativo.dettaglio.modalita === "simulata")
+      ins.append(h("button", { onclick: () => chiama(url, {}, r => "Riconciliazione: " + r.stato) }, "Riconcilia (prova)"));
+    else {
+      const protocollo = h("input", { "aria-label": "Protocollo dell'invio", placeholder: "Protocollo assegnato" });
+      const fonte = h("input", { "aria-label": "Evidenza verificata", placeholder: "Dove hai verificato l'esito" });
+      const registra = nonInviato => {
+        if (!fonte.value.trim() || (!nonInviato && !protocollo.value.trim())) return msg("Indica il protocollo e dove hai verificato l'esito; per un invio non avvenuto indica l'evidenza.", "e");
+        const evidenze = { verificato_su: fonte.value.trim(), ...(nonInviato ? { non_trasmesso: true } : { protocollo: protocollo.value.trim() }) };
+        return chiama(url, { evidenze }, r => "Esito registrato: " + r.stato);
+      };
+      ins.append(protocollo, fonte, h("div", { class: "az" },
+        h("button", { onclick: () => registra(false) }, "Registra protocollo"),
+        h("button", { onclick: () => { if (confirm("Hai verificato che questo invio non è avvenuto?")) registra(true); } }, "Registra invio non avvenuto")));
+    }
   }
+  if (tentativo && tentativo.dettaglio.protocollo) await renderRicevute(ins, pid, tentativo.dettaglio.job_id);
   for (const tid of d.tentativi || []) ins.append(h("div", { class: "mut", style: "font-size:12px" }, "Tentativo " + tid + (tid === d.tentativo_corrente ? " (corrente)" : "")));
+}
+async function renderRicevute(ins, pid, tid) {
+  const url = '/api/pratiche/' + pid + '/ricevute/' + tid;
+  const stato = await api(url);
+  ins.append(h('h3', {}, 'Ricevute ed esiti successivi'));
+  for (const k of ['registrazione', 'pagamento', 'volture', 'copia_semplice', 'attestazione']) ins.append(riga_stato(k, stato[k]));
+  const tipi = S.schema.tipi_ricevuta;
+  const tipo = h('select', { 'aria-label': 'Tipo di ricevuta' }, Object.keys(tipi).map(k => h('option', { value: k }, k.replaceAll('_', ' '))));
+  const esito = h('select', { 'aria-label': 'Esito della ricevuta' });
+  const aggiorna = () => esito.replaceChildren(h('option', { value: '' }, '(senza esito)'), ...tipi[tipo.value].esiti.map(k => h('option', { value: k }, k)));
+  tipo.addEventListener('change', aggiorna); aggiorna();
+  const file = h('input', { type: 'file', 'aria-label': 'Documento ricevuto' });
+  ins.append(tipo, esito, file, h('button', { onclick: async () => {
+    const f = file.files[0]; if (!f) return msg('Scegli il documento ricevuto.', 'e');
+    try {
+      await api(url + '?' + new URLSearchParams({ tipo: tipo.value, esito: esito.value, nome: f.name }), { method: 'POST', body: await f.arrayBuffer() });
+      msg('Ricevuta originale acquisita e associata al protocollo.', 'o'); renderIns();
+    } catch (e) { msg(e.message, 'e'); }
+  } }, 'Acquisisci ricevuta'));
+  for (const doc of stato.documenti) ins.append(h('p', { class: 'mut' }, h('a', { href: url + '/file/' + doc.job_id, download: '' }, doc.nome), ' · ' + doc.tipo + ' · ' + (doc.esito || '') + ' · SHA-256 ' + doc.sha256));
 }
 function vaiA(r) {
   S.sel = r.quadro;
@@ -409,6 +499,9 @@ function schedaPersona(titolo, ruolo, vis) {
 const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore booleano nel modello), altrimenti testo
   ["stato_civile", "stato civile"], ["devoluzione_per_legge", "devoluzione per legge", "bool"], ["firma_dichiarante", "firma del dichiarante", "bool"],
   ["tempistica_pagamento", "tempistica del pagamento"],
+  ["dichiara_copie_conformi", "dichiarazione di conformità delle copie allegate", "bool"],
+  ["azienda_data_deposito", "azienda: data di deposito (AAAA-MM-GG)"],
+  ["azienda_camera_commercio", "azienda: camera di commercio"],
   ["presentatore.persona_id", "presentatore: id persona"], ["presentatore.codice_carica", "presentatore: codice carica"],
   ["presentatore.telefono", "presentatore: telefono"], ["presentatore.email", "presentatore: email"],
   ["versamento.iban", "versamento: IBAN"], ["versamento.cf_titolare", "versamento: codice fiscale del titolare"],
@@ -423,35 +516,32 @@ function sezioneDatiDichiarazione() {
   const dich = tel.dichiarazione || {};
   const leggi = (chiave) => chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
   const sez = h("section", { class: "grp" }, h("h2", {}, "Dati della dichiarazione"),
-    h("div", { class: "nota", style: "margin:8px 14px" }, "Codici come da istruzioni del frontespizio. Usare solo dati sintetici in prova. La devoluzione per testamento non e' ancora esportabile: la pratica resta non finalizzabile."));
+    h("div", { class: "nota", style: "margin:8px 14px" }, "Codici come da istruzioni del frontespizio. Il testamento è gestito nel perimetro indicato nella matrice; i casi non coperti bloccano il file completo."));
   const inputs = {};
   for (const [chiave, etichetta, tipo] of CAMPI_DICH) {
-    const v = leggi(chiave); const id = "dd_" + chiave.replaceAll(".", "_");
+    const v = S.dichDirty.has(chiave) ? S.dichDirty.get(chiave) : leggi(chiave); const id = "dd_" + chiave.replaceAll(".", "_");
     let inp;
     if (tipo === "bool") {
       inp = h("select", { id, "aria-label": etichetta }, h("option", { value: "" }, "(non indicato)"), h("option", { value: "si" }, "si'"), h("option", { value: "no" }, "no"));
       inp.value = v === true ? "si" : v === false ? "no" : "";
     } else inp = h("input", { id, "aria-label": etichetta, value: v == null ? "" : String(v) });
+    const modifica = () => {
+      const testo = inp.value.trim();
+      S.dichDirty.set(chiave, testo === "" ? null : tipo === "bool" ? testo === "si" : testo);
+      aggiornaBottoni(); renderSb();
+    };
+    inp.addEventListener("input", modifica); inp.addEventListener("change", modifica);
     inputs[chiave] = inp;
     sez.append(h("div", { class: "rg" }, h("label", { for: id }, etichetta), inp));
   }
   sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "dd_salva", onclick: async () => {
     // legge l'oggetto corrente e modifica solo le chiavi toccate: persone, beni e passivita' dell'oggetto restano intatti
-    const nuovo = JSON.parse(JSON.stringify(tel)); const d = nuovo.dichiarazione = nuovo.dichiarazione || {};
-    for (const [chiave, , tipo] of CAMPI_DICH) {
-      const val = inputs[chiave].value.trim(); const parti = chiave.split("."); let o = d;
-      for (const p of parti.slice(0, -1)) o = o[p] = o[p] || {};
-      const ultimo = parti[parti.length - 1];
-      if (val === "") delete o[ultimo]; else o[ultimo] = tipo === "bool" ? val === "si" : val;
-    }
-    for (const g of ["presentatore", "versamento", "testamento"]) if (d[g] && !Object.keys(d[g]).length) delete d[g];
-    if (!Object.keys(d).length) delete nuovo.dichiarazione;
-    await salvaOps([{ op: "set", sezione: "opzioni", campi: { telematico: nuovo } }]);
+    await salvaTutto();
   } }, "Salva dati della dichiarazione")));
   return sez;
 }
 function renderFront(main) {
-  main.append(schedaPersona("Defunto", "defunto", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso"]));
+  main.append(schedaPersona("Defunto", "defunto", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso", "comune_decesso", "provincia_decesso"]));
   main.append(schedaPersona("Presentatore della dichiarazione", "presentatore", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "relazione_con_defunto"]));
   const tipo = (S.P.dati.opzioni || {}).tipo_dichiarazione || "originaria";
   const sel = h("select", { "aria-label": "Tipo di dichiarazione" }, h("option", { value: "originaria" }, "Dichiarazione originaria"), h("option", { value: "sostitutiva" }, "Dichiarazione sostitutiva"));
@@ -517,12 +607,34 @@ async function salvaTutto() {
   if (!S.P || S.writeBusy) return false;
   // Snapshot indipendente: la digitazione durante l'HTTP rimane nel buffer vivo.
   for (const d of S.dirty.values()) if (!d.id) d.id = nuovoId(d.coll);
-  const dirty = structuredClone(S.dirty), nuove = structuredClone(S.nuove);
+  const dirty = structuredClone(S.dirty), nuove = structuredClone(S.nuove), dichiarazione = structuredClone(S.dichDirty), supplementi = structuredClone(S.supDirty);
   const ops = [];
+  if (dichiarazione.size || supplementi.size) {
+    const tel = structuredClone(S.P.dati.opzioni.telematico || {});
+    const d = tel.dichiarazione = tel.dichiarazione || {};
+    for (const [path, val] of dichiarazione) {
+      const parti = path.split('.'); let o = d;
+      for (const p of parti.slice(0, -1)) o = o[p] = o[p] || {};
+      if (val === null) delete o[parti.at(-1)]; else o[parti.at(-1)] = val;
+    }
+    for (const k of ['presentatore', 'versamento', 'testamento']) if (d[k] && !Object.keys(d[k]).length) delete d[k];
+    for (const { coll, id, campi } of supplementi.values()) {
+      const ent = (tel[coll] = tel[coll] || {})[id] = ((tel[coll] || {})[id] || {});
+      for (const [k, v] of Object.entries(campi)) { if (v === null) delete ent[k]; else ent[k] = v; }
+      if (!Object.keys(ent).length) delete tel[coll][id];
+    }
+    ops.push({ op: 'set', sezione: 'opzioni', campi: { telematico: tel } });
+  }
   for (const d of dirty.values()) ops.push({ op: "upsert", coll: d.coll, id: d.id, campi: { ...d.campi } });
   for (const n of nuove.values()) { const campi = Object.fromEntries(Object.entries(n.campi).filter(([, v]) => v !== null)); if (Object.keys(campi).length) ops.push({ op: "upsert", coll: n.coll, id: n.id, campi }); }
   if (!ops.length) return true;
   return salvaOps(ops, () => {
+    for (const [k, v] of dichiarazione) if (uguale(S.dichDirty.get(k), v)) S.dichDirty.delete(k);
+    for (const [key, inviato] of supplementi) {
+      const vivo = S.supDirty.get(key); if (!vivo) continue;
+      for (const [k, v] of Object.entries(inviato.campi)) if (uguale(vivo.campi[k], v)) delete vivo.campi[k];
+      if (!Object.keys(vivo.campi).length) S.supDirty.delete(key);
+    }
     for (const [k, inviato] of dirty) {
       const vivo = S.dirty.get(k); if (!vivo) continue;
       for (const [c, v] of Object.entries(inviato.campi)) if (uguale(vivo.campi[c], v)) delete vivo.campi[c];
@@ -616,6 +728,21 @@ async function wizAvanti() {
   }
 }
 
+/* Importa un file telematico SUC13 (XML) come nuova pratica: importa solo cio' che il programma sa riprodurre e dice il resto. */
+async function importaXml(file) {
+  if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di importare.", "e");
+  try {
+    const r = await fetch("/api/importa", { method: "POST", body: await file.arrayBuffer(), headers: { "Content-Type": "application/xml" } });
+    const j = await r.json();
+    if (!r.ok) return msg("Importazione non riuscita: " + (j.messaggio || j.codice || r.status), "e");
+    await caricaPratiche(); await apri(j.pratica_id, "AN");
+    const n = Object.entries(j.importato).map(([k, v]) => v + " " + k.replaceAll("_", " ")).join(", ");
+    const resto = j.non_importato.concat(j.avvisi);
+    msg("Importata: " + n + ". Verifica i dati." + (resto.length ? " Da reinserire o controllare: " + resto.join("; ") + "." : ""), resto.length ? "e" : "o");
+  } catch (e) { msg("Importazione non riuscita: " + e.message, "e"); }
+}
+$("#bImporta").onclick = () => $("#fImporta").click();
+$("#fImporta").onchange = ev => { const f = ev.target.files[0]; ev.target.value = ""; if (f) importaXml(f); };
 $("#bNuova").onclick = wizApri;
 $("#wAnnulla").onclick = () => $("#wiz").close();
 $("#wIndietro").onclick = () => { W.passo--; wizRender(); };

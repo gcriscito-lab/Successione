@@ -45,3 +45,9 @@ Fonti: `docs/BETA_DA_REVISIONARE.md`, `docs/RISPOSTA_ALLA_REVISIONE.md`, `docs/C
 
 ## Compilazione dal codice fiscale
 Scrivendo un codice fiscale di persona fisica (16 caratteri) nella procedura guidata, nelle schede del defunto e del presentatore o nella riga di un erede, il programma compila **solo i campi ancora vuoti**: data di nascita, sesso, comune e provincia di nascita (il comune dalle tabelle del componente di controllo SUC13, se configurato; altrimenti resta il codice catastale e un avviso). Il secolo non è nel codice fiscale: viene dedotto e, se ambiguo, segnalato. È un suggerimento: verifica sempre i dati. Un carattere di controllo errato viene segnalato senza bloccare. Anche l'assistente può usarlo: strumento `successioni_decodifica_codice_fiscale`.
+
+## Riprendere una successione da un file XML
+
+Il pulsante **Importa XML** crea una nuova pratica da un file telematico SUC13 (`.xml`, `.suc` in formato XML), per esempio uno esportato da questo programma. Si importano frontespizio, eredi (EA), terreni (EB), fabbricati (EC), passività (ED) e disponibilità finanziarie (ER). Gli altri quadri sono elencati nel messaggio finale come da reinserire; EE ed EF si ricalcolano. Gli allegati (EG) vanno riacquisiti. I dati letti vanno verificati: l'importazione non è un controllo ufficiale.
+
+I file `.diz` del compilatore ministeriale **non** sono importabili: contengono oggetti dell'interfaccia del compilatore e serve un campione sintetico prodotto dal compilatore per scrivere un lettore affidabile.

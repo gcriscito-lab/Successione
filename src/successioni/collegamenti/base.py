@@ -10,6 +10,7 @@ Regole di fondo (vedi docs/COLLEGAMENTI.md):
   chiavi che somigliano a segreti.
 """
 from __future__ import annotations
+from contextlib import nullcontext
 
 import hashlib
 import json
@@ -280,7 +281,7 @@ class RegistroJob:
     # -- aggiornamento
     def transizione(self, job_id: str, da: Iterable[str] | None, a: str | None, *, patch: dict | None = None,
                     nota: str = "", errore: str | None = None,
-                    vincolo: Callable[[Callable[..., list[dict]]], str | None] | None = None) -> dict:
+                    vincolo: Callable[[Callable[..., list[dict]]], str | None] | None = None, _conn=None) -> dict:
         """Passa allo stato `a` solo se lo stato corrente e' in `da` (None = qualsiasi); `a=None` mantiene lo
         stato corrente (annotazione). `patch` viene fuso (primo livello) in `risultato`; la cronologia e' sempre
         estesa, mai riscritta. Tutto avviene in un'unica transazione IMMEDIATE (compare-and-set).
@@ -290,7 +291,7 @@ class RegistroJob:
         (es. un'altra copia della stessa pratica gia' in invio)."""
         verifica_assenza_segreti(patch or {}, "risultato")
         t = ora()
-        with self.arch.transazione() as c:
+        with (nullcontext(_conn) if _conn is not None else self.arch.transazione()) as c:
             r = c.execute("SELECT * FROM job WHERE id=?", (job_id,)).fetchone()
             if not r:
                 raise NonTrovato("tentativo inesistente", job_id=job_id)
@@ -321,6 +322,12 @@ class RegistroJob:
     def annota(self, job_id: str, patch: dict, nota: str = "") -> dict:
         """Aggiorna `risultato` senza cambiare stato (atomico: non puo' annullare una transizione concorrente)."""
         return self.transizione(job_id, None, None, patch=patch, nota=nota)
+
+    def transizioni(self, operazioni: list[dict]) -> None:
+        """Aggiorna piu' job insieme: un errore annulla tutte le transizioni."""
+        with self.arch.transazione() as c:
+            for op in operazioni:
+                self.transizione(**op, _conn=c)
 
 
 def risultato_da_job(job: dict, esito: Esito | str, *, artefatti: list | None = None,

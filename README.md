@@ -2,7 +2,12 @@
 
 Progetto per un'applicazione locale Windows destinata alla compilazione delle dichiarazioni di successione e delle domande di volture catastali.
 
-Il repository contiene i materiali di partenza e le istruzioni operative. L'applicazione è da sviluppare.
+Il repository contiene una beta locale: archivio condiviso fra GUI e MCP, compilazione, allegati, export XML,
+controllo SUC13 configurabile e percorso di invio manuale tracciato. La copertura fiscale e i collegamenti autenticati
+non sono completi: vedere `docs/ESITO_CORREZIONI_20261103.md` e `docs/MATRICE_COPERTURA.md`.
+
+Sulla postazione con l'ambiente `.venv` già presente, `Avvia-programma-aggiornato.cmd` avvia questi sorgenti aggiornati.
+Questa scorciatoia non ricostruisce o aggiorna un'eventuale installazione autonoma precedente.
 
 ## Inizia qui
 

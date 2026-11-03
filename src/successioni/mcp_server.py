@@ -13,12 +13,12 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 from . import __version__, pdfa, schema as S
-from .errori import ErroreServizio
+from .errori import DatiNonValidi, ErroreServizio
 from .servizio import VERSIONE_REGOLE, Servizio
 
 COPERTURA_NON_DISPONIBILE = [
-    "copertura completa di tutti i casi SUC13", "stampa", "collaudo ufficiale su Windows",
-    "acquisizione catastale Entratel", "invio e ricevute",
+    "copertura completa di tutti i casi SUC13", "stampa del modello ministeriale", "collaudo operativo completo",
+    "acquisizione catastale Entratel", "invio automatico e download autenticato delle ricevute",
 ]
 
 
@@ -155,6 +155,14 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
     def file_in_ingresso() -> list[str]:
         """File che l'utente ha messo nella cartella d'ingresso e che possono essere acquisiti."""
         return sorted(p.name for p in sv.cartella_ingresso.iterdir() if p.is_file())
+
+    @tool(ann=LOCALE)
+    def importa_xml_telematico(nome_file: str, titolo: str | None = None) -> dict:
+        """Crea una nuova pratica da XML SUC13 nella cartella d'ingresso. Rifiuta campi non conservabili; non invia."""
+        p = (sv.cartella_ingresso / nome_file).resolve()
+        if not p.is_relative_to(sv.cartella_ingresso.resolve()) or not p.is_file() or p.stat().st_size > 20_000_000:
+            raise DatiNonValidi("file non disponibile nella cartella d'ingresso o oltre 20 MB")
+        return sv.importa_xml_telematico(p.read_bytes(), titolo=titolo, autore="assistente", canale="mcp")
 
     @tool(ann=LOCALE)
     def acquisisci_allegato(pratica_id: str, nome_file: str, tipo_eg: str | None = None,

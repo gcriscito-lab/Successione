@@ -103,6 +103,17 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
                           (chiave, pid, "crea_pratica", impr, json.dumps(risp), t))
             return risp
 
+    def importa_xml_telematico(self, xml: bytes, *, titolo: str | None = None, autore="utente", canale="gui") -> dict:
+        """Crea una pratica a partire da un file telematico SUC13 (vedi `telematico/importa.py`): solo i dati che
+        l'esportazione sa riprodurre; il resto e' nell'elenco `non_importato`. I dati restano da verificare."""
+        from .telematico.importa import XmlNonImportabile, importa_xml
+        try:
+            letto = importa_xml(xml)
+        except XmlNonImportabile as e:
+            raise DatiNonValidi(f"file non importabile: {e}") from None
+        r = self.crea_pratica(titolo or letto["titolo"], autore=autore, canale=canale, iniziali=letto["operazioni"])
+        return {**r, "importato": letto["importato"], "non_importato": letto["non_importato"], "avvisi": letto["avvisi"]}
+
     def elenca(self) -> list[dict]:
         with self.arch.lettura() as c:
             return [dict(r) for r in c.execute(
@@ -250,6 +261,9 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
                 if not any(e["id"] == eid for e in righe):
                     raise NonTrovato(f"operazione {i}: elemento inesistente", coll=coll, id=eid)
                 dati[coll] = [e for e in righe if e["id"] != eid]
+                supplementi = dati.get("opzioni", {}).get("telematico", {}).get(coll, {})
+                if isinstance(supplementi, dict):
+                    supplementi.pop(eid, None)
                 return
             if eid is None:
                 eid = f"{PREFISSI[coll]}_{uuid.uuid4().hex[:8]}"

@@ -95,7 +95,9 @@ def test_configurazione_illeggibile_ignorata(tmp_path, monkeypatch):
     assert A.leggi_configurazione() == {}
 
 
-def test_candidati_windows_cartelle_standard_versione_piu_recente(tmp_path):
+def test_candidati_windows_cartelle_standard_versione_piu_recente(tmp_path, monkeypatch):
+    glob_reale = A.glob.glob
+    monkeypatch.setattr(A.glob, "glob", lambda pattern: glob_reale(pattern) if str(pattern).startswith(str(tmp_path)) else [])
     pf = tmp_path / "Program Files"
     for v in ("gs10.02.1", "gs10.05.0", "gs9.56.1"):
         (pf / "gs" / v / "bin").mkdir(parents=True)

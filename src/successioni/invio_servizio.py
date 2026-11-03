@@ -49,9 +49,16 @@ class InvioMixin:
         d = self.leggi(pratica_id)
         forn = (d["dati"].get("opzioni", {}) or {}).get("fornitore", {}) or {}
         profilo = {k: forn[k] for k in ("cf", "tipo", "impegno_codice", "data_impegno") if forn.get(k)}
+        from lxml import etree
+        from .telematico.fonti import NS_SUC, NS_TM
+        xml, _ = self.file_export(pratica_id, exp["job_id"])
+        root = etree.fromstring(xml, etree.XMLParser(resolve_entities=False, no_network=True))
+        importi = {"totale_da_versare": root.findtext(f'.//{{{NS_SUC}}}Frontespizio/{{{NS_SUC}}}ImportoDaVersare', '0').replace(',', '.')}
+        profilo["cf"] = root.findtext(f'.//{{{NS_TM}}}CodiceFiscaleFornitore')
         r = self._adattatore_invio("manuale").prepara(
             pratica_id, elaborati=[{"percorso": str(self.arch.base / exp["percorso"]), "ruolo": "telematico"}],
-            importi={}, profilo=profilo, controllo_job_id=controllo, revisione=exp.get("revisione"), chiave=chiave)
+            importi=importi, profilo=profilo, controllo_job_id=controllo, revisione=exp.get("revisione"), chiave=chiave,
+            aspettative={"addebito": bool(root.find(f'.//{{{NS_SUC}}}Versamento') is not None)})
         return self._copia_json(r)
 
     def invio_copia(self, copia_id: str) -> dict:
@@ -72,7 +79,13 @@ class InvioMixin:
                              else "Il programma NON ha trasmesso nulla: segui le istruzioni, poi registra l'esito con la riconciliazione.")
         return out
 
-    def invio_riconcilia(self, tentativo_id: str, evidenze: dict | None = None, *, modalita: str = "simulata") -> dict:
+    def invio_riconcilia(self, tentativo_id: str, evidenze: dict | None = None, *, modalita: str | None = None) -> dict:
+        ad = self._adattatore_invio("manuale")
+        t = ad.job.leggi(tentativo_id, "invio_tentativo")
+        registrata = ad._modalita_tentativo(t)
+        if modalita is not None and modalita != registrata:
+            raise DatiNonValidi("modalita' diversa da quella del tentativo")
+        modalita = registrata
         r = self._adattatore_invio(modalita).riconcilia(tentativo_id, evidenze=evidenze)
         out = r.asdict()
         out["job_id"], out["stato"] = out["dettaglio"].get("job_id"), out["dettaglio"].get("stato")
@@ -84,6 +97,32 @@ class InvioMixin:
         from .collegamenti.invio import TIPO_COPIA
         ad = self._adattatore_invio("manuale")
         copie = []
-        for j in ad.job.elenca(TIPO_COPIA, pratica_id):
-            copie.append(self._copia_json(ad.verifica_validita(j["job_id"])))
+        for j in reversed(ad.job.elenca(TIPO_COPIA, pratica_id)):
+            for tid in j["risultato"].get("tentativi", []):
+                ad._recupera_finale(ad.job.leggi(tid, "invio_tentativo"))
+            copia = self._copia_json(ad.verifica_validita(j["job_id"]))
+            copia["tentativi"] = [ad.leggi_tentativo(tid).asdict() for tid in copia["dettaglio"].get("tentativi", [])]
+            copie.append(copia)
         return {"pratica_id": pratica_id, "copie": copie}
+
+    def ricevuta_acquisisci(self, pratica_id: str, tentativo_id: str, contenuto: bytes, *, nome: str,
+                           tipo: str, esito: str | None = None) -> dict:
+        """Conserva l'originale associandolo al protocollo preciso, mai per ordine d'arrivo."""
+        self.leggi(pratica_id)
+        ad = self._adattatore_invio("manuale")
+        t = ad.job.leggi(tentativo_id, "invio_tentativo")
+        if t["pratica_id"] != pratica_id or t["stato"] != "trasmesso" or not t["risultato"].get("protocollo"):
+            raise DatiNonValidi("serve un tentativo trasmesso della stessa pratica con protocollo registrato")
+        if not contenuto or len(contenuto) > 20_000_000:
+            raise DatiNonValidi("ricevuta vuota o oltre 20 MB")
+        ad = self._adattatore_invio(ad._modalita_tentativo(t))
+        return ad.associa(protocollo=t["risultato"]["protocollo"], tipo=tipo, contenuto=contenuto,
+                          nome=nome, esito=esito, pratica_id=pratica_id).asdict()
+
+    def ricevute_stato(self, pratica_id: str, tentativo_id: str) -> dict:
+        ad = self._adattatore_invio("manuale")
+        t = ad.job.leggi(tentativo_id, "invio_tentativo")
+        if t["pratica_id"] != pratica_id or not t["risultato"].get("protocollo"):
+            raise DatiNonValidi("tentativo senza protocollo o appartenente a un'altra pratica")
+        ad = self._adattatore_invio(ad._modalita_tentativo(t))
+        return ad.stato_esiti(t["risultato"]["protocollo"], pratica_id=pratica_id)
