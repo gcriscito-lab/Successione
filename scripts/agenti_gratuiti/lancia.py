@@ -39,6 +39,13 @@ VERIFICHE: dict[str, list[list[str]]] = {
     "C9": [[sys.executable, "-m", "pytest", "-q", "tests/test_invio_lettori_extra.py"]],
     "C10": [[sys.executable, "-m", "pytest", "-q", "tests/test_formati_extra.py"]],
     "C12": [[sys.executable, "-m", "pytest", "-q", "tests/test_quadri_schema_extra.py"]],
+    "C13": [[sys.executable, "-m", "pytest", "-q", "tests/test_invio_web_mcp.py"]],
+    "C14": [[sys.executable, "-m", "pytest", "-q", "tests/test_devoluzione_legge_extra.py"]],
+    "C15": [[sys.executable, "-m", "pytest", "-q", "tests/test_identificativi_extra.py"]],
+    "C18": [[sys.executable, "-m", "pytest", "-q", "tests/test_quadri_nuovi_servizio.py"]],
+    "C19": [[sys.executable, "-m", "pytest", "-q", "tests/test_matrice_coerenza.py"]],
+    "C16": [[sys.executable, "scripts/verifica_doc_quadri.py", "docs/GUIDA_QUADRI.md"]],
+    "C21": [[sys.executable, "scripts/verifica_doc_quadri.py", "docs/QUADRI_DISPONIBILI.md"]],
 }
 
 REGOLE_SISTEMA = (

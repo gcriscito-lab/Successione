@@ -90,6 +90,48 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 **Cosa fare:** casi limite di `quadro_di` (ogni tipo di bene verso il quadro atteso, province tavolari BZ/TN/GO/TS in maiuscolo e minuscolo, flag `sistema_tavolare`, persone defunto/presentatore/erede, collezioni passivita/documenti_ref/devoluzioni), di `attivi` (quadri_attivi assente o con sigle sconosciute, quadri sempre attivi) e di `schema.valida_campo` per i campi aggiunti di recente (`tipo_titolo`, `quantita`, `data_documento`, `anno_costruzione`, `partita_tavolare`). Scrivere SOLO il file di test indicato: non modificare mai `src/`. I test descrivono il comportamento REALE del codice mostrato (non inventare funzioni, firme, codici o messaggi). Almeno 20 asserzioni; ogni caso negativo verifica il tipo di errore.
 **Accettazione:** `python -m pytest -q tests/test_quadri_schema_extra.py` verde (lo esegue il lanciatore).
 
+## C13. Test delle rotte web e degli strumenti MCP dell'invio
+**File:** `tests/test_invio_web_mcp.py` (nuovo).
+**Contesto:** `src/successioni/web.py`, `src/successioni/invio_servizio.py`, `src/successioni/mcp_server.py`, `tests/test_correzioni_codex.py` (solo per vedere come si crea una pratica con `Servizio`, `crea_app` e `TestClient`).
+**Cosa fare:** Con `starlette.testclient.TestClient` e `crea_app(servizio, token='sintetico', ammetti_host_di_prova=True)`: rotte `/api/pratiche/{pid}/invio` (lettura), `/api/pratiche/{pid}/invio/prepara` senza file completo (errore atteso), `/api/invio/{cid}/conferma` e `/trasmetti` con copia inesistente (errore leggibile, mai HTTP 500), richieste senza token (401). Per MCP: `mcp_server.costruisci(servizio)` e verifica per nome che esistano `successioni_invio_prepara` e `successioni_invio_stato` e che NON esistano strumenti di conferma o trasmissione. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio.
+**Accettazione:** `python -m pytest -q tests/test_invio_web_mcp.py` verde.
+
+## C14. Test di caratterizzazione delle quote di legge
+**File:** `tests/test_devoluzione_legge_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/devoluzione_legge.py`, `src/successioni/valori.py`.
+**Cosa fare:** Casi di `quote_di_legge` e `descrivi` esattamente come il codice li gestisce oggi (configurazioni coperte e non coperte, input vuoti, gradi sconosciuti, tipi soggetto diversi da 1). NON stabilire quali quote siano giuste in base a norme: documentare cosa restituisce il codice, annotando in un commento `# caratterizzazione` ogni caso. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio.
+**Accettazione:** `python -m pytest -q tests/test_devoluzione_legge_extra.py` verde.
+
+## C15. Test degli identificativi (CF, IBAN, partita IVA)
+**File:** `tests/test_identificativi_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/identificativi.py`.
+**Cosa fare:** Casi limite di `carattere_controllo`, `cf_persona_fisica_valido`, `genera_cf_sintetico`, `iban_modulo_97_valido`, `cifre_controllo_iban`, `piva_checksum_valida` (lunghezze errate, minuscole, caratteri non ammessi, omocodia se gestita, cifra di controllo corretta e sbagliata). Usare solo codici sintetici generati dalle funzioni stesse. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio.
+**Accettazione:** `python -m pytest -q tests/test_identificativi_extra.py` verde.
+
+## C16. Guida alla compilazione dei quadri
+**File:** `docs/GUIDA_QUADRI.md` (nuovo).
+**Contesto:** `docs/MATRICE_COPERTURA.md`, `src/successioni/quadri.py`, `src/successioni/schema.py`, `tests/telematico_casi.py`.
+**Cosa fare:** Per ogni quadro (EA, EB, EC, ED, EE, EF, EG, EH, EL, EM, EN, EO, EP, EQ, ER, EI): a cosa serve in due righe, quali campi del modello si compilano (nomi esatti come in `schema.py`, tra backtick), un esempio sintetico ricavato da `tests/telematico_casi.py`, cosa NON e' supportato (copiato dalla matrice, senza aggiungere nulla). Linguaggio semplice. NON riportare aliquote, franchigie o regole fiscali. Massimo 6 pagine.
+**Accettazione:** `python scripts/verifica_doc_quadri.py docs/GUIDA_QUADRI.md` stampa «verifica documento: ok» (lo esegue il lanciatore).
+
+## C18. Test dei quadri nuovi attraverso il servizio
+**File:** `tests/test_quadri_nuovi_servizio.py` (nuovo).
+**Contesto:** `src/successioni/servizio.py`, `src/successioni/quadri.py`, `src/successioni/schema.py`, `tests/telematico_casi.py`, `tests/test_elaborati.py` (per `ops_da_caso`).
+**Cosa fare:** Con `Servizio(Archivio(tmp_path))` e `ops_da_caso`: crea pratiche dai casi `caso_titoli()`, `caso_mezzi()`, `caso_azienda()`, `caso_tavolare()` e verifica che `servizio.quadri(pid)` riporti per EO, EP, EQ, EN, EL, EM uno stato diverso da `non_supportato`, che `servizio.verifica(pid)` non produca rilievi `QUADRO_NON_SUPPORTATO` per essi, e che `EI` resti `non_supportato`. Aggiungere un test che una modifica di un bene `titolo` cambi la revisione e l'impronta dichiarativa. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio.
+**Accettazione:** `python -m pytest -q tests/test_quadri_nuovi_servizio.py` verde.
+
+## C19. Test di coerenza tra matrice di copertura e codice
+**File:** `tests/test_matrice_coerenza.py` (nuovo).
+**Contesto:** `docs/MATRICE_COPERTURA.md`, `src/successioni/quadri.py`, `src/successioni/telematico/esporta.py` (costante `QUADRI_ESPORTABILI`).
+**Cosa fare:** Test che leggono la matrice come testo: ogni quadro in `QUADRI_ESPORTABILI` e ogni quadro con `supportato=True` in `quadri.QUADRI` e' citato nella matrice nella tabella di sintesi; i quadri con `supportato=False` non risultano dichiarati «controllo locale». Messaggi di errore chiari che nominano il quadro. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio.
+**Accettazione:** `python -m pytest -q tests/test_matrice_coerenza.py` verde.
+
+## C21. Sezione «Quadri disponibili» del manuale breve
+**File:** `docs/QUADRI_DISPONIBILI.md` (nuovo).
+**Contesto:** `docs/MATRICE_COPERTURA.md`, `docs/MANUALE_BREVE.md`.
+**Cosa fare:** Una tabella per il professionista: quadro, cosa copre oggi in una riga, cosa non copre in una riga (dalla matrice, senza aggiungere nulla), con la distinzione fra «controllo locale» e «verifica ufficiale». Niente regole fiscali, niente promesse. Massimo 2 pagine.
+**Accettazione:** `python scripts/verifica_doc_quadri.py docs/QUADRI_DISPONIBILI.md` stampa «verifica documento: ok».
+
 ---
 
 ## Come il coordinatore integra
