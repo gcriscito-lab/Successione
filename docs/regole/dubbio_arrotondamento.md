@@ -93,3 +93,15 @@ franchigia per i gradi non elencati a p. 3; corrispondenza `05a/07a/09a` (guida)
   2.3.x (o con ALIS 2.x) un caso di riferimento che includa agevolazione L e imposta estera come nell'esempio, e il
   caso dei cugini sopra; confrontare l'importo EF18bis calcolato dal software con i due candidati e registrare
   versione, input e output. Finche' la prova manca, il calcolo resta una proposta da confermare.
+
+## 6. Aggiornamento 2026-11-03: riduzioni art. 25 e controllo ufficiale eseguito in locale
+
+- Il controllo ufficiale SUC13 2.3.1 **eseguito in locale** (dati sintetici) ricalcola l'imposta di successione e scarta il file
+  se EF18bis non corrisponde (diagnostici 3454 e 3481). Per i casi con riduzioni art. 25, L, Q, R, F implementati
+  (docs/regole/riduzioni_art25.md) l'importo intero calcolato e' accettato e l'importo +1 e -1 e' scartato: l'**intero**
+  di EF18bis coincide con quello del componente per ogni caso provato. Il centesimo non e' osservabile (campo in euro interi).
+- Il dubbio 82,0875 / 82,08 riguarda `DET.estero`, ancora **non implementata**: resta aperto. Non e' stato eseguito con il
+  componente alcun caso con imposta estera.
+- Ispezione statica aggiuntiva (`javap -c`, nessuna esecuzione): scale di `AgevolazioniRiduzioni.calcolaAliquota` e
+  `calcolaRiduzione` riportate nel §3 di riduzioni_art25.md.
+

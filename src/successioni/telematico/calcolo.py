@@ -23,9 +23,11 @@ Stato del calcolo (specifica §10): ``completato`` se i due candidati danno lo s
 e' considerato validato), ``divergenza_aperta`` se l'importo intero cambia, ``non_supportato`` per casistiche fuori perimetro, ``dati_incompleti`` se l'export
 non riesce. ``esito_collaudo`` resta sempre ``da_collaudare``: nessun confronto eseguito con il software ufficiale.
 
-Perimetro: QE, QDN, QP, AN, FR, QN, PR, QTI, AL, ISL, ISN e totale. NON supportati (stato ``non_supportato``):
-agevolazioni e riduzioni (L, Q, R, F, art. 25), detrazione dell'imposta estera, trust, stesso soggetto su piu' righi
-EA (franchigia unica da ripartire), quadri EL-EQ, dichiarazioni sostitutive, decessi anteriori al 2025-01-01.
+Perimetro: QE, QDN, QP, AN, FR, QN, PR, QTI, AL, ISL, RID (riduzioni art. 25 c. 1 con i codici 1-5 e agevolazioni L, Q, R, F:
+guida pp. 5-7, regole in ``riduzioni_art25.py`` e docs/regole/riduzioni_art25.md), ISN e totale. NON supportati (stato
+``non_supportato``): detrazione dell'imposta estera, trust, stesso soggetto su piu' righi EA (franchigia unica da ripartire),
+agevolazioni diverse da P, X, Y, Z, L, Q, R, F, codici 1-5 insieme a un'agevolazione sulla stessa riga, riduzioni su cespiti DN o
+su titoli esenti, piu' righe R/F per lo stesso beneficiario, dichiarazioni sostitutive, decessi anteriori al 2025-01-01.
 """
 from __future__ import annotations
 
@@ -38,6 +40,7 @@ from lxml import etree
 
 from ..schema import Errore
 from . import fonti as FO
+from . import riduzioni_art25 as RA
 
 DECORRENZA = date(2025, 1, 1)
 VERSIONE_REGOLE = "calcolo-0.1 (guida SHA-256 2570aacc...; " + FO.VERSIONE_SPECIFICHE + ")"
@@ -160,6 +163,22 @@ def _testo(el, nome: str) -> str | None:
     return x.text if x is not None else None
 
 
+def _motivo_riduzione(q, agev, rid, tc, valore, vps) -> str | None:
+    """Motivo per cui la riga con riduzione non e' supportata dal calcolo (None se supportata)."""
+    if agev and rid:
+        return f"agevolazione {agev} e riduzione art. 25 ({rid}) sulla stessa riga: combinazione non coperta dalle fonti"
+    if tc in ("DN", "ES"):
+        return "riduzione su cespite DN o su titolo esente: trattamento non coperto dalle fonti"
+    if agev and q not in RA.QUADRI_SUPPORTATI[agev]:
+        return f"agevolazione {agev} nel quadro {q}: non supportata (supportati {', '.join(RA.QUADRI_SUPPORTATI[agev])})"
+    if rid:
+        if rid not in RA.CODICI_RID or q not in RA.QUADRI_RID:
+            return f"riduzione art. 25 {rid} nel quadro {q}: non supportata"
+        if vps is None or valore is None or _num(vps) <= 0 or _num(vps) > _num(valore):
+            return "riduzione art. 25 senza un valore precedenti successioni valido (0 < valore prec. succ. <= valore)"
+    return None
+
+
 def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
     """Estrae i dati rilevanti per il calcolo. Restituisce (dati, motivi di non supporto)."""
     root = etree.fromstring(xml, parser=etree.XMLParser(resolve_entities=False, no_network=True))
@@ -190,6 +209,7 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
             continue
         tipo_cespite = None
         esente_eo = False
+        val_riga, vps_riga = None, None   # Valore e ValorePrecSucc del cespite; i righi di continuazione li ereditano
         for riga in (x for mod in quad.findall(SUC + "Modulo") for x in mod):
             if q == "EO":
                 # Titolo esente (TipoTitolo 3 / Possesso/ValoreEsente): il «Valore Quota» comprende il valore esente
@@ -197,10 +217,15 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                 # continuazione (senza TipoTitolo) ereditano la natura del rigo precedente.
                 if _testo(riga, "TipoTitolo") is not None:
                     esente_eo = _testo(riga, "TipoTitolo") == "3" or riga.find(f"{SUC}Possesso/{SUC}ValoreEsente") is not None
+                poss = riga.find(SUC + "Possesso")
+                if poss is not None:
+                    val_riga, vps_riga = _testo(poss, "Valore"), _testo(poss, "ValorePrecSucc")
+            elif _testo(riga, "Valore") is not None:
+                val_riga, vps_riga = _testo(riga, "Valore"), _testo(riga, "ValorePrecSucc")
             if q == "ER" and _testo(riga, "TipoCespite"):
                 tipo_cespite = _testo(riga, "TipoCespite")
                 bi = bi or tipo_cespite == "BI"
-            for nome in ("ValorePrecSucc", "ImpostaVersataEstero", "BeniEsteri", "BeneAziendale", "DirittoAbitazione"):
+            for nome in ("ImpostaVersataEstero", "BeniEsteri", "BeneAziendale", "DirittoAbitazione"):
                 if riga.find(SUC + nome) is not None:
                     ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/{nome}", f"{nome}: riduzioni, beni esteri o "
                                      "agevolazioni non supportati dal calcolo", _g(5, "riduzioni") + "; " +
@@ -209,14 +234,25 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                 # Guida al calcolo p. 1 (QE: esclusi solo i codici A, D, C, G, N, E, H) e p. 5 (riduzioni: solo L, Q, R, F e
                 # art. 25): i codici prima casa P, X, Y, Z non modificano l'imposta di successione (Fascicolo I p. PDF 57,
                 # quadro sinottico: solo imposte ipotecaria e catastale fisse)
-                if _testo(dv, "Agevolazioni") not in (None, "", "P", "X", "Y", "Z") or dv.find(SUC + "Riduzioni") is not None:
-                    ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/Devoluzione", "agevolazioni/riduzioni "
-                                     "non supportate dal calcolo", _g(5, "riduzioni e agevolazioni")))
+                agev, rid = _testo(dv, "Agevolazioni") or None, _testo(dv, "Riduzioni") or None
+                if agev not in (None, "P", "X", "Y", "Z") + RA.CODICI_AGEV:
+                    ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/Devoluzione", f"agevolazione {agev} non "
+                                     "supportata dal calcolo", _g(5, "riduzioni e agevolazioni")))
+                tc_riga = tipo_cespite if q == "ER" else ("ES" if q == "EO" and esente_eo else None)
+                if agev in RA.CODICI_AGEV or rid:
+                    motivo = _motivo_riduzione(q, agev, rid, tc_riga, val_riga, vps_riga)
+                    if motivo:
+                        ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/Devoluzione", motivo,
+                                         _g(5, "riduzioni") + "; " + _g(7, "Rid.art25") + "; " + RA.FONTE_SINOTTICO))
+                elif vps_riga is not None:
+                    ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/ValorePrecSucc", "valore precedenti successioni "
+                                     "senza il codice di riduzione art. 25 nella devoluzione", _g(7, "r25")))
                 ide = dv.find(SUC + "IdentificazioneSoggetto")
                 pos = (int(_testo(ide, "Modulo")), int(_testo(ide, "Rigo")))
                 qv = dv.find(f"{SUC}Quota/{SUC}QuotaValore")
-                tc = tipo_cespite if q == "ER" else ("ES" if q == "EO" and esente_eo else None)
-                devs.append((pos, q, tc, _num(qv.text if qv is not None else None)))
+                devs.append((pos, q, tc_riga, _num(qv.text if qv is not None else None),
+                             {"agev": agev if agev in RA.CODICI_AGEV else None, "rid": rid,
+                              "valore": _num(val_riga), "vps": _num(vps_riga)}))
     passivo = []
     for rip in dich.iter(SUC + "Ripartizione"):
         ide = rip.find(SUC + "IdentificazioneSoggetto")
@@ -227,7 +263,79 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
             "passivo": passivo, "bi": bi}, ns
 
 
+# ------------------------------------------------------------------------------------------- riduzioni
+def _dbl(f: Fraction) -> Fraction:
+    """Valore letto come ``double`` e convertito con ``new BigDecimal(double)`` (residuo binario incluso)."""
+    return Fraction(float(f))
+
+
+#: coefficienti del componente: ``new BigDecimal(0.5d)`` ecc. (valori double, con residuo binario; ispezione statica di
+#: AgevolazioniRiduzioni: mapRiduzione e coefficienti 0,5 / 0,4 delle agevolazioni)
+_C_COMP_AGEV = {k: Fraction(float(v)) for k, v in RA.COEFF_AGEV.items()}
+_C_COMP_25 = {k: Fraction(float(v)) for k, v in RA.COEFF_ART25.items()}
+_SIGLE_RID = ("art25", "L", "Q", "R", "F")
+
+
+def riduzioni_esatte(righe: list[dict], isl: Fraction, qe: Fraction) -> dict[str, Fraction]:
+    """Rid.art25, Rid.agevL/Q/R/F con aritmetica esatta. Formule: guida p. 5-7 (r = valore quota agevolata x ISL / QE;
+    Rid.agevL = r x 0,5; Q = r x 0,4; R e F = r x 0,4 se il valore della quota <= 103.291, altrimenti
+    (103.291 x ISL / QE) x 0,4; r25 = (valore prec. succ. x valore quota / valore cespite) x ISL / QE, per il coefficiente
+    0,5 / 0,4 / 0,3 / 0,2 / 0,1 dei codici 1-5)."""
+    out = {k: Fraction(0) for k in _SIGLE_RID}
+    if qe <= 0 or isl <= 0:
+        return out
+    rapporto = isl / qe
+    for r in righe:
+        qv = r["qv"]
+        if r["agev"]:
+            base = qv if r["agev"] in ("L", "Q") else min(qv, RA.SOGLIA_RF)
+            out[r["agev"]] += base * rapporto * RA.COEFF_AGEV[r["agev"]]
+        if r["rid"] and r["valore"] > 0:
+            out["art25"] += r["vps"] * qv / r["valore"] * rapporto * RA.COEFF_ART25[r["rid"]]
+    return out
+
+
+def riduzioni_componente(righe: list[dict], isl: Fraction, qe: Fraction) -> dict[str, Fraction]:
+    """Stesse riduzioni con le scale del componente ufficiale (ispezione statica di
+    ``it.finanze.entrate.sco.modSUC.beans.AgevolazioniRiduzioni.calcolaAliquota`` e ``calcolaRiduzione``, classe di
+    controlliXMLREG2013.jar, SHA-256 0b42dfc3...): rapporto ISL / QE a 10 decimali HALF_UP per L, Q, R, F (a 6 decimali per
+    l'art. 25); R oltre soglia: somma riportata a 2 decimali HALF_UP; art. 25: (VPS x valore quota / valore) a 6 decimali
+    HALF_UP, per il rapporto a 6 decimali, per il coefficiente, a 3 decimali HALF_UP. Valori e coefficienti sono ``double``."""
+    out = {k: Fraction(0) for k in _SIGLE_RID}
+    if qe <= 0 or isl <= 0:
+        return out
+    r10, r6 = _half_up(isl / qe, 10), _half_up(isl / qe, 6)
+    for r in righe:
+        qv = _dbl(r["qv"])
+        a = r["agev"]
+        if a in ("L", "Q"):
+            out[a] += qv * r10 * _C_COMP_AGEV[a]
+        elif a in ("R", "F"):
+            if qv <= RA.SOGLIA_RF:
+                out[a] += qv * r10 * _C_COMP_AGEV[a]
+            else:
+                out[a] += RA.SOGLIA_RF * r10 * _C_COMP_AGEV[a]
+                if a == "R":
+                    out[a] = _half_up(out[a], 2)
+        if r["rid"] and r["valore"] > 0 and r["vps"] > 0:
+            base = _half_up(_dbl(r["vps"]) * qv / _dbl(r["valore"]), 6) * r6
+            out["art25"] += _half_up(_C_COMP_25[r["rid"]] * base, 3)
+    return out
+
+
 # ------------------------------------------------------------------------------------------- calcolo
+def _passaggi_rid(righe: list[dict], rid_e: dict[str, Fraction]) -> list[Passaggio]:
+    if not righe:
+        return []
+    fonti = {"art25": _g(7, "Rid.art25 = r25 x coefficiente; r25 a p. 7") + "; " + _g(6, "casella Riduzioni Art. 25"),
+             "L": _g(6, "Rid.agevL = r x 0,5"), "Q": _g(6, "Rid.agevQ = r x 0,4"),
+             "R": _g(6, "Rid.agevR: soglia 103.291,00"), "F": _g(6, "Rid.agevF: soglia 103.291,00")}
+    nomi = {"art25": "Rid.art25", "L": "Rid.agevL", "Q": "Rid.agevQ", "R": "Rid.agevR", "F": "Rid.agevF"}
+    usati = {"art25": any(r["rid"] for r in righe), **{c: any(r["agev"] == c for r in righe) for c in RA.CODICI_AGEV}}
+    return [Passaggio(nomi[k], f"riduzione {nomi[k]} sui righi con la relativa richiesta", esatto(rid_e[k]), fonti[k])
+            for k in _SIGLE_RID if usati[k]]
+
+
 def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
     d, motivi = _leggi(xml)
     if d["data_decesso"] < DECORRENZA:
@@ -249,6 +357,13 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
             aliquota(s["grado"])
         except ValueError as e:
             motivi.append(Errore("CALCOLO_NON_SUPPORTATO", f"QuadroEA {s['pos']}", str(e), _g(9, "appendice")))
+    for s in d["soggetti"]:
+        for cod in ("R", "F"):
+            n = sum(1 for p, q, tc, v, ex in d["devoluzioni"] if p == s["pos"] and ex["agev"] == cod)
+            if n > 1:
+                motivi.append(Errore("CALCOLO_NON_SUPPORTATO", f"QuadroEA {s['pos']}", f"{n} righe con codice {cod}: la guida "
+                                     "applica la soglia per riga, il Fascicolo I (p. PDF 63) la riferisce al valore "
+                                     "complessivo", _g(6, "Rid.agevR / Rid.agevF") + "; " + RA.FONTE_SINOTTICO))
     if motivi:
         return RisultatoCalcolo(stato="non_supportato", motivi=motivi)
 
@@ -261,8 +376,8 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
         # diritto dichiarato esente dall'imposta»; indicazione dei titoli esenti «opzionale», con valenza solo verso gli
         # operatori finanziari) e guida p. 1 (QE = valore imponibile). La guida non elenca il tipo 3 fra le esclusioni
         # A, D, C, G, N, E, H: l'esclusione e' un'interpretazione dichiarata, riportata nelle note del risultato.
-        qe = sum((v for p, q, tc, v in d["devoluzioni"] if p == pos and tc not in ("DN", "ES")), Fraction(0))
-        qdn = sum((v for p, q, tc, v in d["devoluzioni"] if p == pos and tc == "DN"), Fraction(0))
+        qe = sum((v for p, q, tc, v, ex in d["devoluzioni"] if p == pos and tc not in ("DN", "ES")), Fraction(0))
+        qdn = sum((v for p, q, tc, v, ex in d["devoluzioni"] if p == pos and tc == "DN"), Fraction(0))
         qp = sum((v for p, v in d["passivo"] if p == pos), Fraction(0))
         an = max(qe + qdn - qp, Fraction(0))
         fr, fonte_fr = franchigia(s["grado"], s["handicap"])
@@ -272,11 +387,17 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
         qti = qn + pr
         al, fonte_al = aliquota(s["grado"])
         isl = qti * al
-        isn = max(isl, Fraction(0))  # RID = 0 e DET = 0 nel perimetro
+        righe_rid = [{"qv": v, **{k: ex[k] for k in ("agev", "rid", "valore", "vps")}}
+                     for p, q, tc, v, ex in d["devoluzioni"] if p == pos and (ex["agev"] or ex["rid"])]
+        rid_e = riduzioni_esatte(righe_rid, isl, qe)
+        rid = sum(rid_e.values(), Fraction(0))
+        isn = max(isl - rid, Fraction(0))  # DET = 0 nel perimetro
         # candidato 'componente_ispezionato': PR e ISL a 2 decimali HALF_UP (CalcolaImpostaSuccessione)
         pr_c = max(_half_up(Fraction(1, 10) * (qn - qdn), 2) - qdn, Fraction(0)) if applica_pr else Fraction(0)
         isl_c = _half_up((qn + pr_c) * al, 2)
-        isn_c = max(isl_c, Fraction(0))
+        rid_c_d = riduzioni_componente(righe_rid, isl_c, qe)
+        rid_c = sum(rid_c_d.values(), Fraction(0))
+        isn_c = max(isl_c - rid_c, Fraction(0))
         tot_esatto += isn
         tot_comp = _half_up(tot_comp + isn_c, 2)
         passi = [
@@ -295,7 +416,9 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
             Passaggio("QTI", "QN + PR", esatto(qti), _g(4, "QTI")),
             Passaggio("AL", f"aliquota per grado {s['grado']}", esatto(al), fonte_al),
             Passaggio("ISL", "QTI x AL", esatto(isl), _g(5, "ISL")),
-            Passaggio("RID", "riduzioni: nessuna nel perimetro supportato", "0", _g(7, "RID")),
+            *_passaggi_rid(righe_rid, rid_e),
+            Passaggio("RID", "riduzioni: Rid.art25 + Rid.agevL + Rid.agevQ + Rid.agevR + Rid.agevF" +
+                      ("" if righe_rid else " (nessuna richiesta)"), esatto(rid), _g(7, "RID")),
             Passaggio("DET", "detrazione imposta estera: nessuna nel perimetro supportato", "0", _g(8, "DET.estero")),
             Passaggio("ISN", "ISL - RID - DET", esatto(isn), _g(8, "ISN")),
         ]
@@ -332,10 +455,14 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
                         "resta <= 10 euro (" + FO.fonte_fasc1(47, "EF18bis colonna 1") + "; " +
                         FO.fonte_annotazione("QuadroEF/SezioneVBis_ImpostaSuccessione/ImpostaCalcolata/ImpostaDaVersare")
                         + ")")
-    if any(tc == "ES" for _, _, tc, _ in d["devoluzioni"]):
+    if any(tc == "ES" for _, _, tc, _, _ in d["devoluzioni"]):
         ris.note.append("Titoli esenti (EO tipo 3) esclusi dalla base imponibile (QE): " + FO.fonte_fasc1(3, "titoli esenti")
                         + "; " + _g(1, "QE = valore imponibile") + ". La guida non li elenca fra le esclusioni A, D, C, G, N, E, H: "
                         "interpretazione da confermare.")
+    if any(ex["agev"] or ex["rid"] for _, _, _, _, ex in d["devoluzioni"]):
+        ris.note.append("Riduzioni (art. 25 c. 1 codici 1-5, agevolazioni L, Q, R, F): formule dalla guida pp. 5-7; la guida "
+                        "non definisce gli arrotondamenti, il candidato 'componente_ispezionato' replica le scale lette "
+                        "con ispezione statica di AgevolazioniRiduzioni (docs/regole/riduzioni_art25.md).")
     ris.note.append("Gli eredi sono tenuti in solido all'imposta complessiva; i legatari alla propria quota (" +
                     _g(8, "chiusura") + ").")
     return ris
