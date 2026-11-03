@@ -216,11 +216,13 @@ def caso_tavolare() -> dict:
     d["beni"] += [
         {"id": "b_terrtav1", "_origine": {}, "tipo": "terreno", "comune": "Bolzano .Bozen.", "foglio": "12", "particella": "345",
          "valore": "8000", "diritto": "1", "quota_defunto": "1/1", "natura": "T", "tipologia_terreno": "3",
-         "reddito_dominicale": "6.50", "superficie": {"ettari": 0, "are": 30, "centiare": 0}, "partita_tavolare": "1234",
+         "reddito_dominicale": "6.50", "partita_tavolare": "1234",
          "corpo_tavolare": "1", **comune},
         {"id": "b_fabbtav1", "_origine": {}, "tipo": "fabbricato", "comune": "Bolzano .Bozen.", "foglio": "12", "particella": "400",
          "subalterno": "2", "categoria": "A/2", "rendita": "700.00", "valore": "90000", "diritto": "1", "quota_defunto": "1/1",
          "indirizzo": "Via Esempio 3", "classe": "2", "consistenza": "4.5", "partita_tavolare": "5678", **comune}]
+    # la superficie e' un dato strutturato: sta in opzioni.telematico, non e' un campo del modello
+    d["opzioni"]["telematico"]["beni"]["b_terrtav1"] = {"superficie": {"ettari": 0, "are": 30, "centiare": 0}}
     for bid in ("b_terrtav1", "b_fabbtav1"):
         for pid in ("p_anna0001", "p_luca0001"):
             d["devoluzioni"].append({"id": f"d_{bid[2:7]}{pid[2:6]}", "_origine": {}, "bene_id": bid, "persona_id": pid,
