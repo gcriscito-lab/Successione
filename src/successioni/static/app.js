@@ -18,7 +18,7 @@ S.fornitoreDirty = {};
 const nMod = () => S.dirty.size + S.nuove.size + S.dichDirty.size + S.supDirty.size + (Object.keys(S.fornitoreDirty).length ? 1 : 0);
 const nuovoId = coll => ({ persone: "p", beni: "b", devoluzioni: "d", passivita: "ps", documenti_ref: "dr" }[coll]) + "_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const uguale = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 14, interlinea: 'normale', larghezza_pannello: 360 };
+const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 14, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240 };
 const FONT_UI = { sistema: 'system-ui, "Segoe UI", sans-serif', segoe: '"Segoe UI", system-ui, sans-serif',
   arial: 'Arial, sans-serif', verdana: 'Verdana, sans-serif', georgia: 'Georgia, serif', consolas: 'Consolas, monospace' };
 let preferenze = { ...ASPETTO_DEFAULT };
@@ -29,11 +29,18 @@ function applicaAspetto(valori) {
   root.style.setProperty('--f-ui', FONT_UI[p.font] || FONT_UI.sistema);
   root.style.setProperty('--dimensione-base', Math.max(12, Math.min(22, Number(p.dimensione) || 14)) + 'px');
   root.style.setProperty('--interlinea', ({ compatta: 1.3, normale: 1.5, ampia: 1.8 })[p.interlinea] || 1.5);
-  const limite = Math.max(280, Math.min(760, window.innerWidth - 580));
+  const nav = limiteNav() ? Math.min(limiteNav(), Math.max(180, Number(p.larghezza_nav) || 240)) : 240;
+  root.style.setProperty('--larghezza-nav', nav + 'px');
+  const limite = limitePannello(nav);
   root.style.setProperty('--larghezza-ins', Math.min(limite, Math.max(280, Number(p.larghezza_pannello) || 360)) + 'px');
   const separatore = $('#ridimensiona');
   if (separatore) separatore.setAttribute('aria-valuenow', String(Math.round(Math.min(limite, p.larghezza_pannello))));
+  const sepNav = $('#ridimensionaNav');
+  if (sepNav) { sepNav.setAttribute('aria-valuenow', String(nav)); sepNav.setAttribute('aria-valuemax', String(limiteNav() || 480)); }
 }
+/* Limiti delle larghezze: la vista centrale deve restare di almeno 340 px; il menu dei quadri puo' crescere fino a 480 px. */
+function limiteNav() { return window.innerWidth <= 960 ? 0 : Math.max(180, Math.min(480, window.innerWidth - 340 - 280)); }
+function limitePannello(nav) { return Math.max(280, Math.min(760, window.innerWidth - (nav || preferenze.larghezza_nav || 240) - 340)); }
 function memorizzaAspetto(p) {
   preferenze = { ...ASPETTO_DEFAULT, ...p }; applicaAspetto(preferenze);
   try { localStorage.setItem('successioni.aspetto', JSON.stringify(preferenze)); } catch (_) { /* il file sul PC resta la fonte */ }
@@ -102,7 +109,7 @@ async function caricaPratiche() {
   S.pratiche = await api("/api/pratiche");
   const ul = $("#lista"); ul.replaceChildren();
   if (!S.pratiche.length) ul.append(h("li", { class: "mut" }, "Nessuna pratica."));
-  for (const p of S.pratiche) ul.append(h("li", {}, h("button", { "aria-current": S.P && S.P.pratica_id === p.id ? "true" : "false", onclick: () => apri(p.id) }, h("span", {}, p.titolo), h("span", { class: "mut" }, "rev. " + p.revisione))));
+  for (const p of S.pratiche) ul.append(h("li", {}, h("button", { title: p.titolo + " (rev. " + p.revisione + ")", "aria-current": S.P && S.P.pratica_id === p.id ? "true" : "false", onclick: () => apri(p.id) }, h("span", {}, p.titolo), h("span", { class: "mut" }, "rev. " + p.revisione))));
 }
 async function apri(id, sel) {
   if (S.writeBusy) { msg("Salvataggio in corso: attendi prima di cambiare pratica.", "e"); return; }
@@ -150,15 +157,15 @@ function scegliQuadro(id) { S.sel = id; S.riga = null; S.tab = 'dati'; $('#vista
 function renderAlbero() {
   const nav = $("#albero"); nav.replaceChildren();
   if (!S.Q) return;
-  nav.append(h('button', { class: 'voce nav-file', id: 'navFile', 'aria-current': S.sel === 'FILE' ? 'page' : 'false', onclick: vaiFile },
+  nav.append(h('button', { class: 'voce nav-file', id: 'navFile', title: 'File e invio', 'aria-current': S.sel === 'FILE' ? 'page' : 'false', onclick: vaiFile },
     h('span', { class: 'sigla' }, '↗'), h('span', {}, 'File e invio')));
   for (const [g, nome] of [["frontespizio", "Frontespizio"], ["quadri", "Quadri"], ["riepiloghi", "Riepiloghi"], ["lavoro", "Tabella di lavoro"]]) {
     nav.append(h("div", { class: "gruppo" }, nome));
     for (const q of S.Q.quadri.filter(x => x.gruppo === g)) {
       const st = q.stato;
       const testo = st === "rilievi" ? q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi") : (q.righe && st === "compilato" ? q.righe + (q.righe === 1 ? " riga" : " righe") : STATI[st]);
-      nav.append(h("button", { class: "voce", "data-stato": st, "data-q": q.id, "aria-current": S.sel === q.id ? "true" : "false", onclick: () => scegliQuadro(q.id) },
-        h("span", { class: "sigla" }, q.id), h("span", { class: "nome" }, q.titolo), h("span", { class: "st" }, testo)));
+      nav.append(h("button", { class: "voce", "data-stato": st, "data-q": q.id, title: q.id + " — " + q.titolo + (testo ? " (" + testo + ")" : ""), "aria-current": S.sel === q.id ? "true" : "false", onclick: () => scegliQuadro(q.id) },
+        h("span", { class: "sigla" }, q.id), h("span", { class: "testi" }, h("span", { class: "nome" }, q.titolo), h("span", { class: "st" }, testo))));
     }
   }
 }
@@ -279,9 +286,9 @@ function renderTabella(main, q) {
   righe.forEach((r, i) => {
     const id = r.e && r.e.id; const base = id ? q.coll + "[" + id + "]" : null;
     const rilRiga = base ? rilievi().filter(x => x.percorso === base || x.percorso.startsWith(base + ".")) : [];
-    const tr = h("tr", { tabindex: "0", "aria-selected": S.riga === r.key ? "true" : "false", class: (r.nuova || S.dirty.has(r.key)) ? "mod" : "", "data-key": r.key,
-      onclick: () => selezionaRiga(r.key),
-      onkeydown: ev => { if (ev.key === "ArrowDown" && righe[i + 1]) { ev.preventDefault(); selezionaRiga(righe[i + 1].key, true); } else if (ev.key === "ArrowUp" && righe[i - 1]) { ev.preventDefault(); selezionaRiga(righe[i - 1].key, true); } else if (ev.key === "Enter") selezionaRiga(r.key); } });
+    const tr = h("tr", { tabindex: (S.riga && righe.some(x => x.key === S.riga) ? S.riga === r.key : i === 0) ? "0" : "-1", "aria-selected": S.riga === r.key ? "true" : "false", class: (r.nuova || S.dirty.has(r.key)) ? "mod" : "", "data-key": r.key,
+      onclick: () => selezionaRiga(r.key, "riga"),
+      onkeydown: ev => tastiTabella(ev, tr, r.key) });
     q.colonne.forEach((c, j) => {
       const kind = campi[c]; const v = valRiga(r, c);
       let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v);
@@ -303,9 +310,26 @@ function aggiungiRiga(q) {
   S.riga = key; S.tab = "dati"; renderVista(); renderIns(); aggiornaBottoni(); renderSb();
   const primo = $("#ins .rg input, #ins .rg select"); if (primo) primo.focus();
 }
-function selezionaRiga(key, focusRiga) {
+/* Tastiera nella tabella (roving tabindex: una sola tappa Tab per tabella). Frecce su/giu, Home e Fine spostano il focus tra le
+   righe; Invio o Spazio aprono la riga e portano il focus al primo campo del pannello (Esc, gestito in layout.js, torna alla riga). */
+function tastiTabella(ev, tr, key) {
+  const righe = [...tr.parentElement.querySelectorAll("tr[data-key]")], i = righe.indexOf(tr);
+  const vai = n => { const t = righe[Math.max(0, Math.min(righe.length - 1, n))]; if (!t) return; ev.preventDefault();
+    righe.forEach(x => x.tabIndex = -1); t.tabIndex = 0; t.focus(); };
+  if (ev.key === "ArrowDown") vai(i + 1); else if (ev.key === "ArrowUp") vai(i - 1);
+  else if (ev.key === "Home") vai(0); else if (ev.key === "End") vai(righe.length - 1);
+  else if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selezionaRiga(key, "pannello"); }
+}
+function rigaDaFocalizzare(key) { return document.querySelector('tr[data-key="' + CSS.escape(key) + '"]'); }
+function selezionaRiga(key, dove) {
   S.riga = key; S.tab = "dati"; renderVista(); renderIns();
-  if (focusRiga) { const tr = document.querySelector('tr[data-key="' + CSS.escape(key) + '"]'); if (tr) tr.focus(); }
+  if (dove === "pannello") { const primo = $("#ins .rg input, #ins .rg select, #ins .rg textarea"); if (primo) { primo.focus(); return; } }
+  if (dove) { const tr = rigaDaFocalizzare(key); if (tr) tr.focus({ preventScroll: true }); }
+  if (window.innerWidth <= 960) $("#ins").scrollIntoView({ block: "start" });   // su schermo stretto il pannello sta sotto la tabella
+}
+function tornaTabella() {
+  const tr = S.riga && rigaDaFocalizzare(S.riga) || document.querySelector("#vista tbody tr[tabindex]");
+  if (tr) { tr.focus({ preventScroll: true }); tr.scrollIntoView({ block: "center" }); }
 }
 
 /* ---------- ispettore ---------- */
@@ -318,6 +342,7 @@ function renderIns() {
   const seg = h("div", { class: "seg", role: "tablist" }, [["dati", "Dati"], ["controlli", "Controlli" + (nr ? " (" + nr + ")" : "")], ["cronologia", "Cronologia"]].map(([k, n]) =>
     h("button", { role: "tab", "aria-selected": S.tab === k ? "true" : "false", onclick: () => { S.tab = k; render(); } }, n)));
   ins.append(seg);
+  if (S.tab === "dati" && S.riga) ins.append(h("button", { class: "lk solo-mobile", onclick: tornaTabella }, "↑ Torna alla tabella"));
   if (S.tab === "dati") insDati(ins); else if (S.tab === "controlli") insControlli(ins); else if (S.tab === "file") insFile(ins); else insCronologia(ins);
 }
 function rigaSelezionata() {
@@ -452,7 +477,7 @@ async function insCronologia(ins) {
 }
 const PILLOLE = { aggiornato: "ok", valido: "ok", positivo: "ok", senza_rilievi: "ok", negativo: "er", non_valido: "er", con_rilievi: "am", obsoleto: "am", non_eseguito: "", non_preparata: "" };
 function riga_stato(nome, stato, extra) {
-  return h("div", { class: "rg", style: "grid-template-columns:120px 1fr" }, h("label", {}, nome), h("div", {}, h("span", { class: "pz " + (PILLOLE[stato] || "") , style: PILLOLE[stato] ? "" : "background:var(--grigio)" }, String(stato).replaceAll("_", " ")), extra ? h("div", { class: "mut", style: "font-size:0.9231rem;margin-top:3px" }, extra) : null));
+  return h("div", { class: "rg", style: "grid-template-columns:120px 1fr" }, h("span", { class: "etichetta" }, nome), h("div", {}, h("span", { class: "pz " + (PILLOLE[stato] || "") , style: PILLOLE[stato] ? "" : "background:var(--grigio)" }, String(stato).replaceAll("_", " ")), extra ? h("div", { class: "mut", style: "font-size:0.9231rem;margin-top:3px" }, extra) : null));
 }
 async function insFile(dest) {
   const pid = S.P.pratica_id;
@@ -976,40 +1001,46 @@ $("#iSalva").onclick = impSalva;
 $('#imp').addEventListener('close', () => applicaAspetto(preferenze));
 
 /* Separatore del pannello: pointer capture evita salti quando il mouse esce dal bordo. */
-async function salvaLarghezza(larghezza) {
+async function salvaLarghezza(larghezza, chiave = 'larghezza_pannello') {
   const precedente = { ...preferenze };
-  memorizzaAspetto({ ...preferenze, larghezza_pannello: larghezza });
+  memorizzaAspetto({ ...preferenze, [chiave]: larghezza });
   try {
-    const r = await post('/api/impostazioni', { interfaccia: { larghezza_pannello: larghezza } });
+    const r = await post('/api/impostazioni', { interfaccia: { [chiave]: larghezza } });
     memorizzaAspetto(r.interfaccia);
   } catch (e) { memorizzaAspetto(precedente); msg('Larghezza non salvata: ' + e.message, 'e'); }
 }
-const separatoreDati = $('#ridimensiona');
-let trascinamento = null;
-separatoreDati.addEventListener('pointerdown', ev => {
-  if (ev.button !== 0 || window.innerWidth <= 960) return;
-  trascinamento = { id: ev.pointerId, x: ev.clientX, larghezza: $('#ins').getBoundingClientRect().width, nuova: preferenze.larghezza_pannello };
-  separatoreDati.setPointerCapture(ev.pointerId); document.body.classList.add('ridimensionando'); ev.preventDefault();
-});
-separatoreDati.addEventListener('pointermove', ev => {
-  if (!trascinamento || ev.pointerId !== trascinamento.id) return;
-  trascinamento.nuova = Math.round(Math.max(280, Math.min(760, window.innerWidth - 580, trascinamento.larghezza + trascinamento.x - ev.clientX)));
-  applicaAspetto({ ...preferenze, larghezza_pannello: trascinamento.nuova });
-});
-const terminaTrascinamento = ev => {
-  if (!trascinamento || ev.pointerId !== trascinamento.id) return;
-  const larghezza = trascinamento.nuova; trascinamento = null; document.body.classList.remove('ridimensionando');
-  if (separatoreDati.hasPointerCapture(ev.pointerId)) separatoreDati.releasePointerCapture(ev.pointerId);
-  if (ev.type === 'pointercancel') applicaAspetto(preferenze); else salvaLarghezza(larghezza);
-};
-separatoreDati.addEventListener('pointerup', terminaTrascinamento);
-separatoreDati.addEventListener('pointercancel', terminaTrascinamento);
-separatoreDati.addEventListener('keydown', ev => {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
-  ev.preventDefault();
-  const l = ev.key === 'Home' ? 280 : ev.key === 'End' ? 760 : preferenze.larghezza_pannello + (ev.key === 'ArrowLeft' ? 16 : -16);
-  salvaLarghezza(Math.max(280, Math.min(760, l)));
-});
+/* Separatore ridimensionabile: cfg = { chiave, pannello (selettore), verso (+1 se il pannello e' a sinistra del separatore),
+   min, max() }. Trascinamento con pointer capture, tastiera con frecce/Home/End, doppio clic per il valore predefinito. */
+function collegaSeparatore(sep, cfg) {
+  let tr = null;
+  sep.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0 || window.innerWidth <= 960) return;
+    tr = { id: ev.pointerId, x: ev.clientX, larghezza: $(cfg.pannello).getBoundingClientRect().width, nuova: preferenze[cfg.chiave] };
+    sep.setPointerCapture(ev.pointerId); document.body.classList.add('ridimensionando'); ev.preventDefault();
+  });
+  sep.addEventListener('pointermove', ev => {
+    if (!tr || ev.pointerId !== tr.id) return;
+    tr.nuova = Math.round(Math.max(cfg.min, Math.min(cfg.max(), tr.larghezza + cfg.verso * (ev.clientX - tr.x))));
+    applicaAspetto({ ...preferenze, [cfg.chiave]: tr.nuova });
+  });
+  const fine = ev => {
+    if (!tr || ev.pointerId !== tr.id) return;
+    const larghezza = tr.nuova; tr = null; document.body.classList.remove('ridimensionando');
+    if (sep.hasPointerCapture(ev.pointerId)) sep.releasePointerCapture(ev.pointerId);
+    if (ev.type === 'pointercancel') applicaAspetto(preferenze); else salvaLarghezza(larghezza, cfg.chiave);
+  };
+  sep.addEventListener('pointerup', fine); sep.addEventListener('pointercancel', fine);
+  sep.addEventListener('keydown', ev => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
+    ev.preventDefault();
+    const piu = cfg.verso > 0 ? 'ArrowRight' : 'ArrowLeft';
+    const l = ev.key === 'Home' ? cfg.min : ev.key === 'End' ? cfg.max() : preferenze[cfg.chiave] + (ev.key === piu ? 16 : -16);
+    salvaLarghezza(Math.max(cfg.min, Math.min(cfg.max(), l)), cfg.chiave);
+  });
+  sep.addEventListener('dblclick', () => salvaLarghezza(ASPETTO_DEFAULT[cfg.chiave], cfg.chiave));
+}
+collegaSeparatore($('#ridimensiona'), { chiave: 'larghezza_pannello', pannello: '#ins', verso: -1, min: 280, max: () => limitePannello() });
+collegaSeparatore($('#ridimensionaNav'), { chiave: 'larghezza_nav', pannello: '#lat', verso: 1, min: 180, max: () => limiteNav() || 480 });
 
 /* Importa un file telematico SUC13 (XML) come nuova pratica: importa solo cio' che il programma sa riprodurre e dice il resto. */
 async function importaXml(file) {
