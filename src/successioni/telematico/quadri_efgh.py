@@ -357,6 +357,12 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
         "Rinuncia": {"FlagAssenzaRinuncia": "1"},
         "FirmaDichiarante": "1",
     }
+    for chiave, elenco, flag in (("Navi", x.eh_navi, "FlagNavi"), ("Aeromobili", x.eh_aeromobili, "FlagAeromobili")):
+        if len(elenco) > 1:
+            x.ns.append(f"quadro EH: {len(elenco)} {chiave.lower()} nel quadro {'EQ' if chiave == 'Navi' else 'EP'}: la sezione "
+                        f"{chiave} del quadro EH ne ammette una sola nel primo modulo, il secondo modulo non e' supportato")
+        elif elenco:
+            sez[chiave] = {flag: "1", **elenco[0]}
     if eredi:
         sez["Eredi"] = eredi[:3]
     if eg and "DocumentiPassivita" in eg:

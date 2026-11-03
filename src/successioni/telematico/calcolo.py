@@ -184,7 +184,7 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
         quad = dich.find(SUC + f"Quadro{q}")
         if quad is None:
             continue
-        if q not in ("EB", "EC", "EO", "ER"):
+        if q not in ("EB", "EC", "EO", "EP", "EQ", "ER"):
             ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}", f"quadro {q} non supportato dal calcolo",
                              _g(1, "QE")))
             continue

@@ -33,7 +33,8 @@ Regole e fonti dettagliate: `docs/regole/mappa_xsd.md`; albero completo: `docs/r
 | EI_new | non coperto | — | voltura: discordanze e passaggi intermedi |
 | EL, EM | non coperto | — | sistema tavolare (province tavolari rilevate e bloccate) |
 | EO | parziale - **controllo locale** (caso `caso_titoli`) | titoli quotati (1, con CF emittente e codice titolo), non quotati (2) e fondi comuni (4) con valore, quantita', tipo e data documento, diritto, devoluzione con continuazione; totale EE `TotaleValoreTitoli`; calcolo (QE) | titoli esenti (3, `ValoreEsente`), beni esteri, riduzioni art. 25 (`ValorePrecSucc`), codice ufficio e registrazione in Anagrafe Tributaria del CF emittente (verificati solo dal controllo ufficiale) |
-| EN, EP, EQ | non coperto | — | aziende, aeromobili, navi |
+| EP, EQ | parziale - **controllo locale** (caso `caso_mezzi`) | aeromobili (marca/modello, anni, nazionalita', immatricolazione) e navi (vela/motore, iscrizione, lunghezza o stazza) con valore, diritto, devoluzione; totale EE `TotaleValoreAereiNavi`; righe EH (EH11, EH12) con un solo mezzo per tipo; calcolo (QE) | beni esteri, riduzioni art. 25 (`ValorePrecSucc`), piu' navi o aeromobili in EH (secondo modulo) |
+| EN | non coperto | — | aziende |
 | ER | parziale | tipi cespite BI, CR, DN, AB; descrizione; possesso; diritto 1/2; valore; devoluzione con continuazione; moduli da 4 | GD, CR senza valore, beni esteri, imposta estera, valore precedenti successioni, agevolazioni A/L |
 
 Il caso sintetico nel perimetro coperto puo' ottenere `completo=True` dal modulo, dal servizio/API,

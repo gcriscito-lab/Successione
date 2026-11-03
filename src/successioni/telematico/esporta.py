@@ -53,12 +53,14 @@ PERIMETRO = {
     "EB": "terreni in Italia (provincia non tavolare), natura T, con valore",
     "EC": "fabbricati in Italia (provincia non tavolare), con rendita catastale (categorie non F) e valore",
     "ER": "tipi cespite BI, CR, DN, AB con valore; beni non esteri",
+    "EP": "aeromobili con valore; beni esteri e riduzioni art. 25 non supportati",
+    "EQ": "navi e imbarcazioni con valore; beni esteri e riduzioni art. 25 non supportati",
     "EO": "titoli quotati (1), non quotati (2), fondi (4) con valore; titoli esenti (3) e beni esteri non supportati",
     "ED": "passivita' con tipo, documento, possesso e ripartizione a un solo soggetto EA",
     "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
     "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; nessuna agevolazione/riduzione",
 }
-QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "EO", "ER")
+QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "EO", "EP", "EQ", "ER")
 SCOPI = ("completo", "bozza_tecnica")
 _ID_DICH = re.compile(r"[0-9]{4}[1-9]|[0-9]{3}[1-9][0-9]|[0-9]{2}[1-9][0-9]{2}|[0-9][1-9][0-9]{3}|[1-9][0-9]{4}")
 
@@ -555,6 +557,92 @@ class _Export:
         self.tipo_cespite[b["id"]] = tc
         return {"TipoCespite": tc, "Descrizione": descr, "Possesso": poss, "CodiceDiritto_P": dir_p, "Valore": valore}
 
+    def _anno_xml(self, b: dict, campo: str, elemento: str):
+        """DatoDA_Type: anno aaaa tra 1800 e 2099, non futuro."""
+        v = SUP.attr(self.d, "beni", b, campo)
+        self.usa(b, campo)
+        fonte = FO.fonte_xsd(elemento)
+        if v in (None, "") or V.e_stato(v):
+            self.err("DATO_MANCANTE", f"beni[{b['id']}].{campo}", "anno obbligatorio (aaaa)", fonte)
+            return None
+        if not re.fullmatch(r"(18|19|20)[0-9]{2}", str(v)) or int(v) > self.oggi.year:
+            self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].{campo}", f"{v!r}: anno aaaa tra 1800 e l'anno corrente (DatoDA_Type)", fonte)
+            return None
+        return str(v)
+
+    def _testo_xml(self, b: dict, campo: str, elemento: str, massimo: int, *, numerico: bool = False):
+        v = SUP.attr(self.d, "beni", b, campo)
+        self.usa(b, campo)
+        fonte = FO.fonte_xsd(elemento)
+        if v in (None, "") or V.e_stato(v):
+            self.err("DATO_MANCANTE", f"beni[{b['id']}].{campo}", "dato obbligatorio", fonte)
+            return None
+        try:
+            if numerico:
+                if not str(v).isdigit() or len(str(v)) > massimo:
+                    raise F.ValoreXml(f"{v!r}: solo cifre, massimo {massimo}")
+                return str(v)
+            return F.an(str(v), massimo)
+        except F.ValoreXml as e:
+            self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].{campo}", str(e), fonte)
+            return None
+
+    def _rigo_mezzo(self, b: dict, quadro: str, tipo_xml: dict | None) -> dict | None:
+        el = f"Quadro{quadro}/Modulo/{_RIGA[quadro]}"
+        for campo in ("comune", "sezione", "foglio", "particella", "subalterno", "categoria", "rendita"):
+            if b.get(campo) not in (None, ""):
+                self.usa(b, campo)
+                self.ns.append(f"beni[{b['id']}].{campo}: campo catastale non previsto per il quadro {quadro}")
+        poss, _ = self.quota_possesso(b, el + "/Possesso")
+        dir_p = self.diritto_defunto(b, "CodiciDirittoNonImmobili", el + "/CodiceDiritto_P")
+        valore = self.valore_bene(b, el + "/Valore")
+        if tipo_xml is None or None in (poss, dir_p, valore):
+            return None
+        self.diritto_bene[b["id"]] = dir_p
+        self.valore_beni[b["id"]] = int(valore)
+        return {"Tipo": tipo_xml, "Possesso": poss, "CodiceDiritto_P": dir_p, "Valore": valore}
+
+    def riga_ep(self, b: dict) -> dict | None:
+        """Quadro EP, rigo Aeromobili (Tipo: marca/modello, anno costruzione, nazionalita', anno e numero di immatricolazione)."""
+        el = "QuadroEP/Modulo/Aeromobili/Tipo"
+        t = {"MarcaModello": self._testo_xml(b, "marca_modello", el + "/MarcaModello", 45),
+             "AnnoCostruzione": self._anno_xml(b, "anno_costruzione", el + "/AnnoCostruzione"),
+             "Nazionalita": self._testo_xml(b, "nazionalita", el + "/Nazionalita", 20),
+             "AnnoImmatricolazione": self._anno_xml(b, "anno_immatricolazione", el + "/AnnoImmatricolazione"),
+             "NumeroImmatricolazione": self._testo_xml(b, "numero_immatricolazione", el + "/NumeroImmatricolazione", 10,
+                                                       numerico=True)}
+        r = self._rigo_mezzo(b, "EP", None if None in t.values() else t)
+        if r is not None:   # EH rigo EH12: gli stessi dati dell'aeromobile
+            self.eh_aeromobili.append({k: t[k] for k in ("Nazionalita", "AnnoImmatricolazione", "NumeroImmatricolazione")})
+        return r
+
+    def riga_eq(self, b: dict) -> dict | None:
+        """Quadro EQ, rigo Navi (Tipo: vela/motore, nazionalita', ufficio e numero di iscrizione, dimensione lunghezza o stazza)."""
+        el = "QuadroEQ/Modulo/Navi/Tipo"
+        tu = self.val("beni", b, "tipo_unita", lambda v: codice_enum(str(v), "TipoUnita_Type"), elemento=el + "/TipoUnita")
+        lun, staz = SUP.attr(self.d, "beni", b, "lunghezza"), SUP.attr(self.d, "beni", b, "stazza")
+        self.usa(b, "lunghezza")
+        self.usa(b, "stazza")
+        dim = None
+        if (lun in (None, "")) == (staz in (None, "")):
+            self.err("DATI_INCOERENTI", f"beni[{b['id']}].lunghezza", "indicare la lunghezza oppure la stazza (scelta esclusiva)",
+                     FO.fonte_xsd(el + "/Dimensione"))
+        else:
+            campo, nome = ("lunghezza", "Lunghezza") if lun not in (None, "") else ("stazza", "Stazza")
+            v = self._testo_xml(b, campo, el + "/Dimensione/" + nome, 6, numerico=True)
+            dim = {nome: v} if v is not None else None
+        t = {"TipoUnita": tu,
+             "Nazionalita": self._testo_xml(b, "nazionalita", el + "/Nazionalita", 20),
+             "SiglaUfficioIscrizione": self._testo_xml(b, "sigla_ufficio_iscrizione", el + "/SiglaUfficioIscrizione", 6),
+             "AnnoIscrizione": self._anno_xml(b, "anno_iscrizione", el + "/AnnoIscrizione"),
+             "NumeroIscrizione": self._testo_xml(b, "numero_iscrizione", el + "/NumeroIscrizione", 10, numerico=True),
+             "AnnoCostruzione": self._anno_xml(b, "anno_costruzione", el + "/AnnoCostruzione"),
+             "Dimensione": dim}
+        r = self._rigo_mezzo(b, "EQ", None if None in t.values() else t)
+        if r is not None:   # EH rigo EH11: gli stessi dati della nave
+            self.eh_navi.append({k: t[k] for k in ("SiglaUfficioIscrizione", "AnnoIscrizione", "NumeroIscrizione")})
+        return r
+
     def riga_eo(self, b: dict) -> dict | None:
         """Quadro EO, rigo Titoli: quotati (1), non quotati (2), fondi comuni (4). Titoli esenti (3) e beni esteri: non supportati."""
         c, el = "beni", "QuadroEO/Modulo/Titoli"
@@ -641,7 +729,7 @@ class _Export:
     def devoluzioni_bene(self, b: dict, quadro: str) -> list[dict]:
         """Righe della sezione devoluzione del bene, ordinate per posizione EA (annotazione IdentificazioneSoggetto:
         'in ordine progressivo')."""
-        tipo_rip = "CodiciDirittoNonImmobiliDevoluzione" if quadro in ("ER", "EO") else "CodiciDiritto_Type"
+        tipo_rip = "CodiciDirittoNonImmobiliDevoluzione" if quadro in ("ER", "EO", "EP", "EQ") else "CodiciDiritto_Type"
         el = f"Quadro{quadro}/Modulo/{_RIGA[quadro]}/Devoluzione{quadro}/Devoluzione"
         devs = [d for d in self.d.get("devoluzioni", []) if d.get("bene_id") == b["id"]]
         righe, somma, persone_viste = [], Fraction(0), set()
@@ -1007,15 +1095,18 @@ class _Export:
         imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC"))
         altri = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "ER")
         titoli = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "EO")
+        mezzi = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EP", "EQ"))
         passivo = sum(self.valore_passivita.values())
-        attivo = imm + titoli + altri
-        if not (imm or titoli or altri or passivo):
+        attivo = imm + titoli + mezzi + altri
+        if not (imm or titoli or mezzi or altri or passivo):
             return None
         ee: dict = {}
         if imm:
             ee["TotaleValoreImmobili"] = str(imm)
         if titoli:
             ee["TotaleValoreTitoli"] = str(titoli)
+        if mezzi:
+            ee["TotaleValoreAereiNavi"] = str(mezzi)
         if altri:
             ee["TotaleValoreAltriBeni"] = str(altri)
         if attivo:
@@ -1279,6 +1370,7 @@ class _Export:
         self.totale_da_versare = 0
         self.defunto = self.presentatore = None
         self.testamento_x, self.test_reg = None, None
+        self.eh_navi, self.eh_aeromobili = [], []
 
         self.classifica_persone()
         self.ordina_ea()
@@ -1297,7 +1389,7 @@ class _Export:
                     "configurazione di eredi non coperta dalla verifica delle quote di legge: "
                     "conservabile come bozza tecnica, non finalizzabile", DL.FONTE))
         beni = self.d.get("beni", [])
-        per_q: dict[str, list] = {"EB": [], "EC": [], "EO": [], "ER": []}
+        per_q: dict[str, list] = {"EB": [], "EC": [], "EO": [], "EP": [], "EQ": [], "ER": []}
         for b in beni:
             self.usa(b, "tipo")
             q = Q.quadro_di("beni", b)
@@ -1314,6 +1406,10 @@ class _Export:
         qec = self.quadro_beni("EC", sorted(per_q["EC"], key=_chiave_immobile), self.riga_ec)
         qeo = self.quadro_beni("EO", sorted(per_q["EO"], key=lambda b: (
             str(SUP.attr(self.d, "beni", b, "tipo_titolo") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_eo)
+        qep = self.quadro_beni("EP", sorted(per_q["EP"], key=lambda b: (
+            str(b.get("marca_modello") or ""), b["id"])), self.riga_ep)
+        qeq = self.quadro_beni("EQ", sorted(per_q["EQ"], key=lambda b: (
+            str(b.get("numero_iscrizione") or ""), b["id"])), self.riga_eq)
         qer = self.quadro_beni("ER", sorted(per_q["ER"], key=lambda b: (
             str(SUP.attr(self.d, "beni", b, "tipo_cespite") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_er)
         if self.ea:
@@ -1328,7 +1424,7 @@ class _Export:
         qed = self.quadro_ed()
         self.risolvi_progressivi(qed)
         qee = self.quadro_ee()
-        corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroEO": qeo, "QuadroER": qer}
+        corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroEO": qeo, "QuadroEP": qep, "QuadroEQ": qeq, "QuadroER": qer}
         presenti = [k[6:] for k, v in corpo.items() if v]
         fr = self.frontespizio(presenti)
         intest = {"TipoFornitore": ctx.tipo_fornitore}
@@ -1400,8 +1496,8 @@ class _Export:
         return esito
 
 
-_RIGA = {"EB": "Terreni", "EC": "Fabbricati", "EO": "Titoli", "ER": "Rendite"}
-_PER_MODULO = {"EB": 2, "EC": 2, "EO": 3, "ER": 4}
+_RIGA = {"EB": "Terreni", "EC": "Fabbricati", "EO": "Titoli", "EP": "Aeromobili", "EQ": "Navi", "ER": "Rendite"}
+_PER_MODULO = {"EB": 2, "EC": 2, "EO": 3, "EP": 1, "EQ": 2, "ER": 4}
 _XP_DICH = "/tm:Messaggio/tm:Contenuto/suc:Fornitura/suc:Dichiarazione"
 
 

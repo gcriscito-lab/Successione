@@ -44,8 +44,10 @@ QUADRI: list[dict] = [
     {"id": "EO", "titolo": "Azioni, Obbligazioni, Altri titoli, Quote sociali", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
      "preset": {"tipo": "titolo"},
      "colonne": ["tipo_titolo", "descrizione", "quantita", "valore", "quota_defunto"], "supportato": True},
-    {"id": "EP", "titolo": "Aeromobili", "gruppo": "quadri", "vista": "non_supportato", "supportato": False, "motivo": "non ancora supportato"},
-    {"id": "EQ", "titolo": "Navi e Imbarcazioni", "gruppo": "quadri", "vista": "non_supportato", "supportato": False, "motivo": "non ancora supportato"},
+    {"id": "EP", "titolo": "Aeromobili", "gruppo": "quadri", "vista": "tabella", "coll": "beni", "preset": {"tipo": "aeromobile"},
+     "colonne": ["marca_modello", "anno_costruzione", "valore", "quota_defunto"], "supportato": True},
+    {"id": "EQ", "titolo": "Navi e Imbarcazioni", "gruppo": "quadri", "vista": "tabella", "coll": "beni", "preset": {"tipo": "nave"},
+     "colonne": ["tipo_unita", "nazionalita", "numero_iscrizione", "valore", "quota_defunto"], "supportato": True},
     {"id": "EH", "titolo": "Dichiarazioni sostitutive, agevolazioni e riduzioni", "gruppo": "riepiloghi", "vista": "non_supportato",
      "supportato": False, "motivo": "non ancora supportato"},
     {"id": "EE", "titolo": "Prospetto riepilogativo asse ereditario", "gruppo": "riepiloghi", "vista": "non_supportato",
@@ -63,7 +65,7 @@ def quadro_di(coll: str, entita: dict) -> str | None:
     if coll == "persone":
         return "AN" if entita.get("ruolo") in ("defunto", "presentatore") else "EA"
     if coll == "beni":
-        return {"terreno": "EB", "fabbricato": "EC", "titolo": "EO"}.get(entita.get("tipo"), "ER")
+        return {"terreno": "EB", "fabbricato": "EC", "titolo": "EO", "aeromobile": "EP", "nave": "EQ"}.get(entita.get("tipo"), "ER")
     return {"passivita": "ED", "documenti_ref": "EG", "devoluzioni": "DV"}.get(coll)
 
 

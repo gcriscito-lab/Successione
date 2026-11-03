@@ -16,7 +16,7 @@ CODICE_FISCALE = re.compile(r"^[A-Z0-9]{16}$")
 DATA_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 RUOLI_PERSONA = ("defunto", "erede", "legatario", "rappresentante", "presentatore", "altro")
-TIPI_BENE = ("fabbricato", "terreno", "disponibilita_finanziaria", "titolo", "altro")
+TIPI_BENE = ("fabbricato", "terreno", "disponibilita_finanziaria", "titolo", "aeromobile", "nave", "altro")
 
 # kind: str | cf | data | quota | importo | enum:<a|b> | ref:<collezione>
 COLLEZIONI: dict[str, dict[str, str]] = {
@@ -38,6 +38,9 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         "zona_censuaria": "str", "consistenza": "str", "tipo_cespite": "str",
         "tipo_titolo": "str", "quantita": "str", "codice_titolo": "str", "codice_fiscale_emittente": "str",
         "tipo_documento": "str", "data_documento": "data",
+        "marca_modello": "str", "anno_costruzione": "str", "nazionalita": "str", "anno_immatricolazione": "str",
+        "numero_immatricolazione": "str", "tipo_unita": "str", "sigla_ufficio_iscrizione": "str", "anno_iscrizione": "str",
+        "numero_iscrizione": "str", "lunghezza": "str", "stazza": "str",
     },
     "devoluzioni": {
         "bene_id": "ref:beni", "persona_id": "ref:persone", "quota": "quota", "diritto": "str",

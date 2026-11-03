@@ -170,6 +170,24 @@ def caso_titoli() -> dict:
     return d
 
 
+def caso_mezzi() -> dict:
+    """``caso_a10`` con un aeromobile (EP) e una barca a vela (EQ) devoluti per quote di legge ai due figli."""
+    d = caso_a10()
+    d["opzioni"]["quadri_attivi"] = ["EA", "EB", "EC", "ER", "ED", "EG", "EP", "EQ"]
+    d["beni"] += [
+        {"id": "b_aereo001", "_origine": {}, "tipo": "aeromobile", "valore": "30000", "diritto": "1", "quota_defunto": "1/1",
+         "marca_modello": "Aeromobile Sintetico X1", "anno_costruzione": "1998", "nazionalita": "Italiana",
+         "anno_immatricolazione": "2005", "numero_immatricolazione": "123456"},
+        {"id": "b_barca001", "_origine": {}, "tipo": "nave", "valore": "12000", "diritto": "1", "quota_defunto": "1/1",
+         "tipo_unita": "1", "nazionalita": "Italiana", "sigla_ufficio_iscrizione": "RM", "anno_iscrizione": "2010",
+         "numero_iscrizione": "98765", "anno_costruzione": "2008", "lunghezza": "9"}]
+    for bid in ("b_aereo001", "b_barca001"):
+        for pid in ("p_anna0001", "p_luca0001"):
+            d["devoluzioni"].append({"id": f"d_{bid[2:7]}{pid[2:6]}", "_origine": {}, "bene_id": bid, "persona_id": pid,
+                                     "quota": {"num": 1, "den": 2}, "diritto": "1"})
+    return d
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),
