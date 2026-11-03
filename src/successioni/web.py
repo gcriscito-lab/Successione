@@ -201,7 +201,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def impostazioni_salva(request):
         from . import impostazioni
         b = await request.json()
-        return impostazioni.salva(b["modifiche"])
+        return impostazioni.salva(b.get("modifiche", {}), interfaccia=b.get("interfaccia"))
 
     async def corpo(request):
         return await request.json() if (await request.body()) else {}

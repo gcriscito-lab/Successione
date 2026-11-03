@@ -2,7 +2,8 @@
 fonti) e tempo massimo del controllo, con stato di rilevamento e salvataggio nel file di configurazione.
 
 Il file e' lo stesso letto dall'avviatore (`scripts/windows/avvia_successioni.py`, variabile `SUCCESSIONI_CONFIG`; in
-mancanza, `configurazione.json` nella cartella dei dati). Contiene SOLO le variabili elencate in `VOCI`: percorsi e un numero.
+mancanza, `configurazione.json` nella cartella dei dati). Contiene le variabili elencate in `VOCI` e le preferenze
+grafiche validate nella sezione `interfaccia` (non diventano variabili d'ambiente).
 Nessuna credenziale, certificato o password vi puo' essere scritto: una chiave non elencata e' rifiutata.
 
 Una modifica vale subito (si aggiorna l'ambiente del processo) e al prossimo avvio; se all'avvio esiste una variabile
@@ -40,6 +41,35 @@ CHIAVI = {v[0]: v for v in VOCI}
 _ESEMPIO = {"SUCCESSIONI_JAVA": "java.exe", "SUCCESSIONI_GS": "gswin64c.exe", "SUCCESSIONI_VERAPDF": "verapdf.bat",
             "SUCCESSIONI_QPDF": "qpdf.exe", "SUCCESSIONI_ICC": "srgb.icc"}
 MINIMO_TIMEOUT, MASSIMO_TIMEOUT = 10, 7200
+INTERFACCIA_DEFAULT = {"tema": "sistema", "font": "sistema", "dimensione": 14,
+                       "interlinea": "normale", "larghezza_pannello": 360}
+SCELTE_INTERFACCIA = {"tema": ("sistema", "chiaro", "scuro", "seppia"),
+                      "font": ("sistema", "segoe", "arial", "verdana", "georgia", "consolas"),
+                      "interlinea": ("compatta", "normale", "ampia")}
+
+
+def _valida_interfaccia(valori: dict) -> dict:
+    if not isinstance(valori, dict):
+        raise DatiNonValidi("preferenze dell'interfaccia: atteso un oggetto")
+    for k, v in valori.items():
+        if k not in INTERFACCIA_DEFAULT:
+            raise DatiNonValidi(f"preferenza dell'interfaccia sconosciuta: {k}")
+        if k in SCELTE_INTERFACCIA:
+            if v not in SCELTE_INTERFACCIA[k]:
+                raise DatiNonValidi(f"{k}: valore non ammesso")
+        else:
+            minimo, massimo = (12, 22) if k == "dimensione" else (280, 760)
+            if isinstance(v, bool) or not isinstance(v, int) or not minimo <= v <= massimo:
+                raise DatiNonValidi(f"{k}: indicare un intero da {minimo} a {massimo}")
+    return valori.copy()
+
+
+def preferenze_interfaccia(contenuto: dict) -> dict:
+    valori = contenuto.get("interfaccia", {})
+    try:
+        return {**INTERFACCIA_DEFAULT, **_valida_interfaccia(valori)}
+    except DatiNonValidi:
+        return INTERFACCIA_DEFAULT.copy()
 # Nome del file ammesso per ciascuno strumento: l'impostazione sceglie QUALE programma eseguire, quindi non si accetta un
 # eseguibile qualunque (es. cmd.exe o calc.exe al posto di Java). Il controllo e' sul nome, non sul contenuto del file.
 NOMI_AMMESSI = {
@@ -145,7 +175,7 @@ def stato() -> dict:
                      "salvato": nel_file.get(chiave) if isinstance(nel_file.get(chiave), str) else None,
                      "origine": origine, "a_posto": ok, "dettaglio": descr,
                      "modificabile": tipo != "sola_lettura"})
-    return {"file": str(file_configurazione()), "voci": voci}
+    return {"file": str(file_configurazione()), "voci": voci, "interfaccia": preferenze_interfaccia(nel_file)}
 
 
 def _valida(chiave: str, valore) -> str:
@@ -178,13 +208,16 @@ def _valida(chiave: str, valore) -> str:
     return v
 
 
-def salva(modifiche: dict) -> dict:
+def salva(modifiche: dict, interfaccia: dict | None = None) -> dict:
     """Applica e salva le modifiche (valore vuoto = rimuove l'impostazione). Tutto o niente: se un valore e' errato non si
     scrive nulla. Restituisce lo stato aggiornato piu' gli eventuali `avvisi`."""
-    if not isinstance(modifiche, dict) or not modifiche:
+    if not isinstance(modifiche, dict) or (not modifiche and not interfaccia):
         raise DatiNonValidi("nessuna modifica indicata")
     nuove = {k: _valida(k, v) for k, v in modifiche.items()}
+    aspetto = _valida_interfaccia(interfaccia) if interfaccia is not None else None
     contenuto = _leggi_file_stretto()
+    if aspetto is not None:
+        contenuto["interfaccia"] = {**preferenze_interfaccia(contenuto), **aspetto}
     avvisi = []
     for k, v in nuove.items():
         if v:
