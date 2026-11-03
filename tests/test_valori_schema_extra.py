@@ -56,10 +56,10 @@ class TestValoriSchemaExtra(unittest.TestCase):
         self.assertEqual(valida_campo("enum:a|b", "a", "test", {}), [])
         # Test campo non valido
         self.assertEqual(valida_campo("str", 123, "test", {}), [Errore("VALORE_NON_VALIDO", "test", "atteso testo")])
-        self.assertEqual(valida_campo("cf", "ABCDEFGHIJKLMN", "test", {}), [Errore("VALORE_NON_VALIDO", "test", "codice fiscale di 16 caratteri alfanumerici")])
+        self.assertEqual(valida_campo("cf", "ABCDEFGHIJKLMN", "test", {}), [Errore("VALORE_NON_VALIDO", "test", "codice fiscale di 16 caratteri alfanumerici (lettere e cifre, senza spazi)")])
         self.assertEqual(valida_campo("data", "2023-02-29", "test", {}), [Errore("VALORE_NON_VALIDO", "test", "data inesistente nel calendario")])
         self.assertEqual(valida_campo("quota", {"num": 1, "den": 0}, "test", {}), [Errore("VALORE_NON_VALIDO", "test", "denominatore > 0 e numeratore >= 0")])
-        self.assertEqual(valida_campo("importo", "100,50", "test", {}), [Errore("VALORE_NON_VALIDO", "test", "separatore decimale ',' non ammesso: usare '.'")])
+        self.assertEqual(valida_campo("importo", "100,50", "test", {}), [Errore("VALORE_NON_VALIDO", "test", "separatore decimale ',' non ammesso: usare il punto (esempio 1234.50)")])
         self.assertEqual(valida_campo("enum:a|b", "c", "test", {}), [Errore("VALORE_NON_VALIDO", "test", "valore ammesso: a, b")])
 
 if __name__ == '__main__':

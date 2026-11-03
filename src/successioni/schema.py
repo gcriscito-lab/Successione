@@ -83,6 +83,7 @@ def _opz(valore: str, etichetta: str, aiuto: str) -> dict:
 #: tipo: enum (opzioni con etichetta e aiuto) | bool (si'/no). Gli aiuti riportano solo cio' che e' nelle fonti: XSD
 #: fornituraSUC13_v1.xsd (SUC13_20250702), Fascicolo I, docs/regole/prima_casa.md. Coerenza con il codice di esportazione
 #: verificata da tests/test_maschere_strutturati.py.
+ALIAS_SINO = {"1": "si", "true": "si", "0": "no", "false": "no"}
 STRUTTURATI: dict[str, dict] = {
     "beni.tipo_titolo": {
         "etichetta": "tipo di titolo", "tipo": "enum", "aiuto": AIUTI["beni.tipo_titolo"],
@@ -99,6 +100,20 @@ STRUTTURATI: dict[str, dict] = {
             _opz("4", "fondo comune d'investimento", "Fondo comune d'investimento: valore nel campo «valore»."),
         ],
     },
+    # Caselle si'/no (DatoCB nell'XSD). Il modello le conserva come testo («si»/«no»): l'esportazione legge «1», «si», «true»
+    # come si' (quadri_efgh._flag) e ogni altro valore come no. «alias» = scritture gia' ammesse, mostrate come la voce.
+    "beni.discordanza_intestatario": {
+        "etichetta": "discordanza dati intestatario", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
+        "aiuto": "Casella del quadro EB/EC: i dati dell'intestatario in catasto non corrispondono. Genera il quadro EI.",
+        "opzioni": [_opz("si", "si'", "Casella spuntata."), _opz("no", "no", "Casella non spuntata.")]},
+    "beni.passaggi_senza_atti_legali": {
+        "etichetta": "passaggi senza atti legali", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
+        "aiuto": "Casella del quadro EB/EC: ci sono passaggi di proprieta' non risultanti da atti legali. Genera il quadro EI.",
+        "opzioni": [_opz("si", "si'", "Casella spuntata."), _opz("no", "no", "Casella non spuntata.")]},
+    "beni.sistema_tavolare": {
+        "etichetta": "sistema tavolare", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
+        "aiuto": "Si' se l'immobile e' nel sistema tavolare (quadri EL/EM), anche fuori dalle province tavolari.",
+        "opzioni": [_opz("si", "si'", "Immobile in sistema tavolare."), _opz("no", "no", "Immobile in catasto ordinario.")]},
     "devoluzioni.agevolazioni": {
         "etichetta": "agevolazione prima casa", "tipo": "enum", "aiuto": AIUTI["devoluzioni.agevolazioni"] +
         " Si indica sulla riga del soggetto che chiede il beneficio; si estende a tutti i beneficiari del bene. "
@@ -169,14 +184,14 @@ def valida_campo(kind: str, valore, percorso: str, riferimenti: dict[str, set[st
                 raise V.ValoreNonValido("atteso testo")
         elif kind == "cf":
             if not (isinstance(valore, str) and CODICE_FISCALE.match(valore.upper())):
-                raise V.ValoreNonValido("codice fiscale di 16 caratteri alfanumerici")
+                raise V.ValoreNonValido("codice fiscale di 16 caratteri alfanumerici (lettere e cifre, senza spazi)")
         elif kind == "data":
             if not (isinstance(valore, str) and DATA_ISO.match(valore)):
-                raise V.ValoreNonValido("data in formato AAAA-MM-GG")
+                raise V.ValoreNonValido("data non valida: scrivere GG/MM/AAAA (esempio 10/02/1970) oppure AAAA-MM-GG")
             try:
                 datetime.date.fromisoformat(valore)
             except ValueError:
-                raise V.ValoreNonValido("data inesistente nel calendario")
+                raise V.ValoreNonValido("data inesistente nel calendario: controllare giorno e mese (formato GG/MM/AAAA)")
         elif kind == "quota":
             V.parse_quota(valore)
         elif kind == "importo":

@@ -268,7 +268,8 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
             if eid is None:
                 eid = f"{PREFISSI[coll]}_{uuid.uuid4().hex[:8]}"
             elif not ID_VALIDO.match(eid):
-                raise DatiNonValidi(f"operazione {i}: identificativo non valido", id=eid)
+                raise DatiNonValidi(f"operazione {i}: identificativo {eid!r} non valido: formato atteso da 1 a 4 lettere minuscole, "
+                                  "un trattino basso e da 4 a 32 caratteri tra lettere minuscole e cifre (esempio p_a1b2c3d4)", id=eid)
             elemento = next((e for e in righe if e["id"] == eid), None)
             if elemento is None:
                 elemento = {"id": eid, "_origine": {}}

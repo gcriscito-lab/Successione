@@ -98,12 +98,12 @@ ETICHETTE_DICHIARAZIONE: dict[str, str] = {
     "devoluzione_per_testamento": "Devoluzione per testamento",
     "testamento.estero": "Testamento estero",
     "testamento.pubblico_ufficiale": "Pubblico ufficiale",
-    "testamento.data_pubblicazione": "Pubblicato il (AAAA-MM-GG)",
+    "testamento.data_pubblicazione": "Pubblicato il",
     "testamento.ufficio_registrazione": "Ufficio di registrazione",
     "testamento.serie": "Serie",
     "testamento.numero_registrazione": "Numero di registrazione",
     "testamento.sottonumero_registrazione": "Sottonumero",
-    "testamento.data_registrazione": "Registrato il (AAAA-MM-GG)",
+    "testamento.data_registrazione": "Registrato il",
     "presentatore.persona_id": "Presentatore tra i soggetti della pratica",
     "presentatore.codice_carica": "Codice carica",
     "presentatore.telefono": "Telefono",
@@ -113,7 +113,7 @@ ETICHETTE_DICHIARAZIONE: dict[str, str] = {
     "versamento.cf_titolare": "Codice fiscale del titolare del conto",
     "firma_dichiarante": "Firma del dichiarante",
     "dichiara_copie_conformi": "Dichiarazione di conformità delle copie allegate",
-    "azienda_data_deposito": "Azienda: data di deposito (AAAA-MM-GG)",
+    "azienda_data_deposito": "Azienda: data di deposito",
     "azienda_camera_commercio": "Azienda: camera di commercio",
 }
 
