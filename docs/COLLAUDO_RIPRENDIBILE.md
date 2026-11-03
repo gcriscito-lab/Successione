@@ -143,3 +143,11 @@ reali di ciascuna ricevuta SUC13.
 | | A14 reale | | | | da_collaudare | |
 | | A18 reale | | | | da_collaudare | |
 | | A19 reale | | | | da_collaudare | |
+
+
+## Aggiornamento 2026-11-03: PDF/A su questo PC
+Installati: Ghostscript 10.08.0 (`gs10080w64.exe`, 65.093.120 byte, firma Authenticode valida, Artifex Software) in `C:\gs\gs10.08.0`; veraPDF 1.30.3
+(`verapdf-installer.zip`, 32.971.125 byte, firma GPG `13DD 102B 4DD6 9354 D12D E5A8 3184 8632 78B1 7FE7` verificata) in `C:eraPDF`, componente CLI.
+Variabili utente: `SUCCESSIONI_GS`, `SUCCESSIONI_VERAPDF`, `SUCCESSIONI_ICC` (profilo `default_rgb.icc` di Ghostscript). Con queste i test PDF/A (`test_pdfa.py`,
+`test_documenti_*`, collaudo A11 con veraPDF) passano: 42 test, nessun saltato. Avvertenza: non anteporre Java 8 al `PATH` (un test lancia un file `.java`, che richiede
+Java 11 o successivo); `SUCCESSIONI_JAVA` indica Java 8 per il solo controllo SUC13. Non e' la verifica ufficiale CIVIS.

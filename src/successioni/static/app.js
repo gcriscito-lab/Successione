@@ -139,9 +139,16 @@ function campoInput(coll, id, campo, kind, val, onMod) {
 }
 
 /* ---------- vista centrale ---------- */
+/* Stesso instradamento di quadri.quadro_di (server): le province tavolari arrivano da /api/schema. */
+function quadroBene(e) {
+  const prov = String(e.provincia || "").trim().toUpperCase();
+  const tav = (S.schema.province_tavolari || []).includes(prov) || ["1", "si", "true"].includes(String(e.sistema_tavolare || "").trim().toLowerCase());
+  if (tav && (e.tipo === "terreno" || e.tipo === "fabbricato")) return e.tipo === "terreno" ? "EL" : "EM";
+  return { terreno: "EB", fabbricato: "EC", titolo: "EO", aeromobile: "EP", nave: "EQ", azienda: "EN" }[e.tipo] || "ER";
+}
 function appartiene(q, e) {
   if (q.coll === "persone") return !["defunto", "presentatore"].includes(e.ruolo);
-  if (q.coll === "beni") { const t = e.tipo; return q.id === "EB" ? t === "terreno" : q.id === "EC" ? t === "fabbricato" : !["terreno", "fabbricato"].includes(t); }
+  if (q.coll === "beni") return quadroBene(e) === q.id;
   return true;
 }
 function righeQuadro(q) {
@@ -235,7 +242,10 @@ function insDati(ins) {
   const campi = S.schema.collezioni[q.coll]; const id = r.e && r.e.id;
   ins.append(h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)));
   for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e", style: "color:var(--er);margin:0 0 6px" }, x.messaggio));
+  const visibili = q.campi ? new Set(q.campi) : null;   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
   for (const [c, kind] of Object.entries(campi)) {
+    const vv = valRiga(r, c);
+    if (visibili && !visibili.has(c) && (vv === undefined || vv === null || vv === "")) continue;
     const w = campoInput(q.coll, id, c, kind, valRiga(r, c), (campo, v) => {
       if (r.nuova) r.nuova.campi[campo] = v;
       else { const d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} }; d.campi[campo] = v; S.dirty.set(r.key, d); }

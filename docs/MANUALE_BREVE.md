@@ -19,7 +19,7 @@ Nella cartella indicata dalla variabile `SUCCESSIONI_DATA`. Per provare il progr
 
 ## Allegati e PDF/A
 - `successioni converti-pdfa` converte un PDF in PDF/A-1b e riporta l'esito. Serve Ghostscript.
-- Senza veraPDF l'esito è sempre «non verificato», mai «conforme».
+- Senza veraPDF l'esito è sempre «non verificato», mai «conforme». Con Ghostscript 10.08.0 e veraPDF 1.30.3 (profilo PDF/A-1b) installati e configurati (`SUCCESSIONI_GS`, `SUCCESSIONI_VERAPDF`, `SUCCESSIONI_ICC`) il collaudo sul corpus sintetico passa; non è la verifica ufficiale (servizio CIVIS dell'Agenzia).
 - Gli allegati oltre 5 MB si possono suddividere dalla scheda File.
 
 ## Invio (prova simulata)

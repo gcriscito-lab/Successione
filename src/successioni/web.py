@@ -81,7 +81,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def schema_(request):
-        return {"collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": S.AIUTI}
+        return {"collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": S.AIUTI,
+                "province_tavolari": list(Q.PROVINCE_TAVOLARI)}
 
     @api
     async def elenca(request):

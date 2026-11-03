@@ -60,6 +60,29 @@ QUADRI: list[dict] = [
      "nota": "Tabella di lavoro: collega ogni bene agli aventi diritto. Non è un quadro ministeriale."},
 ]
 PER_ID = {q["id"]: q for q in QUADRI}
+#: campi di un bene mostrati nell'ispettore per ciascun quadro (gli altri restano nel modello ma non si propongono; un campo
+#: gia' valorizzato si mostra sempre)
+_BASE = ["tipo", "descrizione", "valore", "diritto", "quota_defunto"]
+_IMM = ["comune", "foglio", "particella", "subalterno", "provincia", "codice_comune", "comune_amministrativo",
+        "codice_comune_amministrativo", "provenienza"]
+_TAV = ["comune_catastale", "codice_comune_catastale", "partita_tavolare", "corpo_tavolare", "sistema_tavolare"]
+CAMPI_BENI = {
+    "EB": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"],
+    "EC": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza"],
+    "EL": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"] + _TAV,
+    "EM": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
+                          "porzione_materiale"] + _TAV,
+    "EN": _BASE + ["codice_fiscale_emittente", "inventario", "data_redazione_inventario"],
+    "EO": _BASE + ["tipo_titolo", "quantita", "codice_titolo", "codice_fiscale_emittente", "tipo_documento", "data_documento"],
+    "EP": _BASE + ["marca_modello", "anno_costruzione", "nazionalita", "anno_immatricolazione", "numero_immatricolazione"],
+    "EQ": _BASE + ["tipo_unita", "nazionalita", "sigla_ufficio_iscrizione", "anno_iscrizione", "numero_iscrizione",
+                   "anno_costruzione", "lunghezza", "stazza"],
+    "ER": _BASE + ["tipo_cespite", "provenienza"],
+}
+for _q in QUADRI:
+    if _q["id"] in CAMPI_BENI:
+        _q["campi"] = CAMPI_BENI[_q["id"]]
+
 SEMPRE_ATTIVI = ("AN", "DV")
 PREDEFINITI = ("EA", "EB", "EC", "ER", "ED", "EG")
 
