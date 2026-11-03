@@ -60,6 +60,24 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 **Cosa fare:** per ciascuno dei sei argomenti (1 franchigie e aliquote per i legatari; 2 presunzione su denaro, gioielli e mobilia e legatari; 3 documenti da allegare per testamento e legatari; 4 codici carica 2, 3, 7, 9 del dichiarante; 5 quote e devoluzioni in presenza di testamento; 6 passivita' ED tipo 11, legati e oneri) elencare fino a 8 punti. Ogni punto ha: la citazione LETTERALE copiata dal testo (massimo 40 parole, tra virgolette), la sigla e il numero di pagina dell'intestazione sotto cui compare. NON riformulare, NON calcolare, NON dedurre: se un argomento non compare nel testo scrivere «non trovato nel contesto».
 **Accettazione:** il coordinatore verifica con uno script che ogni citazione compaia alla lettera nella pagina indicata; le citazioni non trovate fanno scartare il punto.
 
+## C8. Test di caratterizzazione del supplemento telematico
+**File:** `tests/test_supplemento_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/supplemento.py`, `src/successioni/valori.py`.
+**Cosa fare:** Casi limite di `attr` (valore sull'entita' che ha la precedenza, valore in `opzioni.telematico`, stati `assente`/`non_applicabile`/`da_confermare`/`zero`), `dich`, `presentatore_sup`, `chiavi_non_gestite` (chiavi sconosciute, riferimento a elemento inesistente, chiavi annidate di presentatore, versamento, testamento). Scrivere SOLO il file di test indicato: non modificare mai `src/`. I test descrivono il comportamento REALE del codice mostrato (non inventare funzioni, firme, codici o messaggi che non compaiono nel contesto). Import come negli altri test: `from successioni... import ...`. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di eccezione e un frammento del messaggio; niente test che passino per il motivo sbagliato.
+**Accettazione:** `python -m pytest -q tests/test_supplemento_extra.py` verde (lo esegue il lanciatore).
+
+## C9. Test dei lettori di esiti e richieste dell'invio
+**File:** `tests/test_invio_lettori_extra.py` (nuovo).
+**Contesto:** `src/successioni/collegamenti/invio.py`.
+**Cosa fare:** Solo le funzioni pure di lettura e costruzione: `leggi_esi`, `leggi_stato_invii`, `richiesta_download` (contenuti validi, vuoti, malformati, campi mancanti) e `TrasportoSimulato` da solo (protocolli progressivi, guasti `timeout_prima`, `timeout_dopo_ricezione`, `rifiuto`, consultazione per impronta). Non usare l'archivio ne' `InvioAdattatore`. Scrivere SOLO il file di test indicato: non modificare mai `src/`. I test descrivono il comportamento REALE del codice mostrato (non inventare funzioni, firme, codici o messaggi che non compaiono nel contesto). Import come negli altri test: `from successioni... import ...`. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di eccezione e un frammento del messaggio; niente test che passino per il motivo sbagliato.
+**Accettazione:** `python -m pytest -q tests/test_invio_lettori_extra.py` verde (lo esegue il lanciatore).
+
+## C10. Test dei formattatori XML
+**File:** `tests/test_formati_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/formati.py`, `src/successioni/valori.py`.
+**Cosa fare:** Casi limite di `an`, `cf`, `data_iso`, `data`, `euro_intero`, `euro_centesimi`, `quota_grezza`, `telefono`, `email`, `cb`: valori validi, ai limiti di lunghezza, vuoti, di tipo sbagliato, date inesistenti (29 febbraio), importi con decimali o virgola. Scrivere SOLO il file di test indicato: non modificare mai `src/`. I test descrivono il comportamento REALE del codice mostrato (non inventare funzioni, firme, codici o messaggi che non compaiono nel contesto). Import come negli altri test: `from successioni... import ...`. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di eccezione e un frammento del messaggio; niente test che passino per il motivo sbagliato.
+**Accettazione:** `python -m pytest -q tests/test_formati_extra.py` verde (lo esegue il lanciatore).
+
 ---
 
 ## Come il coordinatore integra
