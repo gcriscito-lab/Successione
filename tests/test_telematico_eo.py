@@ -38,9 +38,10 @@ def test_xml_completo_con_titoli_e_totali_ee():
     assert t("/suc:Frontespizio/suc:Firma/suc:CasellaEO/text()") == ["1"] or t("//suc:CasellaEO/text()") == ["1"]
 
 
-def test_titolo_esente_non_supportato():
+def test_titolo_esente_ora_supportato_vedi_test_telematico_eo_esenti():
     es = _es(lambda b: b.update(tipo_titolo="3"))
-    assert es.xml is None and any("tipo_titolo=3" in s for s in es.non_supportato)
+    assert es.errori == [] and es.non_supportato == [] and es.xml is not None
+    assert b"<ValoreEsente>" in es.xml or b":ValoreEsente>" in es.xml
 
 
 def test_quotato_richiede_codice_fiscale_emittente():
