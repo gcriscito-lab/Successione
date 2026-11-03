@@ -12,6 +12,7 @@ from lxml import etree
 from starlette.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).parent))
+from successioni import codici
 from successioni import schema as S  # noqa: E402
 from successioni.archivio import Archivio  # noqa: E402
 from successioni.servizio import Servizio  # noqa: E402
@@ -82,7 +83,10 @@ def test_gli_aiuti_non_citano_regole_fuori_dalle_fonti():
 def test_lo_schema_web_espone_le_maschere(tmp_path):
     with TestClient(crea_app(Servizio(Archivio(tmp_path / "d")), token="sintetico", ammetti_host_di_prova=True)) as cl:
         r = cl.get("/api/schema?t=sintetico").json()
-    assert r["strutturati"] == S.STRUTTURATI and "devoluzioni.agevolazioni" in r["strutturati"]
+    # le voci scritte a mano arrivano invariate; in piu' ci sono solo i menu dei codici ufficiali generati dagli XSD (codici.py)
+    assert {k: v for k, v in r["strutturati"].items() if k in S.STRUTTURATI} == S.STRUTTURATI
+    assert "devoluzioni.agevolazioni" in r["strutturati"]
+    assert set(r["strutturati"]) - set(S.STRUTTURATI) <= set(codici.REGOLE)
 
 
 def test_la_gui_ha_una_maschera_per_ogni_chiave_di_supplemento():
