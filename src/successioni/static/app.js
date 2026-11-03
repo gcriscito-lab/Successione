@@ -248,9 +248,17 @@ function insDati(ins) {
     const vv = valRiga(r, c);
     if (visibili && !visibili.has(c) && (vv === undefined || vv === null || vv === "")) continue;
     const w = campoInput(q.coll, id, c, kind, valRiga(r, c), (campo, v) => {
-      if (r.nuova) r.nuova.campi[campo] = v;
-      else { const d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} }; d.campi[campo] = v; S.dirty.set(r.key, d); }
+      const scrivi = (c2, x) => {
+        if (r.nuova) r.nuova.campi[c2] = x;
+        else { const d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} }; d.campi[c2] = x; S.dirty.set(r.key, d); }
+      };
+      scrivi(campo, v);
       renderVista(); aggiornaBottoni(); renderSb();
+      if (q.coll === "persone" && campo === "codice_fiscale")
+        suggerisciDaCF(v, r.e ? r.e.ruolo : (r.nuova && r.nuova.campi.ruolo), c2 => valRiga(r, c2), scrivi).then(res => {
+          if (res.testo) msg(res.testo, res.riempiti.length ? "o" : "e");
+          if (res.riempiti.length) { renderVista(); renderIns(); aggiornaBottoni(); renderSb(); }
+        });
     });
     const aiuto = (S.schema.aiuti || {})[q.coll + "." + c];
     if (aiuto) w.append(h("div", { class: "mut", style: "font-size:11.5px;margin-top:2px" }, aiuto));
@@ -386,8 +394,13 @@ function schedaPersona(titolo, ruolo, vis) {
   for (const c of vis) {
     const cur = S.dirty.has(key) && c in S.dirty.get(key).campi ? S.dirty.get(key).campi[c] : (e ? e[c] : undefined);
     g.append(h("div", { class: "rg" }, h("label", {}, c.replaceAll("_", " ")), campoInput("persone", e && e.id, c, campi[c], cur, (campo, v) => {
-      const d = S.dirty.get(key) || { coll: "persone", id: e ? e.id : null, campi: e ? {} : { ruolo } };
-      d.campi[campo] = v; S.dirty.set(key, d); aggiornaBottoni(); renderSb();
+      const scrivi = (c2, x) => { const d = S.dirty.get(key) || { coll: "persone", id: e ? e.id : null, campi: e ? {} : { ruolo } }; d.campi[c2] = x; S.dirty.set(key, d); };
+      scrivi(campo, v); aggiornaBottoni(); renderSb();
+      if (campo === "codice_fiscale")
+        suggerisciDaCF(v, ruolo, c2 => { const dd = S.dirty.get(key); return dd && c2 in dd.campi ? dd.campi[c2] : (e ? e[c2] : undefined); }, scrivi).then(res => {
+          if (res.testo) msg(res.testo, res.riempiti.length ? "o" : "e");
+          if (res.riempiti.length) { aggiornaBottoni(); renderSb(); render(); }
+        });
     })));
   }
   return g;
@@ -438,8 +451,8 @@ function sezioneDatiDichiarazione() {
   return sez;
 }
 function renderFront(main) {
-  main.append(schedaPersona("Defunto", "defunto", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "data_decesso"]));
-  main.append(schedaPersona("Presentatore della dichiarazione", "presentatore", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "relazione_con_defunto"]));
+  main.append(schedaPersona("Defunto", "defunto", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso"]));
+  main.append(schedaPersona("Presentatore della dichiarazione", "presentatore", ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "relazione_con_defunto"]));
   const tipo = (S.P.dati.opzioni || {}).tipo_dichiarazione || "originaria";
   const sel = h("select", { "aria-label": "Tipo di dichiarazione" }, h("option", { value: "originaria" }, "Dichiarazione originaria"), h("option", { value: "sostitutiva" }, "Dichiarazione sostitutiva"));
   sel.value = tipo; sel.addEventListener("change", () => salvaOps([{ op: "set", sezione: "opzioni", campi: { tipo_dichiarazione: sel.value } }]));
@@ -525,6 +538,32 @@ async function salvaTutto() {
   });
 }
 
+/* ---------- compilazione dal codice fiscale ---------- */
+/* Dal codice fiscale si ricavano sesso, data di nascita, comune e provincia (server: /api/codice-fiscale). E' un suggerimento:
+   riempie solo i campi ancora vuoti e dice cosa ha compilato, l'utente verifica. */
+const DA_CF = ["data_nascita", "luogo_nascita", "sesso", "provincia_nascita"];
+const _cacheCF = new Map();
+async function decodificaCF(cf, ruolo) {
+  const k = cf + "|" + (ruolo || "");
+  if (!_cacheCF.has(k)) _cacheCF.set(k, await api("/api/codice-fiscale?cf=" + encodeURIComponent(cf) + (ruolo ? "&ruolo=" + encodeURIComponent(ruolo) : "")));
+  return _cacheCF.get(k);
+}
+function testoCF(r, riempiti) {
+  const parti = [];
+  if (!r.valido) parti.push("Codice fiscale non valido: " + r.motivi.join("; ") + ".");
+  if (riempiti.length) parti.push("Compilato dal codice fiscale: " + riempiti.map(c => c.replaceAll("_", " ")).join(", ") + ". Verifica i dati.");
+  if (r.avvisi.length) parti.push(r.avvisi.join(" "));
+  return parti.join(" ");
+}
+async function suggerisciDaCF(cf, ruolo, leggiCampo, scriviCampo) {
+  const v = String(cf || "").trim().toUpperCase();
+  if (v.length !== 16) return { riempiti: [], testo: "" };
+  let r; try { r = await decodificaCF(v, ruolo); } catch (e) { return { riempiti: [], testo: "" }; }
+  const riempiti = [];
+  for (const c of DA_CF) { const x = r.campi[c]; if (x && !String(leggiCampo(c) || "").trim()) { scriviCampo(c, x); riempiti.push(c); } }
+  return { riempiti, testo: testoCF(r, riempiti) };
+}
+
 /* ---------- procedura guidata ---------- */
 const W = { passo: 0, dati: {} };
 const PASSI = ["Defunto", "Tipo", "Quadri", "Conferma"];
@@ -534,8 +573,8 @@ function wizRender() {
   const c = $("#wizCorpo"); c.replaceChildren(); $("#wizErr").textContent = "";
   $("#wIndietro").hidden = W.passo === 0; $("#wAvanti").textContent = W.passo === PASSI.length - 1 ? "Crea dichiarazione" : "Avanti";
   const d = W.dati;
-  const f = (k, label, ph) => h("div", { class: "campo" }, h("label", { for: "w_" + k }, label), h("input", { id: "w_" + k, value: d[k] || "", placeholder: ph || "", class: k === "codice_fiscale" ? "mono" : "", oninput: ev => { d[k] = ev.target.value; } }));
-  if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nel frontespizio."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "AAAA-MM-GG"), f("luogo_nascita", "Luogo di nascita"), f("data_decesso", "Data del decesso", "AAAA-MM-GG")));
+  const f = (k, label, ph) => h("div", { class: "campo" }, h("label", { for: "w_" + k }, label), h("input", { id: "w_" + k, value: d[k] || "", placeholder: ph || "", class: k === "codice_fiscale" ? "mono" : "", oninput: ev => { d[k] = ev.target.value; if (k === "codice_fiscale") wizDaCF(ev.target.value); } }));
+  if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nel frontespizio."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "AAAA-MM-GG"), f("luogo_nascita", "Luogo di nascita"), f("data_decesso", "Data del decesso", "AAAA-MM-GG")), h("div", { id: "w_cf_nota", class: "mut", style: "font-size:12px;margin-top:8px", "aria-live": "polite" }));
   if (W.passo === 1) {
     d.tipo = d.tipo || "originaria";
     for (const [v, t, s] of [["originaria", "Dichiarazione originaria", "Prima dichiarazione per questa successione."], ["sostitutiva", "Dichiarazione sostitutiva", "Sostituisce una dichiarazione già presentata. La gestione dei dati della precedente non è ancora disponibile."]]) {
@@ -554,12 +593,17 @@ function wizRender() {
   }
   if (W.passo === 3) c.append(h("p", {}, "Verrà creata la dichiarazione «" + titoloWiz() + "» con " + (d.quadri || S.schema.predefiniti).length + " quadri selezionati, tipo " + (d.tipo || "originaria") + "."), h("p", { class: "mut" }, "Potrai completare ogni dato nei quadri; i controlli ti mostreranno cosa manca."));
 }
+async function wizDaCF(valore) {
+  const d = W.dati;
+  const { testo } = await suggerisciDaCF(valore, "defunto", c => d[c], (c, x) => { d[c] = x; const el = $("#w_" + c); if (el) el.value = x; });
+  const nota = $("#w_cf_nota"); if (nota) nota.textContent = testo;
+}
 function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; wizRender(); $("#wiz").showModal(); }
 async function wizAvanti() {
   const d = W.dati;
   if (W.passo === 0 && !(d.cognome || "").trim()) { $("#wizErr").textContent = "Indica almeno il cognome del defunto."; return; }
   if (W.passo < PASSI.length - 1) { W.passo++; wizRender(); return; }
-  const campi = {}; for (const k of ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "data_decesso"]) if ((d[k] || "").trim()) campi[k] = k === "codice_fiscale" ? d[k].trim().toUpperCase() : d[k].trim();
+  const campi = {}; for (const k of ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso"]) if ((d[k] || "").trim()) campi[k] = k === "codice_fiscale" ? d[k].trim().toUpperCase() : d[k].trim();
   campi.ruolo = "defunto";
   const iniziali = [{ op: "upsert", coll: "persone", campi }, { op: "set", sezione: "opzioni", campi: { tipo_dichiarazione: d.tipo || "originaria", quadri_attivi: d.quadri || S.schema.predefiniti } }];
   try {

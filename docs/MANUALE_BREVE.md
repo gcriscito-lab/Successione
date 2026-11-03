@@ -42,3 +42,6 @@ Un file non si invia due volte: dopo un tentativo, anche incerto, si riconcilia 
 - Nessun esito locale autorizza l'uso su una pratica reale.
 
 Fonti: `docs/BETA_DA_REVISIONARE.md`, `docs/RISPOSTA_ALLA_REVISIONE.md`, `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+
+## Compilazione dal codice fiscale
+Scrivendo un codice fiscale di persona fisica (16 caratteri) nella procedura guidata, nelle schede del defunto e del presentatore o nella riga di un erede, il programma compila **solo i campi ancora vuoti**: data di nascita, sesso, comune e provincia di nascita (il comune dalle tabelle del componente di controllo SUC13, se configurato; altrimenti resta il codice catastale e un avviso). Il secolo non è nel codice fiscale: viene dedotto e, se ambiguo, segnalato. È un suggerimento: verifica sempre i dati. Un carattere di controllo errato viene segnalato senza bloccare. Anche l'assistente può usarlo: strumento `successioni_decodifica_codice_fiscale`.

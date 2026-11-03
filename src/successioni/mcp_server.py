@@ -146,6 +146,12 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         return sv.invio_stato(pratica_id)
 
     @tool
+    def decodifica_codice_fiscale(codice_fiscale: str, ruolo: str | None = None) -> dict:
+        """Dati anagrafici ricavabili da un codice fiscale di persona fisica (sesso, data di nascita, comune e provincia se le tabelle del componente SUC13 sono configurate), con controllo del carattere di controllo. E' un suggerimento da verificare: il secolo non e' nel codice e viene dedotto (ruolo 'defunto' per il defunto)."""
+        from .codice_fiscale import decodifica
+        return decodifica(codice_fiscale, ruolo=ruolo)
+
+    @tool
     def file_in_ingresso() -> list[str]:
         """File che l'utente ha messo nella cartella d'ingresso e che possono essere acquisiti."""
         return sorted(p.name for p in sv.cartella_ingresso.iterdir() if p.is_file())

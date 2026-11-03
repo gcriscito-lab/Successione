@@ -161,6 +161,11 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         return await request.json() if (await request.body()) else {}
 
     @api
+    async def cf_decodifica(request):
+        from .codice_fiscale import decodifica
+        return decodifica(request.query_params.get("cf", ""), ruolo=request.query_params.get("ruolo"))
+
+    @api
     async def invio_stato(request):
         return sv.invio_stato(request.path_params["pid"])
 
@@ -188,6 +193,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     P = "/api/pratiche/{pid}"
     return Starlette(routes=[
+        Route("/api/codice-fiscale", cf_decodifica),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
         Route("/api/invio/{cid}/conferma", invio_conferma, methods=["POST"]),
         Route("/api/invio/{cid}/trasmetti", invio_trasmetti, methods=["POST"]),
