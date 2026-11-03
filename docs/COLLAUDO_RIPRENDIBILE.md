@@ -162,3 +162,10 @@ nessuno di conferma o trasmissione. `tests/test_installazione.py` con `SUCCESSIO
 Corretto: il pacchetto cercava Ghostscript solo in `Program Files`; ora anche `C:\gs\gs*\bin` (installazione silenziosa con `/D=`).
 **Ancora da collaudare**: `Installa.cmd` (copia in `%LOCALAPPDATA%\Programs\Successioni` e crea collegamenti sul desktop e nel menu Start), SmartScreen e antivirus su un altro PC,
 `Disinstalla.cmd`, `Configura-MCP.cmd --scrivi-claude-desktop` con Claude Desktop, avvio da un percorso con spazi e accenti dopo l'installazione.
+
+## Aggiornamento 2026-11-03 (sera): installazione e aggiornamento su questo PC
+`installa.ps1` eseguito: programma in `%LOCALAPPDATA%\Programs\Successioni`, collegamenti `Successioni.lnk` (desktop e menu Start) e `Successioni - Diagnosi.lnk`
+(menu Start); nessuna voce di registro. Reinstallazione sopra la precedente: **backup automatico dell'archivio** in `%LOCALAPPDATA%\Successioni-backup\prima-di-aggiornare-*`,
+programma sostituito, cartella dati `%LOCALAPPDATA%\Successioni` intatta. Dal programma installato: interfaccia su 127.0.0.1:8765 (HTTP 200), Ghostscript e veraPDF veri,
+accesso senza token respinto (401), chiusura pulita. Il profilo sRGB di Ghostscript (`srgb.icc`) ora si trova da solo anche in `C:\gs`: tolta la variabile `SUCCESSIONI_ICC`.
+Non eseguibile in modo non interattivo e quindi **da provare a mano**: `Disinstalla.cmd` (chiede conferma con `Read-Host`). Resta da collaudare anche SmartScreen/antivirus su un altro PC.

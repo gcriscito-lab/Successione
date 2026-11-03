@@ -132,6 +132,24 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 **Cosa fare:** Una tabella per il professionista: quadro, cosa copre oggi in una riga, cosa non copre in una riga (dalla matrice, senza aggiungere nulla), con la distinzione fra «controllo locale» e «verifica ufficiale». Niente regole fiscali, niente promesse. Massimo 2 pagine.
 **Accettazione:** `python scripts/verifica_doc_quadri.py docs/QUADRI_DISPONIBILI.md` stampa «verifica documento: ok».
 
+## C22. Test del rilevamento di Ghostscript, veraPDF e profilo ICC
+**File:** `tests/test_pdfa_rilevamento_extra.py` (nuovo).
+**Contesto:** `src/successioni/pdfa.py`.
+**Cosa fare:** Le funzioni `_icc` e `trova_gs` (e l'analoga per veraPDF se presente): variabile d'ambiente valida, variabile che punta a un file inesistente (ignorata), nessuna variabile e nessuno strumento (restituisce None), ordine di precedenza. Usare `monkeypatch.setenv`/`delenv` e `tmp_path` con file finti; NON eseguire mai Ghostscript. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_pdfa_rilevamento_extra.py` verde (lo esegue il lanciatore).
+
+## C23. Test delle chiavi del supplemento telematico (estremi, azienda, testamento)
+**File:** `tests/test_supplemento_chiavi_extra.py` (nuovo).
+**Contesto:** `src/successioni/telematico/supplemento.py`, `tests/telematico_casi.py`.
+**Cosa fare:** `chiavi_non_gestite` e `attr` con le chiavi aggiunte di recente: dichiarazione (`azienda_data_deposito`, `azienda_camera_commercio`, `devoluzione_per_testamento`, `testamento` con le sue sottochiavi) e per i beni (`estremi_trascrizione`, `estremi_registrazione`, `superficie`): chiavi note non segnalate, chiavi sconosciute segnalate con il percorso esatto, riferimento a un bene inesistente. Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_supplemento_chiavi_extra.py` verde (lo esegue il lanciatore).
+
+## C24. Test degli stati di invio e dei trasporti
+**File:** `tests/test_invio_stati_extra.py` (nuovo).
+**Contesto:** `src/successioni/collegamenti/invio.py`, `src/successioni/collegamenti/base.py`, `tests/test_invio_servizio.py` (solo per vedere come si crea un `Servizio`).
+**Cosa fare:** `TrasportoManualeTracciato` (nessuna trasmissione, istruzioni nel motivo), `TrasportoSimulato` con i tre guasti e la consultazione, e `stati_pratica` / `InvioAdattatore.stato_esiti` su una pratica senza copie (stati iniziali coerenti). Non creare copie congelate (richiedono un file XML completo). Scrivere SOLO il file indicato: non modificare mai `src/`. Descrivere il comportamento REALE del codice mostrato: non inventare funzioni, firme, campi, codici o messaggi. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di errore e un frammento del messaggio. Per le variabili d'ambiente usare `monkeypatch`.
+**Accettazione:** `python -m pytest -q tests/test_invio_stati_extra.py` verde (lo esegue il lanciatore).
+
 ---
 
 ## Come il coordinatore integra

@@ -155,7 +155,8 @@ def _icc() -> str | None:
     if env and Path(env).exists():
         return env
     for pat in ("/usr/share/ghostscript/*/iccprofiles/srgb.icc", "/usr/share/color/icc/ghostscript/srgb.icc",
-                "C:/Program Files/gs/*/iccprofiles/srgb.icc"):
+                "C:/Program Files/gs/*/iccprofiles/srgb.icc",
+                "C:/gs/*/iccprofiles/srgb.icc"):   # installazione silenziosa di Ghostscript con /D=C:\gs\gs<versione>
         h = glob.glob(pat)
         if h:
             return h[0]
