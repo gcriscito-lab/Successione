@@ -76,7 +76,8 @@ def candidati_windows(env: dict | None = None) -> dict:
     pf = [env.get("ProgramFiles", r"C:\Program Files"), env.get("ProgramFiles(x86)", r"C:\Program Files (x86)")]
     la = env.get("LOCALAPPDATA", "")
     out = {}
-    gs = _primo([str(Path(p) / "gs" / "gs*" / "bin" / "gswin64c.exe") for p in pf])
+    gs = _primo([str(Path(p) / "gs" / "gs*" / "bin" / "gswin64c.exe") for p in pf]
+                 + [r"C:\gs\gs*\bin\gswin64c.exe"])   # installazione silenziosa con /D=C:\gs\gs<versione>
     if gs:
         out["SUCCESSIONI_GS"] = gs
     qpdf = _primo([str(Path(p) / "qpdf*" / "bin" / "qpdf.exe") for p in pf])

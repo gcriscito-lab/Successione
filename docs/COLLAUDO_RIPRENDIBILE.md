@@ -151,3 +151,14 @@ Installati: Ghostscript 10.08.0 (`gs10080w64.exe`, 65.093.120 byte, firma Authen
 Variabili utente: `SUCCESSIONI_GS`, `SUCCESSIONI_VERAPDF`, `SUCCESSIONI_ICC` (profilo `default_rgb.icc` di Ghostscript). Con queste i test PDF/A (`test_pdfa.py`,
 `test_documenti_*`, collaudo A11 con veraPDF) passano: 42 test, nessun saltato. Avvertenza: non anteporre Java 8 al `PATH` (un test lancia un file `.java`, che richiede
 Java 11 o successivo); `SUCCESSIONI_JAVA` indica Java 8 per il solo controllo SUC13. Non e' la verifica ufficiale CIVIS.
+
+## Aggiornamento 2026-11-03: pacchetto Windows costruito e avviato (A01 in parte)
+Costruito con `python packaging/costruisci_pacchetto.py` da Windows: Python 3.13.17 embeddable (11.441.267 byte, SHA-256 fissato) e 34 wheel da PyPI (29.471.249 byte,
+SHA-256 del lock), cartella da 111 MB e zip da 51 MB (`Successioni-0.1.0-win64`). `--verifica`: nessun problema.
+Provato **senza installare** (nessun collegamento creato): con il Python incorporato si importano tutti i moduli attesi (mcp, lxml, pypdf, reportlab, PIL, starlette, uvicorn,
+pydantic, win32api, successioni); `app\diagnosi.py` riconosce Ghostscript 10.08.0, veraPDF 1.30.3, Java 8 e i 15 JAR SUC13; `avvia_successioni.py gui` serve
+l'interfaccia su 127.0.0.1:8765 (HTTP 200, `pdfa.ghostscript` e `pdfa.veraPDF` veri); `avvia_successioni.py mcp` risponde all'handshake con 20 strumenti `successioni_*`,
+nessuno di conferma o trasmissione. `tests/test_installazione.py` con `SUCCESSIONI_PACCHETTO_WIN`: 18 passati.
+Corretto: il pacchetto cercava Ghostscript solo in `Program Files`; ora anche `C:\gs\gs*\bin` (installazione silenziosa con `/D=`).
+**Ancora da collaudare**: `Installa.cmd` (copia in `%LOCALAPPDATA%\Programs\Successioni` e crea collegamenti sul desktop e nel menu Start), SmartScreen e antivirus su un altro PC,
+`Disinstalla.cmd`, `Configura-MCP.cmd --scrivi-claude-desktop` con Claude Desktop, avvio da un percorso con spazi e accenti dopo l'installazione.

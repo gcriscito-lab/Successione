@@ -110,6 +110,16 @@ def test_candidati_windows_cartelle_standard_versione_piu_recente(tmp_path):
     assert "SUCCESSIONI_QPDF" not in c                              # solo file esistenti
 
 
+
+def test_candidati_windows_ghostscript_in_cartella_c_gs():
+    # installazione silenziosa con /D=C:\gs\gs10.08.0: cartella non standard, cercata dopo Program Files
+    import glob
+    if not glob.glob(r"C:\gs\gs*\bin\gswin64c.exe"):
+        pytest.skip(r"Ghostscript non installato in C:\gs su questo PC")
+    c = A.candidati_windows({"ProgramFiles": r"C:\nessuna1", "ProgramFiles(x86)": r"C:\nessuna2"})
+    assert c["SUCCESSIONI_GS"].lower().startswith(r"c:\gs" + "\\") and c["SUCCESSIONI_GS"].endswith("gswin64c.exe")
+
+
 def test_gui_localhost_token_host_e_seconda_apertura(tmp_path):
     base = tmp_path / NOME_ITALIANO
     env = _env(base)
