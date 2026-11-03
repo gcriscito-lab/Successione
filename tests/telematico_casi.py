@@ -201,6 +201,33 @@ def caso_azienda() -> dict:
     return d
 
 
+def caso_tavolare() -> dict:
+    """``caso_a10`` con un terreno (EL) e un fabbricato (EM) a Bolzano, devoluti per quote di legge ai due figli."""
+    d = caso_a10()
+    d["opzioni"]["quadri_attivi"] = ["EA", "EB", "EC", "ER", "ED", "EG", "EL", "EM"]
+    # solo immobili a Bolzano (EF richiede un solo comune): tolti gli immobili romani, il mutuo grava sul fabbricato tavolare
+    romani = {"b_casa0001", "b_terr0001"}
+    d["beni"] = [b for b in d["beni"] if b["id"] not in romani]
+    d["devoluzioni"] = [x for x in d["devoluzioni"] if x["bene_id"] not in romani]
+    d["opzioni"]["telematico"]["beni"] = {k: v for k, v in d["opzioni"]["telematico"]["beni"].items() if k not in romani}
+    d["opzioni"]["telematico"]["passivita"]["ps_mutuo01"]["bene_id"] = "b_fabbtav1"
+    comune = {"provincia": "BZ", "codice_comune": "A952", "codice_comune_amministrativo": "A952", "comune_catastale": "BOLZANO",
+              "codice_comune_catastale": "613"}
+    d["beni"] += [
+        {"id": "b_terrtav1", "_origine": {}, "tipo": "terreno", "comune": "Bolzano .Bozen.", "foglio": "12", "particella": "345",
+         "valore": "8000", "diritto": "1", "quota_defunto": "1/1", "natura": "T", "tipologia_terreno": "3",
+         "reddito_dominicale": "6.50", "superficie": {"ettari": 0, "are": 30, "centiare": 0}, "partita_tavolare": "1234",
+         "corpo_tavolare": "1", **comune},
+        {"id": "b_fabbtav1", "_origine": {}, "tipo": "fabbricato", "comune": "Bolzano .Bozen.", "foglio": "12", "particella": "400",
+         "subalterno": "2", "categoria": "A/2", "rendita": "700.00", "valore": "90000", "diritto": "1", "quota_defunto": "1/1",
+         "indirizzo": "Via Esempio 3", "classe": "2", "consistenza": "4.5", "partita_tavolare": "5678", **comune}]
+    for bid in ("b_terrtav1", "b_fabbtav1"):
+        for pid in ("p_anna0001", "p_luca0001"):
+            d["devoluzioni"].append({"id": f"d_{bid[2:7]}{pid[2:6]}", "_origine": {}, "bene_id": bid, "persona_id": pid,
+                                     "quota": {"num": 1, "den": 2}, "diritto": "1"})
+    return d
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),

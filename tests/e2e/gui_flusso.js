@@ -31,7 +31,7 @@ const { ok } = require('./verifiche');
   await pg.waitForFunction(() => document.querySelector('#msg').textContent.includes('Nessun file parziale'));
   ok((await pg.textContent('#msg')).includes('File non generato'), 'Genera file: nessun XML parziale, motivi mostrati');
   ok((await pg.textContent('#ins')).includes('non eseguito'), 'scheda File con stati separati');
-  await pg.click('.voce[data-q=EN]'); ok((await pg.textContent('#vista')).includes('non è ancora supportato'), 'quadro non supportato spiegato');
+  await pg.click('.voce[data-q=EI]'); ok((await pg.textContent('#vista')).includes('non è ancora supportato'), 'quadro non supportato spiegato');
   const stati = await pg.evaluate(() => [...document.querySelectorAll('.voce')].map(v => v.dataset.q + ':' + v.dataset.stato).join(' ')); console.log(stati);
   await pg.click('.voce[data-q=EC]'); await pg.click('#vista tbody tr'); await pg.screenshot({ path: process.argv[2] });
   ok(!(await pg.textContent('#sb')).includes('null'), 'barra di stato senza la parola null'); ok((await pg.locator('#lista li').count()) === 1, 'una sola pratica nell elenco'); ok(errs.length === 0, 'nessun errore JS ' + JSON.stringify(errs));

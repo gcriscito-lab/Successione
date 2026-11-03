@@ -84,6 +84,12 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 **Cosa fare:** confrontare il codice con le annotazioni ufficiali e segnalare SOLO discrepanze concrete: obbligatorieta' non rispettate, condizioni invertite, campi non validati, elementi emessi in ordine diverso dallo schema, casi in cui il codice scarta dati senza errore. Per ogni segnalazione: la riga di codice (copiata alla lettera), la frase dell'annotazione XSD (copiata alla lettera) e perche' non coincidono. NON proporre modifiche fiscali, NON inventare regole che non compaiono nel testo, se non trovi discrepanze scrivi «nessuna discrepanza trovata».
 **Accettazione:** il coordinatore verifica ogni segnalazione contro il testo; quelle non confermate vengono scartate.
 
+## C12. Test di caratterizzazione di quadri.py e schema.py
+**File:** `tests/test_quadri_schema_extra.py` (nuovo).
+**Contesto:** `src/successioni/quadri.py`, `src/successioni/schema.py`, `src/successioni/valori.py`.
+**Cosa fare:** casi limite di `quadro_di` (ogni tipo di bene verso il quadro atteso, province tavolari BZ/TN/GO/TS in maiuscolo e minuscolo, flag `sistema_tavolare`, persone defunto/presentatore/erede, collezioni passivita/documenti_ref/devoluzioni), di `attivi` (quadri_attivi assente o con sigle sconosciute, quadri sempre attivi) e di `schema.valida_campo` per i campi aggiunti di recente (`tipo_titolo`, `quantita`, `data_documento`, `anno_costruzione`, `partita_tavolare`). Scrivere SOLO il file di test indicato: non modificare mai `src/`. I test descrivono il comportamento REALE del codice mostrato (non inventare funzioni, firme, codici o messaggi). Almeno 20 asserzioni; ogni caso negativo verifica il tipo di errore.
+**Accettazione:** `python -m pytest -q tests/test_quadri_schema_extra.py` verde (lo esegue il lanciatore).
+
 ---
 
 ## Come il coordinatore integra

@@ -29,13 +29,13 @@ def test_stati_e_mappatura_quadri(sv):
 
 def test_quadro_non_supportato_blocca_finalizzazione_senza_perdere_dati(sv):
     pid = sv.crea_pratica("X")["pratica_id"]
-    r = sv.aggiorna(pid, 1, [{"op": "set", "sezione": "opzioni", "campi": {"quadri_attivi": ["EA", "EN"]}},
+    r = sv.aggiorna(pid, 1, [{"op": "set", "sezione": "opzioni", "campi": {"quadri_attivi": ["EA", "EI"]}},
                              op("persone", "p_aaaa1111", cognome="R", ruolo="defunto", codice_fiscale="RSSMRA50A01H501X")])
     v = sv.verifica(pid)
     assert not v["finalizzabile"]
-    assert any(x["codice"] == "QUADRO_NON_SUPPORTATO" and "EN" in x["percorso"] for x in v["rilievi"])
-    assert sv.leggi(pid)["dati"]["opzioni"]["quadri_attivi"] == ["EA", "EN"]      # bozza conservata
-    assert {q["id"]: q["stato"] for q in sv.quadri(pid)["quadri"]}["EN"] == "non_supportato"
+    assert any(x["codice"] == "QUADRO_NON_SUPPORTATO" and "EI" in x["percorso"] for x in v["rilievi"])
+    assert sv.leggi(pid)["dati"]["opzioni"]["quadri_attivi"] == ["EA", "EI"]      # bozza conservata
+    assert {q["id"]: q["stato"] for q in sv.quadri(pid)["quadri"]}["EI"] == "non_supportato"
 
 
 def test_dati_in_quadro_non_attivo_segnalati(sv):

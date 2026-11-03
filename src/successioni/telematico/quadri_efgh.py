@@ -88,7 +88,7 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
     dd = x.data_decesso
     if dd is None:
         return None
-    immobili = [r for r in x.righe_dev.values() if r["quadro"] in ("EB", "EC")]
+    immobili = [r for r in x.righe_dev.values() if r["quadro"] in ("EB", "EC", "EL", "EM")]
     obbligatorio = dd >= DEC_2025 or (bool(x.ea) and bool(immobili))
     if not obbligatorio:
         return None
@@ -105,20 +105,25 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         if any(r["diritto"] == "10" for r in immobili):
             motivi.append("immobili gravati da oneri reali (codice diritto 10): esclusi dalle circoscrizioni "
                           "(Fascicolo I p. 44), caso non coperto")
-        if not any(r["quadro"] == "EC" for r in immobili):
+        if not any(r["quadro"] in ("EC", "EM") for r in immobili):
             motivi.append("soli terreni senza fabbricati: confronto con i valori fiscali dei terreni (Fascicolo I "
                           "p. 40, rigo EF1; annotazione ImpostaProporzionale_Imposta) non coperto")
         if imponibile != imponibile.to_integral_value():
             motivi.append(f"somma dei 'Valore quota' degli immobili {imponibile} non intera: l'arrotondamento "
                           "dell'imponibile EF1/EF9 (cm:DatoNP_Type) non e' indicato dalle fonti")
+        # EF1: quadri EB, EC, EL, EM (Fascicolo I p. 40). EF9 (catastale): il testo (p. 43) non elenca i quadri; il controllo
+        # ufficiale SUC13 2.3.1 eseguito in locale il 2026-11-03 esclude i terreni tavolari (EL) dalla base catastale.
+        imponibile_cat = sum((r["quota_valore"] for r in immobili if r["quadro"] != "EL"), Decimal(0))
         ip = arrotonda_euro(imponibile * ALIQUOTA_IPOTECARIA)
-        cat = arrotonda_euro(imponibile * ALIQUOTA_CATASTALE)
+        cat = arrotonda_euro(imponibile_cat * ALIQUOTA_CATASTALE)
         if ip < IMPOSTA_FISSA or cat < IMPOSTA_FISSA:
             motivi.append(f"imposta proporzionale ({ip} / {cat}) inferiore alla fissa: il Fascicolo I (p. 40 e 43) "
                           "chiede 200 nella colonna 2, l'annotazione XSD solo nel totale dovuto (EF5/EF11): fonti non "
                           "concordi, caso non coperto")
-        comuni = sorted({r["codice_comune"] for r in immobili})
-        if len(comuni) != 1:
+        # circoscrizioni (EF15, EF16): solo immobili del catasto ordinario; per i tavolari il controllo ufficiale SUC13 2.3.1
+        # (locale, 2026-11-03) individua 0 circoscrizioni
+        comuni = sorted({r["codice_comune"] for r in immobili if r["quadro"] in ("EB", "EC")})
+        if len(comuni) > 1:
             motivi.append(f"immobili in piu' comuni {comuni}: la circoscrizione si individua dall'elenco delle "
                           "conservatorie (sito dell'Agenzia, Fascicolo I p. 44), non disponibile nelle fonti")
         if not motivi:
@@ -129,19 +134,20 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                                          "ImpostaProporzionale_Imposta": str(ip)},
                 "ImpostaIpotecariaDovuta": str(ip), "ImpostaIpotecariaDaVersare": str(ip)}
             ef["SezioneII_ImpostaCatastale"] = {
-                "ImpostaProporzionale": {"ImpostaProporzionale_Imponibile": imp,
+                "ImpostaProporzionale": {"ImpostaProporzionale_Imponibile": str(int(imponibile_cat)),
                                          "ImpostaProporzionale_Imposta": str(cat)},
                 "ImpostaCatastaleDovuta": str(cat), "ImpostaCatastaleDaVersare": str(cat)}
             n = len(comuni)
-            ef["SezioneIII_TassaIpotecaria"] = {"Circoscrizioni_Numero": str(n),
-                                                "Circoscrizioni_Imposta": str(TASSA_CIRCOSCRIZIONE * n)}
-            ef["SezioneIV_ImpostaBollo"] = {"Circoscrizioni_Numero": str(n),
-                                           "Circoscrizioni_Imposta": str(BOLLO_CIRCOSCRIZIONE * n)}
+            if n:
+                ef["SezioneIII_TassaIpotecaria"] = {"Circoscrizioni_Numero": str(n),
+                                                    "Circoscrizioni_Imposta": str(TASSA_CIRCOSCRIZIONE * n)}
+                ef["SezioneIV_ImpostaBollo"] = {"Circoscrizioni_Numero": str(n),
+                                               "Circoscrizioni_Imposta": str(BOLLO_CIRCOSCRIZIONE * n)}
             da_versare += ip + cat + TASSA_CIRCOSCRIZIONE * n + BOLLO_CIRCOSCRIZIONE * n
             x.calcoli_ef = {
                 "EF1": {"imponibile": imp, "imposta": ip, "fonte": fa1 + "; " + FO.fonte_fasc1(40, "rigo EF1")},
                 "EF5/EF8": {"importo": ip, "fonte": FO.fonte_fasc1(41, "rigo EF5") + "; " + FO.fonte_fasc1(42, "EF8")},
-                "EF9": {"imponibile": imp, "imposta": cat, "fonte": FO.fonte_fasc1(43, "rigo EF9")},
+                "EF9": {"imponibile": str(int(imponibile_cat)), "imposta": cat, "fonte": FO.fonte_fasc1(43, "rigo EF9")},
                 "EF11/EF14": {"importo": cat, "fonte": FO.fonte_fasc1(44, "righi EF11, EF14")},
                 "EF15": {"circoscrizioni": n, "imposta": TASSA_CIRCOSCRIZIONE * n,
                          "fonte": FO.fonte_fasc1(44, "rigo EF15: stesso codice comune -> 1 circoscrizione; 120 euro")},

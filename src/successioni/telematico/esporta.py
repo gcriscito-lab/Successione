@@ -53,6 +53,8 @@ PERIMETRO = {
     "EB": "terreni in Italia (provincia non tavolare), natura T, con valore",
     "EC": "fabbricati in Italia (provincia non tavolare), con rendita catastale (categorie non F) e valore",
     "ER": "tipi cespite BI, CR, DN, AB con valore; beni non esteri",
+    "EL": "terreni in province tavolari (BZ, TN, GO, TS) natura T; partita tavolare obbligatoria",
+    "EM": "fabbricati in province tavolari (BZ, TN, GO, TS); graffati e determinazione rendita non supportati",
     "EN": "aziende (denominazione, CF, diritto 1/2, valore); immobili aziendali, inventario, beni esteri, agevolazioni non supportati",
     "EP": "aeromobili con valore; beni esteri e riduzioni art. 25 non supportati",
     "EQ": "navi e imbarcazioni con valore; beni esteri e riduzioni art. 25 non supportati",
@@ -61,7 +63,7 @@ PERIMETRO = {
     "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
     "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; nessuna agevolazione/riduzione",
 }
-QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "EN", "EO", "EP", "EQ", "ER")
+QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "EL", "EM", "EN", "EO", "EP", "EQ", "ER")
 SCOPI = ("completo", "bozza_tecnica")
 _ID_DICH = re.compile(r"[0-9]{4}[1-9]|[0-9]{3}[1-9][0-9]|[0-9]{2}[1-9][0-9]{2}|[0-9][1-9][0-9]{3}|[1-9][0-9]{4}")
 
@@ -376,8 +378,10 @@ class _Export:
             self.err("VALORE_NON_VALIDO", perc, str(e), FO.fonte_xsd(elemento))
             return None, None
 
-    def luogo(self, b: dict, quadro: str, *, indirizzo_obbl: bool) -> dict | None:
+    def luogo(self, b: dict, quadro: str, *, indirizzo_obbl: bool, tavolare: bool = False) -> dict | None:
         c, el = "beni", f"Quadro{quadro}/Modulo/{'Terreni' if quadro == 'EB' else 'Fabbricati'}/Luogo"
+        if tavolare:
+            return self.luogo_tavolare(b, quadro, indirizzo_obbl)
         prov = self.val(c, b, "provincia", lambda v: str(v).strip().upper(), elemento=el + "/Provincia")
         if prov is None:
             return None
@@ -411,6 +415,47 @@ class _Export:
             return None
         return {"Provincia": prov, "Italia": it}
 
+    def luogo_tavolare(self, b: dict, quadro: str, indirizzo_obbl: bool) -> dict | None:
+        """LuogoTavolareType (quadri EL/EM): luogo piatto con provincia tavolare e, per TN e BZ, comune catastale."""
+        c = "beni"
+        el = f"Quadro{quadro}/Modulo/{'TerreniTavolare' if quadro == 'EL' else 'FabbricatiTavolare'}/LuogoTavolare"
+        prov = self.val(c, b, "provincia", lambda v: str(v).strip().upper(), elemento=el + "/Provincia")
+        if prov is None:
+            return None
+        if prov not in X.enumerazioni("PRTavolare_Type"):
+            self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].provincia", f"{prov!r}: provincia non del catasto tavolare "
+                     "(ammesse BZ, TN, BL, GO, UD, TS, BS, VI)", FO.fonte_xsd(el + "/Provincia (reg:PRTavolare_Type)"))
+            return None
+        out = {
+            "ComuneAmministrativo": self.val(c, b, "comune_amministrativo", lambda v: F.an(v, 50),
+                                             elemento=el + "/ComuneAmministrativo", obbl=False)
+            or self.val(c, b, "comune", lambda v: F.an(v, 50), elemento=el + "/ComuneAmministrativo"),
+            "CodiceComune": self.val(c, b, "codice_comune", lambda v: F.an(v, 5), elemento=el + "/CodiceComune",
+                                     fonte=FO.fonte_xsd(el + "/CodiceComune")),
+        }
+        ind = self.val(c, b, "indirizzo", lambda v: F.an(v, 80), elemento=el + "/Indirizzo", obbl=indirizzo_obbl,
+                       fonte=FO.fonte_annotazione(el) if indirizzo_obbl else None)
+        if ind:
+            out["Indirizzo"] = ind
+        out["CodiceComuneAmministrativo"] = self.val(c, b, "codice_comune_amministrativo", lambda v: F.an(v, 5),
+                                                     elemento=el + "/CodiceComuneAmministrativo")
+        out["Provincia"] = prov
+        self.usa(b, "comune")
+        cc = self.val(c, b, "comune_catastale", lambda v: F.an(v, 50), elemento=el + "/ComuneCatastale", obbl=False)
+        ccc = self.val(c, b, "codice_comune_catastale", lambda v: codice_enum(str(v), "ComuniCatastaliTNBZ_Type"),
+                       elemento=el + "/CodiceComuneCatastale", obbl=False)
+        if prov in ("TN", "BZ"):
+            if cc:
+                out["ComuneCatastale"] = cc
+            if ccc:
+                out["CodiceComuneCatastale"] = ccc
+        elif cc or ccc:
+            self.err("DATI_INCOERENTI", f"beni[{b['id']}].comune_catastale", "comune catastale e codice solo per le "
+                     "province TN e BZ", FO.fonte_annotazione(el + "/ComuneCatastale"))
+        if any(v is None for v in out.values()):
+            return None
+        return out
+
     def catastali(self, b: dict, quadro: str) -> dict | None:
         c = "beni"
         el = f"Quadro{quadro}/Modulo/{'Terreni/DatiTerreni' if quadro == 'EB' else 'Fabbricati/DatiFabbricati'}/DatiCatastali"
@@ -435,14 +480,14 @@ class _Export:
                         fonte=FO.fonte_xsd(elemento) + "; " + FO.fonte_fasc1(22, "Valore: base imponibile della quota del "
                                                                               "defunto, arrotondata all'unita' di euro"))
 
-    def riga_eb(self, b: dict) -> dict | None:
+    def riga_eb(self, b: dict, tavolare: bool = False) -> dict | None:
         c, el = "beni", "QuadroEB/Modulo/Terreni"
         for campo in ("sezione", "categoria"):
             if b.get(campo) not in (None, ""):
                 self.usa(b, campo)
                 self.ns.append(f"beni[{b['id']}].{campo}: campo non previsto dal tracciato dei terreni "
                                "(reg:DatiCatastali_Type / reg:DatiCatastaliTerreni_Type)")
-        luogo = self.luogo(b, "EB", indirizzo_obbl=False)
+        luogo = self.luogo(b, "EB", indirizzo_obbl=False, tavolare=tavolare)
         cat = self.catastali(b, "EB")
         natura = self.val(c, b, "natura", lambda v: codice_enum(str(v).upper(), "CodiciNatura_Type"),
                           elemento=el + "/DatiTerreni/DatiTerreni/Natura")
@@ -483,16 +528,16 @@ class _Export:
         valore = self.valore_bene(b, el + "/Valore")
         if None in (luogo, cat, natura, poss, dir_p, tip, valore):
             return None
-        self.comune_bene[b["id"]] = luogo["Italia"]["CodiceComune"]
+        self.comune_bene[b["id"]] = luogo.get("Italia", luogo)["CodiceComune"]
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
         return {"Luogo": luogo, "DatiTerreni": {"DatiCatastali": cat, "DatiTerreni": dt}, "Possesso": poss,
                 "CodiceDiritto_P": dir_p, "TipologiaTerreno": tip, "Valore": valore}
 
-    def riga_ec(self, b: dict) -> dict | None:
+    def riga_ec(self, b: dict, tavolare: bool = False) -> dict | None:
         c, el = "beni", "QuadroEC/Modulo/Fabbricati"
         eld = el + "/DatiFabbricati/DatiFabbricati"
-        luogo = self.luogo(b, "EC", indirizzo_obbl=True)
+        luogo = self.luogo(b, "EC", indirizzo_obbl=True, tavolare=tavolare)
         cat = self.catastali(b, "EC")
         df: dict = {}
         sez = self.val(c, b, "sezione", lambda v: F.an(str(v), 3), elemento=eld + "/SezioneUrbana", obbl=False)
@@ -530,7 +575,7 @@ class _Export:
         valore = self.valore_bene(b, el + "/Valore")
         if None in (luogo, cat, categ, poss, dir_p, valore):
             return None
-        self.comune_bene[b["id"]] = luogo["Italia"]["CodiceComune"]
+        self.comune_bene[b["id"]] = luogo.get("Italia", luogo)["CodiceComune"]
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
         return {"Luogo": luogo, "DatiFabbricati": {"DatiCatastali": cat, "DatiFabbricati": df}, "Possesso": poss,
@@ -643,6 +688,45 @@ class _Export:
         if r is not None:   # EH rigo EH11: gli stessi dati della nave
             self.eh_navi.append({k: t[k] for k in ("SiglaUfficioIscrizione", "AnnoIscrizione", "NumeroIscrizione")})
         return r
+
+    def riga_el(self, b: dict) -> dict | None:
+        """Quadro EL, rigo TerreniTavolare: come EB con luogo tavolare e dati tavolari (partita tavolare obbligatoria)."""
+        r = self.riga_eb(b, tavolare=True)
+        pt = self.val("beni", b, "partita_tavolare", lambda v: F.an(str(v), 7),
+                      elemento="QuadroEL/Modulo/TerreniTavolare/DatiTerreniTavolare/DatiTerreni/PartitaTavolare")
+        ct = self.val("beni", b, "corpo_tavolare", lambda v: F.an(str(v), 3),
+                      elemento="QuadroEL/Modulo/TerreniTavolare/DatiTerreniTavolare/DatiTerreni/CorpoTavolare", obbl=False)
+        if r is None or pt is None:
+            return None
+        dt = dict(r["DatiTerreni"]["DatiTerreni"])
+        dt["PartitaTavolare"] = pt
+        if ct:
+            dt["CorpoTavolare"] = ct
+        self.usa(b, "porzione_materiale")
+        return {"LuogoTavolare": r["Luogo"], "DatiTerreniTavolare": {"DatiCatastali": r["DatiTerreni"]["DatiCatastali"], "DatiTerreni": dt},
+                "Possesso": r["Possesso"], "CodiceDiritto_P": r["CodiceDiritto_P"], "TipologiaTerreno": r["TipologiaTerreno"],
+                "Valore": r["Valore"]}
+
+    def riga_em(self, b: dict) -> dict | None:
+        """Quadro EM, rigo FabbricatiTavolare: come EC con luogo tavolare e partita/corpo tavolare (facoltativi)."""
+        r = self.riga_ec(b, tavolare=True)
+        el = "QuadroEM/Modulo/FabbricatiTavolare/DatiFabbricatiTavolare/DatiFabbricati"
+        pt = self.val("beni", b, "partita_tavolare", lambda v: F.an(str(v), 7), elemento=el + "/PartitaTavolare", obbl=False)
+        ct = self.val("beni", b, "corpo_tavolare", lambda v: F.an(str(v), 3), elemento=el + "/CorpoTavolare", obbl=False)
+        pm = self.val("beni", b, "porzione_materiale", lambda v: F.an(str(v), 12), elemento=el + "/PorzioneMateriale", obbl=False)
+        if r is None:
+            return None
+        df = dict(r["DatiFabbricati"]["DatiFabbricati"])
+        for k, v in (("PartitaTavolare", pt), ("CorpoTavolare", ct), ("PorzioneMateriale", pm)):
+            if v:
+                df[k] = v
+        out = {"LuogoTavolare": r["Luogo"], "DatiFabbricatiTavolare": {"DatiCatastali": r["DatiFabbricati"]["DatiCatastali"],
+                                                                         "DatiFabbricati": df},
+               "Possesso": r["Possesso"], "CodiceDiritto_P": r["CodiceDiritto_P"]}
+        for k in ("Valore",):
+            if k in r:
+                out[k] = r[k]
+        return out
 
     def riga_en(self, b: dict) -> dict | None:
         """Quadro EN, rigo Aziende (denominazione e CF, inventario facoltativo, diritto 1/2, valore netto). Immobili aziendali,
@@ -1143,7 +1227,7 @@ class _Export:
                              "esportato in questa dichiarazione",
                              FO.fonte_annotazione("QuadroED/Modulo/Passivita/ProgressivoCespite"))
                     continue
-                if tipo == "3" and ref["quadro"] not in ("EB", "EC"):
+                if tipo == "3" and ref["quadro"] not in ("EB", "EC", "EL", "EM"):
                     self.err("REGOLA_PROGRESSIVO_CESPITE", f"passivita[{pas}].bene_id", "per il tipo 3 (mutui) il "
                              "cespite deve essere un immobile (EB, EC)",
                              FO.fonte_annotazione("QuadroED/Modulo/Passivita/ProgressivoCespite/Quadro"))
@@ -1152,7 +1236,7 @@ class _Export:
     # ---------------------------------------------------------------- EE
     def quadro_ee(self) -> dict | None:
         """Totali dalle annotazioni XSD di QuadroEE (nessun bene aziendale o agevolazione A nel perimetro)."""
-        imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC"))
+        imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC", "EL", "EM"))
         altri = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "ER")
         titoli = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "EO")
         aziende = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "EN")
@@ -1452,7 +1536,7 @@ class _Export:
                     "configurazione di eredi non coperta dalla verifica delle quote di legge: "
                     "conservabile come bozza tecnica, non finalizzabile", DL.FONTE))
         beni = self.d.get("beni", [])
-        per_q: dict[str, list] = {"EB": [], "EC": [], "EN": [], "EO": [], "EP": [], "EQ": [], "ER": []}
+        per_q: dict[str, list] = {"EB": [], "EC": [], "EL": [], "EM": [], "EN": [], "EO": [], "EP": [], "EQ": [], "ER": []}
         for b in beni:
             self.usa(b, "tipo")
             q = Q.quadro_di("beni", b)
@@ -1467,6 +1551,8 @@ class _Export:
                 self.interno(b, "descrizione")
         qeb = self.quadro_beni("EB", sorted(per_q["EB"], key=_chiave_immobile), self.riga_eb)
         qec = self.quadro_beni("EC", sorted(per_q["EC"], key=_chiave_immobile), self.riga_ec)
+        qel = self.quadro_beni("EL", sorted(per_q["EL"], key=_chiave_immobile), self.riga_el)
+        qem = self.quadro_beni("EM", sorted(per_q["EM"], key=_chiave_immobile), self.riga_em)
         qen = self.quadro_beni("EN", sorted(per_q["EN"], key=lambda b: (str(b.get("descrizione") or ""), b["id"])), self.riga_en)
         qeo = self.quadro_beni("EO", sorted(per_q["EO"], key=lambda b: (
             str(SUP.attr(self.d, "beni", b, "tipo_titolo") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_eo)
@@ -1488,9 +1574,12 @@ class _Export:
         qed = self.quadro_ed()
         self.risolvi_progressivi(qed)
         qee = self.quadro_ee()
-        corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroEN": qen, "QuadroEO": qeo, "QuadroEP": qep, "QuadroEQ": qeq, "QuadroER": qer}
+        corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroEL": qel, "QuadroEM": qem, "QuadroEN": qen, "QuadroEO": qeo, "QuadroEP": qep, "QuadroEQ": qeq, "QuadroER": qer}
         presenti = [k[6:] for k, v in corpo.items() if v]
         fr = self.frontespizio(presenti)
+        if fr is not None and ("EL" in presenti or "EM" in presenti) and not ("EB" in presenti or "EC" in presenti):
+            # annotazione CasiParticolari: obbligatorio in assenza dei quadri EB, EC ed in presenza di EL o EM (volture non richieste)
+            fr["CasiParticolari"] = {"CasiParticolari": "1", "FirmaDichiarante": "1"}
         intest = {"TipoFornitore": ctx.tipo_fornitore}
         if ctx.spazio_utente:
             try:
@@ -1560,8 +1649,8 @@ class _Export:
         return esito
 
 
-_RIGA = {"EB": "Terreni", "EC": "Fabbricati", "EN": "Aziende", "EO": "Titoli", "EP": "Aeromobili", "EQ": "Navi", "ER": "Rendite"}
-_PER_MODULO = {"EB": 2, "EC": 2, "EN": 2, "EO": 3, "EP": 1, "EQ": 2, "ER": 4}
+_RIGA = {"EB": "Terreni", "EC": "Fabbricati", "EL": "TerreniTavolare", "EM": "FabbricatiTavolare", "EN": "Aziende", "EO": "Titoli", "EP": "Aeromobili", "EQ": "Navi", "ER": "Rendite"}
+_PER_MODULO = {"EB": 2, "EC": 2, "EL": 2, "EM": 1, "EN": 2, "EO": 3, "EP": 1, "EQ": 2, "ER": 4}
 _XP_DICH = "/tm:Messaggio/tm:Contenuto/suc:Fornitura/suc:Dichiarazione"
 
 

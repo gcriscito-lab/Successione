@@ -114,11 +114,11 @@ def test_mcp_stato_quadri_e_blocco_non_supportati(tmp_path):
                 await s.initialize()
                 pid = dati(await s.call_tool("successioni_crea_pratica", {"titolo": "X", "chiave_richiesta": "k"}))["pratica_id"]
                 await s.call_tool("successioni_aggiorna_pratica", {"pratica_id": pid, "revisione_attesa": 1, "chiave_richiesta": "u",
-                    "operazioni": [{"op": "set", "sezione": "opzioni", "campi": {"quadri_attivi": ["EA", "EN"]}}]})
+                    "operazioni": [{"op": "set", "sezione": "opzioni", "campi": {"quadri_attivi": ["EA", "EI"]}}]})
                 st = dati(await s.call_tool("successioni_stato_quadri", {"pratica_id": pid}))
                 assert st["finalizzabile"] is False
-                assert {q["id"]: q["stato"] for q in st["quadri"]}["EN"] == "non_supportato"
-                assert any(x["codice"] == "QUADRO_NON_SUPPORTATO" and x["quadro"] == "EN" for x in st["rilievi"])
+                assert {q["id"]: q["stato"] for q in st["quadri"]}["EI"] == "non_supportato"
+                assert any(x["codice"] == "QUADRO_NON_SUPPORTATO" and x["quadro"] == "EI" for x in st["rilievi"])
     anyio.run(scenario)
 
 

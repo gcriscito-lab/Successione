@@ -38,6 +38,7 @@ VERIFICHE: dict[str, list[list[str]]] = {
     "C8": [[sys.executable, "-m", "pytest", "-q", "tests/test_supplemento_extra.py"]],
     "C9": [[sys.executable, "-m", "pytest", "-q", "tests/test_invio_lettori_extra.py"]],
     "C10": [[sys.executable, "-m", "pytest", "-q", "tests/test_formati_extra.py"]],
+    "C12": [[sys.executable, "-m", "pytest", "-q", "tests/test_quadri_schema_extra.py"]],
 }
 
 REGOLE_SISTEMA = (

@@ -150,8 +150,8 @@ def test_casi_non_supportati_non_esportano():
     d["opzioni"]["telematico"]["dichiarazione"]["devoluzione_per_legge"] = False
     casi["testamento"] = d
     d = caso_completo()
-    d["opzioni"]["quadri_attivi"] = ["EA", "EB", "EC", "ED", "ER", "EG", "EN"]
-    casi["quadro EN attivo"] = d
+    d["opzioni"]["quadri_attivi"] = ["EA", "EB", "EC", "ED", "ER", "EG", "EI"]
+    casi["quadro EI attivo"] = d
     for nome, dati in casi.items():
         es = _bozza(dati)
         assert es.xml is None, nome

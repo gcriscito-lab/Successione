@@ -36,10 +36,12 @@ QUADRI: list[dict] = [
      "supportato": True},
     {"id": "EI", "titolo": "Dichiarazioni utili alla voltura catastale", "gruppo": "quadri", "vista": "non_supportato",
      "supportato": False, "motivo": "dichiarazioni di voltura non ancora mappate sugli XSD"},
-    {"id": "EL", "titolo": "Attivo ereditario terreni sistema tavolare", "gruppo": "quadri", "vista": "non_supportato", "supportato": False,
-     "motivo": "sistema tavolare non ancora supportato"},
-    {"id": "EM", "titolo": "Attivo ereditario fabbricati sistema tavolare", "gruppo": "quadri", "vista": "non_supportato", "supportato": False,
-     "motivo": "sistema tavolare non ancora supportato"},
+    {"id": "EL", "titolo": "Attivo ereditario terreni sistema tavolare", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
+     "preset": {"tipo": "terreno", "provincia": "BZ"},
+     "colonne": ["comune", "foglio", "particella", "partita_tavolare", "valore", "quota_defunto"], "supportato": True},
+    {"id": "EM", "titolo": "Attivo ereditario fabbricati sistema tavolare", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
+     "preset": {"tipo": "fabbricato", "provincia": "BZ"},
+     "colonne": ["comune", "foglio", "particella", "categoria", "valore", "quota_defunto"], "supportato": True},
     {"id": "EN", "titolo": "Aziende", "gruppo": "quadri", "vista": "tabella", "coll": "beni", "preset": {"tipo": "azienda"},
      "colonne": ["descrizione", "codice_fiscale_emittente", "valore", "quota_defunto"], "supportato": True},
     {"id": "EO", "titolo": "Azioni, Obbligazioni, Altri titoli, Quote sociali", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
@@ -62,10 +64,18 @@ SEMPRE_ATTIVI = ("AN", "DV")
 PREDEFINITI = ("EA", "EB", "EC", "ER", "ED", "EG")
 
 
+#: province con catasto tavolare esclusivo (non compaiono in reg:PENonTavolare_Type): i loro immobili vanno in EL/EM
+PROVINCE_TAVOLARI = ("BZ", "TN", "GO", "TS")
+
+
 def quadro_di(coll: str, entita: dict) -> str | None:
     if coll == "persone":
         return "AN" if entita.get("ruolo") in ("defunto", "presentatore") else "EA"
     if coll == "beni":
+        tavolare = (str(entita.get("provincia") or "").strip().upper() in PROVINCE_TAVOLARI
+                    or str(entita.get("sistema_tavolare") or "").strip().lower() in ("1", "si", "true"))
+        if tavolare and entita.get("tipo") in ("terreno", "fabbricato"):
+            return "EL" if entita.get("tipo") == "terreno" else "EM"
         return {"terreno": "EB", "fabbricato": "EC", "titolo": "EO", "aeromobile": "EP", "nave": "EQ", "azienda": "EN"}.get(entita.get("tipo"), "ER")
     return {"passivita": "ED", "documenti_ref": "EG", "devoluzioni": "DV"}.get(coll)
 
