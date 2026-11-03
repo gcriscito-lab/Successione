@@ -35,7 +35,7 @@ CHIAVI = {
                 "comune_decesso", "provincia_decesso"},
     "beni": {"provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo", "indirizzo",
              "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe", "zona_censuaria",
-             "consistenza", "tipo_cespite"},
+             "consistenza", "tipo_cespite", "estremi_trascrizione", "estremi_registrazione"},
     "passivita": {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id", "ripartizione"},
 }
 CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",

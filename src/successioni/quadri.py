@@ -34,8 +34,9 @@ QUADRI: list[dict] = [
     {"id": "EG", "titolo": "Elenco documenti, certificati e dichiarazioni sostitutive", "gruppo": "quadri",
      "vista": "documenti", "coll": "documenti_ref", "preset": {}, "colonne": ["allegato_id", "tipo_eg", "finalita", "persona_id"],
      "supportato": True},
-    {"id": "EI", "titolo": "Dichiarazioni utili alla voltura catastale", "gruppo": "quadri", "vista": "non_supportato",
-     "supportato": False, "motivo": "dichiarazioni di voltura non ancora mappate sugli XSD"},
+    {"id": "EI", "titolo": "Dichiarazioni utili alla voltura catastale", "gruppo": "quadri", "vista": "derivato",
+     "supportato": False, "motivo": "quadro generato automaticamente dal programma: non si compila",
+     "nota": "Il quadro EI si genera da solo: nei beni dei quadri EB ed EC spunta «discordanza dati intestatario» o «passaggi senza atti legali» e, per la discordanza, indica gli estremi di trascrizione o registrazione degli atti (dati degli estremi: oggi da MCP o API)."},
     {"id": "EL", "titolo": "Attivo ereditario terreni sistema tavolare", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
      "preset": {"tipo": "terreno", "provincia": "BZ"},
      "colonne": ["comune", "foglio", "particella", "partita_tavolare", "valore", "quota_defunto"], "supportato": True},
@@ -67,8 +68,9 @@ _IMM = ["comune", "foglio", "particella", "subalterno", "provincia", "codice_com
         "codice_comune_amministrativo", "provenienza"]
 _TAV = ["comune_catastale", "codice_comune_catastale", "partita_tavolare", "corpo_tavolare", "sistema_tavolare"]
 CAMPI_BENI = {
-    "EB": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"],
-    "EC": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza"],
+    "EB": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita", "discordanza_intestatario", "passaggi_senza_atti_legali"],
+    "EC": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
+                          "discordanza_intestatario", "passaggi_senza_atti_legali"],
     "EL": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"] + _TAV,
     "EM": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
                           "porzione_materiale"] + _TAV,

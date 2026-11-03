@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 
 from successioni.telematico.esporta import esporta_xml
-from telematico_casi import caso_azienda, caso_mezzi, caso_tavolare, caso_testamento_legato, caso_titoli, contesto_caso_a10
+from telematico_casi import caso_azienda, caso_mezzi, caso_tavolare, caso_testamento_legato, caso_titoli, caso_voltura, contesto_caso_a10
 
 COLLEZIONI = ("persone", "beni", "devoluzioni", "passivita", "documenti_ref")
 CTX = contesto_caso_a10(data_riferimento=date(2025, 9, 1))
@@ -44,7 +44,7 @@ def _applica(d, m, modo):
         tgt[campo] = ""
 
 
-@pytest.mark.parametrize("caso", [caso_testamento_legato, caso_titoli, caso_mezzi, caso_azienda, caso_tavolare])
+@pytest.mark.parametrize("caso", [caso_testamento_legato, caso_titoli, caso_mezzi, caso_azienda, caso_tavolare, caso_voltura])
 @pytest.mark.parametrize("modo", ["del", "vuoto"])
 def test_nessuna_perdita_silenziosa(modo, caso):
     BASE = caso()

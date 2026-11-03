@@ -480,6 +480,28 @@ class _Export:
                         fonte=FO.fonte_xsd(elemento) + "; " + FO.fonte_fasc1(22, "Valore: base imponibile della quota del "
                                                                               "defunto, arrotondata all'unita' di euro"))
 
+    def _flag_ei(self, b: dict, quadro: str, luogo: dict, cat: dict, sezione, tavolare: bool) -> dict:
+        """Caselle «Discordanza dati intestatario» e «Passaggi senza atti legali» di EB/EC e registrazione per il quadro EI."""
+        self.usa(b, "discordanza_intestatario")
+        self.usa(b, "passaggi_senza_atti_legali")
+        disc = SUP.attr(self.d, "beni", b, "discordanza_intestatario")
+        pas = SUP.attr(self.d, "beni", b, "passaggi_senza_atti_legali")
+        from .quadri_efgh import _flag
+        disc, pas = _flag(disc), _flag(pas)
+        if not (disc or pas):
+            return {}
+        if tavolare:
+            self.ns.append(f"beni[{b['id']}]: discordanza e passaggi senza atti legali non sono previsti dai quadri EL/EM")
+            return {}
+        self.ei_beni.append({"id": b["id"], "bene": b, "quadro": quadro, "luogo": luogo, "cat": cat, "sezione": sezione,
+                             "discordanza": disc, "passaggi": pas})
+        out = {}
+        if disc:
+            out["DiscordanzaDatiIntestatario"] = "1"
+        if pas:
+            out["PassaggiSenzaAttiLegali"] = "1"
+        return out
+
     def riga_eb(self, b: dict, tavolare: bool = False) -> dict | None:
         c, el = "beni", "QuadroEB/Modulo/Terreni"
         for campo in ("sezione", "categoria"):
@@ -531,8 +553,10 @@ class _Export:
         self.comune_bene[b["id"]] = luogo.get("Italia", luogo)["CodiceComune"]
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
-        return {"Luogo": luogo, "DatiTerreni": {"DatiCatastali": cat, "DatiTerreni": dt}, "Possesso": poss,
+        riga = {"Luogo": luogo, "DatiTerreni": {"DatiCatastali": cat, "DatiTerreni": dt}, "Possesso": poss,
                 "CodiceDiritto_P": dir_p, "TipologiaTerreno": tip, "Valore": valore}
+        riga.update(self._flag_ei(b, "EB", luogo, cat, None, tavolare))
+        return riga
 
     def riga_ec(self, b: dict, tavolare: bool = False) -> dict | None:
         c, el = "beni", "QuadroEC/Modulo/Fabbricati"
@@ -578,8 +602,10 @@ class _Export:
         self.comune_bene[b["id"]] = luogo.get("Italia", luogo)["CodiceComune"]
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
-        return {"Luogo": luogo, "DatiFabbricati": {"DatiCatastali": cat, "DatiFabbricati": df}, "Possesso": poss,
+        riga = {"Luogo": luogo, "DatiFabbricati": {"DatiCatastali": cat, "DatiFabbricati": df}, "Possesso": poss,
                 "CodiceDiritto_P": dir_p, "Valore": valore}
+        riga.update(self._flag_ei(b, "EC", luogo, cat, df.get("SezioneUrbana"), tavolare))
+        return riga
 
     def riga_er(self, b: dict) -> dict | None:
         c, el = "beni", "QuadroER/Modulo/Rendite"
@@ -1517,7 +1543,7 @@ class _Export:
         self.totale_da_versare = 0
         self.defunto = self.presentatore = None
         self.testamento_x, self.test_reg = None, None
-        self.eh_navi, self.eh_aeromobili = [], []
+        self.eh_navi, self.eh_aeromobili, self.ei_beni = [], [], []
 
         self.classifica_persone()
         self.ordina_ea()
@@ -1590,6 +1616,7 @@ class _Export:
         liq = fr is not None and ctx.quadri_liquidazione
         qeg = EFGH.quadro_eg(self) if liq else None
         qeh = EFGH.quadro_eh(self, fr, qeg) if liq else None
+        corpo["QuadroEI_new"] = EFGH.quadro_ei(self, fr) if fr is not None else None
         xml_pre = None
         if liq and not self.errori and not self.ns:
             dich_pre = {"@identificativo": ctx.identificativo, "Frontespizio": fr}
@@ -1600,7 +1627,7 @@ class _Export:
                 self.err("ERRORE_SERIALIZZAZIONE", "/", str(e), FO.fonte_xsd())
         qef = EFGH.quadro_ef(self, xml_pre) if fr is not None and xml_pre is not None else None
         corpo.update({"QuadroEF": qef, "QuadroEG": qeg, "QuadroEH": qeh})
-        presenti = [k[6:] for k, v in corpo.items() if v]
+        presenti = [("EI" if k == "QuadroEI_new" else k[6:]) for k, v in corpo.items() if v]
         if fr is not None:
             fr["FirmaModello"] = {**{f"Casella{q}": "1" for q in presenti}, "FirmaDichiarante": "1"}
         if fr is not None and qef is not None:

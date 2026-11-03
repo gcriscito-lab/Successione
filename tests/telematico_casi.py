@@ -230,6 +230,22 @@ def caso_tavolare() -> dict:
     return d
 
 
+def caso_voltura() -> dict:
+    """``caso_a10`` con discordanza dati intestatario sul fabbricato (EC, con estremi di trascrizione e registrazione) e passaggi
+    senza atti legali sul terreno (EB): genera il quadro EI."""
+    d = caso_a10()
+    for b in d["beni"]:
+        if b["id"] == "b_casa0001":
+            b["discordanza_intestatario"] = "si"
+        if b["id"] == "b_terr0001":
+            b["passaggi_senza_atti_legali"] = "si"
+    d["opzioni"]["telematico"]["beni"]["b_casa0001"]["estremi_trascrizione"] = [
+        {"ufficio": "RM10", "registro_particolare": "12345", "anno": "2010"}]
+    d["opzioni"]["telematico"]["beni"]["b_casa0001"]["estremi_registrazione"] = [
+        {"ufficio": "795", "anno": "2020", "volume": "88888", "numero": "123"}]
+    return d
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),

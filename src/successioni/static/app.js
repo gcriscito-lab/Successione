@@ -169,6 +169,7 @@ function renderVista() {
   if (!q.attivo && q.supportato) main.append(h("div", { class: "nota" }, "Questo quadro non è selezionato per la dichiarazione. ", h("button", { class: "lk", onclick: () => impostaQuadro(q.id, true) }, "Seleziona il quadro")));
   if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { style: "flex:1" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
   if (q.vista === "frontespizio") renderFront(main);
+  else if (q.vista === "derivato") main.append(h("div", { class: "nota" }, q.nota || "Quadro generato automaticamente dal programma."));
   else if (q.vista === "non_supportato") renderNonSupp(main, q);
   else { renderTabella(main, q); if (q.vista === "documenti") renderAllegati(main); }
   main.scrollTop = y;

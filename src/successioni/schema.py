@@ -44,6 +44,7 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         "inventario": "str", "data_redazione_inventario": "data",
         "comune_catastale": "str", "codice_comune_catastale": "str", "partita_tavolare": "str", "corpo_tavolare": "str",
         "porzione_materiale": "str", "particella_denominatore": "str", "sistema_tavolare": "str",
+        "discordanza_intestatario": "str", "passaggi_senza_atti_legali": "str",
     },
     "devoluzioni": {
         "bene_id": "ref:beni", "persona_id": "ref:persone", "quota": "quota", "diritto": "str",

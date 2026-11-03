@@ -24,6 +24,8 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
+import re
+
 from ..schema import Errore
 from . import fonti as FO
 from . import formati as F
@@ -307,6 +309,109 @@ def quadro_eg(x) -> dict | None:
           "conformita' PDF/A-1a/1b (pena lo scarto) va verificata con un validatore indipendente (area documenti)",
           FO.fonte_fasc1(49, "formati ammessi"))
     return eg
+
+
+# ============================================================================================== EI
+def _flag(v) -> bool:
+    return v is True or str(v).strip().lower() in ("1", "si", "true")
+
+
+def _estremi_ei(x, b: dict, campo: str, voci, spec, base: str, fonte: str) -> list[dict]:
+    """Estremi di trascrizione o registrazione di un immobile: ``spec`` = [(chiave, elemento XSD, tipo)], massimo 3."""
+    from .esporta import codice_enum   # import locale: esporta importa questo modulo
+    out = []
+    if voci in (None, ""):
+        return out
+    if not isinstance(voci, list):
+        x.err("VALORE_NON_VALIDO", f"{base}.{campo}", "attesa una lista di estremi", fonte)
+        return out
+    if len(voci) > 3:
+        x.ns.append(f"{base}.{campo}: piu' di tre estremi (campo Continuazione, moduli successivi) non supportato")
+        return out
+    for i, v in enumerate(voci):
+        perc = f"{base}.{campo}[{i}]"
+        if not isinstance(v, dict) or set(v) - {k for k, _, _ in spec}:
+            x.err("VALORE_NON_VALIDO", perc, f"attesi solo i campi {[k for k, _, _ in spec]}", fonte)
+            continue
+        riga, ok = {}, True
+        for chiave, elemento, tipo in spec:
+            val = v.get(chiave)
+            try:
+                if val in (None, ""):
+                    raise F.ValoreXml("dato obbligatorio")
+                if tipo.startswith("enum:"):
+                    riga[elemento] = codice_enum(str(val), tipo[5:])
+                elif tipo == "anno":
+                    if not re.fullmatch(r"(18|19|20)[0-9]{2}", str(val)) or int(val) > x.oggi.year:
+                        raise F.ValoreXml(f"{val!r}: anno aaaa tra 1800 e l'anno corrente")
+                    riga[elemento] = str(val)
+                else:   # numerico con massimo di cifre
+                    massimo = int(tipo)
+                    if not str(val).isdigit() or len(str(val)) > massimo:
+                        raise F.ValoreXml(f"{val!r}: solo cifre, massimo {massimo}")
+                    riga[elemento] = str(val)
+            except F.ValoreXml as e:
+                x.err("DATO_MANCANTE" if val in (None, "") else "VALORE_NON_VALIDO", f"{perc}.{chiave}", str(e), fonte)
+                ok = False
+        if ok:
+            out.append(riga)
+    return out
+
+
+def quadro_ei(x, fr: dict) -> dict | None:
+    """Quadro EI (dichiarazione sostitutiva per la voltura): generato dai beni EB/EC con «discordanza dati intestatario» o
+    «passaggi senza atti legali» (Fascicolo I p. 54). Piu' di tre estremi per immobile (Continuazione): non supportato."""
+    el = "QuadroEI_new/PrimoModulo"
+    if not x.ei_beni or fr is None:
+        return None
+    pres_fr = fr.get("Presentatore") or {}
+    pres = dict(pres_fr.get("DatiAnagrafici") or {})
+    pres["CodiceFiscale"] = pres_fr.get("CodiceFiscale")
+    pres["CodiceCarica"] = pres_fr.get("CodiceCarica")
+    if pres_fr.get("CodiceFiscaleRappresentato"):
+        pres["CodiceFiscaleRappresentato"] = pres_fr["CodiceFiscaleRappresentato"]
+    primo: dict = {"Presentatore": pres}
+    if any(e["passaggi"] for e in x.ei_beni):
+        primo["SezioneI_AttiLegali"] = {"FlagAttiLegali": "1", "FirmaDichiarante": "1"}
+    sezioni = []
+    for e in sorted((e for e in x.ei_beni if e["discordanza"]), key=lambda e: e["id"]):
+        b, base = e["bene"], f"beni[{e['id']}]"
+        fonte = FO.fonte_annotazione(el + "/SezioneII_DatiIntestatario/EstremiTrascrizione") + "; " + FO.fonte_fasc1(54, "Sezione II")
+        sup_tr = SUP.attr(x.d, "beni", b, "estremi_trascrizione")
+        sup_rg = SUP.attr(x.d, "beni", b, "estremi_registrazione")
+        x.usa(b, "estremi_trascrizione")
+        x.usa(b, "estremi_registrazione")
+        tr = _estremi_ei(x, b, "estremi_trascrizione", sup_tr, [
+            ("ufficio", "UfficioTrascrizione", "enum:UfficioDiTrascrizione_Type"),
+            ("registro_particolare", "RegistroParticolare", "6"), ("anno", "Anno", "anno")], base, fonte)
+        rg = _estremi_ei(x, b, "estremi_registrazione", sup_rg, [
+            ("ufficio", "UfficioTerritoriale", "enum:UfficioDiRegistrazione_Type"), ("anno", "Anno", "anno"),
+            ("volume", "Volume", "5"), ("numero", "Numero", "6")], base, fonte)
+        if sup_tr in (None, "", []) and sup_rg in (None, "", []):
+            x.err("DATO_MANCANTE", base + ".estremi_trascrizione", "con la discordanza dati intestatario indicare almeno una "
+                  "trascrizione o una registrazione", fonte)
+        luogo = e["luogo"]
+        it = luogo.get("Italia", luogo)
+        imm = {"TipoCatasto": "T" if e["quadro"] == "EB" else "U",
+               "Luogo": {"Provincia": luogo["Provincia"], "ComuneAmministrativo": it["ComuneAmministrativo"],
+                         "CodiceComune": it["CodiceComune"], "CodiceComuneAmministrativo": it["CodiceComuneAmministrativo"]},
+               "DatiCatastali": e["cat"]}
+        if e["quadro"] == "EC" and e.get("sezione"):
+            imm["SezioneUrbana"] = e["sezione"]
+        sez = {"Immobile": imm}
+        if tr:
+            sez["EstremiTrascrizione"] = tr
+        if rg:
+            sez["EstremiRegistrazione"] = rg
+        sez["FirmaDichiarante"] = "1"
+        sezioni.append(sez)
+    if sezioni:
+        primo["SezioneII_DatiIntestatario"] = sezioni[0]
+    out = {"PrimoModulo": primo}
+    if len(sezioni) > 1:
+        # nei moduli successivi al primo la sezione non prevede la firma (XSD: Modulo/SezioneII_DatiIntestatario)
+        out["Modulo"] = [{"SezioneII_DatiIntestatario": {k: v for k, v in s.items() if k != "FirmaDichiarante"}} for s in sezioni[1:]]
+    return out
 
 
 # ============================================================================================== EH
