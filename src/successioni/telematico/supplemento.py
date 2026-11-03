@@ -35,15 +35,16 @@ CHIAVI = {
                 "comune_decesso", "provincia_decesso"},
     "beni": {"provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo", "indirizzo",
              "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe", "zona_censuaria",
-             "consistenza", "tipo_cespite", "estremi_trascrizione", "estremi_registrazione"},
+             "consistenza", "tipo_cespite", "estremi_trascrizione", "estremi_registrazione",
+             "valore_prec_succ"},
     "passivita": {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id", "ripartizione"},
     # agevolazioni della sezione devoluzione (docs/regole/prima_casa.md): oggi solo i codici P, X, Z
-    "devoluzioni": {"agevolazioni"},
+    "devoluzioni": {"agevolazioni", "riduzioni"},
 }
 CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",
                         "tempistica_pagamento", "pagamento_rateale", "dichiara_copie_conformi",
                         "devoluzione_per_testamento", "testamento", "azienda_data_deposito", "azienda_camera_commercio",
-                        "prima_casa"}
+                        "prima_casa", "riduzioni_art25"}
 # Sezione Testamento del frontespizio (annotazioni XSD: Pubblicazione, Registrazione, TestamentoEstero)
 CHIAVI_TESTAMENTO = {"estero", "pubblico_ufficiale", "data_pubblicazione", "ufficio_registrazione", "serie",
                      "numero_registrazione", "sottonumero_registrazione", "data_registrazione"}
