@@ -188,6 +188,19 @@ def caso_mezzi() -> dict:
     return d
 
 
+def caso_azienda() -> dict:
+    """``caso_a10`` con un'azienda (EN) devoluta per quote di legge ai due figli; dati del rigo EH9 nella dichiarazione."""
+    d = caso_a10()
+    d["opzioni"]["quadri_attivi"] = ["EA", "EB", "EC", "ER", "ED", "EG", "EN"]
+    d["opzioni"]["telematico"]["dichiarazione"].update({"azienda_data_deposito": "2025-06-30", "azienda_camera_commercio": "ROMA"})
+    d["beni"].append({"id": "b_azien001", "_origine": {}, "tipo": "azienda", "descrizione": "Alfa Impresa Individuale (sintetico)",
+                      "codice_fiscale_emittente": "00000000018", "valore": "20000", "diritto": "1", "quota_defunto": "1/1"})
+    for pid in ("p_anna0001", "p_luca0001"):
+        d["devoluzioni"].append({"id": f"d_azien{pid[2:6]}", "_origine": {}, "bene_id": "b_azien001", "persona_id": pid,
+                                 "quota": {"num": 1, "den": 2}, "diritto": "1"})
+    return d
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),

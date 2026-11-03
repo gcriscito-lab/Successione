@@ -363,6 +363,20 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
                         f"{chiave} del quadro EH ne ammette una sola nel primo modulo, il secondo modulo non e' supportato")
         elif elenco:
             sez[chiave] = {flag: "1", **elenco[0]}
+    if x.quadro_bene and "EN" in set(x.quadro_bene.values()):
+        dd, cc = SUP.dich(x.d, "azienda_data_deposito"), SUP.dich(x.d, "azienda_camera_commercio")
+        az = {"FlagAzienda": "1"}
+        fonte = FO.fonte_annotazione("QuadroEH/PrimoModulo/SezioneI_DichSost/Aziende")
+        for chiave, val, conv in (("DataDeposito", dd, lambda v: F.data(v, non_oltre=x.oggi)), ("CameraCommercio", cc, lambda v: F.an(v, 35))):
+            nome = "azienda_data_deposito" if chiave == "DataDeposito" else "azienda_camera_commercio"
+            if val in (None, ""):
+                x.err("DATO_MANCANTE", "opzioni.telematico.dichiarazione." + nome, "dato obbligatorio con il quadro EN (rigo EH9)", fonte)
+                continue
+            try:
+                az[chiave] = conv(val)
+            except F.ValoreXml as e:
+                x.err("VALORE_NON_VALIDO", "opzioni.telematico.dichiarazione." + nome, str(e), fonte)
+        sez["Aziende"] = az
     if eredi:
         sez["Eredi"] = eredi[:3]
     if eg and "DocumentiPassivita" in eg:

@@ -40,7 +40,8 @@ QUADRI: list[dict] = [
      "motivo": "sistema tavolare non ancora supportato"},
     {"id": "EM", "titolo": "Attivo ereditario fabbricati sistema tavolare", "gruppo": "quadri", "vista": "non_supportato", "supportato": False,
      "motivo": "sistema tavolare non ancora supportato"},
-    {"id": "EN", "titolo": "Aziende", "gruppo": "quadri", "vista": "non_supportato", "supportato": False, "motivo": "non ancora supportato"},
+    {"id": "EN", "titolo": "Aziende", "gruppo": "quadri", "vista": "tabella", "coll": "beni", "preset": {"tipo": "azienda"},
+     "colonne": ["descrizione", "codice_fiscale_emittente", "valore", "quota_defunto"], "supportato": True},
     {"id": "EO", "titolo": "Azioni, Obbligazioni, Altri titoli, Quote sociali", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
      "preset": {"tipo": "titolo"},
      "colonne": ["tipo_titolo", "descrizione", "quantita", "valore", "quota_defunto"], "supportato": True},
@@ -65,7 +66,7 @@ def quadro_di(coll: str, entita: dict) -> str | None:
     if coll == "persone":
         return "AN" if entita.get("ruolo") in ("defunto", "presentatore") else "EA"
     if coll == "beni":
-        return {"terreno": "EB", "fabbricato": "EC", "titolo": "EO", "aeromobile": "EP", "nave": "EQ"}.get(entita.get("tipo"), "ER")
+        return {"terreno": "EB", "fabbricato": "EC", "titolo": "EO", "aeromobile": "EP", "nave": "EQ", "azienda": "EN"}.get(entita.get("tipo"), "ER")
     return {"passivita": "ED", "documenti_ref": "EG", "devoluzioni": "DV"}.get(coll)
 
 
