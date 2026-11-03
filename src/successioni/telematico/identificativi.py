@@ -134,3 +134,14 @@ def _mod97(s: str) -> int:
 def cifre_controllo_iban(paese: str, bban: str) -> str:
     """Cifre di controllo IBAN (98 - modulo 97 con cifre '00'), come ``IBANCheckDigit.calculate``."""
     return f"{98 - _mod97(bban.upper() + paese.upper() + '00'):02d}"
+
+
+def piva_checksum_valida(s: str) -> bool:
+    """Cifra di controllo dei codici numerici a 11 cifre (partita IVA / codice fiscale di societa'): somma delle cifre
+    dispari piu' il doppio (meno 9 se > 9) delle pari, controllo a modulo 10. NON verifica il codice ufficio (cifre 8-10) ne'
+    la registrazione in Anagrafe Tributaria: il controllo ufficiale SUC13 scarta anche quei casi (1013), verificato 2026-11-03."""
+    if not (isinstance(s, str) and len(s) == 11 and s.isdigit()):
+        return False
+    d = [int(c) for c in s]
+    tot = sum(d[0:10:2]) + sum((x * 2 - 9 if x * 2 > 9 else x * 2) for x in d[1:10:2])
+    return (10 - tot % 10) % 10 == d[10]

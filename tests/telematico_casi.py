@@ -152,6 +152,24 @@ def caso_testamento_legato() -> dict:
     return d
 
 
+def _titolo(id_, tipo_titolo, descr, valore, **extra):
+    return {"id": id_, "_origine": {}, "tipo": "titolo", "descrizione": descr, "valore": valore, "diritto": "1",
+            "quota_defunto": "1/1", "tipo_titolo": tipo_titolo, "quantita": "100", "tipo_documento": "3", **extra}
+
+
+def caso_titoli() -> dict:
+    """``caso_a10`` con due titoli (non quotato e fondo comune) devoluti per quote di legge ai due figli."""
+    d = caso_a10()
+    d["opzioni"]["quadri_attivi"] = ["EA", "EB", "EC", "ER", "ED", "EG", "EO"]
+    d["beni"] += [_titolo("b_azioni01", "2", "Azioni Alfa SRL non quotata (sintetico)", "10000"),
+                  _titolo("b_fondo001", "4", "Fondo comune di investimento (sintetico)", "6000", quantita="250")]
+    for bid in ("b_azioni01", "b_fondo001"):
+        for pid in ("p_anna0001", "p_luca0001"):
+            d["devoluzioni"].append({"id": f"d_{bid[2:7]}{pid[2:6]}", "_origine": {}, "bene_id": bid, "persona_id": pid,
+                                     "quota": {"num": 1, "den": 2}, "diritto": "1"})
+    return d
+
+
 ALLEGATI_A10 = {"al_albero": {"percorso": str(FIXTURE / "allegati" / "albero_genealogico.pdf"),
                               "nome": "albero_genealogico.pdf"},
                 "al_passiv": {"percorso": str(FIXTURE / "allegati" / "documenti_passivita.pdf"),

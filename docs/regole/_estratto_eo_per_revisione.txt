@@ -1,0 +1,246 @@
+===== CODICE riga_eo (esporta.py) =====
+    def riga_eo(self, b: dict) -> dict | None:
+        """Quadro EO, rigo Titoli: quotati (1), non quotati (2), fondi comuni (4). Titoli esenti (3) e beni esteri: non supportati."""
+        c, el = "beni", "QuadroEO/Modulo/Titoli"
+        for campo in ("comune", "sezione", "foglio", "particella", "subalterno", "categoria", "rendita"):
+            if b.get(campo) not in (None, ""):
+                self.usa(b, campo)
+                self.ns.append(f"beni[{b['id']}].{campo}: campo catastale non previsto per i titoli del quadro EO")
+        tt = self.val(c, b, "tipo_titolo", lambda v: codice_enum(str(v), "Titoli_Type"), elemento=el + "/TipoTitolo")
+        if tt == "3":
+            self.ns.append(f"beni[{b['id']}].tipo_titolo=3: titolo esente (ValoreEsente) non supportato: il valore esente non "
+                           "entra nella base imponibile e richiede le regole di calcolo dedicate")
+        cf_em = SUP.attr(self.d, c, b, "codice_fiscale_emittente")
+        self.usa(b, "codice_fiscale_emittente")
+        out: dict = {"TipoTitolo": tt}
+        fonte_cf = FO.fonte_annotazione(el + "/CodiceFiscale")
+        if tt == "1" and cf_em in (None, ""):   # annotazione CodiceFiscale: obbligatorio se TipoTitolo = 1
+            self.err("DATO_MANCANTE", f"beni[{b['id']}].codice_fiscale_emittente",
+                     "codice fiscale dell'emittente obbligatorio per i titoli quotati (TipoTitolo 1)", fonte_cf)
+        elif cf_em not in (None, ""):
+            try:
+                out["CodiceFiscale"] = cf_persona(cf_em)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].codice_fiscale_emittente", str(e), fonte_cf)
+        qta = SUP.attr(self.d, c, b, "quantita")
+        self.usa(b, "quantita")
+        if qta not in (None, ""):
+            if not str(qta).isdigit() or len(str(qta)) > 10:
+                self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].quantita", f"{qta!r}: quantita' intera, massimo 10 cifre",
+                         FO.fonte_xsd(el + "/Quantita"))
+            else:
+                out["Quantita"] = str(qta)
+        ct = SUP.attr(self.d, c, b, "codice_titolo")
+        self.usa(b, "codice_titolo")
+        if ct not in (None, ""):
+            if tt != "1":
+                self.err("DATI_INCOERENTI", f"beni[{b['id']}].codice_titolo", "il codice titolo va indicato solo per i titoli "
+                         "quotati in borsa italiana", FO.fonte_annotazione(el + "/CodiceTitolo"))
+            else:
+                try:
+                    out["CodiceTitolo"] = F.an(ct, 12)
+                except F.ValoreXml as e:
+                    self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].codice_titolo", str(e), FO.fonte_xsd(el + "/CodiceTitolo"))
+        descr = self.val(c, b, "descrizione", lambda v: F.an(v, 250), elemento=el + "/Descrizione")
+        td = self.val(c, b, "tipo_documento", lambda v: codice_enum(str(v), "TipoDocumento_Type"),
+                      elemento=el + "/TipoDocumento")
+        dd = SUP.attr(self.d, c, b, "data_documento")
+        self.usa(b, "data_documento")
+        data_doc = None
+        fonte_dd = FO.fonte_annotazione(el + "/DataDocumento")
+        if dd in (None, ""):
+            if td in ("1", "2"):
+                self.err("DATO_MANCANTE", f"beni[{b['id']}].data_documento", "data del documento obbligatoria se il tipo "
+                         "documento e' 1 (bilancio) o 2 (inventario)", fonte_dd)
+        else:
+            try:
+                data_doc = F.data(dd, non_oltre=self.oggi)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].data_documento", str(e), fonte_dd)
+        poss, _ = self.quota_possesso(b, el + "/Possesso")
+        dir_c = self.diritto_defunto(b, "CodiciDirittoNonImmobili", el + "/CodiceDiritto_C")
+        valore = self.valore_bene(b, el + "/Possesso/Valore")
+        if None in (tt, descr, td, poss, dir_c, valore) or tt == "3":
+            return None
+        self.diritto_bene[b["id"]] = dir_c
+        self.valore_beni[b["id"]] = int(valore)
+        riga = {"TipoTitolo": tt}
+        for k in ("CodiceFiscale", "Quantita", "CodiceTitolo"):
+            if k in out:
+                riga[k] = out[k]
+        riga["Descrizione"], riga["TipoDocumento"] = descr, td
+        if data_doc:
+            riga["DataDocumento"] = data_doc
+        riga["Possesso"] = {**poss, "Valore": valore}
+        riga["CodiceDiritto_C"] = dir_c
+        return riga
+
+
+===== XSD QuadroEO =====
+<xs:element name="QuadroEO" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Non deve essere presente se 'Dichiarazione sostitutiva è uguale a '3'</xs:documentation>
+ </xs:annotation>
+ <xs:complexType>
+ <xs:sequence>
+ <xs:element name="Modulo" maxOccurs="unbounded">
+ <xs:complexType>
+ <xs:sequence>
+ <xs:element name="Titoli" maxOccurs="3">
+ <xs:complexType>
+ <xs:sequence>
+ <xs:element name="TipoTitolo" type="suc:Titoli_Type" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>obbligatorio se non è presente il campo continuazione del rigo precedente</xs:documentation>
+ </xs:annotation>
+ </xs:element>
+ <xs:element name="CodiceFiscale" type="cm:DatoCF_Type" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Campo obbligatorio se TipoTitolo uguale a 1.
+Non deve essere presente se è barrata la casella Bene sito all’estero.
+Deve essere diverso dal campo 'Codice fiscale del defunto' e da quello dei soggetti presenti nel quadro EA. 
+Il codice fiscale deve essere formalmente corretto e registrato in Anagrafe Tributaria.
+La non registrazione comporta lo scarto della denuncia in fase di accettazione.</xs:documentation>
+ </xs:annotation>
+ </xs:element>
+ <xs:element name="Quantita" minOccurs="0">
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoNP_Type">
+ <xs:maxLength value="10"/>
+ </xs:restriction>
+ </xs:simpleType>
+ </xs:element>
+ <xs:element name="CodiceTitolo" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Il Codice titolo deve essere indicato solo se si tratta di titolo quotato in borsa italiana</xs:documentation>
+ </xs:annotation>
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoAN_Type">
+ <xs:maxLength value="12"/>
+ </xs:restriction>
+ </xs:simpleType>
+ </xs:element>
+ <xs:element name="Descrizione" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>obbligatorio se non è presente il campo continuazione del rigo precedente</xs:documentation>
+ </xs:annotation>
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoAN_Type">
+ <xs:maxLength value="250"/>
+ </xs:restriction>
+ </xs:simpleType>
+ </xs:element>
+ <xs:element name="TipoDocumento" type="suc:TipoDocumento_Type" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>obbligatorio se non è presente il campo continuazione del rigo precedente</xs:documentation>
+ </xs:annotation>
+ </xs:element>
+ <xs:element name="DataDocumento" type="cm:DatoDT_Type" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>obbligatorio se non è presente il campo continuazione del rigo precedente e se tipo documento = 1 o 2</xs:documentation>
+ </xs:annotation>
+ </xs:element>
+ <xs:element name="Possesso" type="suc:PossessoEO_Type" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>obbligatorio se non è presente il campo continuazione del rigo precedente</xs:documentation>
+ </xs:annotation>
+ </xs:element>
+ <xs:element name="CodiceDiritto_C" type="suc:CodiciDirittoNonImmobili" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>obbligatorio se non è presente il campo continuazione del rigo precedente. 
+Per i quadri EN, EO, ER sono ammessi solo i codici 1, 2</xs:documentation>
+ </xs:annotation>
+ </xs:element>
+ <xs:element name="BeniEsteri" type="suc:BeniEsteri_Type" minOccurs="0"/>
+ <xs:element name="DevoluzioneEO" type="suc:DevoluzioneNonImmobili_Type" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Se il numero dei soggetti a cui sono devoluti i singoli beni supera il numero dei campi disponibili, barrare la casella continuazione e riportare l’indicazione degli ulteriori soggetti nella sezione devoluzione del rigo che segue senza compilare la parte relativa ai dati identificativi del bene. 
+In presenza del Quadro EA la sezione deve essere compilata.</xs:documentation>
+ </xs:annotation>
+ </xs:element>
+ </xs:sequence>
+ </xs:complexType>
+ </xs:element>
+ </xs:sequence>
+ </xs:complexType>
+ </xs:element>
+ </xs:sequence>
+ </xs:complexType>
+ </xs:element>
+ 
+===== XSD PossessoEO_Type =====
+<xs:complexType name="PossessoEO_Type">
+ <xs:sequence>
+ <xs:element name="PossessoNumeratore" type="cm:DatoVP_Type"/>
+ <xs:element name="PossessoDenominatore">
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoNP_Type">
+ <xs:maxLength value="6"/>
+ </xs:restriction>
+ </xs:simpleType>
+ </xs:element>
+ <xs:element name="Valore" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Campo obbligatorio in assenza del campo 'Valore esente'.
+Non può essere presente in presenza del campo 'Valore esente' 
+Campo obbligatorio se titolo = 1 (titolo quotato in borsa o negoziato nel mercato ristretto), 2 (titolo non quotato in borsa).
+Non può essere presente se titolo = 3 (titolo esente compreso nell’attivo ereditario).</xs:documentation>
+ </xs:annotation>
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoNP_Type">
+ <xs:maxLength value="13"/>
+ </xs:restriction>
+ </xs:simpleType>
+ </xs:element>
+ <xs:element name="ValoreEsente" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Campo obbligatorio in assenza del campo 'Valore'.
+Non può essere presente in presenza del campo 'Valore' 
+Campo obbligatorio se titolo = 3 (titolo esente compreso nell’attivo ereditario)
+Non può essere presente se titolo = 1 (titolo quotato in borsa o negoziato nel mercato ristretto), 2 (titolo non quotato in borsa).</xs:documentation>
+ </xs:annotation>
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoNP_Type">
+ <xs:maxLength value="13"/>
+ </xs:restriction>
+ </xs:simpleType>
+ </xs:element>
+ <xs:element name="ValorePrecSucc" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Non può essere presente in assenza di riduzioni art. 25 c. 1 nella sezione devoluzione. 
+Campo obbligatorio in presenza di riduzioni art. 25 c. 1 nella sezione devoluzione.
+Non può essere superiore al campo valore.</xs:documentation>
+ </xs:annotation>
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoNP_Type">
+ <xs:maxLength value="13"/>
+ </xs:restriction>
+ </xs:simpleType>
+ </xs:element>
+ </xs:sequence>
+ </xs:complexType>
+ <xs:complexType name="Possesso2_Type">
+ <xs:sequence>
+ <xs:element name="PossessoNumeratore" type="cm:DatoNP_Type" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Se campo 'Tipo passività' = '11' (Legato o altro onere che grava su una quota ereditaria o sul legato stesso) non valorizzare. </xs:documentation>
+ </xs:annotation>
+ </xs:element>
+ <xs:element name="PossessoDenominatore" minOccurs="0">
+ <xs:annotation>
+ <xs:documentation>Se campo 'Tipo passività' = '11' (Legato o altro onere che grava su una quota ereditaria o sul legato stesso) non valorizzare. </xs:documentation>
+ </xs:annotation>
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoNP_Type">
+ <xs:maxLength value="6"/>
+ </xs:restriction>
+ </xs:simpleType>
+ </xs:element>
+ <xs:element name="Valore">
+ <xs:annotation>
+ <xs:documentation>In presenza di Tipo passività = 2 (Spese funerarie) l'importo non può essere maggiore di 1033.</xs:documentation>
+ </xs:annotation>
+ <xs:simpleType>
+ <xs:restriction base="cm:DatoNP_Type">
+ <xs:maxLength value="13"/>
+ </x

@@ -78,6 +78,12 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 **Cosa fare:** Casi limite di `an`, `cf`, `data_iso`, `data`, `euro_intero`, `euro_centesimi`, `quota_grezza`, `telefono`, `email`, `cb`: valori validi, ai limiti di lunghezza, vuoti, di tipo sbagliato, date inesistenti (29 febbraio), importi con decimali o virgola. Scrivere SOLO il file di test indicato: non modificare mai `src/`. I test descrivono il comportamento REALE del codice mostrato (non inventare funzioni, firme, codici o messaggi che non compaiono nel contesto). Import come negli altri test: `from successioni... import ...`. Almeno 15 asserzioni; ogni caso negativo verifica il tipo di eccezione e un frammento del messaggio; niente test che passino per il motivo sbagliato.
 **Accettazione:** `python -m pytest -q tests/test_formati_extra.py` verde (lo esegue il lanciatore).
 
+## C11. Revisione indipendente del codice del quadro EO (solo segnalazioni)
+**File:** `docs/regole/REVISIONE_EO.md` (nuovo).
+**Contesto:** `docs/regole/_estratto_eo_per_revisione.txt` (codice `riga_eo` e annotazioni XSD del quadro EO).
+**Cosa fare:** confrontare il codice con le annotazioni ufficiali e segnalare SOLO discrepanze concrete: obbligatorieta' non rispettate, condizioni invertite, campi non validati, elementi emessi in ordine diverso dallo schema, casi in cui il codice scarta dati senza errore. Per ogni segnalazione: la riga di codice (copiata alla lettera), la frase dell'annotazione XSD (copiata alla lettera) e perche' non coincidono. NON proporre modifiche fiscali, NON inventare regole che non compaiono nel testo, se non trovi discrepanze scrivi «nessuna discrepanza trovata».
+**Accettazione:** il coordinatore verifica ogni segnalazione contro il testo; quelle non confermate vengono scartate.
+
 ---
 
 ## Come il coordinatore integra

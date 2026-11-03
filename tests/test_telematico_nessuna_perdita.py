@@ -7,14 +7,13 @@ from datetime import date
 import pytest
 
 from successioni.telematico.esporta import esporta_xml
-from telematico_casi import caso_testamento_legato, contesto_caso_a10
+from telematico_casi import caso_testamento_legato, caso_titoli, contesto_caso_a10
 
 COLLEZIONI = ("persone", "beni", "devoluzioni", "passivita", "documenti_ref")
-BASE = caso_testamento_legato()
 CTX = contesto_caso_a10(data_riferimento=date(2025, 9, 1))
 
 
-def _mutazioni():
+def _mutazioni(BASE):
     for coll in COLLEZIONI:
         for i, e in enumerate(BASE[coll]):
             for campo in (k for k in e if not k.startswith("_") and k != "id"):
@@ -45,10 +44,12 @@ def _applica(d, m, modo):
         tgt[campo] = ""
 
 
+@pytest.mark.parametrize("caso", [caso_testamento_legato, caso_titoli])
 @pytest.mark.parametrize("modo", ["del", "vuoto"])
-def test_nessuna_perdita_silenziosa(modo):
+def test_nessuna_perdita_silenziosa(modo, caso):
+    BASE = caso()
     anomalie = []
-    for m in _mutazioni():
+    for m in _mutazioni(BASE):
         d = copy.deepcopy(BASE)
         _applica(d, m, modo)
         es = esporta_xml(d, CTX)

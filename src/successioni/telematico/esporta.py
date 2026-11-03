@@ -53,11 +53,12 @@ PERIMETRO = {
     "EB": "terreni in Italia (provincia non tavolare), natura T, con valore",
     "EC": "fabbricati in Italia (provincia non tavolare), con rendita catastale (categorie non F) e valore",
     "ER": "tipi cespite BI, CR, DN, AB con valore; beni non esteri",
+    "EO": "titoli quotati (1), non quotati (2), fondi (4) con valore; titoli esenti (3) e beni esteri non supportati",
     "ED": "passivita' con tipo, documento, possesso e ripartizione a un solo soggetto EA",
     "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
     "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; nessuna agevolazione/riduzione",
 }
-QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "ER")
+QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "EO", "ER")
 SCOPI = ("completo", "bozza_tecnica")
 _ID_DICH = re.compile(r"[0-9]{4}[1-9]|[0-9]{3}[1-9][0-9]|[0-9]{2}[1-9][0-9]{2}|[0-9][1-9][0-9]{3}|[1-9][0-9]{4}")
 
@@ -132,6 +133,8 @@ def cf_persona(valore) -> str:
     U1CheckDigit.controllaCheckDigit di checkCF_PIVA.jar, verificata eseguendo il componente). Il controllo ufficiale
     scarta (***) 'Codice Fiscale errato'. I codici numerici a 11 cifre non sono verificati qui."""
     s = F.cf(valore)
+    if len(s) == 11 and not ID.piva_checksum_valida(s):
+        raise F.ValoreXml(f"{s}: cifra di controllo del codice a 11 cifre errata (il controllo ufficiale scarta, 1013)")
     if len(s) == 16 and not ID.cf_persona_fisica_valido(s):
         raise F.ValoreXml(f"{s}: carattere di controllo errato (atteso {ID.carattere_controllo(s[:15])}) - "
                           + ID.FONTE_CF)
@@ -552,10 +555,86 @@ class _Export:
         self.tipo_cespite[b["id"]] = tc
         return {"TipoCespite": tc, "Descrizione": descr, "Possesso": poss, "CodiceDiritto_P": dir_p, "Valore": valore}
 
+    def riga_eo(self, b: dict) -> dict | None:
+        """Quadro EO, rigo Titoli: quotati (1), non quotati (2), fondi comuni (4). Titoli esenti (3) e beni esteri: non supportati."""
+        c, el = "beni", "QuadroEO/Modulo/Titoli"
+        for campo in ("comune", "sezione", "foglio", "particella", "subalterno", "categoria", "rendita"):
+            if b.get(campo) not in (None, ""):
+                self.usa(b, campo)
+                self.ns.append(f"beni[{b['id']}].{campo}: campo catastale non previsto per i titoli del quadro EO")
+        tt = self.val(c, b, "tipo_titolo", lambda v: codice_enum(str(v), "Titoli_Type"), elemento=el + "/TipoTitolo")
+        if tt == "3":
+            self.ns.append(f"beni[{b['id']}].tipo_titolo=3: titolo esente (ValoreEsente) non supportato: il valore esente non "
+                           "entra nella base imponibile e richiede le regole di calcolo dedicate")
+        cf_em = SUP.attr(self.d, c, b, "codice_fiscale_emittente")
+        self.usa(b, "codice_fiscale_emittente")
+        out: dict = {"TipoTitolo": tt}
+        fonte_cf = FO.fonte_annotazione(el + "/CodiceFiscale")
+        if tt == "1" and cf_em in (None, ""):   # annotazione CodiceFiscale: obbligatorio se TipoTitolo = 1
+            self.err("DATO_MANCANTE", f"beni[{b['id']}].codice_fiscale_emittente",
+                     "codice fiscale dell'emittente obbligatorio per i titoli quotati (TipoTitolo 1)", fonte_cf)
+        elif cf_em not in (None, ""):
+            try:
+                out["CodiceFiscale"] = cf_persona(cf_em)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].codice_fiscale_emittente", str(e), fonte_cf)
+        qta = SUP.attr(self.d, c, b, "quantita")
+        self.usa(b, "quantita")
+        if qta not in (None, ""):
+            if not str(qta).isdigit() or len(str(qta)) > 10:
+                self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].quantita", f"{qta!r}: quantita' intera, massimo 10 cifre",
+                         FO.fonte_xsd(el + "/Quantita"))
+            else:
+                out["Quantita"] = str(qta)
+        ct = SUP.attr(self.d, c, b, "codice_titolo")
+        self.usa(b, "codice_titolo")
+        if ct not in (None, ""):
+            if tt != "1":
+                self.err("DATI_INCOERENTI", f"beni[{b['id']}].codice_titolo", "il codice titolo va indicato solo per i titoli "
+                         "quotati in borsa italiana", FO.fonte_annotazione(el + "/CodiceTitolo"))
+            else:
+                try:
+                    out["CodiceTitolo"] = F.an(ct, 12)
+                except F.ValoreXml as e:
+                    self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].codice_titolo", str(e), FO.fonte_xsd(el + "/CodiceTitolo"))
+        descr = self.val(c, b, "descrizione", lambda v: F.an(v, 250), elemento=el + "/Descrizione")
+        td = self.val(c, b, "tipo_documento", lambda v: codice_enum(str(v), "TipoDocumento_Type"),
+                      elemento=el + "/TipoDocumento")
+        dd = SUP.attr(self.d, c, b, "data_documento")
+        self.usa(b, "data_documento")
+        data_doc = None
+        fonte_dd = FO.fonte_annotazione(el + "/DataDocumento")
+        if dd in (None, ""):
+            if td in ("1", "2"):
+                self.err("DATO_MANCANTE", f"beni[{b['id']}].data_documento", "data del documento obbligatoria se il tipo "
+                         "documento e' 1 (bilancio) o 2 (inventario)", fonte_dd)
+        else:
+            try:
+                data_doc = F.data(dd, non_oltre=self.oggi)
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].data_documento", str(e), fonte_dd)
+        poss, _ = self.quota_possesso(b, el + "/Possesso")
+        dir_c = self.diritto_defunto(b, "CodiciDirittoNonImmobili", el + "/CodiceDiritto_C")
+        valore = self.valore_bene(b, el + "/Possesso/Valore")
+        if None in (tt, descr, td, poss, dir_c, valore) or tt == "3":
+            return None
+        self.diritto_bene[b["id"]] = dir_c
+        self.valore_beni[b["id"]] = int(valore)
+        riga = {"TipoTitolo": tt}
+        for k in ("CodiceFiscale", "Quantita", "CodiceTitolo"):
+            if k in out:
+                riga[k] = out[k]
+        riga["Descrizione"], riga["TipoDocumento"] = descr, td
+        if data_doc:
+            riga["DataDocumento"] = data_doc
+        riga["Possesso"] = {**poss, "Valore": valore}
+        riga["CodiceDiritto_C"] = dir_c
+        return riga
+
     def devoluzioni_bene(self, b: dict, quadro: str) -> list[dict]:
         """Righe della sezione devoluzione del bene, ordinate per posizione EA (annotazione IdentificazioneSoggetto:
         'in ordine progressivo')."""
-        tipo_rip = "CodiciDirittoNonImmobiliDevoluzione" if quadro == "ER" else "CodiciDiritto_Type"
+        tipo_rip = "CodiciDirittoNonImmobiliDevoluzione" if quadro in ("ER", "EO") else "CodiciDiritto_Type"
         el = f"Quadro{quadro}/Modulo/{_RIGA[quadro]}/Devoluzione{quadro}/Devoluzione"
         devs = [d for d in self.d.get("devoluzioni", []) if d.get("bene_id") == b["id"]]
         righe, somma, persone_viste = [], Fraction(0), set()
@@ -920,13 +999,16 @@ class _Export:
         """Totali dalle annotazioni XSD di QuadroEE (nessun bene aziendale o agevolazione A nel perimetro)."""
         imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC"))
         altri = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "ER")
+        titoli = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "EO")
         passivo = sum(self.valore_passivita.values())
-        attivo = imm + altri
-        if not (imm or altri or passivo):
+        attivo = imm + titoli + altri
+        if not (imm or titoli or altri or passivo):
             return None
         ee: dict = {}
         if imm:
             ee["TotaleValoreImmobili"] = str(imm)
+        if titoli:
+            ee["TotaleValoreTitoli"] = str(titoli)
         if altri:
             ee["TotaleValoreAltriBeni"] = str(altri)
         if attivo:
@@ -1208,7 +1290,7 @@ class _Export:
                     "configurazione di eredi non coperta dalla verifica delle quote di legge: "
                     "conservabile come bozza tecnica, non finalizzabile", DL.FONTE))
         beni = self.d.get("beni", [])
-        per_q: dict[str, list] = {"EB": [], "EC": [], "ER": []}
+        per_q: dict[str, list] = {"EB": [], "EC": [], "EO": [], "ER": []}
         for b in beni:
             self.usa(b, "tipo")
             q = Q.quadro_di("beni", b)
@@ -1223,6 +1305,8 @@ class _Export:
                 self.interno(b, "descrizione")
         qeb = self.quadro_beni("EB", sorted(per_q["EB"], key=_chiave_immobile), self.riga_eb)
         qec = self.quadro_beni("EC", sorted(per_q["EC"], key=_chiave_immobile), self.riga_ec)
+        qeo = self.quadro_beni("EO", sorted(per_q["EO"], key=lambda b: (
+            str(SUP.attr(self.d, "beni", b, "tipo_titolo") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_eo)
         qer = self.quadro_beni("ER", sorted(per_q["ER"], key=lambda b: (
             str(SUP.attr(self.d, "beni", b, "tipo_cespite") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_er)
         if self.ea:
@@ -1237,7 +1321,7 @@ class _Export:
         qed = self.quadro_ed()
         self.risolvi_progressivi(qed)
         qee = self.quadro_ee()
-        corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroER": qer}
+        corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroEO": qeo, "QuadroER": qer}
         presenti = [k[6:] for k, v in corpo.items() if v]
         fr = self.frontespizio(presenti)
         intest = {"TipoFornitore": ctx.tipo_fornitore}
@@ -1309,8 +1393,8 @@ class _Export:
         return esito
 
 
-_RIGA = {"EB": "Terreni", "EC": "Fabbricati", "ER": "Rendite"}
-_PER_MODULO = {"EB": 2, "EC": 2, "ER": 4}
+_RIGA = {"EB": "Terreni", "EC": "Fabbricati", "EO": "Titoli", "ER": "Rendite"}
+_PER_MODULO = {"EB": 2, "EC": 2, "EO": 3, "ER": 4}
 _XP_DICH = "/tm:Messaggio/tm:Contenuto/suc:Fornitura/suc:Dichiarazione"
 
 
