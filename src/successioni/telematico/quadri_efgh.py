@@ -6,17 +6,18 @@ istruzioni ``Succ_FASCICOLO_I_Nov_23.pdf`` (pagina PDF = pagina stampata). Nessu
 
 PERIMETRO (il resto e' ``non_supportato`` oppure ``quadri_mancanti`` con il motivo):
 
-- EF: successioni aperte dal 2025-01-01, prima dichiarazione, immobili senza agevolazioni/riduzioni in un solo
-  comune; Sezioni I (ipotecaria 2%), II (catastale 1%), III (tassa ipotecaria 120 euro per circoscrizione), IV (bollo
+- EF: successioni aperte dal 2025-01-01, prima dichiarazione, immobili in un solo comune, senza agevolazioni/riduzioni
+  salvo la prima casa (codici P, X, Z: rigo EF4 e Sezione II di EH, vedi ``prima_casa.py``); Sezioni I (ipotecaria 2%), II (catastale 1%), III (tassa ipotecaria 120 euro per circoscrizione), IV (bollo
   85 euro per circoscrizione), V-bis (imposta di successione da ``calcolo.calcola_da_xml`` sul file dichiarato),
-  totale EF19. Non coperti: agevolazioni (G, M, P/X/Y/Z, trust), regola dei valori fiscali dei soli terreni
+  totale EF19. Non coperti: agevolazioni (G, M, Y, Z senza P, trust), regola dei valori fiscali dei soli terreni
   (Fascicolo I p. 40), imposta proporzionale inferiore alla fissa (fonti non concordi, vedi sotto), piu' comuni
   (l'individuazione della conservatoria richiede l'elenco dell'Agenzia), attestazione/copia conforme, crediti
   d'imposta, sostitutive, sanzioni e interessi, rateazione.
 - EG: righi EG1 DichSost, EG5 DocumentiPassivita, EG6 AlberoGenealogico, EG7 DocumentiIdentita, EG8 Altro; i
   contenuti vengono SOLO da ``documenti.base64.dati_file_attachment`` (nome maiuscolo/conforme a cm:DatoAN_Type).
 - EH: Sezione I con dichiarante erede/chiamato (carica 1), defunto deceduto (non morte presunta), devoluzione per
-  legge, nessun interdetto/disabile, nessuna rinuncia, stato civile diverso da 5 e 7. Sezioni II-IV non coperte.
+  legge, nessun interdetto/disabile, nessuna rinuncia, stato civile diverso da 5 e 7. Sezione II (prima casa del
+  dichiarante) coperta da ``prima_casa.sezione_eh``; Sezioni III-IV non coperte.
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ import re
 from ..schema import Errore
 from . import fonti as FO
 from . import formati as F
+from . import prima_casa as PC
 from . import supplemento as SUP
 
 DEC_2025 = date(2025, 1, 1)
@@ -49,7 +51,8 @@ BOLLO_CIRCOSCRIZIONE = 85
 SEZIONI_EG = ("DichSost", "Testamento", "Inventario", "CertificazioneImpostaVersataEstero", "DocumentiPassivita",
               "AlberoGenealogico", "DocumentiIdentita", "Altro", "PrimaCasa", "AgevolazioniImposteIpocatastali",
               "RiduzioniImposteSuccessione")
-EG_SUPPORTATE = {"DichSost", "Testamento", "DocumentiPassivita", "AlberoGenealogico", "DocumentiIdentita", "Altro"}
+EG_SUPPORTATE = {"DichSost", "Testamento", "DocumentiPassivita", "AlberoGenealogico", "DocumentiIdentita", "Altro",
+                 "PrimaCasa"}
 
 
 def _snake(nome: str) -> str:
@@ -103,22 +106,36 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
     ef: dict = {}
     da_versare = Decimal(0)
     if immobili and not motivi:
-        imponibile = sum((r["quota_valore"] for r in immobili), Decimal(0))
+        # prima casa (docs/regole/prima_casa.md): i beni con P/X/Z escono dai righi EF1 ed EF9 (annotazioni
+        # QuadroEF/SezioneI_ImpostaIpotecaria/ImpostaProporzionale e SezioneII_ImpostaCatastale/ImpostaProporzionale:
+        # «l'agevolazione prima casa si estende a tutti i beneficiari ... in relazione a quel bene») ed entrano nel rigo EF4
+        agevolati = [r for r in immobili if r["bene_id"] in x.pc_beni]
+        immobili_prop = [r for r in immobili if r["bene_id"] not in x.pc_beni]
+        imponibile = sum((r["quota_valore"] for r in immobili_prop), Decimal(0))
+        valore_pc = sum((r["quota_valore"] for r in agevolati), Decimal(0))
+        n_pc = x.pc_numero
+        if agevolati and n_pc == 0:
+            motivi.append("immobili con agevolazione prima casa senza alcun codice P: il numero di immobili del rigo EF4 "
+                          "(solo P, o Z in assenza di P) non e' determinabile")
+        if valore_pc != valore_pc.to_integral_value():
+            motivi.append(f"somma dei 'Valore quota' degli immobili prima casa {valore_pc} non intera: l'arrotondamento "
+                          "del rigo EF4 colonna 2 non e' indicato dalle fonti")
         if any(r["diritto"] == "10" for r in immobili):
             motivi.append("immobili gravati da oneri reali (codice diritto 10): esclusi dalle circoscrizioni "
                           "(Fascicolo I p. 44), caso non coperto")
         if not any(r["quadro"] in ("EC", "EM") for r in immobili):
             motivi.append("soli terreni senza fabbricati: confronto con i valori fiscali dei terreni (Fascicolo I "
                           "p. 40, rigo EF1; annotazione ImpostaProporzionale_Imposta) non coperto")
-        if imponibile != imponibile.to_integral_value():
+        if immobili_prop and imponibile != imponibile.to_integral_value():
             motivi.append(f"somma dei 'Valore quota' degli immobili {imponibile} non intera: l'arrotondamento "
                           "dell'imponibile EF1/EF9 (cm:DatoNP_Type) non e' indicato dalle fonti")
         # EF1: quadri EB, EC, EL, EM (Fascicolo I p. 40). EF9 (catastale): il testo (p. 43) non elenca i quadri; il controllo
         # ufficiale SUC13 2.3.1 eseguito in locale il 2026-11-03 esclude i terreni tavolari (EL) dalla base catastale.
-        imponibile_cat = sum((r["quota_valore"] for r in immobili if r["quadro"] != "EL"), Decimal(0))
+        prop_cat = [r for r in immobili_prop if r["quadro"] != "EL"]
+        imponibile_cat = sum((r["quota_valore"] for r in prop_cat), Decimal(0))
         ip = arrotonda_euro(imponibile * ALIQUOTA_IPOTECARIA)
         cat = arrotonda_euro(imponibile_cat * ALIQUOTA_CATASTALE)
-        if ip < IMPOSTA_FISSA or cat < IMPOSTA_FISSA:
+        if (immobili_prop and ip < IMPOSTA_FISSA) or (prop_cat and cat < IMPOSTA_FISSA):
             motivi.append(f"imposta proporzionale ({ip} / {cat}) inferiore alla fissa: il Fascicolo I (p. 40 e 43) "
                           "chiede 200 nella colonna 2, l'annotazione XSD solo nel totale dovuto (EF5/EF11): fonti non "
                           "concordi, caso non coperto")
@@ -131,31 +148,51 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         if not motivi:
             imp = str(int(imponibile))
             fa1 = _fa(el + "/SezioneI_ImpostaIpotecaria/ImpostaProporzionale/ImpostaProporzionale_Imposta")
-            ef["SezioneI_ImpostaIpotecaria"] = {
-                "ImpostaProporzionale": {"ImpostaProporzionale_Imponibile": imp,
-                                         "ImpostaProporzionale_Imposta": str(ip)},
-                "ImpostaIpotecariaDovuta": str(ip), "ImpostaIpotecariaDaVersare": str(ip)}
-            ef["SezioneII_ImpostaCatastale"] = {
-                "ImpostaProporzionale": {"ImpostaProporzionale_Imponibile": str(int(imponibile_cat)),
-                                         "ImpostaProporzionale_Imposta": str(cat)},
-                "ImpostaCatastaleDovuta": str(cat), "ImpostaCatastaleDaVersare": str(cat)}
+            # rigo EF4 (Fascicolo I p. PDF 41, annotazione PrimaCasa_Imposta): numero immobili x 200; EF5/EF11 = proporzionale + EF4
+            fissa_pc = IMPOSTA_FISSA * n_pc
+            ip = ip if immobili_prop else 0
+            cat = cat if prop_cat else 0
+            s1: dict = {}
+            if immobili_prop:
+                s1["ImpostaProporzionale"] = {"ImpostaProporzionale_Imponibile": imp,
+                                              "ImpostaProporzionale_Imposta": str(ip)}
+            if agevolati:
+                s1["PrimaCasa"] = {"PrimaCasa_Numero": str(n_pc), "AgevolazionePX_Valore": str(int(valore_pc)),
+                                   "PrimaCasa_Imposta": str(fissa_pc)}
+            s1["ImpostaIpotecariaDovuta"] = str(ip + fissa_pc)
+            s1["ImpostaIpotecariaDaVersare"] = str(ip + fissa_pc)
+            ef["SezioneI_ImpostaIpotecaria"] = s1
+            s2: dict = {}
+            if prop_cat:
+                s2["ImpostaProporzionale"] = {"ImpostaProporzionale_Imponibile": str(int(imponibile_cat)),
+                                              "ImpostaProporzionale_Imposta": str(cat)}
+            if agevolati:
+                s2["ImpostaCatastaleFissa"] = str(fissa_pc)
+            s2["ImpostaCatastaleDovuta"] = str(cat + fissa_pc)
+            s2["ImpostaCatastaleDaVersare"] = str(cat + fissa_pc)
+            ef["SezioneII_ImpostaCatastale"] = s2
             n = len(comuni)
             if n:
                 ef["SezioneIII_TassaIpotecaria"] = {"Circoscrizioni_Numero": str(n),
                                                     "Circoscrizioni_Imposta": str(TASSA_CIRCOSCRIZIONE * n)}
                 ef["SezioneIV_ImpostaBollo"] = {"Circoscrizioni_Numero": str(n),
                                                "Circoscrizioni_Imposta": str(BOLLO_CIRCOSCRIZIONE * n)}
-            da_versare += ip + cat + TASSA_CIRCOSCRIZIONE * n + BOLLO_CIRCOSCRIZIONE * n
+            da_versare += ip + cat + 2 * fissa_pc + TASSA_CIRCOSCRIZIONE * n + BOLLO_CIRCOSCRIZIONE * n
             x.calcoli_ef = {
                 "EF1": {"imponibile": imp, "imposta": ip, "fonte": fa1 + "; " + FO.fonte_fasc1(40, "rigo EF1")},
-                "EF5/EF8": {"importo": ip, "fonte": FO.fonte_fasc1(41, "rigo EF5") + "; " + FO.fonte_fasc1(42, "EF8")},
+                "EF4": {"numero": n_pc, "valore": str(int(valore_pc)), "imposta": fissa_pc,
+                        "fonte": FO.fonte_fasc1(41, "rigo EF4") + "; " + FO.fonte_fasc1(43, "rigo EF10") + "; " +
+                        _fa(el + "/SezioneI_ImpostaIpotecaria/PrimaCasa") + "; " + PC.FONTE_SINOTTICO},
+                "EF5/EF8": {"importo": ip + fissa_pc, "fonte": FO.fonte_fasc1(41, "rigo EF5") + "; " + FO.fonte_fasc1(42, "EF8")},
                 "EF9": {"imponibile": str(int(imponibile_cat)), "imposta": cat, "fonte": FO.fonte_fasc1(43, "rigo EF9")},
-                "EF11/EF14": {"importo": cat, "fonte": FO.fonte_fasc1(44, "righi EF11, EF14")},
+                "EF11/EF14": {"importo": cat + fissa_pc, "fonte": FO.fonte_fasc1(44, "righi EF11, EF14")},
                 "EF15": {"circoscrizioni": n, "imposta": TASSA_CIRCOSCRIZIONE * n,
                          "fonte": FO.fonte_fasc1(44, "rigo EF15: stesso codice comune -> 1 circoscrizione; 120 euro")},
                 "EF16": {"circoscrizioni": n, "imposta": BOLLO_CIRCOSCRIZIONE * n,
                          "fonte": FO.fonte_fasc1(45, "rigo EF16: 85 euro") + "; " + FO.fonte_fasc1(46, "col. 3")},
             }
+            if not agevolati:
+                x.calcoli_ef.pop("EF4")
     if dd >= DEC_2025 and not motivi:
         vbis, extra, m2 = _sezione_vbis(x, xml_pre)
         motivi += m2
@@ -290,6 +327,19 @@ def quadro_eg(x) -> dict | None:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiIdentita", "documento "
                                  "d'identita' (rigo EG7) obbligatorio in presenza del rigo EG1",
                                  _fa(el + "/DocumentiIdentita")))
+    if x.pc_eg:
+        # annotazione QuadroEG/PrimaCasa: obbligatorio con agevolazioni P/X/Y/Z per soggetti diversi dal dichiarante;
+        # Fascicolo I p. PDF 7: copia del documento d'identita' di chi sottoscrive le sostitutive rese da beneficiari diversi
+        if "PrimaCasa" not in per_sez:
+            x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].PrimaCasa", "richiesta dell'agevolazione "
+                                     "prima casa di un beneficiario diverso dal dichiarante: allegare la dichiarazione "
+                                     "sostitutiva (rigo EG9)", _fa(el + "/PrimaCasa") + "; " +
+                                     FO.fonte_fasc1(52, "Sezione II: richiesta da soggetto diverso dal dichiarante")))
+        if "DocumentiIdentita" not in per_sez:
+            x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiIdentita", "documento d'identita' "
+                                     "di chi sottoscrive la richiesta prima casa (rigo EG7)",
+                                     FO.fonte_fasc1(7, "copia del documento d'identita' di chi sottoscrive le dichiarazioni "
+                                                    "sostitutive rese da beneficiari diversi dal dichiarante")))
     if x.fornitore_diverso_da_dichiarante and "DocumentiIdentita" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiIdentita", "il modello non e' "
                                  "trasmesso direttamente dal dichiarante: allegare la copia del suo documento "
@@ -499,6 +549,12 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
                   _fa(el + "/FlagPassivita") + "; " + FO.fonte_fasc1(52, "lettera l"))
         sez["FlagPassivita"] = "1"
     eh: dict = {"PrimoModulo": {"SezioneI_DichSost": sez}}
+    sez2 = PC.sezione_eh(x)
+    if sez2:
+        eh["PrimoModulo"]["SezioneII_AgevPrimaCasa"] = sez2
+    elif x.pc_dichiarante is None and SUP.dich(x.d, "prima_casa") is not None:
+        x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.prima_casa", "la Sezione II del quadro EH puo' essere "
+              "compilata solo con l'agevolazione P richiesta dal dichiarante", _fa("QuadroEH/PrimoModulo/SezioneII_AgevPrimaCasa"))
     altri = [eredi[i:i + 3] for i in range(3, len(eredi), 3)]
     if altri:
         eh["Modulo"] = [{"SezioneI_DichSost": {"Eredi": blocco}} for blocco in altri]

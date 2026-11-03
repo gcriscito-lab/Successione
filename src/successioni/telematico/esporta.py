@@ -42,6 +42,7 @@ from . import devoluzione_legge as DL
 from . import formati as F
 from . import identificativi as ID
 from . import modello_xsd as M
+from . import prima_casa as PC
 from . import quadri_efgh as EFGH
 from . import supplemento as SUP
 from . import xsd as X
@@ -61,7 +62,8 @@ PERIMETRO = {
     "EO": "titoli quotati (1), non quotati (2), fondi (4) con valore; titoli esenti (3) e beni esteri non supportati",
     "ED": "passivita' con tipo, documento, possesso e ripartizione a un solo soggetto EA",
     "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
-    "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; nessuna agevolazione/riduzione",
+    "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; agevolazioni solo prima casa P, X, Z in EC "
+                   "(prima_casa.py), nessuna riduzione",
 }
 QUADRI_ESPORTABILI = ("EA", "EB", "EC", "ED", "EE", "EF", "EG", "EH", "EL", "EM", "EN", "EO", "EP", "EQ", "ER")
 SCOPI = ("completo", "bozza_tecnica")
@@ -602,6 +604,8 @@ class _Export:
         self.comune_bene[b["id"]] = luogo.get("Italia", luogo)["CodiceComune"]
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
+        if not tavolare:
+            self.info_ec[b["id"]] = {"luogo": luogo, "cat": cat, "sezione": df.get("SezioneUrbana"), "categoria": categ}
         riga = {"Luogo": luogo, "DatiFabbricati": {"DatiCatastali": cat, "DatiFabbricati": df}, "Possesso": poss,
                 "CodiceDiritto_P": dir_p, "Valore": valore}
         riga.update(self._flag_ei(b, "EC", luogo, cat, df.get("SezioneUrbana"), tavolare))
@@ -935,6 +939,9 @@ class _Export:
                 self.ns.append(f"{perc}: diritto devoluto {dir_r} diverso dal diritto del defunto {dir_def} (il valore "
                                "quota richiede le regole di valutazione dei diritti, Fascicolo I p. PDF 24): non supportato")
                 continue
+            agev = PC.leggi_riga(self, d, b, quadro, perc)
+            if agev:
+                PC.registra(self, d["id"], b["id"], pid, agev, quadro)
             somma += Fraction(n, den)
             self.persona_dev[d["id"]] = pid
             righe.append((self.pos_ea[pid], dir_r, d["id"], n, den))
@@ -967,8 +974,13 @@ class _Export:
             quota = {"QuotaElementi": {"QuotaNumeratore": str(n), "QuotaDenominatore": str(den)}}
             if qv is not None:
                 quota["QuotaValore"] = qv
-            out.append({"_id": did, "IdentificazioneSoggetto": {"Rigo": str(r), "Modulo": str(m)}, "Quota": quota,
-                        "CodiceDiritto_Rip": dir_r})
+            riga_dev = {"_id": did, "IdentificazioneSoggetto": {"Rigo": str(r), "Modulo": str(m)}, "Quota": quota,
+                        "CodiceDiritto_Rip": dir_r}
+            if did in self.agev_dev:
+                riga_dev["Agevolazioni"] = self.agev_dev[did]
+            if did in self.righe_dev:
+                self.righe_dev[did]["agevolazione"] = self.agev_dev.get(did)
+            out.append(riga_dev)
         return out
 
     # ---------------------------------------------------------------- quadri beni
@@ -1544,6 +1556,7 @@ class _Export:
         self.defunto = self.presentatore = None
         self.testamento_x, self.test_reg = None, None
         self.eh_navi, self.eh_aeromobili, self.ei_beni = [], [], []
+        PC.inizializza(self)
 
         self.classifica_persone()
         self.ordina_ea()
@@ -1588,6 +1601,7 @@ class _Export:
             str(b.get("numero_iscrizione") or ""), b["id"])), self.riga_eq)
         qer = self.quadro_beni("ER", sorted(per_q["ER"], key=lambda b: (
             str(SUP.attr(self.d, "beni", b, "tipo_cespite") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_er)
+        PC.valida(self)
         if self.ea:
             assegnati = {d.get("persona_id") for d in self.d.get("devoluzioni", [])}
             for p in self.ea:
