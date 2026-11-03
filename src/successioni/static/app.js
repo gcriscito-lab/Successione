@@ -66,9 +66,22 @@ function leggi(kind, t) {
   if (kind === "quota") { const m = t.match(/^(\d+)\s*\/\s*(\d+)$/); return m ? { num: +m[1], den: +m[2] } : t; }
   return t;
 }
+/* Etichette e ordine dei campi: arrivano da /api/schema (server: etichette.py). Mai il nome interno con i trattini bassi. */
+function lbl(coll, campo, quadro) {
+  const E = (S.schema && S.schema.etichette) || {};
+  return (quadro && (E.quadro || {})[quadro + "." + campo]) || ((E.campi || {})[coll] || {})[campo] || String(campo).replaceAll("_", " ");
+}
+function nomeVal(coll, campo, v) { return ((((S.schema || {}).etichette || {}).valori || {})[coll + "." + campo] || {})[v] || v; }
+function lblDich(chiave, fallback) { return ((((S.schema || {}).etichette || {}).dichiarazione || {})[chiave]) || fallback || chiave.replaceAll("_", " ").replaceAll(".", ": "); }
+/* campi nell'ordine del quadro; quelli non previsti vanno in coda */
+function ordinati(chiaveOrdine, campi) {
+  const o = ((S.schema || {}).ordine || {})[chiaveOrdine] || [];
+  const pos = c => { const i = o.indexOf(c); return i < 0 ? o.length : i; };
+  return [...campi].sort((a, b) => pos(a) - pos(b));
+}
 function etichetta(coll, e) {
   if (coll === "persone") return [e.cognome, e.nome].filter(Boolean).join(" ") || e.id;
-  if (coll === "beni") return [e.tipo, e.comune, e.foglio && "fg." + e.foglio, e.particella && "p." + e.particella, e.subalterno && "sub." + e.subalterno, e.descrizione].filter(Boolean).join(" ") || e.id;
+  if (coll === "beni") return [nomeVal("beni", "tipo", e.tipo), e.comune, e.foglio && "fg." + e.foglio, e.particella && "p." + e.particella, e.subalterno && "sub." + e.subalterno, e.descrizione].filter(Boolean).join(" ") || e.id;
   return e.id;
 }
 const rilievi = () => (S.Q ? S.Q.rilievi : []);
@@ -165,7 +178,7 @@ function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
   const err = path ? rilievi().filter(r => r.percorso === path) : [];
   let el;
   if (kind.startsWith("enum:")) {
-    el = h("select", { "aria-label": campo }, h("option", { value: "" }, ""), kind.slice(5).split("|").map(o => h("option", { value: o }, o)));
+    el = h("select", { "aria-label": campo }, h("option", { value: "" }, ""), kind.slice(5).split("|").map(o => h("option", { value: o }, nomeVal(coll, campo, o))));
     el.value = val || "";
   } else if (kind.startsWith("ref:")) {
     const rc = kind.slice(4);
@@ -261,7 +274,7 @@ function renderTabella(main, q) {
   const campi = S.schema.collezioni[q.coll];
   const righe = righeQuadro(q);
   const t = h("table", { role: "grid", "aria-label": q.titolo });
-  t.append(h("thead", {}, h("tr", {}, q.colonne.map(c => h("th", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : "" }, c.replaceAll("_", " "))))));
+  t.append(h("thead", {}, h("tr", {}, q.colonne.map(c => h("th", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : "" }, lbl(q.coll, c, q.id))))));
   const tb = h("tbody"); t.append(tb);
   righe.forEach((r, i) => {
     const id = r.e && r.e.id; const base = id ? q.coll + "[" + id + "]" : null;
@@ -271,7 +284,7 @@ function renderTabella(main, q) {
       onkeydown: ev => { if (ev.key === "ArrowDown" && righe[i + 1]) { ev.preventDefault(); selezionaRiga(righe[i + 1].key, true); } else if (ev.key === "ArrowUp" && righe[i - 1]) { ev.preventDefault(); selezionaRiga(righe[i - 1].key, true); } else if (ev.key === "Enter") selezionaRiga(r.key); } });
     q.colonne.forEach((c, j) => {
       const kind = campi[c]; const v = valRiga(r, c);
-      let txt = mostra(kind, v);
+      let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v);
       if (kind.startsWith("ref:") && v) { const e = (S.P.dati[kind.slice(4)] || []).find(x => x.id === v); if (e) txt = etichetta(kind.slice(4), e); }
       const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
       const td = h("td", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : "", title: txt }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
@@ -318,10 +331,10 @@ function insDati(ins) {
   const campi = S.schema.collezioni[q.coll]; const id = r.e && r.e.id;
   ins.append(h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)));
   for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e", style: "color:var(--er);margin:0 0 6px" }, x.messaggio));
-  const visibili = q.campi ? new Set(q.campi) : null;   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
-  const ordine = Object.keys(campi);
+  const visibili = q.campi ? new Set(q.campi) : (((S.schema.ordine || {})[q.id]) ? new Set(S.schema.ordine[q.id]) : null);   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
+  const ordine = ordinati(q.id, Object.keys(campi));
   for (const [comune, provincia] of [['comune', 'provincia'], ['luogo_nascita', 'provincia_nascita']]) {
-    if (ordine.includes(comune) && ordine.includes(provincia)) { ordine.splice(ordine.indexOf(provincia), 1); ordine.splice(ordine.indexOf(comune) + 1, 0, provincia); }
+    void comune; void provincia;   // provincia e comune seguono gia' l'ordine ufficiale (provincia prima del comune)
   }
   for (const c of ordine) { const kind = campi[c];
     const vv = valRiga(r, c);
@@ -349,7 +362,7 @@ function insDati(ins) {
       : campoInput(q.coll, id, c, kind, valRiga(r, c), modificaCampo);
     const aiuto = (S.schema.aiuti || {})[q.coll + "." + c];
     if (aiuto) w.append(h("div", { class: "mut", style: "font-size:0.8846rem;margin-top:2px" }, aiuto));
-    ins.append(h("div", { class: "rg" }, h("label", {}, c.replaceAll("_", " ")), w));
+    ins.append(h("div", { class: "rg" }, h("label", {}, lbl(q.coll, c, q.id)), w));
   }
   renderStrutturati(ins, q, r);
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
@@ -400,7 +413,7 @@ function renderStrutturati(ins, q, r) {
     const righe = valore(campo) || [];
     righe.forEach((voce, i) => {
       const box = h('div', { class: 'grp', style: 'padding:8px;margin:6px 0' });
-      for (const [c, tipo] of campi) box.append(h('label', {}, c.replaceAll('_', ' '), campoInput(q.coll, null, c, tipo, voce[c], (k, v) => {
+      for (const [c, tipo] of campi) box.append(h('label', {}, lbl(q.coll, c), campoInput(q.coll, null, c, tipo, voce[c], (k, v) => {
         const nuove = structuredClone(valore(campo) || []); nuove[i][k] = v; scrivi(campo, nuove);
       })));
       box.append(h('button', { onclick: () => { scrivi(campo, righe.filter((_, j) => j !== i)); renderIns(); } }, 'Rimuovi ' + titolo.toLowerCase()));
@@ -596,10 +609,9 @@ function schedaPersona(titolo, ruolo, vis) {
   const key = e ? 'e:persone:' + e.id : "f:" + ruolo; const campi = S.schema.collezioni.persone;
   const g = h("section", { class: "grp" }, h("h2", {}, titolo));
   const griglia = h('div', { class: 'persona-campi' }); g.append(griglia);
-  for (const c of vis) {
+  for (const c of ordinati(ruolo === 'presentatore' ? 'AN.presentatore' : 'AN', vis)) {
     const cur = S.dirty.has(key) && c in S.dirty.get(key).campi ? S.dirty.get(key).campi[c] : (e ? e[c] : undefined);
-    const nomi = { luogo_nascita: 'Comune di nascita', provincia_nascita: 'Provincia di nascita', comune_decesso: 'Comune del decesso', provincia_decesso: 'Provincia del decesso' };
-    griglia.append(h("div", { class: "rg", 'data-campo': c }, h("label", {}, nomi[c] || c.replaceAll("_", " ")), campoInput("persone", e && e.id, c, campi[c], cur, (campo, v) => {
+    griglia.append(h("div", { class: "rg", 'data-campo': c }, h("label", {}, lbl("persone", c)), campoInput("persone", e && e.id, c, campi[c], cur, (campo, v) => {
       const scrivi = (c2, x) => { const d = S.dirty.get(key) || { coll: "persone", id: e ? e.id : null, campi: e ? {} : { ruolo } }; d.campi[c2] = x; S.dirty.set(key, d); };
       scrivi(campo, v); aggiornaBottoni(); renderSb();
       if (campo === "codice_fiscale")
@@ -633,7 +645,10 @@ function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazi
   const leggi = (chiave) => chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
   const sez = h("section", { class: "grp" }, h("h2", {}, titolo));
   const inputs = {};
-  for (const [chiave, etichetta, tipo] of CAMPI_DICH) {
+  const ordDich = (S.schema.ordine || {})['AN.dichiarazione'] || [];
+  const posDich = k => { const i = ordDich.indexOf(k); return i < 0 ? ordDich.length : i; };
+  for (const [chiave, etichetta0, tipo] of [...CAMPI_DICH].sort((a, b) => posDich(a[0]) - posDich(b[0]))) {
+    const etichetta = lblDich(chiave, etichetta0);
     if (chiavi && !chiavi.includes(chiave)) continue;
     const v = S.dichDirty.has(chiave) ? S.dichDirty.get(chiave) : leggi(chiave); const id = "dd_" + chiave.replaceAll(".", "_");
     let inp;
@@ -667,7 +682,7 @@ function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazi
   } }, "Salva dati della dichiarazione")));
   return sez;
 }
-const etichettaPersona = p => [p.cognome, p.nome].filter(Boolean).join(' ') + (p.ruolo ? ' · ' + p.ruolo : '');
+const etichettaPersona = p => [p.cognome, p.nome].filter(Boolean).join(' ') + (p.ruolo ? ' · ' + nomeVal('persone', 'ruolo', p.ruolo) : '');
 /* Agevolazione prima casa del dichiarante: opzioni.telematico.dichiarazione.prima_casa (elenco e aiuti: schema.STRUTTURATI). */
 function sezionePrimaCasa() {
   const dich = ((S.P.dati.opzioni || {}).telematico || {}).dichiarazione || {};
@@ -843,7 +858,7 @@ async function decodificaCF(cf, ruolo) {
 function testoCF(r, riempiti) {
   const parti = [];
   if (!r.valido) parti.push("Codice fiscale non valido: " + r.motivi.join("; ") + ".");
-  if (riempiti.length) parti.push("Compilato dal codice fiscale: " + riempiti.map(c => c.replaceAll("_", " ")).join(", ") + ". Verifica i dati.");
+  if (riempiti.length) parti.push("Compilato dal codice fiscale: " + riempiti.map(c => lbl("persone", c)).join(", ") + ". Verifica i dati.");
   if (r.avvisi.length) parti.push(r.avvisi.join(" "));
   return parti.join(" ");
 }

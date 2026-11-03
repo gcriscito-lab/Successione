@@ -7,6 +7,7 @@ finalizzabile finche' il quadro e' attivo (specifica §1).
 """
 from __future__ import annotations
 
+from .etichette import ordina
 from .schema import Errore
 
 # colonne = campi mostrati nella tabella del quadro (sottoinsieme dei campi dello schema)
@@ -84,6 +85,10 @@ CAMPI_BENI = {
 for _q in QUADRI:
     if _q["id"] in CAMPI_BENI:
         _q["campi"] = CAMPI_BENI[_q["id"]]
+    if _q.get("colonne"):   # colonne e campi nell'ordine dei moduli ufficiali (etichette.ORDINE)
+        _q["colonne"] = ordina(_q["id"], _q["colonne"])
+    if _q.get("campi"):
+        _q["campi"] = ordina(_q["id"], _q["campi"])
 
 SEMPRE_ATTIVI = ("AN", "DV")
 PREDEFINITI = ("EA", "EB", "EC", "ER", "ED", "EG")
