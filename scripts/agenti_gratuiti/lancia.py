@@ -19,6 +19,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -53,11 +54,13 @@ VERIFICHE: dict[str, list[list[str]]] = {
 
 REGOLE_SISTEMA = (
     "Sei un agente di sviluppo che lavora a un progetto Python (applicazione locale per dichiarazioni di successione). "
-    "Rispondi ESCLUSIVAMENTE con un oggetto JSON, senza testo fuori dal JSON, con questa forma: "
-    '{"modifiche": [{"file": "percorso", "contenuto": "contenuto COMPLETO del file"} oppure '
-    '{"file": "percorso", "vecchio": "testo esatto da sostituire (unico nel file)", "nuovo": "testo sostitutivo"}], '
-    '"note": "cosa hai fatto e cosa non hai potuto verificare"}. '
-    "Regole: tocca SOLO i file consentiti; dati solo sintetici; nessuna regola fiscale inventata (se serve, scrivilo in note e non farlo); "
+    "Rispondi SOLO con blocchi di testo, senza JSON e senza altro testo fuori dai blocchi. Per creare o sostituire un file intero:\n"
+    "=== FILE: percorso/del/file ===\n<contenuto completo, scritto esattamente come deve stare nel file>\n=== FINE ===\n"
+    "Per cambiare una parte di un file esistente (il testo VECCHIO deve comparire una sola volta):\n"
+    "=== MODIFICA: percorso/del/file ===\n<<<<<<< VECCHIO\ntesto esatto da sostituire\n=======\ntesto sostitutivo\n>>>>>>> NUOVO\n=== FINE ===\n"
+    "Alla fine un blocco con cosa hai fatto e cosa non hai potuto verificare:\n=== NOTE ===\ntesto libero\n=== FINE ===\n"
+    "Non usare recinti di codice (```) dentro i blocchi: le barre rovesciate e le virgolette si scrivono come sono. "
+    "Regole: tocca SOLO i file consentiti; dati solo sintetici; nessuna regola fiscale inventata (se serve, scrivilo in NOTE e non farlo); "
     "non saltare né indebolire test; nessuna chiave o credenziale nel codice."
 )
 
@@ -87,6 +90,44 @@ def percorso_sicuro(rel: str, ammessi: list[str]) -> str | None:
     if ".." in Path(norm).parts or norm not in ammessi:
         return None
     return norm
+
+
+_RE_BLOCCO = re.compile(r"^=== (FILE|MODIFICA|NOTE)(?:: *(.+?))? ===[ \t]*\n(.*?)\n=== FINE ===[ \t]*$", re.S | re.M)
+_RE_HUNK = re.compile(r"<<<<<<< VECCHIO\n(.*?)\n=======\n(.*?)\n>>>>>>> NUOVO", re.S)
+
+
+def _senza_recinto(t: str) -> str:
+    m = re.fullmatch(r"```[A-Za-z0-9_+-]*\n(.*)\n```\s*", t, re.S)
+    return m.group(1) if m else t
+
+
+def estrai_blocchi(testo: str) -> dict:
+    """Risposta a blocchi di testo (nessun escape): FILE (contenuto intero), MODIFICA (VECCHIO/NUOVO), NOTE."""
+    blocchi = list(_RE_BLOCCO.finditer(testo))
+    if not blocchi:
+        raise ValueError("nessun blocco '=== FILE: ... ===' nella risposta")
+    if testo.count("=== FINE ===") < len(re.findall(r"^=== (?:FILE|MODIFICA|NOTE)", testo, re.M)):
+        raise ValueError("risposta troncata: manca '=== FINE ===' in un blocco")
+    modifiche, note = [], ""
+    for b in blocchi:
+        tipo, percorso, corpo = b.group(1), (b.group(2) or "").strip(), b.group(3)
+        if tipo == "NOTE":
+            note = corpo.strip()
+        elif tipo == "FILE":
+            modifiche.append({"file": percorso, "contenuto": _senza_recinto(corpo.strip("\n")) + "\n"})
+        else:
+            hunk = _RE_HUNK.findall(corpo)
+            if not hunk:
+                raise ValueError(f"blocco MODIFICA di {percorso}: servono '<<<<<<< VECCHIO', '=======', '>>>>>>> NUOVO'")
+            modifiche += [{"file": percorso, "vecchio": v, "nuovo": n} for v, n in hunk]
+    return {"modifiche": modifiche, "note": note}
+
+
+def estrai_proposta(testo: str) -> dict:
+    """Blocchi di testo (formato richiesto) oppure, per compatibilita', un oggetto JSON."""
+    if re.search(r"^=== (FILE|MODIFICA)", testo, re.M):
+        return estrai_blocchi(testo)
+    return estrai_json(testo)
 
 
 def estrai_json(testo: str) -> dict:
@@ -140,6 +181,47 @@ def chiama_modello(base_url: str, chiave: str, modello: str, messaggi: list[dict
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         raise RuntimeError(f"servizio non raggiungibile ({type(e).__name__}): controllare indirizzo e rete consentita") from None
     return dati["choices"][0]["message"]["content"]
+
+
+CODICI_TRANSITORI = (429, 500, 502, 503, 504)
+
+
+def chiama_con_riprova(base_url: str, chiave: str, modelli: list[str], messaggi: list[dict], *, tentativi: int = 3,
+                       attesa_s: float | None = None) -> tuple[str, str]:
+    """Chiama il primo modello; su errori transitori del servizio (429, 5xx) riprova con attesa crescente, poi passa al
+    modello di riserva. Restituisce (testo, modello usato). Errori non transitori: subito RuntimeError."""
+    base_attesa = float(os.environ.get("FREELLMAPI_ATTESA_S", "5")) if attesa_s is None else attesa_s
+    ultimo = None
+    for modello in modelli:
+        for n in range(tentativi):
+            try:
+                return chiama_modello(base_url, chiave, modello, messaggi), modello
+            except RuntimeError as e:
+                ultimo = e
+                m = re.search(r"HTTP (\d+)", str(e))
+                if not (m and int(m.group(1)) in CODICI_TRANSITORI):
+                    raise
+                if n + 1 < tentativi:
+                    time.sleep(base_attesa * (2 ** n))
+    raise ultimo if ultimo else RuntimeError("nessun modello disponibile")
+
+
+def classifica_causa(errori: list[str], verifiche_ok: bool, ha_patch: bool) -> str:
+    """Motivo prevalente del mancato esito, per capire se rilanciare, cambiare formato o rivedere il compito."""
+    if ha_patch and verifiche_ok:
+        return "nessun problema"
+    testo = " ".join(errori)
+    if re.search(r"HTTP (429|5\d\d)", testo):
+        return "limite o errore transitorio del servizio (429/5xx): rilanciare con un altro modello"
+    if re.search(r"non raggiungibile", testo):
+        return "servizio non raggiungibile: riavviare FreeLLMAPI"
+    if re.search(r"nessun blocco|nessun oggetto JSON|troncata|Expecting|Invalid|Unterminated|blocco MODIFICA", testo):
+        return "formato della risposta non valido"
+    if re.search(r"non consentito|deve comparire esattamente", testo):
+        return "modifica rifiutata (file non consentito o testo da sostituire non unico)"
+    if ha_patch and not verifiche_ok:
+        return "la verifica del compito non passa"
+    return "nessuna modifica prodotta"
 
 
 def elenca_modelli(base_url: str, chiave: str, timeout: int = 60) -> list[str]:
@@ -220,6 +302,9 @@ def main(argv=None) -> int:
     comp = leggi_compito(a.compito)
     base, chiave, modello = (os.environ.get("FREELLMAPI_BASE_URL"), os.environ.get("FREELLMAPI_KEY"),
                              os.environ.get("FREELLMAPI_MODEL"))
+    riserva = [m.strip() for m in os.environ.get("FREELLMAPI_MODELLI_RISERVA", "").split(",") if m.strip()]
+    modelli = [m for m in [modello] + riserva if m]
+    modello_usato = modello
     if a.dry_run:
         print("File consentiti:", comp["ammessi"], "| nuovi:", sorted(comp["nuovi"]))
         print("Verifiche:", VERIFICHE.get(a.compito, []))
@@ -243,11 +328,12 @@ def main(argv=None) -> int:
             toccati, esiti, errori_tot, note = set(), [], [], ""
             for it in range(1, a.max_iter + 1):
                 try:
-                    risposta = chiama_modello(base, chiave, modello, messaggi)
-                    proposta = estrai_json(risposta)
+                    risposta, modello_usato = chiama_con_riprova(base, chiave, modelli, messaggi)
+                    proposta = estrai_proposta(risposta)
                 except (RuntimeError, ValueError, KeyError) as e:
                     errori_tot.append(f"iterazione {it}: {e}")
-                    messaggi += [{"role": "user", "content": f"Risposta non valida ({e}). Rispondi solo con il JSON richiesto."}]
+                    messaggi += [{"role": "user", "content": f"Risposta non valida ({e}). Rispondi solo con i blocchi richiesti "
+                                                          "(=== FILE: ... === / === MODIFICA: ... === / === NOTE ===, ognuno chiuso da === FINE ===)."}]
                     if isinstance(e, RuntimeError):
                         break
                     continue
@@ -271,7 +357,9 @@ def main(argv=None) -> int:
             subprocess.run(["git", "worktree", "remove", "--force", str(lavoro)], cwd=RADICE, capture_output=True)
     ultime = {e["comando"]: e for e in esiti}
     ok = bool(patch.strip()) and all(e["codice"] == 0 for e in ultime.values())
-    righe = [f"# Consegna {a.compito}", "", f"Modello: {modello}", f"Servizio: {base}", f"Iterazioni max: {a.max_iter}",
+    causa = classifica_causa(errori_tot, all(e["codice"] == 0 for e in ultime.values()), bool(patch.strip()))
+    righe = [f"# Consegna {a.compito}", "", f"Modello: {modello_usato}" + (f" (richiesto: {modello})" if modello_usato != modello else ""),
+             f"Servizio: {base}", f"Iterazioni max: {a.max_iter}", f"Causa prevalente del mancato esito: {causa}",
              f"File toccati (tutti dall'elenco consentito): {sorted(toccati) or 'nessuno'}", "",
              "## Verifiche eseguite dal lanciatore (esiti reali)"]
     righe += [f"- `{c}`: codice {e['codice']}" for c, e in ultime.items()] or ["- nessuna verifica automatica per questo compito: serve la lettura del coordinatore"]
