@@ -13,7 +13,7 @@ from successioni.telematico import supplemento as SUP
 from successioni.telematico import xsd as X
 from successioni.telematico.esporta import codice_enum, esporta_xml
 from successioni.web import crea_app, strutturati_completi
-from telematico_casi import caso_a10, caso_testamento_legatario, contesto_caso_a10
+from telematico_casi import caso_a10, caso_tavolare, caso_testamento, caso_testamento_legatario, contesto_caso_a10
 
 CTX = contesto_caso_a10(data_riferimento=date(2025, 9, 1))
 
@@ -31,17 +31,37 @@ def test_le_chiavi_sono_campi_reali_della_pratica():
         parti = chiave.split(".", 1)
         if parti[0] == "dichiarazione":
             assert parti[1].split(".")[0] in SUP.CHIAVI_DICHIARAZIONE, chiave
+            _chiave_annidata_esiste(parti[1])
         else:
             campo = parti[1].split("@")[0]
             assert campo in S.COLLEZIONI[parti[0]], chiave
             assert S.COLLEZIONI[parti[0]][campo] in ("str", "cf"), chiave      # un testo, non un enum gia' a menu
 
 
-@pytest.mark.parametrize("chiave", list(C.REGOLE))
+def _chiave_annidata_esiste(percorso):
+    sez, _, foglia = percorso.partition(".")
+    insiemi = {"presentatore": SUP.CHIAVI_PRESENTATORE, "testamento": SUP.CHIAVI_TESTAMENTO, "versamento": SUP.CHIAVI_VERSAMENTO}
+    if foglia:
+        assert foglia in insiemi[sez], percorso
+
+
+def _accettato(valore, tipo):
+    """Accettato dall'esportazione se lo e' da almeno uno dei tipi della regola (unione «A+B»)."""
+    for t in C.tipi_xsd(tipo):
+        try:
+            if codice_enum(valore, t) == valore:
+                return True
+        except Exception:
+            pass
+    return False
+
+
+@pytest.mark.parametrize("chiave", list(C.REGOLE) + list(C.SUGGERIMENTI))
 def test_ogni_codice_proposto_e_accettato_dall_esportazione(chiave):
-    tipo = C.REGOLE[chiave][0]
+    tipo = (C.REGOLE.get(chiave) or C.SUGGERIMENTI[chiave])[0]
+    assert C.voci(tipo)
     for v in C.voci(tipo):
-        assert codice_enum(v["valore"], tipo) == v["valore"]
+        assert _accettato(v["valore"], tipo), (chiave, v["valore"])
 
 
 def test_stato_civile_e_gli_altri_codici_noti():
@@ -147,3 +167,98 @@ def test_strutturati_generati_sono_menu_a_scelta():
     s = C.strutturati()
     assert all(v["tipo"] == "enum" and v["opzioni"] and v["xsd"] and "Si salva il codice" in v["aiuto"] for v in s.values())
     assert set(s) == set(C.REGOLE)
+
+
+# ------------------------------------------------------------------ province e liste lunghe (SOGLIA_MENU)
+def test_suggerimenti_sono_campi_reali_e_oltre_la_soglia():
+    for chiave, (tipo, etichetta) in C.SUGGERIMENTI.items():
+        assert etichetta and len(C.voci(tipo)) > C.SOGLIA_MENU, chiave
+        parti = chiave.split(".", 1)
+        if parti[0] == "dichiarazione":
+            assert parti[1].split(".")[0] in SUP.CHIAVI_DICHIARAZIONE
+            _chiave_annidata_esiste(parti[1])
+        else:
+            assert S.COLLEZIONI[parti[0]][parti[1]] in ("str", "cf")
+    assert not set(C.SUGGERIMENTI) & set(C.REGOLE)
+
+
+def test_i_menu_restano_entro_la_soglia():
+    for chiave, (tipo, _) in C.REGOLE.items():
+        assert len(C.voci(tipo)) <= C.SOGLIA_MENU, chiave
+
+
+def test_province_nei_menu():
+    s = C.strutturati()
+    nasc = {o["valore"] for o in s["persone.provincia_nascita"]["opzioni"]}
+    assert len(nasc) == 115 and {"RM", "EE", "FU"} <= nasc
+    assert {o["valore"] for o in s["persone.provincia_decesso"]["opzioni"]} == nasc
+    imm = {o["valore"] for o in s["beni.provincia@immobile"]["opzioni"]}
+    assert len(imm) == 112 and {"RM", "BZ", "TN", "GO", "TS", "BL"} <= imm and not {"FU", "PL", "ZA"} & imm
+    assert "beni.provincia" not in s                     # gli altri beni non hanno provincia
+
+
+def test_unione_dei_tipi_senza_duplicati_e_ordine_naturale(monkeypatch):
+    monkeypatch.setattr(X, "enumerazioni", lambda t, namespace=None: {"A": "", "B": "x"} if t == "T1" else {"B": "y", "C": "z"})
+    assert [(v["valore"], v["etichetta"]) for v in C.voci("T1+T2")] == [("A", "A"), ("B", "x"), ("C", "z")]
+    assert C.tipi_xsd("T1+T2") == ["T1", "T2"] and C.tipi_xsd("T1") == ["T1"]
+
+
+def test_suggerimenti_elenco_e_assenza_fonti(monkeypatch):
+    sg = C.suggerimenti()
+    assert len(sg["beni.codice_comune_catastale"]["valori"]) == 692 and "613" in sg["beni.codice_comune_catastale"]["valori"]
+    assert len(sg["dichiarazione.testamento.ufficio_registrazione"]["valori"]) == 1261
+    monkeypatch.setattr(X, "enumerazioni", lambda *a, **k: (_ for _ in ()).throw(KeyError("x")))
+    assert C.suggerimenti() == {}
+
+
+def test_esportazione_reale_con_province_e_codici_dei_menu():
+    d = caso_a10()
+    pers = d["opzioni"]["telematico"]["persone"]
+    for p in d["persone"]:
+        pers.setdefault(p["id"], {})["provincia_nascita"] = "FU" if p["ruolo"] == "defunto" else "MI"
+        if p["ruolo"] == "defunto":
+            p["data_decesso"] = "2025-03-10"
+            pers[p["id"]]["provincia_decesso"] = "TN"
+    for b in d["beni"]:
+        if b["tipo"] in ("fabbricato", "terreno"):
+            d["opzioni"]["telematico"]["beni"].setdefault(b["id"], {})["provincia"] = "MI"
+    assert not [e for e in _errori(d) if e[1] == "VALORE_NON_VALIDO"], _errori(d)
+
+
+def test_provincia_non_in_elenco_e_ancora_un_errore():
+    d = caso_a10()
+    d["opzioni"]["telematico"]["persone"][next(p["id"] for p in d["persone"] if p["ruolo"] == "defunto")]["provincia_nascita"] = "XX"
+    assert any(p.endswith("provincia_nascita") or "Provincia" in p for p, c in _errori(d) if c == "VALORE_NON_VALIDO")
+
+
+def test_tavolare_con_provincia_e_comune_catastale_dei_codici():
+    d = caso_tavolare()
+    for b in d["beni"]:
+        if b["id"].endswith("tav1"):
+            assert b["provincia"] in {v["valore"] for v in C.voci(C.REGOLE["beni.provincia@immobile"][0])}
+            assert b["codice_comune_catastale"] in C.suggerimenti()["beni.codice_comune_catastale"]["valori"]
+    assert not [e for e in _errori(d) if e[1] == "VALORE_NON_VALIDO"], _errori(d)
+    d["beni"][-1]["codice_comune_catastale"] = "999"          # fuori elenco
+    assert any(c == "VALORE_NON_VALIDO" for _, c in _errori(d))
+
+
+def test_ufficio_registrazione_testamento_dai_suggerimenti():
+    d = caso_testamento()
+    ufficio = C.suggerimenti()["dichiarazione.testamento.ufficio_registrazione"]["valori"][5]
+    d["opzioni"]["telematico"]["dichiarazione"]["testamento"]["ufficio_registrazione"] = ufficio
+    assert not [e for e in _errori(d) if e[0].endswith("ufficio_registrazione")]
+    d["opzioni"]["telematico"]["dichiarazione"]["testamento"]["ufficio_registrazione"] = "ZZZ"
+    assert any(p.endswith("ufficio_registrazione") for p, _ in _errori(d))
+
+
+def test_ordine_con_codici_numerici_e_alfanumerici_misti():
+    v = [x["valore"] for x in C.voci("UfficioDiRegistrazione_Type")]
+    assert v[0] == "795" or v[0].isdigit()
+    primo_alfa = next(i for i, c in enumerate(v) if not c.isdigit())
+    assert all(c.isdigit() for c in v[:primo_alfa]) and v[primo_alfa:] == sorted(v[primo_alfa:], key=C._chiave_naturale)
+    assert C._chiave_naturale("795") < C._chiave_naturale("T57")
+
+
+def test_etichette_dei_suggerimenti():
+    assert C.SUGGERIMENTI["beni.codice_comune_catastale"][1] == "codice del comune catastale (TN e BZ)"
+    assert C.suggerimenti()["beni.codice_comune_catastale"]["etichetta"].startswith("codice del comune")
