@@ -172,8 +172,10 @@ def test_quadri_generati_sono_marcati_e_non_si_selezionano():
     assert all(not Q.PER_ID[i]["supportato"] for i in generati)
     assert not generati & set(Q.PREDEFINITI)
     assert "Seleziona il quadro (blocca la finalizzazione)" in JS            # resta solo per i quadri non generati
-    blocco = JS.split("function renderNonSupp")[1].split("main.append(h(\"div\", { class: \"nota\" }, \"Il quadro \" + q.id")[0]
-    assert "q.generato" in blocco and "return;" in blocco and "Seleziona" not in blocco
+    blocco = JS.split("function renderNonSupp")[1].split("async function impostaQuadro")[0]
+    ramo_generato = blocco.split("return;")[0]
+    assert "q.generato" in ramo_generato and "Seleziona il quadro" not in ramo_generato and "Deseleziona" in ramo_generato
+    assert "Seleziona il quadro" in blocco.split("return;")[1]
 
 
 def test_un_quadro_generato_gia_selezionato_continua_a_bloccare(sv):

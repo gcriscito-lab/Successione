@@ -49,7 +49,7 @@ def parse_quota(v) -> Fraction:
         raise ValoreNonValido("nella quota il denominatore deve essere maggiore di zero e il numeratore non negativo (esempio 1/2)")
     f = Fraction(n, d)
     if f > 1:
-        raise ValoreNonValido("la quota non puo' essere maggiore di 1 (esempio 1/2)")
+        raise ValoreNonValido("quota maggiore di 1 non ammessa (esempio 1/2)")
     return f
 
 

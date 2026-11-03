@@ -460,12 +460,25 @@ function renderStrutturati(ins, q, r) {
   if (q.coll === 'devoluzioni') {
     const sd = (S.schema.strutturati || {})['devoluzioni.agevolazioni'];
     const bene = (S.P.dati.beni || []).find(b => b.id === valRiga(r, 'bene_id'));
-    ins.append(h('h3', {}, 'Agevolazione prima casa'));
-    ins.append(campoStrutturato(sd, valore('agevolazioni'), v => scrivi('agevolazioni', v), null));
+    const attuale = String(valore('agevolazioni') || '').toUpperCase();
+    ins.append(h('h3', {}, 'Agevolazione (prima casa, riduzioni)'));
+    ins.append(campoStrutturato(sd, valore('agevolazioni'), v => { scrivi('agevolazioni', v); renderIns(); }, null));
     ins.append(h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:4px' }, sd.aiuto));
-    if (bene && quadroBene(bene) !== 'EC')
+    if (bene && ['P', 'X', 'Z'].includes(attuale) && quadroBene(bene) !== 'EC')
       ins.append(h('div', { class: 'nota', style: 'margin:6px 0' }, 'Il bene collegato non è un fabbricato del quadro EC: i codici P, X, Z sono ammessi solo lì e l\'esportazione segnalerà un errore.'));
+    const rd = (S.schema.strutturati || {})['devoluzioni.riduzioni'];
+    ins.append(h('h3', {}, 'Riduzione art. 25 comma 1'));
+    ins.append(campoStrutturato(rd, valore('riduzioni'), v => scrivi('riduzioni', v), null));
+    ins.append(h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:4px' }, rd.aiuto));
+    if (valore('riduzioni') && bene)
+      ins.append(h('div', { class: 'nota', style: 'margin:6px 0' }, 'Indica anche il valore delle precedenti successioni nel pannello del bene collegato (' + etichetta('beni', bene) + ').'));
     return;
+  }
+  if (q.coll === 'beni') {
+    const vp = (S.schema.strutturati || {})['beni.valore_prec_succ'];
+    const inp = h('input', { id: 'vps_' + id, class: 'num', autocomplete: 'off', 'aria-label': vp.etichetta, value: valore('valore_prec_succ') == null ? '' : String(valore('valore_prec_succ')),
+      oninput: ev => scrivi('valore_prec_succ', leggi('importo', ev.target.value)) });
+    ins.append(h('h3', {}, 'Precedenti successioni o donazioni'), h('div', { class: 'rg' }, h('label', { for: 'vps_' + id }, vp.etichetta), h('div', {}, inp, h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:2px' }, vp.aiuto))));
   }
   if (q.coll === 'persone') {
     const cb = h('input', { type: 'checkbox', 'aria-label': 'portatore handicap', onchange: ev => scrivi('portatore_handicap', ev.target.checked) });
@@ -785,6 +798,34 @@ function sezionePrimaCasa() {
   sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "pc_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
   return sez;
 }
+/* Sezione IV del quadro EH per le riduzioni dell'art. 25 e i codici L, Q chiesti dal dichiarante:
+   opzioni.telematico.dichiarazione.riduzioni_art25 (elenco, etichette e aiuti: schema.STRUTTURATI, regole: docs/regole/riduzioni_art25.md). */
+function sezioneRiduzioni() {
+  const dich = ((S.P.dati.opzioni || {}).telematico || {}).dichiarazione || {};
+  const defs = Object.entries(S.schema.strutturati || {}).filter(([k]) => k.startsWith("dichiarazione.riduzioni_art25."));
+  const sez = h("section", { class: "grp", id: "sezRiduzioni" }, h("h2", {}, "Riduzioni dell'art. 25 e codici L, Q (Sezione IV del quadro EH)"),
+    h("div", { class: "nota", style: "margin:8px 14px" }, "Servono solo se il dichiarante chiede una riduzione 1-5 oppure L o Q: i codici si impostano sulle righe di devoluzione (scheda DV) e il valore delle precedenti successioni sul bene. Indica la successione precedente OPPURE la donazione precedente. Fonti: docs/regole/riduzioni_art25.md."));
+  for (const [percorso, sd] of defs) {
+    const chiave = percorso.slice("dichiarazione.".length);   // es. riduzioni_art25.l.data
+    const corrente = S.dichDirty.has(chiave) ? S.dichDirty.get(chiave) : chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
+    const id = "ra_" + chiave.replaceAll(".", "_"), isData = sd.formato === "data";
+    let inp;
+    if (sd.tipo === "bool") {
+      inp = h("select", { id, "aria-label": sd.etichetta }, h("option", { value: "" }, "(non indicato)"), h("option", { value: "si" }, "sì"), h("option", { value: "no" }, "no"));
+      inp.value = corrente === true ? "si" : corrente === false ? "no" : "";
+    } else inp = h("input", { id, "aria-label": sd.etichetta, autocomplete: "off", list: sd.suggerimenti ? listaSuggerimenti(sd.suggerimenti) : null,
+      placeholder: isData ? "GG/MM/AAAA" : "", value: corrente == null ? "" : isData ? dataIt(String(corrente)) : String(corrente) });
+    const modifica = () => {
+      const t = inp.value.trim();
+      S.dichDirty.set(chiave, t === "" ? null : sd.tipo === "bool" ? t === "si" : isData ? dataIso(t) : t);
+      aggiornaBottoni(); renderSb();
+    };
+    inp.addEventListener("input", modifica); inp.addEventListener("change", modifica);
+    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut", style: "font-size:0.8846rem;margin-top:2px" }, sd.aiuto))));
+  }
+  sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "ra_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
+  return sez;
+}
 function renderFront(main) {
   main.append(h('p', { class: 'generali-intro' }, 'Compila i dati nell’ordine indicato. Le modifiche si salvano insieme con Salva o Ctrl+S.'));
   const grid = h('div', { class: 'generali-griglia' }); main.append(grid);
@@ -807,9 +848,10 @@ function renderFront(main) {
   const testamento = h('details', { class: 'gruppo-opzionale', open: dich.devoluzione_per_testamento === true || !!dich.testamento }, h('summary', {}, 'Testamento · dati da compilare se presente'),
     sezioneDatiDichiarazione(CAMPI_DICH.filter(([k]) => k.startsWith('testamento.')).map(([k]) => k), 'Estremi del testamento'));
   const primaCasa = h('details', { class: 'gruppo-opzionale', open: !!dich.prima_casa }, h('summary', {}, 'Agevolazione prima casa'), sezionePrimaCasa());
+  const riduzioni = h('details', { class: 'gruppo-opzionale', open: !!dich.riduzioni_art25 }, h('summary', {}, 'Riduzioni art. 25 e codici L, Q'), sezioneRiduzioni());
   const aziende = h('details', { class: 'gruppo-opzionale', open: S.P.dati.beni.some(b => b.tipo === 'azienda') }, h('summary', {}, 'Dati delle aziende · se presenti'),
     sezioneDatiDichiarazione(['azienda_data_deposito', 'azienda_camera_commercio'], 'Deposito e camera di commercio'));
-  main.append(testamento, primaCasa, aziende);
+  main.append(testamento, primaCasa, riduzioni, aziende);
   const att = new Set(S.P.dati.opzioni.quadri_attivi || S.schema.predefiniti);
   const box = h('details', { class: 'gruppo-opzionale' }, h('summary', {}, 'Quadri inclusi nella pratica · ' + att.size + ' selezionati'));
   for (const q of S.schema.quadri.filter(x => x.gruppo !== 'frontespizio' && x.id !== 'DV' && (!x.generato || att.has(x.id)))) {
@@ -925,7 +967,8 @@ async function salvaTutto() {
       for (const p of parti.slice(0, -1)) o = o[p] = o[p] || {};
       if (val === null) delete o[parti.at(-1)]; else o[parti.at(-1)] = val;
     }
-    for (const k of ['presentatore', 'versamento', 'testamento', 'prima_casa']) if (d[k] && !Object.keys(d[k]).length) delete d[k];
+    const pota = o => { for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) { pota(o[k]); if (!Object.keys(o[k]).length) delete o[k]; } };
+    pota(d);   // oggetti annidati rimasti vuoti (presentatore, versamento, testamento, prima_casa, riduzioni_art25...)
     for (const { coll, id, campi } of supplementi.values()) {
       const ent = (tel[coll] = tel[coll] || {})[id] = ((tel[coll] || {})[id] || {});
       for (const [k, v] of Object.entries(campi)) { if (v === null) delete ent[k]; else ent[k] = v; }

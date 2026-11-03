@@ -70,8 +70,9 @@ AIUTI: dict[str, str] = {
 }
 AIUTI["beni.tipo_titolo"] = ("Quadro EO: scegli il tipo di titolo. Con «esente» (3) il valore è esente e nel file va in "
                              "ValoreEsente, non in Valore. I titoli quotati richiedono il codice fiscale dell'emittente.")
-AIUTI["devoluzioni.agevolazioni"] = ("Codice agevolazione prima casa (P, X, Z) della riga di devoluzione: vale solo per i "
-                                     "fabbricati del quadro EC. Vedi il dettaglio per ciascun codice.")
+AIUTI["devoluzioni.agevolazioni"] = ("Codice di agevolazione della riga di devoluzione. Prima casa (P, X, Z): solo per i "
+                                     "fabbricati del quadro EC. Riduzioni dell'imposta di successione (L, Q, R, F): vedi il "
+                                     "dettaglio e i quadri per ciascun codice.")
 
 
 def _opz(valore: str, etichetta: str, aiuto: str) -> dict:
@@ -115,10 +116,11 @@ STRUTTURATI: dict[str, dict] = {
         "aiuto": "Si' se l'immobile e' nel sistema tavolare (quadri EL/EM), anche fuori dalle province tavolari.",
         "opzioni": [_opz("si", "si'", "Immobile in sistema tavolare."), _opz("no", "no", "Immobile in catasto ordinario.")]},
     "devoluzioni.agevolazioni": {
-        "etichetta": "agevolazione prima casa", "tipo": "enum", "aiuto": AIUTI["devoluzioni.agevolazioni"] +
-        " Si indica sulla riga del soggetto che chiede il beneficio; si estende a tutti i beneficiari del bene. "
-        "Non cambia l'imposta di successione: restano dovute le imposte ipotecaria e catastale in misura fissa "
-        "(Fascicolo I p. 57). Il codice Y non è supportato.",
+        "etichetta": "agevolazione", "tipo": "enum", "aiuto": AIUTI["devoluzioni.agevolazioni"] +
+        " Si indica sulla riga del soggetto che chiede il beneficio. P, X, Z: si estende a tutti i beneficiari del bene e "
+        "non cambia l'imposta di successione (restano dovute le imposte ipotecaria e catastale in misura fissa, "
+        "Fascicolo I p. 57). L, Q, R, F riducono l'imposta di successione (docs/regole/riduzioni_art25.md). "
+        "Gli altri codici (Y, A, C, D, E, G, H, M, N) non sono supportati.",
         "opzioni": [
             _opz("P", "prima casa",
                  "Casa di abitazione con categoria catastale diversa da A/1, A/8, A/9 (Fascicolo I p. 60); un solo immobile "
@@ -128,8 +130,75 @@ STRUTTURATI: dict[str, dict] = {
             _opz("Z", "immobile contiguo",
                  "Immobile contiguo: solo del dichiarante e solo se ha anche P; richiede l'impegno all'unione catastale "
                  "(un solo Z). Fascicolo I p. 26."),
+            _opz("L", "beni culturali (art. 25 c. 2)",
+                 "Beni culturali con vincolo posteriore all'apertura della successione. Quadri EB, EC, EL, EM. Riduzione con "
+                 "coefficiente 0,5. Se la chiede il dichiarante compila la Sezione IV del quadro EH (numero protocollo e data); "
+                 "per un altro beneficiario si compilano i righi EG11 e EG7 del quadro EG. Non convive con P, X, Z "
+                 "sullo stesso bene. Non combinabile con una riduzione 1-5 sulla stessa riga."),
+            _opz("Q", "aziende, quote di societa' di persone, beni strumentali in comuni montani (art. 25 c. 4-bis)",
+                 "Supportato nei quadri EN ed EO. Coefficiente 0,4. Se la chiede il dichiarante, nella Sezione IV del quadro EH "
+                 "si spunta il codice Q; per un altro beneficiario righi EG11 e EG7. Ammessa solo per alcuni gradi di "
+                 "parentela (annotazione XSD di Agevolazioni): altrimenti l'esportazione segnala l'errore."),
+            _opz("R", "fondi rustici (art. 25 c. 3)",
+                 "Quadri EB, EC, EL, EM. Coefficiente 0,4, con soglia di 103.291 euro per riga. Nessuna sezione del quadro EH: "
+                 "l'attestazione dell'ufficio regionale va allegata al quadro EG (rigo EG8 «Altro»). Una sola riga R per "
+                 "beneficiario. Ammessa solo per alcuni gradi di parentela (annotazione XSD)."),
+            _opz("F", "immobili di impresa artigiana familiare (art. 25 c. 4)",
+                 "Solo quadri EC ed EM. Coefficiente 0,4, con soglia di 103.291 euro per riga. Nessuna sezione del quadro EH. "
+                 "Una sola riga F per beneficiario. Ammessa solo per alcuni gradi di parentela (annotazione XSD)."),
         ],
     },
+    "devoluzioni.riduzioni": {
+        "etichetta": "riduzione art. 25 comma 1", "tipo": "enum",
+        "aiuto": "Beni oggetto di precedenti successioni o donazioni (art. 25 c. 1). Richiede il «valore delle precedenti "
+                 "successioni» sul bene collegato. Quadri EB, EC, EL, EM, EN, EO, EP, EQ, ER (non per i cespiti DN). Lo stesso "
+                 "codice va indicato su tutte le righe di devoluzione del bene; non si combina con un'agevolazione sulla "
+                 "stessa riga e non vale per i trust. Il dichiarante compila la Sezione IV del quadro EH; per un altro "
+                 "beneficiario si compilano i righi EG11 e EG7. Fonte: docs/regole/riduzioni_art25.md.",
+        "opzioni": [
+            _opz("1", "precedente successione o donazione entro 1 anno", "Coefficiente di riduzione 0,5."),
+            _opz("2", "precedente successione o donazione entro 2 anni", "Coefficiente di riduzione 0,4."),
+            _opz("3", "precedente successione o donazione entro 3 anni", "Coefficiente di riduzione 0,3."),
+            _opz("4", "precedente successione o donazione entro 4 anni", "Coefficiente di riduzione 0,2."),
+            _opz("5", "precedente successione o donazione entro 5 anni", "Coefficiente di riduzione 0,1."),
+        ],
+    },
+    "beni.valore_prec_succ": {
+        "etichetta": "valore delle precedenti successioni o donazioni", "tipo": "importo",
+        "aiuto": "Euro interi. Obbligatorio se la riga di devoluzione del bene ha una riduzione art. 25 c. 1 (1-5), assente "
+                 "senza riduzione; positivo e non superiore al campo «valore» del bene. Non per i titoli esenti."},
+    "dichiarazione.riduzioni_art25.dichiara_requisiti": {
+        "etichetta": "riduzioni: dichiaro di possedere i requisiti", "tipo": "bool",
+        "aiuto": "Sezione IV del quadro EH, solo se il dichiarante chiede L, Q o una riduzione 1-5: la firma attesta il possesso "
+                 "dei requisiti; per esportare va confermato («si»)."},
+    "dichiarazione.riduzioni_art25.l.num_protocollo": {
+        "etichetta": "codice L: numero di protocollo", "tipo": "testo",
+        "aiuto": "Estremi della richiesta/attestazione dei beni culturali, da 7 a 16 caratteri (controllo ufficiale eseguito in "
+                 "locale, non scritto negli XSD). Serve solo se il dichiarante chiede L."},
+    "dichiarazione.riduzioni_art25.l.data": {
+        "etichetta": "codice L: data", "tipo": "testo", "formato": "data",
+        "aiuto": "Data della richiesta/attestazione dei beni culturali (GG/MM/AAAA). Serve solo se il dichiarante chiede L."},
+    "dichiarazione.riduzioni_art25.successione_precedente.ufficio": {
+        "etichetta": "successione precedente: ufficio", "tipo": "testo", "suggerimenti": "dichiarazione.testamento.ufficio_registrazione",
+        "aiuto": "Codice dell'ufficio territoriale della dichiarazione di successione precedente. Indicare la successione "
+                 "precedente OPPURE la donazione precedente, non entrambe."},
+    "dichiarazione.riduzioni_art25.successione_precedente.anno": {
+        "etichetta": "successione precedente: anno", "tipo": "testo", "aiuto": "Anno a quattro cifre."},
+    "dichiarazione.riduzioni_art25.successione_precedente.volume": {
+        "etichetta": "successione precedente: volume", "tipo": "testo", "aiuto": "Fino a 5 cifre."},
+    "dichiarazione.riduzioni_art25.successione_precedente.numero": {
+        "etichetta": "successione precedente: numero", "tipo": "testo", "aiuto": "Fino a 6 cifre."},
+    "dichiarazione.riduzioni_art25.donazione_precedente.ufficio": {
+        "etichetta": "donazione precedente: ufficio di registrazione", "tipo": "testo",
+        "suggerimenti": "dichiarazione.testamento.ufficio_registrazione",
+        "aiuto": "Codice dell'ufficio di registrazione dell'atto di donazione precedente."},
+    "dichiarazione.riduzioni_art25.donazione_precedente.serie": {
+        "etichetta": "donazione precedente: serie", "tipo": "testo",
+        "aiuto": "Cifra da 1 a 4, con una lettera facoltativa (Serie_Type, XSD)."},
+    "dichiarazione.riduzioni_art25.donazione_precedente.numero": {
+        "etichetta": "donazione precedente: numero di registrazione", "tipo": "testo", "aiuto": "Fino a 6 cifre."},
+    "dichiarazione.riduzioni_art25.donazione_precedente.sottonumero": {
+        "etichetta": "donazione precedente: sottonumero", "tipo": "testo", "aiuto": "Facoltativo, fino a 3 cifre."},
     "dichiarazione.prima_casa.dichiara_requisiti": {
         "etichetta": "prima casa: dichiaro di possedere i requisiti", "tipo": "bool",
         "aiuto": "Serve solo se il dichiarante chiede P. La Sezione II del quadro EH attesta con la firma il possesso dei "

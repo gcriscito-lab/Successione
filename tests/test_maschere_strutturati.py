@@ -18,6 +18,7 @@ from successioni.archivio import Archivio  # noqa: E402
 from successioni.servizio import Servizio  # noqa: E402
 from successioni.telematico import prima_casa as PC  # noqa: E402
 from successioni.telematico import supplemento as SUP  # noqa: E402
+from successioni.telematico import riduzioni_art25 as RA  # noqa: E402
 from successioni.telematico.esporta import esporta_xml  # noqa: E402
 from successioni.web import crea_app  # noqa: E402
 from telematico_casi import (ALLEGATI_A10, FIXTURE, aggiungi_fabbricato, caso_prima_casa, contesto)  # noqa: E402
@@ -45,7 +46,9 @@ def test_le_chiavi_prima_casa_della_maschera_sono_quelle_lette_dall_esportazione
 def test_i_valori_ammessi_della_maschera_sono_quelli_dell_esportazione():
     assert _valori(PREFISSO + "requisito_comune") == list(PC.REQUISITO_COMUNE)
     assert _valori(PREFISSO + "altra_casa") == list(PC.ALTRA_CASA)
-    assert _valori("devoluzioni.agevolazioni") == list(PC.CODICI) == ["P", "X", "Z"]
+    assert list(PC.CODICI) == ["P", "X", "Z"]
+    assert _valori("devoluzioni.agevolazioni") == list(PC.CODICI) + list(RA.CODICI_AGEV)       # + L, Q, R, F (riduzioni art. 25)
+    assert _valori("devoluzioni.riduzioni") == list(RA.CODICI_RID)
 
 
 def test_la_chiave_agevolazioni_e_gestita_dal_supplemento():
@@ -64,7 +67,7 @@ def test_i_tipi_di_titolo_sono_quelli_dello_schema_xsd():
 
 def test_ogni_voce_ha_etichetta_e_aiuto_e_il_titolo_esente_spiega_valore_esente():
     for chiave, d in S.STRUTTURATI.items():
-        assert d["etichetta"].strip() and d["aiuto"].strip() and d["tipo"] in ("enum", "bool"), chiave
+        assert d["etichetta"].strip() and d["aiuto"].strip() and d["tipo"] in ("enum", "bool", "testo", "importo"), chiave
         for o in d.get("opzioni", []):
             assert o["valore"] and o["etichetta"].strip() and o["aiuto"].strip(), (chiave, o)
     esente = next(o for o in S.STRUTTURATI["beni.tipo_titolo"]["opzioni"] if o["valore"] == "3")
