@@ -216,3 +216,30 @@ def test_passivita_collegata_a_una_disponibilita_finanziaria(sv):
     ps = next(p for p in dati["passivita"] if p["descrizione"].startswith("MUTUO"))
     bene = next(b for b in dati["beni"] if b["tipo"] == "disponibilita_finanziaria")
     assert dati["opzioni"]["telematico"]["passivita"][ps["id"]]["bene_id"] == bene["id"]
+
+
+def test_quota_con_un_solo_termine_e_un_errore_non_una_perdita_silenziosa():
+    t = _xml().decode()
+    senza_den = t.replace("<suc:PossessoDenominatore>2</suc:PossessoDenominatore>", "", 1)
+    assert senza_den != t
+    with pytest.raises(XmlNonImportabile, match="quota incompleta, manca il denominatore"):
+        importa_xml(senza_den.encode())
+    i = t.index("<suc:PossessoNumeratore>1,00")
+    senza_num = t[:i] + t[i:].replace("<suc:PossessoNumeratore>1,00</suc:PossessoNumeratore>", "", 1)
+    with pytest.raises(XmlNonImportabile, match="quota incompleta, manca il numeratore"):
+        importa_xml(senza_num.encode())
+
+
+def test_elemento_duplicato_non_si_scarta_in_silenzio():
+    t = _xml().decode()
+    cf = "<suc:CodiceFiscaleDefunto>RSSMRA40A01H501K</suc:CodiceFiscaleDefunto>"
+    with pytest.raises(XmlNonImportabile, match="elemento duplicato.*CodiceFiscaleDefunto.*2 volte"):
+        importa_xml(t.replace(cf, cf + cf, 1).encode())
+
+
+def test_il_file_scaricato_di_una_bozza_si_chiama_bozza(tmp_path, monkeypatch):
+    for completo, nome in ((False, 'filename="successione_rev3_bozza.xml"'), (True, 'filename="successione_rev3.xml"')):
+        monkeypatch.setattr(Servizio, "file_export", lambda self, pid, job=None, c=completo: (b"<a/>", {"input": {"revisione": 3}, "risultato": {"completo": c}}))
+        with _client(tmp_path) as cl:
+            r = cl.get("/api/pratiche/pr_x/file.xml?t=sintetico")
+            assert r.status_code == 200 and nome in r.headers["content-disposition"]

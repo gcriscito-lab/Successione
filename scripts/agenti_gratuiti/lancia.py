@@ -50,6 +50,23 @@ VERIFICHE: dict[str, list[list[str]]] = {
     "C22": [[sys.executable, "-m", "pytest", "-q", "tests/test_pdfa_rilevamento_extra.py"]],
     "C23": [[sys.executable, "-m", "pytest", "-q", "tests/test_supplemento_chiavi_extra.py"]],
     "C24": [[sys.executable, "-m", "pytest", "-q", "tests/test_invio_stati_extra.py"]],
+    "C25": [[sys.executable, "-m", "pytest", "-q", "tests/test_impostazioni_extra.py"]],
+    "C26": [[sys.executable, "-m", "pytest", "-q", "tests/test_stampa_extra.py"]],
+    "C27": [[sys.executable, "-m", "pytest", "-q", "tests/test_importa_extra.py"]],
+    "C28": [[sys.executable, "-m", "pytest", "-q", "tests/test_prima_casa_extra.py"]],
+    "C29": [[sys.executable, "-m", "pytest", "-q", "tests/test_codice_fiscale_extra.py"]],
+    "C30": [[sys.executable, "-m", "pytest", "-q", "tests/test_archivio_extra.py"]],
+    "C31": [[sys.executable, "-m", "pytest", "-q", "tests/test_allegati_extra.py"]],
+    "C32": [[sys.executable, "-m", "pytest", "-q", "tests/test_integrita_extra.py"]],
+    "C33": [[sys.executable, "-m", "pytest", "-q", "tests/test_blocchi_extra.py"]],
+    "C34": [[sys.executable, "-m", "pytest", "-q", "tests/test_elaborati_extra.py"]],
+    "C35": [[sys.executable, "-m", "pytest", "-q", "tests/test_errori_extra.py"]],
+    "C36": [[sys.executable, "-m", "pytest", "-q", "tests/test_cli_extra.py"]],
+    "C37": [[sys.executable, "-m", "pytest", "-q", "tests/test_collegamenti_base_extra.py"]],
+    "C38": [[sys.executable, "-m", "pytest", "-q", "tests/test_documenti_base64_extra.py"]],
+    "C39": [[sys.executable, "-m", "pytest", "-q", "tests/test_xsd_extra.py"]],
+    "C40": [[sys.executable, "-m", "pytest", "-q", "tests/test_mappa_extra.py"]],
+    "C41": [[sys.executable, "-m", "pytest", "-q", "tests/test_mcp_schema_extra.py"]],
 }
 
 REGOLE_SISTEMA = (

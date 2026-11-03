@@ -151,7 +151,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def scarica_xml(request):
         xml, j = sv.file_export(request.path_params["pid"], request.query_params.get("job"))
         return Response(xml, media_type="application/xml", headers={"Content-Disposition":
-                        f'attachment; filename="successione_rev{j["input"]["revisione"]}.xml"', "Cache-Control": "no-store"})
+                        f'attachment; filename="successione_rev{j["input"]["revisione"]}{"" if j["risultato"].get("completo") else "_bozza"}.xml"', "Cache-Control": "no-store"})
 
     @api
     async def stampa(request):
