@@ -29,6 +29,8 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         "comune_decesso": "str", "provincia_decesso": "str",
         # Successione per rappresentazione (EA): codice fiscale e grado del rappresentato (figlio 02, fratello 10/11)
         "rappresentato_cf": "str", "rappresentato_grado": "str",
+        # Persona con disabilita' grave o interdetta (EH): estremi del verbale della commissione o della sentenza
+        "certificatore_disabilita": "str",
     },
     "beni": {
         "tipo": "enum:" + "|".join(TIPI_BENE), "descrizione": "str",
@@ -74,6 +76,7 @@ AIUTI: dict[str, str] = {
     "beni.codice_stato_estero": "Immobile estero (provincia EE): codice a 3 cifre dello Stato estero (Appendice del Modello Unico Persone fisiche), es. 029 per la Francia.",
     "beni.stato_estero": "Immobile estero: nome dello Stato (massimo 34 caratteri).",
     "persone.grado_parentela": "Codice del grado di parentela con il defunto, come nelle istruzioni del quadro EA (es. 02).",
+    "persone.certificatore_disabilita": "Solo per persone con disabilita' grave o interdette (quadro EH, lettera e): estremi del verbale della commissione (L. 104/1992 art. 4) o della sentenza di interdizione/inabilitazione, al massimo 35 caratteri.",
     "persone.rappresentato_cf": "Solo per chi succede per rappresentazione (grado 04, 06, 08, 15, 20, 27): codice fiscale del rappresentato (figlio o fratello del defunto, premorto o rinunciatario).",
     "persone.rappresentato_grado": "Grado di parentela del rappresentato con il defunto: 02 (figlio/a) per i discendenti dei figli, 10 o 11 (fratello/sorella germano o unilaterale) per i discendenti dei fratelli.",
     "beni.codice_comune": "Codice catastale del comune (4 caratteri, es. H501).",

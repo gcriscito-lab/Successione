@@ -33,7 +33,7 @@ from .. import valori as V
 CHIAVI = {
     "persone": {"sesso", "provincia_nascita", "tipo_soggetto", "grado_parentela", "portatore_handicap",
                 "comune_decesso", "provincia_decesso", "rappresentato_cf", "rappresentato_grado", "rinuncia",
-                "rinuncia_estremi", "residenza_estera", "denominazione"},
+                "rinuncia_estremi", "residenza_estera", "denominazione", "certificatore_disabilita"},
     "beni": {"provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo", "indirizzo",
              "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe", "zona_censuaria",
              "consistenza", "tipo_cespite", "estremi_trascrizione", "estremi_registrazione",
@@ -48,7 +48,8 @@ CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiara
                         "devoluzione_per_testamento", "testamento", "azienda_data_deposito", "azienda_camera_commercio",
                         "prima_casa", "riduzioni_art25",
                         "codice_sostitutiva", "prima_anno", "prima_volume", "prima_numero", "ipotecaria_versata",
-                        "catastale_versata", "successione_versata", "circoscrizioni_nuove"}
+                        "catastale_versata", "successione_versata", "circoscrizioni_nuove",
+                        "separazione_con_colpa", "no_scioglimento_unione_civile", "reintegro_1", "reintegro_2", "reintegro_3"}
 # Sezione Testamento del frontespizio (annotazioni XSD: Pubblicazione, Registrazione, TestamentoEstero)
 CHIAVI_TESTAMENTO = {"estero", "pubblico_ufficiale", "data_pubblicazione", "ufficio_registrazione", "serie",
                      "numero_registrazione", "sottonumero_registrazione", "data_registrazione"}
@@ -104,6 +105,10 @@ def chiavi_non_gestite(dati: dict) -> list[str]:
     tst = d.get("testamento")
     if isinstance(tst, dict):
         out += [f"opzioni.telematico.dichiarazione.testamento.{k}" for k in tst if k not in CHIAVI_TESTAMENTO]
+    for n in (1, 2, 3):
+        r = d.get(f"reintegro_{n}")
+        if isinstance(r, dict):
+            out += [f"opzioni.telematico.dichiarazione.reintegro_{n}.{k}" for k in r if k not in CHIAVI_TESTAMENTO]
     pc = d.get("prima_casa")
     if pc is not None and not isinstance(pc, dict):
         out.append("opzioni.telematico.dichiarazione.prima_casa: attesa una struttura di chiavi")
