@@ -28,7 +28,7 @@ COPERTURA_NON_DISPONIBILE = [
 STRUMENTI_LETTURA = frozenset({
     "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
     "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
-    "file_in_ingresso", "elenca_allegati",
+    "file_in_ingresso", "elenca_allegati", "diagnosi",
 })
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "backup_archivio", "stampa_modello",
@@ -160,6 +160,12 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
     def controllo_ufficiale(pratica_id: str) -> dict:
         """Esegue in locale il controllo ufficiale SUC13 sul file esportato aggiornato (se Java e componenti sono configurati; altrimenti passaggio manuale tracciato, esito da_collaudare). È un controllo locale: non sostituisce la verifica con i servizi dell'Agenzia e non trasmette nulla."""
         return sv.controllo_ufficiale_pratica(pratica_id)
+
+    @tool
+    def diagnosi() -> dict:
+        """Diagnosi dell'ambiente in sola lettura: cartella dei dati, Java, componente di controllo SUC13 (con versione installata e confronto con quella provata), Ghostscript, veraPDF, Desktop Telematico, Entratel-Multifile, backup e collegamento di Claude. Ogni voce e' ok, avviso, errore o info, con il rimedio. Non esegue nulla dell'Agenzia."""
+        from . import strumenti
+        return strumenti.diagnosi(sv.arch)
 
     @tool(ann=LOCALE)
     def backup_archivio() -> dict:

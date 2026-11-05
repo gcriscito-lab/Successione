@@ -1339,7 +1339,27 @@ function impPreferenzeRender(p) {
     casella('visura_blocca', 'Una visura vecchia o senza data blocca la finalizzazione', 'Il Fascicolo chiede visure di non più di tre mesi prima della presentazione. Se non spunti, è solo un avviso.'),
     casella('mcp_sola_lettura', 'Claude (MCP) in sola lettura', 'Claude può leggere pratiche e controlli ma non modificare pratiche, generare file, allegare o fare backup. Vale subito, senza riavvio.'));
 }
+function impDiagnosiRender(componente) {
+  const box = $('#impDiagnosi');
+  const nota = componente && componente.messaggio ? h('p', { class: componente.stato === 'aggiornata' ? 'mut' : 'nota', role: 'status' }, componente.messaggio) : null;
+  const risultato = h('div', { id: 'impDiagnosiRis', 'aria-live': 'polite' });
+  box.replaceChildren(h('h3', {}, 'Diagnosi'),
+    h('p', { class: 'mut' }, 'Controlla Java, il componente di controllo SUC13 (e la sua versione), Ghostscript, veraPDF, Desktop Telematico, Entratel-Multifile, i backup e il collegamento di Claude. Non esegue nulla dell\'Agenzia.'),
+    nota,
+    h('button', { type: 'button', class: 'gh', onclick: async ev => {
+      ev.target.disabled = true; risultato.replaceChildren(h('p', { class: 'mut' }, 'Controllo in corso…'));
+      try {
+        const r = await post('/api/diagnosi', {});
+        const icona = { ok: '✓', avviso: '⚠', errore: '✗', info: 'ℹ' };
+        risultato.replaceChildren(h('p', { style: 'font-weight:600' }, r.riepilogo),
+          ...r.voci.map(v => h('div', { class: 'campo', style: 'margin-bottom:6px' }, h('div', {}, (icona[v.stato] || '·') + ' ' + v.nome + ' — ' + v.dettaglio),
+            v.rimedio && v.stato !== 'ok' ? h('div', { class: 'mut', style: 'font-size:0.9231rem' }, v.rimedio) : null)));
+      } catch (e) { risultato.replaceChildren(h('p', { class: 'err' }, 'Diagnosi non riuscita: ' + e.message)); }
+      ev.target.disabled = false;
+    } }, 'Esegui diagnosi'), risultato);
+}
 function impRender(s) {
+  impDiagnosiRender(s.componente_controllo);
   impProfiloRender(s.profilo || {}); impBackupRender(); impPreferenzeRender(s.preferenze || {});
   IMP.voci = s.voci; IMP.iniziali = Object.fromEntries(s.voci.map(v => [v.chiave, v.valore || ""]));
   impAspettoRender(s.interfaccia);

@@ -176,7 +176,12 @@ class TrasportoManualeTracciato:
     automatico = False
 
     def trasmetti(self, file: bytes, nome: str, metadati: dict) -> RispostaInvio:
-        return RispostaInvio("non_disponibile", motivo=ISTRUZIONI_INVIO_MANUALE)
+        try:
+            from .. import strumenti
+            sha = (metadati or {}).get("sha256") or (metadati or {}).get("xml_sha256")
+            return RispostaInvio("non_disponibile", motivo=strumenti.istruzioni_invio(nome, sha))
+        except Exception:   # le istruzioni dinamiche sono un aiuto: in caso di problema vale il testo generale
+            return RispostaInvio("non_disponibile", motivo=ISTRUZIONI_INVIO_MANUALE)
 
     def consulta(self, riferimento: dict) -> RispostaInvio:
         return RispostaInvio("sconosciuto", motivo="consultazione automatica non disponibile: fornire evidenze "

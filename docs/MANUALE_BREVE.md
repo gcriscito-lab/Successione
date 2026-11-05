@@ -42,6 +42,13 @@ Un file non si invia due volte: dopo un tentativo, anche incerto, si riconcilia 
   Per ogni immobile indica la «Data della visura catastale»: e' un dato interno, non va nell'XML.
 - **Personalizzazione (Impostazioni → Aspetto):** tema, carattere, dimensione e spaziatura, **colore di accento**, **densita' delle tabelle**, **contrasto alto**, **animazioni ridotte**,
   nome dello studio in intestazione, **quadri proposti nelle nuove pratiche** e se all'avvio riaprire l'ultima pratica. Le preferenze restano sul computer, nel file di configurazione.
+- **Diagnosi (Impostazioni → Diagnosi):** pulsante «Esegui diagnosi» (equivale a `Diagnosi.cmd`): cartella dei dati, Java, componente di controllo SUC13 con la sua
+  **versione installata** (letta dal JAR) e **avviso se e' piu' vecchia di quella provata** (2.3.1 dell'11/03/2026; avvisa anche se e' piu' recente), Ghostscript, veraPDF,
+  Desktop Telematico, Entratel-Multifile, ultimo backup e collegamento di Claude (anche la coerenza della cartella dati). Ogni voce ha il rimedio. Claude puo' usarla con
+  `successioni_diagnosi` (anche in sola lettura).
+- **Desktop Telematico ed Entratel-Multifile (Impostazioni → Strumenti e percorsi):** il programma li cerca nelle posizioni consuete (es. `C:\DesktopTelematico\DesktopTelematico`)
+  o usi il percorso indicato. Con i percorsi, «Istruzioni per l'invio reale» riporta i passi con i percorsi esatti (eseguibile di Desktop Telematico; cartelle e `.bat` di Multifile).
+  Il programma non legge credenziali, certificati ne' i `.cfg` di Multifile.
 - **Barra di stato:** mostra sempre l'archivio in uso; la scheda File mostra le versioni (programma, regole, specifiche, controllo) con cui e' stato generato il file.
 - `successioni backup <cartella>` copia database e allegati.
 - `successioni ripristina <backup> --destinazione <cartella nuova>` ripristina solo in una cartella nuova: non sovrascrive mai dati esistenti.

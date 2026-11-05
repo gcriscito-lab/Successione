@@ -171,6 +171,11 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                      sha256=r["xml_sha256"], completo=r["completo"]), headers={"Cache-Control": "no-store"})
 
     @api
+    async def diagnosi_api(request):
+        from . import strumenti
+        return strumenti.diagnosi(sv.arch)
+
+    @api
     async def pulizia_api(request):
         from . import pulizia
         return pulizia.pulisci(sv.arch.base, forzata=True)
@@ -304,7 +309,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     threading.Thread(target=pulisci_silenziosa, args=(sv.arch.base,), daemon=True, name="pulizia-avvio").start()
     return Starlette(routes=[
         Route("/api/codice-fiscale", cf_decodifica), Route("/api/importa", importa, methods=["POST"]),
-        Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
+        Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
         Route(P + "/ricevute/{tid}", ricevute, methods=["GET", "POST"]),
