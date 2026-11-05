@@ -49,13 +49,15 @@ CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiara
                         "prima_casa", "riduzioni_art25",
                         "codice_sostitutiva", "prima_anno", "prima_volume", "prima_numero", "ipotecaria_versata",
                         "catastale_versata", "successione_versata", "circoscrizioni_nuove",
-                        "separazione_con_colpa", "no_scioglimento_unione_civile", "reintegro_1", "reintegro_2", "reintegro_3"}
+                        "separazione_con_colpa", "no_scioglimento_unione_civile", "reintegro_1", "reintegro_2", "reintegro_3",
+                        "legge_estera", "eventi_eccezionali", "data_opzione", "beneficio_inventario", "residenza_estera_defunto",
+                        "casi_particolari"}
 # Sezione Testamento del frontespizio (annotazioni XSD: Pubblicazione, Registrazione, TestamentoEstero)
 CHIAVI_TESTAMENTO = {"estero", "pubblico_ufficiale", "data_pubblicazione", "ufficio_registrazione", "serie",
                      "numero_registrazione", "sottonumero_registrazione", "data_registrazione"}
 CHIAVI_VERSAMENTO = {"iban", "cf_titolare"}
 # Sezione II del quadro EH (agevolazione prima casa): vedi prima_casa.CHIAVI_PRIMA_CASA
-CHIAVI_PRESENTATORE = {"persona_id", "codice_carica", "telefono", "email"}
+CHIAVI_PRESENTATORE = {"persona_id", "codice_carica", "telefono", "email", "data_decorrenza", "rappresentato_cf", "residente_estero"}
 CHIAVI_SUPERFICIE = {"ettari", "are", "centiare"}
 CHIAVI_TOP = set(CHIAVI) | {"dichiarazione"}
 

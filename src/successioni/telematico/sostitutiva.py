@@ -55,6 +55,12 @@ def e_sostitutiva(dati: dict) -> bool:
     return ((dati.get("opzioni") or {}).get("tipo_dichiarazione") or "originaria") != "originaria"
 
 
+def e_integrativa(dati: dict) -> bool:
+    """Codice 3: dichiarazione integrativa con sola presentazione di documentazione (solo frontespizio e quadro EG)."""
+    return ((dati.get("opzioni") or {}).get("tipo_dichiarazione") == "sostitutiva"
+            and str(SUP.dich(dati, "codice_sostitutiva") or "") == "3")
+
+
 def _intero(dati: dict, chiave: str, errori: list) -> int:
     v = SUP.dich(dati, chiave)
     if v in (None, ""):
@@ -86,10 +92,7 @@ def leggi(dati: dict, data_decesso: date | None = None) -> tuple[Sostitutiva | N
         return None, [("DATO_MANCANTE", _PERC + "codice_sostitutiva", "dichiarazione sostitutiva: indicare il codice 1 "
                        "(nuova trascrizione e voltura) o 2 (senza nuova trascrizione)", FONTE_TIPO)]
     cod = str(cod)
-    if cod == "3":
-        return None, [("SOSTITUTIVA_NON_SUPPORTATA", _PERC + "codice_sostitutiva", "codice 3 (integrativa con sola "
-                       "documentazione: solo frontespizio ed EG) non ancora gestito: nessun XML", FONTE_TIPO)]
-    if cod not in ("1", "2"):
+    if cod not in ("1", "2", "3"):
         return None, [("VALORE_NON_VALIDO", _PERC + "codice_sostitutiva", f"codice {cod!r} non ammesso (1, 2 o 3)", FONTE_TIPO)]
     anno, vol, num = (str(SUP.dich(dati, k) or "").strip() for k in ("prima_anno", "prima_volume", "prima_numero"))
     for k, v in (("prima_anno", anno), ("prima_volume", vol), ("prima_numero", num)):
@@ -110,6 +113,9 @@ def leggi(dati: dict, data_decesso: date | None = None) -> tuple[Sostitutiva | N
         err.append(("VALORE_NON_VALIDO", _PERC + "prima_numero", f"numero {num!r}: solo cifre, al massimo 6 (DatoTL_Type)",
                     FONTE_ESTREMI))
     versate = [_intero(dati, k, err) for k in ("ipotecaria_versata", "catastale_versata", "successione_versata")]
+    if cod == "3" and any(versate):
+        err.append(("VALORE_NON_VALIDO", _PERC + "ipotecaria_versata", "con il codice 3 (integrativa con sola documentazione) non si "
+                    "liquidano imposte: le imposte gia' versate non si indicano", FONTE_TIPO))
     nuove = None
     if SUP.dich(dati, "circoscrizioni_nuove") not in (None, ""):
         nuove = _intero(dati, "circoscrizioni_nuove", err)
