@@ -47,6 +47,7 @@ from . import agevolazioni as AG
 from . import prima_casa as PC
 from . import riduzioni_art25 as RA
 from . import quadri_efgh as EFGH
+from . import frontespizio as FR
 from . import sostitutiva as SO
 from . import supplemento as SUP
 from . import xsd as X
@@ -1761,9 +1762,9 @@ class _Export:
         if carica is None:
             self.err("DATO_MANCANTE", "opzioni.telematico.dichiarazione.presentatore.codice_carica",
                      "codice carica del dichiarante obbligatorio", FO.fonte_xsd(el + "/Presentatore/CodiceCarica"))
-        elif carica != "1":
-            self.ns.append(f"opzioni.telematico.dichiarazione.presentatore.codice_carica={carica}: supportato solo il "
-                           "codice 1 (erede, chiamato all'eredita')")
+        elif carica not in FR.CARICHE_SUPPORTATE:
+            self.ns.append(f"opzioni.telematico.dichiarazione.presentatore.codice_carica={carica}: {FR.MOTIVO_CARICA.get(carica, 'non supportato')} "
+                           f"(supportati: {', '.join(FR.CARICHE_SUPPORTATE)})")
         self.codice_carica = carica
         if pres is not None:
             cfp = self.val("persone", pres, "codice_fiscale", cf_persona, elemento=el + "/Presentatore/CodiceFiscale")
@@ -1772,9 +1773,10 @@ class _Export:
                          "diverso dal defunto", FO.fonte_annotazione(el + "/Presentatore/CodiceFiscale"))
             in_ea = [p for p in self.ea if isinstance(p.get("codice_fiscale"), str)
                      and p["codice_fiscale"].strip().upper() == cfp]
-            if carica == "1" and not in_ea:
+            if carica == "1" and not in_ea and not self.integrativa:
                 self.err("REGOLA_PRESENTATORE", f"persone[{pres['id']}]", "con codice carica 1 il dichiarante deve essere "
                          "presente nel quadro EA come erede o chiamato", FO.fonte_annotazione(el + "/Presentatore/CodiceCarica"))
+            FR.regole_carica(self, carica, pres, cfp, cfd, in_ea)
             if pres.get("ruolo") == "presentatore" and in_ea:
                 gemello = in_ea[0]
                 for campo in ("cognome", "nome", "data_nascita", "luogo_nascita"):
@@ -1793,6 +1795,15 @@ class _Export:
             tel = psup.get("telefono")
             mail = psup.get("email")
             pres_x = {"CodiceFiscale": cfp, "CodiceCarica": carica, "DatiAnagrafici": ana_p}
+            dec_term = FR.decorrenza(self, ddec, psup)
+            if dec_term:
+                pres_x["DecorrenzaTerminePresentazione"] = dec_term
+            estero_p = FR.residente_estero(self, psup)
+            if estero_p:
+                pres_x["ResidenteEstero"] = estero_p
+            rapp_cf = FR.rappresentato(self, carica, psup, cfp, cfd)
+            if rapp_cf:
+                pres_x["CodiceFiscaleRappresentato"] = rapp_cf
             try:
                 if tel:
                     pres_x["Telefono"] = F.telefono(tel)
@@ -1822,11 +1833,23 @@ class _Export:
             self.err(cod, perc, msg, fonte)
         tipo_dich = SO.tipo_dichiarazione_xml(self.sost)
         tipo_dich["Devoluzione"] = self.devoluzione_fr()
+        cas = FR.leggi(self, ddec)           # caselle del frontespizio: legge estera, eventi eccezionali, opzione, inventario...
+        if cas["legge_estera"]:
+            tipo_dich["Devoluzione"]["LeggeEstera"] = "1"
+        if cas["eventi"]:
+            tipo_dich["EventiEccezionali"] = cas["eventi"]
+        if cas["data_opzione"]:
+            tipo_dich["DataOpzione"] = cas["data_opzione"]
+        if cas["beneficio"]:
+            ben["AccettazioneConBeneficioInventario"] = "1"
+        self.casi_particolari = cas["casi"]
         fr = {"CodiceFiscaleDefunto": cfd, "TipoDichiarazione": tipo_dich}
         if ben:
             fr["Beneficiari"] = ben
-        fr["DatiDefunto"] = {"DatiAnagrafici": ana_d, "UlterioriDati": {
-            "DataDecesso": F.data(dft["data_decesso"]) if ddec else None, "StatoCivile": stato_civ}}
+        ulteriori = {"DataDecesso": F.data(dft["data_decesso"]) if ddec else None, "StatoCivile": stato_civ}
+        if cas["res_defunto"]:
+            ulteriori["ResidenzaEstera"] = cas["res_defunto"]
+        fr["DatiDefunto"] = {"DatiAnagrafici": ana_d, "UlterioriDati": ulteriori}
         fr["Presentatore"] = pres_x
         fr["FirmaModello"] = firma
         imp = self.impegno(pres_x["CodiceFiscale"] if pres_x else None)
@@ -1916,6 +1939,12 @@ class _Export:
     def quadri_obbligatori(self, presenti: list[str]):
         """Quadri resi obbligatori dalle annotazioni XSD ma non generati (motivo gia' registrato o dati mancanti)."""
         gia = {e.percorso for e in self.mancanti}
+        if self.integrativa:     # codice 3: il quadro EG e' obbligatorio, EA/EF/EH non devono essere presenti
+            if "EG" not in presenti and not any(p.startswith("quadro[EG]") for p in gia):
+                self.mancanti.append(Errore("QUADRO_OBBLIGATORIO_NON_SUPPORTATO", "quadro[EG]", "dichiarazione integrativa (codice 3): "
+                                            "il quadro EG con la documentazione e' obbligatorio ma non e' stato generato (nessun "
+                                            "allegato)", FO.fonte_annotazione("QuadroEG")))
+            return
         immobili = any(q in presenti for q in ("EB", "EC"))
         dal_2025 = self.data_decesso is not None and self.data_decesso >= date(2025, 1, 1)
         if (dal_2025 or ("EA" in presenti and immobili)) and "EF" not in presenti and "quadro[EF]" not in gia:
@@ -1974,12 +2003,19 @@ class _Export:
         RA.inizializza(self)
         AG.inizializza(self)
 
+        self.integrativa = SO.e_integrativa(self.d)
+        if self.integrativa:
+            self.d = FR.riduci_per_integrativa(self)    # codice 3: solo frontespizio ed EG
         self.classifica_persone()
+        if self.integrativa:
+            self.ea = []     # il presentatore resta nel frontespizio ma non compare nel quadro EA (assente con il codice 3)
         self.ordina_ea()
         qea = self.quadro_ea()
         self.quote_legge = None
         if SUP.dich(self.d, "devoluzione_per_testamento") is True:
             pass  # con testamento le quote non sono quelle di legge (annotazioni Quota/CodiceDiritto_Rip): nessun controllo
+        elif SUP.dich(self.d, "legge_estera") is True:
+            pass  # legge straniera: le quote non sono quelle dell'allegato 5 (annotazioni Quota: «se legge estera = 0»)
         elif self.ea and all(self.grado_ea.get(p["id"]) for p in self.ea):
             # i rinunciatari non sono beneficiari di quote: restano fuori dal calcolo (e dalle devoluzioni)
             attivi = [p for p in self.ea if p["id"] not in self.rinunce]
@@ -2037,8 +2073,10 @@ class _Export:
         corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroEL": qel, "QuadroEM": qem, "QuadroEN": qen, "QuadroEO": qeo, "QuadroEP": qep, "QuadroEQ": qeq, "QuadroER": qer}
         presenti = [k[6:] for k, v in corpo.items() if v]
         fr = self.frontespizio(presenti)
-        if fr is not None and ("EL" in presenti or "EM" in presenti) and not ("EB" in presenti or "EC" in presenti):
-            # annotazione CasiParticolari: obbligatorio in assenza dei quadri EB, EC ed in presenza di EL o EM (volture non richieste)
+        if fr is not None and (("EL" in presenti or "EM" in presenti) and not ("EB" in presenti or "EC" in presenti)
+                               or getattr(self, "casi_particolari", None)):
+            # annotazione CasiParticolari: obbligatorio in assenza dei quadri EB, EC ed in presenza di EL o EM (volture non richieste);
+            # facoltativo negli altri casi su richiesta del dichiarante (Fascicolo I p. PDF 15, «non voler dar corso alle volture»)
             fr["CasiParticolari"] = {"CasiParticolari": "1", "FirmaDichiarante": "1"}
         intest = {"TipoFornitore": ctx.tipo_fornitore}
         if ctx.spazio_utente:
@@ -2049,10 +2087,10 @@ class _Export:
         # quadri EG, EH, EF (EF dopo una prima serializzazione: il calcolo V-bis legge il file dichiarato)
         liq = fr is not None and ctx.quadri_liquidazione
         qeg = EFGH.quadro_eg(self) if liq else None
-        qeh = EFGH.quadro_eh(self, fr, qeg) if liq else None
-        corpo["QuadroEI_new"] = EFGH.quadro_ei(self, fr) if fr is not None else None
+        qeh = EFGH.quadro_eh(self, fr, qeg) if liq and not self.integrativa else None
+        corpo["QuadroEI_new"] = EFGH.quadro_ei(self, fr) if fr is not None and not self.integrativa else None
         xml_pre = None
-        if liq and not self.errori and not self.ns:
+        if liq and not self.errori and not self.ns and not self.integrativa:   # codice 3: nessun quadro EF da calcolare
             dich_pre = {"@identificativo": ctx.identificativo, "Frontespizio": fr}
             dich_pre.update({k: v for k, v in corpo.items() if v})
             try:

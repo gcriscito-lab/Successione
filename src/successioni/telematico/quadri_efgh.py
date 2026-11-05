@@ -56,6 +56,7 @@ ALIQUOTA_CATASTALE = Decimal("0.01")
 #: tassa per i servizi ipotecari e catastali per circoscrizione (Fascicolo I p. 44 rigo EF15 col. 2; annotazione
 #: SezioneIII_TassaIpotecaria/Circoscrizioni_Imposta)
 TASSA_CIRCOSCRIZIONE = 120
+TASSA_CIRCOSCRIZIONE_SENZA_VOLTURE = 65   # Fascicolo I p. PDF 45, rigo EF15 col. 2 (casi particolari, cariche 5, 6, 9)
 #: imposta di bollo per circoscrizione (Fascicolo I p. 45-46 rigo EF16; annotazione SezioneIV/Circoscrizioni_Imposta)
 BOLLO_CIRCOSCRIZIONE = 85
 
@@ -277,12 +278,15 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             if n and sost and sost.circoscrizioni_nuove:
                 # codice 1: solo le circoscrizioni delle nuove trascrizioni (Fascicolo I pp. PDF 45-46)
                 n = min(n, sost.circoscrizioni_nuove)
+            # «non voler dar corso alle volture» (casi particolari): 65 euro per circoscrizione invece di 120 (Fascicolo I p. PDF 45;
+            # controllo ufficiale locale, diagnostico 3076 con 120)
+            tassa = TASSA_CIRCOSCRIZIONE_SENZA_VOLTURE if getattr(x, "casi_particolari", None) else TASSA_CIRCOSCRIZIONE
             if n:
                 ef["SezioneIII_TassaIpotecaria"] = {"Circoscrizioni_Numero": str(n),
-                                                    "Circoscrizioni_Imposta": str(TASSA_CIRCOSCRIZIONE * n)}
+                                                    "Circoscrizioni_Imposta": str(tassa * n)}
                 ef["SezioneIV_ImpostaBollo"] = {"Circoscrizioni_Numero": str(n),
                                                "Circoscrizioni_Imposta": str(BOLLO_CIRCOSCRIZIONE * n)}
-            da_versare += da_ip + da_cat + TASSA_CIRCOSCRIZIONE * n + BOLLO_CIRCOSCRIZIONE * n
+            da_versare += da_ip + da_cat + tassa * n + BOLLO_CIRCOSCRIZIONE * n
             x.calcoli_ef = {
                 "EF1": {"imponibile": imp, "imposta": ip, "fonte": fa1 + "; " + FO.fonte_fasc1(40, "rigo EF1")},
                 "EF4": {"numero": n_pc, "valore": str(int(valore_pc)), "imposta": fissa_pc,
@@ -291,7 +295,7 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                 "EF5/EF8": {"importo": ip + fissa_pc, "fonte": FO.fonte_fasc1(41, "rigo EF5") + "; " + FO.fonte_fasc1(42, "EF8")},
                 "EF9": {"imponibile": str(int(imponibile_cat)), "imposta": cat, "fonte": FO.fonte_fasc1(43, "rigo EF9")},
                 "EF11/EF14": {"importo": cat + fissa_pc, "fonte": FO.fonte_fasc1(44, "righi EF11, EF14")},
-                "EF15": {"circoscrizioni": n, "imposta": TASSA_CIRCOSCRIZIONE * n,
+                "EF15": {"circoscrizioni": n, "imposta": tassa * n,
                          "fonte": FO.fonte_fasc1(44, "rigo EF15: stesso codice comune -> 1 circoscrizione; 120 euro")},
                 "EF16": {"circoscrizioni": n, "imposta": BOLLO_CIRCOSCRIZIONE * n,
                          "fonte": FO.fonte_fasc1(45, "rigo EF16: 85 euro") + "; " + FO.fonte_fasc1(46, "col. 3")},
@@ -591,6 +595,16 @@ def quadro_eg(x) -> dict | None:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "agevolazione H (immobili demoliti o "
                                  "inagibili): la documentazione va allegata nel quadro EG, rigo EG8 'Altro'",
                                  _fa(el + "/Altro") + "; " + FO.fonte_fasc1(50, "dichiarazione sostitutiva per l'agevolazione H")))
+    if x.codice_carica == "7" and "DichSost" not in per_sez:
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DichSost", "codice carica 7 (esecutore testamentario): "
+                                 "la dichiarazione sostitutiva di atto notorio sullo stato di famiglia e' obbligatoria (rigo EG1; "
+                                 "controllo ufficiale 3328)",
+                                 _fa(el + "/DichSost") + "; " + FO.fonte_fasc1(49, "dichiarazione sostitutiva stato di famiglia")))
+    if getattr(x, "fr_altro", False) and "Altro" not in per_sez:
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "eventi eccezionali (inagibilita' dell'immobile "
+                                 "prima casa gia' agevolato): la certificazione e la dichiarazione sostitutiva vanno allegate nel "
+                                 "quadro EG, rigo EG8 'Altro' (controllo ufficiale 3323)",
+                                 FO.fonte_fasc1(13, "Eventi eccezionali") + "; " + FO.fonte_fasc1(50, "rigo EG8")))
     if x.ra_altro and "Altro" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "codice R (fondi rustici): "
                                  "l'attestazione dell'ufficio regionale va allegata alla dichiarazione nel quadro EG; la "
@@ -736,13 +750,15 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     el = "QuadroEH/PrimoModulo/SezioneI_DichSost"
     if x.codice_carica in ("5", "6", "7"):
         return None  # annotazione QuadroEH: non deve essere presente con codice carica 5, 6, 7
-    if x.codice_carica != "1" or x.presentatore is None or x.defunto is None:
-        return None  # carica diversa da 1 gia' segnalata come non supportata nel frontespizio
+    if x.codice_carica not in ("1", "2", "3", "4") or x.presentatore is None or x.defunto is None:
+        return None  # cariche non supportate gia' segnalate nel frontespizio
     pres_fr = fr.get("Presentatore") or {}
     ana_p = pres_fr.get("DatiAnagrafici") or {}
     pres = dict(ana_p)
     pres["CodiceFiscale"] = pres_fr.get("CodiceFiscale")
     pres["CodiceCarica"] = pres_fr.get("CodiceCarica")
+    if pres_fr.get("CodiceFiscaleRappresentato"):      # cariche 3 e 4: stesso dato del frontespizio (controllo ufficiale 3214)
+        pres["CodiceFiscaleRappresentato"] = pres_fr["CodiceFiscaleRappresentato"]
     dft = x.defunto
     comune = x.val("persone", dft, "comune_decesso", lambda v: F.an(v, 50), elemento=el + "/DatiDefunto/Decesso/Comune")
     prov = x.val("persone", dft, "provincia_decesso", lambda v: _pn(v), elemento=el + "/DatiDefunto/Decesso/Provincia")
@@ -772,7 +788,8 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
         "Presentatore": pres,
         "DatiDefunto": {"DatiAnagrafici": ana_d, "Decesso": {"FlagDeceduto": "1", "DataDecesso": data_dec,
                                                              "Comune": comune, "Provincia": prov}},
-        "Dichiarante": {"PresenzaDichiarante": "1"},
+        # cariche 1 e 2: il dichiarante e' nel quadro EA; cariche 3 e 4 (rappresentante): assenza del dichiarante (controllo 3008)
+        "Dichiarante": ({"PresenzaDichiarante": "1"} if x.codice_carica in ("1", "2") else {"FlagAssenzaDichiarante": "1"}),
         "Testamento": _eh_testamento(x),
         "Interdetti": {"FlagAssenzaInterdetti": "1"},
         "Rinuncia": _eh_rinuncia(x, 0),

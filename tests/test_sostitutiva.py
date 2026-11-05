@@ -81,7 +81,7 @@ def test_codice1_minimo_fisso_e_circoscrizioni(tmp_path):
     (dict(codice_sostitutiva='2', prima_anno='2025', prima_volume='88888', prima_numero='5'), 'VALORE_NON_VALIDO'),  # decesso 2026
     (dict(codice_sostitutiva='2', prima_anno='2026', prima_volume='1', prima_numero='5'), 'VALORE_NON_VALIDO'),
     (dict(codice_sostitutiva='2', ipotecaria_versata='10.5', **BASE), 'VALORE_NON_VALIDO'),
-    (dict(codice_sostitutiva='3', **BASE), 'SOSTITUTIVA_NON_SUPPORTATA'),
+    (dict(codice_sostitutiva='3', ipotecaria_versata='100', **BASE), 'VALORE_NON_VALIDO'),   # il codice 3 non liquida imposte
     (dict(**BASE), 'DATO_MANCANTE'),                                                                # manca il codice
 ])
 def test_dati_non_validi_bloccano_export_e_verifica(tmp_path, dich, codice):
