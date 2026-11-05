@@ -939,6 +939,32 @@ class _Export:
         riga.update(self.flag_aziendale(b, tavolare))
         return riga
 
+    def diritto_abitazione_ec(self, b: dict) -> None:
+        """Diritto di abitazione del coniuge superstite (campo ``DirittoAbitazione``, codici 1-8): non esportabile finche' la devoluzione
+        non supporta diritti distinti (abitazione e nuda proprieta') con la loro valutazione (Fascicolo I pp. PDF 24-27, 31-32): il dato
+        si conserva in bozza e blocca l'XML completo."""
+        self.usa(b, "diritto_abitazione")
+        v = SUP.attr(self.d, "beni", b, "diritto_abitazione")
+        if v in (None, ""):
+            return
+        self.ns.append(f"beni[{b['id']}].diritto_abitazione={v}: il diritto di abitazione del coniuge superstite richiede la devoluzione "
+                       "con diritti distinti (abitazione e nuda proprieta') e la loro valutazione, non ancora supportate (Fascicolo I "
+                       "pp. PDF 24-27 e 31-32)")
+
+    def avviso_diritto_abitazione(self) -> None:
+        """Avviso non bloccante: con un coniuge fra gli eredi e un'abitazione (categoria A, esclusa A/1, A/8, A/9) puo' spettare il diritto
+        di abitazione ex lege, che questa versione non gestisce: l'omissione sarebbe silenziosa."""
+        if not any(self.grado_ea.get(p["id"]) == "01" for p in self.ea):
+            return
+        beni = {b["id"]: b for b in self.d.get("beni", [])}
+        for bid, ec in sorted(self.info_ec.items()):
+            categ = str(ec.get("categoria") or "")
+            if categ[:1] == "A" and categ not in ("A1", "A8", "A9", "A10", "A11") and beni.get(bid) is not None                     and SUP.attr(self.d, "beni", beni[bid], "diritto_abitazione") in (None, ""):
+                self.avv("DIRITTO_ABITAZIONE_DA_VERIFICARE", f"beni[{bid}]", "c'e' un coniuge superstite e un'abitazione: se l'immobile era la "
+                         "residenza familiare spetta al coniuge il diritto di abitazione (art. 540 c.c.), che questa versione non gestisce: "
+                         "verificalo prima di presentare", FO.fonte_fasc1(31, "Diritto di abitazione"))
+                return
+
     def rendita_proposta_ec(self, b: dict, df: dict, rend, categoria_f: bool, eld: str, tavolare: bool) -> None:
         """Rendita proposta (DOCFA): ``DeterminazioneRendita`` = 1 con la rendita proposta nel campo rendita (Fascicolo I pp. PDF 29-30);
         la volonta' di avvalersene si manifesta con una dichiarazione sostitutiva nel quadro EG (rigo «Altro»)."""
@@ -1042,6 +1068,7 @@ class _Export:
         elif rend:
             df["RenditaCatastale"] = rend
         self.rendita_proposta_ec(b, df, rend, categoria_f, eld, tavolare)
+        self.diritto_abitazione_ec(b)
         poss, fposs = self.quota_possesso(b, el + "/Possesso")
         dir_p = self.diritto_defunto(b, "CodiciDirittoImmobili_Type", el + "/CodiceDiritto_P")
         valore = self.valore_bene(b, el + "/Valore")
@@ -2155,6 +2182,8 @@ class _Export:
         qer = self.quadro_beni("ER", sorted(per_q["ER"], key=lambda b: (
             str(SUP.attr(self.d, "beni", b, "tipo_cespite") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_er)
         self.verifica_immobili_aziendali(bool(qen))
+        if self.ea:
+            self.avviso_diritto_abitazione()
         PC.valida(self)
         RA.valida(self)
         AG.valida(self)

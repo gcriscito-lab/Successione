@@ -265,3 +265,26 @@ def test_immobile_aziendale_imposta_alterata_respinta(tmp_path):
     assert xml != es.xml
     stato, dgn, _, _ = _esegui(xml, tmp_path)
     assert stato == "negativo", dgn["diagnostici"]
+
+
+# ------------------------------------------------------------------------------------------ diritto di abitazione (non supportato)
+def test_diritto_abitazione_blocca_con_motivo_esplicito():
+    d = caso_a10()
+    next(b for b in d["beni"] if b["id"] == "b_casa0001")["diritto_abitazione"] = "1"
+    es = esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
+    assert es.xml is None and any("diritti distinti" in s and "diritto_abitazione=1" in s for s in es.non_supportato)
+
+
+def test_senza_coniuge_nessun_avviso_sul_diritto_di_abitazione():
+    es = completo(esporta_xml(caso_a10(), contesto_caso_a10(data_riferimento=date(2026, 3, 9))))
+    assert "DIRITTO_ABITAZIONE_DA_VERIFICARE" not in {a.codice for a in es.avvisi}
+
+
+def test_con_coniuge_e_abitazione_compare_l_avviso():
+    d = caso_a10()
+    d["opzioni"]["telematico"]["dichiarazione"]["stato_civile"] = "2"            # vedovo: ammette un coniuge fra i soggetti EA
+    anna = next(p for p in d["persone"] if p["id"] == "p_anna0001")
+    anna["relazione_con_defunto"] = "01"
+    d["opzioni"]["telematico"]["persone"]["p_anna0001"]["grado_parentela"] = "01"
+    es = esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
+    assert "DIRITTO_ABITAZIONE_DA_VERIFICARE" in {a.codice for a in es.avvisi}, ([e.messaggio for e in es.errori], es.non_supportato)

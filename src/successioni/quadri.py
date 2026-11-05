@@ -73,7 +73,7 @@ _TAV = ["comune_catastale", "codice_comune_catastale", "partita_tavolare", "corp
 CAMPI_BENI = {
     "EB": _BASE + _IMM + _EST + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita", "bene_aziendale", "discordanza_intestatario", "passaggi_senza_atti_legali"],
     "EC": _BASE + _IMM + _EST + ["sezione", "categoria", "rendita", "rendita_proposta", "indirizzo", "classe", "zona_censuaria", "consistenza",
-                          "bene_aziendale", "discordanza_intestatario", "passaggi_senza_atti_legali"],
+                          "diritto_abitazione", "bene_aziendale", "discordanza_intestatario", "passaggi_senza_atti_legali"],
     "EL": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"] + _TAV,
     "EM": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
                           "porzione_materiale"] + _TAV,
