@@ -809,7 +809,44 @@ const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore boo
   ["data_opzione", "data opzione art. 24-bis TUIR"], ["beneficio_inventario", "accettazione con beneficio d'inventario", "bool"],
   ["residenza_estera_defunto", "residenza estera del defunto"], ["casi_particolari", "non dar corso alle volture catastali (casi particolari)", "bool"],
   ["versamento.iban", "versamento: IBAN"], ["versamento.cf_titolare", "versamento: codice fiscale del titolare"],
-  ["devoluzione_per_testamento", "devoluzione per testamento", "bool"], ["testamento.estero", "testamento estero", "bool"],
+  ["devoluzione_per_testamento", "devoluzione per testamento", "bool"],
+  ["credito_ipotecaria", "credito d'imposta da utilizzare per l'imposta ipotecaria (EF7, euro)"],
+  ["credito_catastale", "credito d'imposta da utilizzare per l'imposta catastale (EF13, euro)"],
+  ["credito_successione", "credito d'imposta da utilizzare per l'imposta di successione (EF18bis col. 4, euro)"],
+  ["credito_tipologia", "credito d'imposta: tipologia di imposta (registro, IVA, IVA Sostegni-bis)"],
+  ["credito_imposta", "credito d'imposta maturato (euro; se vuoto, la somma dei crediti utilizzati)"],
+  ["credito_acquisto.ufficio_registrazione", "credito d'imposta, registrazione acquisto: ufficio di registrazione"],
+  ["credito_acquisto.serie", "credito d'imposta, registrazione acquisto: serie"],
+  ["credito_acquisto.numero_registrazione", "credito d'imposta, registrazione acquisto: numero"],
+  ["credito_acquisto.sottonumero_registrazione", "credito d'imposta, registrazione acquisto: sottonumero"],
+  ["credito_acquisto.data_registrazione", "credito d'imposta, registrazione acquisto: data di registrazione"],
+  ["credito_vendita.ufficio_registrazione", "credito d'imposta, registrazione vendita (facoltativa): ufficio di registrazione"],
+  ["credito_vendita.serie", "credito d'imposta, registrazione vendita (facoltativa): serie"],
+  ["credito_vendita.numero_registrazione", "credito d'imposta, registrazione vendita (facoltativa): numero"],
+  ["credito_vendita.sottonumero_registrazione", "credito d'imposta, registrazione vendita (facoltativa): sottonumero"],
+  ["credito_vendita.data_registrazione", "credito d'imposta, registrazione vendita (facoltativa): data di registrazione"],
+  ["credito_tipologia_2", "credito d'imposta, secondo acquisto: tipologia di imposta (registro, IVA)"],
+  ["credito_imposta_2", "credito d'imposta, secondo acquisto: imposta pagata (euro)"],
+  ["credito_acquisto_2.ufficio_registrazione", "credito d'imposta, registrazione secondo acquisto: ufficio di registrazione"],
+  ["credito_acquisto_2.serie", "credito d'imposta, registrazione secondo acquisto: serie"],
+  ["credito_acquisto_2.numero_registrazione", "credito d'imposta, registrazione secondo acquisto: numero"],
+  ["credito_acquisto_2.sottonumero_registrazione", "credito d'imposta, registrazione secondo acquisto: sottonumero"],
+  ["credito_acquisto_2.data_registrazione", "credito d'imposta, registrazione secondo acquisto: data di registrazione"],
+  ["credito_vendita_2.ufficio_registrazione", "credito d'imposta, registrazione vendita del secondo rigo (facoltativa): ufficio di registrazione"],
+  ["credito_vendita_2.serie", "credito d'imposta, registrazione vendita del secondo rigo (facoltativa): serie"],
+  ["credito_vendita_2.numero_registrazione", "credito d'imposta, registrazione vendita del secondo rigo (facoltativa): numero"],
+  ["credito_vendita_2.sottonumero_registrazione", "credito d'imposta, registrazione vendita del secondo rigo (facoltativa): sottonumero"],
+  ["credito_vendita_2.data_registrazione", "credito d'imposta, registrazione vendita del secondo rigo (facoltativa): data di registrazione"],
+  ["sanzione_ipotecaria", "sanzioni indicate dal professionista: imposta ipotecaria (euro)"],
+  ["interessi_ipotecaria", "interessi indicati dal professionista: imposta ipotecaria (euro)"],
+  ["sanzione_catastale", "sanzioni indicate dal professionista: imposta catastale (euro)"],
+  ["interessi_catastale", "interessi indicati dal professionista: imposta catastale (euro)"],
+  ["sanzione_tassa_ipotecaria", "sanzioni indicate dal professionista: tassa ipotecaria (euro)"],
+  ["interessi_tassa_ipotecaria", "interessi indicati dal professionista: tassa ipotecaria (euro)"],
+  ["sanzione_bollo", "sanzioni indicate dal professionista: imposta di bollo (euro)"],
+  ["interessi_bollo", "interessi indicati dal professionista: imposta di bollo (euro)"],
+  ["sanzione_successione", "sanzioni indicate dal professionista: imposta di successione (euro)"],
+  ["interessi_successione", "interessi indicati dal professionista: imposta di successione (euro)"], ["testamento.estero", "testamento estero", "bool"],
   ["testamento.pubblico_ufficiale", "testamento: pubblico ufficiale"], ["testamento.data_pubblicazione", "testamento: data pubblicazione"],
   ["testamento.ufficio_registrazione", "testamento: ufficio di registrazione"], ["testamento.serie", "testamento: serie"],
   ["testamento.numero_registrazione", "testamento: numero registrazione"], ["testamento.sottonumero_registrazione", "testamento: sottonumero"],
@@ -960,11 +997,18 @@ function renderFront(main) {
   const stato = h('details', { class: 'gruppo-opzionale', open: dich.separazione_con_colpa != null || dich.no_scioglimento_unione_civile != null || chiaviReintegro.some(k => k.split('.').reduce((o, c) => (o == null ? undefined : o[c]), dich) != null) },
     h('summary', {}, 'Separazione, unione civile e reintegro dei diritti · quadro EH'),
     sezioneDatiDichiarazione(['separazione_con_colpa', 'no_scioglimento_unione_civile', ...chiaviReintegro], 'Dichiarazioni sullo stato civile e sugli accordi di reintegro'));
+  const chiaviCrediti = CAMPI_DICH.filter(([k]) => k.startsWith('credito_')).map(([k]) => k);
+  const chiaviSanzioni = CAMPI_DICH.filter(([k]) => /^(sanzione|interessi)_/.test(k)).map(([k]) => k);
+  const valorizzata = k => k.split('.').reduce((o, c) => (o == null ? undefined : o[c]), dich) != null;
+  const pagamenti = h('details', { class: 'gruppo-opzionale', open: chiaviCrediti.some(valorizzata) || chiaviSanzioni.some(valorizzata) },
+    h('summary', {}, 'Crediti d\'imposta, sanzioni e interessi · quadri EF ed EH'),
+    sezioneDatiDichiarazione(chiaviCrediti, 'Crediti d\'imposta (Legge 448/1998 art. 7 c. 2; DL 73/2021 art. 64 c. 7)'),
+    sezioneDatiDichiarazione(chiaviSanzioni, 'Sanzioni e interessi del ravvedimento (importi calcolati dal professionista)'));
   const primaCasa = h('details', { class: 'gruppo-opzionale', open: !!dich.prima_casa }, h('summary', {}, 'Agevolazione prima casa'), sezionePrimaCasa());
   const riduzioni = h('details', { class: 'gruppo-opzionale', open: !!dich.riduzioni_art25 }, h('summary', {}, 'Riduzioni art. 25 e codici L, Q'), sezioneRiduzioni());
   const aziende = h('details', { class: 'gruppo-opzionale', open: S.P.dati.beni.some(b => b.tipo === 'azienda') }, h('summary', {}, 'Dati delle aziende · se presenti'),
     sezioneDatiDichiarazione(['azienda_data_deposito', 'azienda_camera_commercio'], 'Deposito e camera di commercio'));
-  main.append(testamento, stato, primaCasa, riduzioni, aziende);
+  main.append(testamento, stato, pagamenti, primaCasa, riduzioni, aziende);
   const att = new Set(S.P.dati.opzioni.quadri_attivi || S.schema.predefiniti);
   const box = h('details', { class: 'gruppo-opzionale' }, h('summary', {}, 'Quadri inclusi nella pratica · ' + att.size + ' selezionati'));
   for (const q of S.schema.quadri.filter(x => x.gruppo !== 'frontespizio' && x.id !== 'DV' && (!x.generato || att.has(x.id)))) {
