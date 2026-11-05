@@ -345,16 +345,9 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
         motivi.append(Errore("CALCOLO_NON_APPLICABILE", "Frontespizio/DatiDefunto/UlterioriDati/DataDecesso",
                              "successione aperta prima del 2025-01-01: l'imposta e' liquidata dall'ufficio",
                              _g(1, "premessa") + "; " + FO.fonte_fasc1(46, "Rigo EF18bis")))
-    cfs = [s["cf"] for s in d["soggetti"]]
-    if len(set(cfs)) != len(cfs):
-        motivi.append(Errore("CALCOLO_NON_SUPPORTATO", "QuadroEA", "stesso soggetto su piu' righi: franchigia unica da "
-                             "scomputare in sequenza, ordine non definito dalla guida", _g(3, "qualifiche diverse")))
     if d["carica"] == "9" or any(s["trust"] or s["tipo"] == "5" for s in d["soggetti"]):
         motivi.append(Errore("CALCOLO_NON_SUPPORTATO", "QuadroEA", "trust non supportato dal calcolo",
                              FO.fonte_fasc1(46, "trust")))
-    if any(s["rinuncia"] for s in d["soggetti"]):
-        motivi.append(Errore("CALCOLO_NON_SUPPORTATO", "QuadroEA", "soggetti rinunciatari non supportati dal calcolo",
-                             _g(1, "soggetti del quadro EA")))
     for s in d["soggetti"]:
         try:
             aliquota(s["grado"])
@@ -373,7 +366,7 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
     ris = RisultatoCalcolo(stato="completato")
     tot_esatto = Fraction(0)
     tot_comp = Fraction(0)
-    for s in sorted(d["soggetti"], key=lambda x: x["pos"]):
+    def calcola_riga(s, fr_res=None):
         pos = s["pos"]
         # titoli esenti EO (tc "ES"): non entrano ne' in QE ne' in QDN. Fonti: Fascicolo I p. PDF 3 («ogni altro bene o
         # diritto dichiarato esente dall'imposta»; indicazione dei titoli esenti «opzionale», con valenza solo verso gli
@@ -384,6 +377,9 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
         qp = sum((v for p, v in d["passivo"] if p == pos), Fraction(0))
         an = max(qe + qdn - qp, Fraction(0))
         fr, fonte_fr = franchigia(s["grado"], s["handicap"])
+        if fr_res is not None:      # soggetto su piu' righi: franchigia unica, residuo dopo le righe gia' calcolate
+            fr = fr_res
+        usata = min(an, fr)
         qn = max(an - fr, Fraction(0))
         applica_pr = not d["bi"] and s["tipo"] != "2"
         pr = max(Fraction(1, 10) * (qn - qdn) - qdn, Fraction(0)) if applica_pr else Fraction(0)
@@ -401,8 +397,6 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
         rid_c_d = riduzioni_componente(righe_rid, isl_c, qe)
         rid_c = sum(rid_c_d.values(), Fraction(0))
         isn_c = max(isl_c - rid_c, Fraction(0))
-        tot_esatto += isn
-        tot_comp = _half_up(tot_comp + isn_c, 2)
         passi = [
             Passaggio("QE", "somma dei Valore Quota dei cespiti EB, EC, ER (esclusi DN) devoluti al soggetto", esatto(qe),
                       _g(1, "QE")),
@@ -425,8 +419,37 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
             Passaggio("DET", "detrazione imposta estera: nessuna nel perimetro supportato", "0", _g(8, "DET.estero")),
             Passaggio("ISN", "ISL - RID - DET", esatto(isn), _g(8, "ISN")),
         ]
-        ris.beneficiari.append(QuotaBeneficiario(f"{pos[0]}/{pos[1]}", s["cf"], s["tipo"], s["grado"], passi,
-                                                 esatto(isn), esatto(isn_c)))
+        return {"isn": isn, "isn_c": isn_c, "usata": usata,
+                "benef": QuotaBeneficiario(f"{pos[0]}/{pos[1]}", s["cf"], s["tipo"], s["grado"], passi, esatto(isn), esatto(isn_c))}
+
+    # Soggetto su piu' righi (es. erede e legatario): «la franchigia e' unica e deve essere scomputata prima su una quota e poi il
+    # restante importo deve essere sottratto dalle quote successive, fino al suo completo esaurimento» (Guida p. 3). La guida non
+    # fissa quale quota per prima: si calcolano tutti gli ordini e il caso si accetta solo se il totale non ne dipende.
+    from itertools import permutations
+    per_cf: dict[str, list] = {}
+    for s in sorted(d["soggetti"], key=lambda x: x["pos"]):
+        per_cf.setdefault(s["cf"], []).append(s)
+    for cf_, righe in per_cf.items():
+        esiti = []
+        for ordine in (permutations(righe) if len(righe) > 1 else [tuple(righe)]):
+            fr_res, parziali = None, []
+            for s in ordine:
+                if fr_res is None:
+                    fr_res = franchigia(s["grado"], s["handicap"])[0]
+                r = calcola_riga(s, fr_res)
+                fr_res -= r["usata"]
+                parziali.append(r)
+            esiti.append(sorted(parziali, key=lambda r: tuple(int(x) for x in r["benef"].rigo_ea.split("/"))))
+        totali = {(sum((r["isn"] for r in e), Fraction(0)), sum((r["isn_c"] for r in e), Fraction(0))) for e in esiti}
+        if len(totali) > 1:
+            return RisultatoCalcolo(stato="non_supportato", motivi=[Errore(
+                "CALCOLO_NON_SUPPORTATO", "QuadroEA", f"stesso soggetto ({cf_}) su piu' righi: l'imposta dipende dall'ordine con cui "
+                "si scomputa la franchigia unica, che la guida non definisce", _g(3, "qualifiche diverse"))])
+        for r in esiti[0]:
+            tot_esatto += r["isn"]
+            tot_comp = _half_up(tot_comp + r["isn_c"], 2)
+            ris.beneficiari.append(r["benef"])
+    ris.beneficiari.sort(key=lambda b: tuple(int(x) for x in b.rigo_ea.split("/")))
     cent_e = _half_up(tot_esatto, 2)
     euro_e = _half_up(cent_e, 0)
     euro_c = _half_up(tot_comp, 0)
