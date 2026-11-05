@@ -150,8 +150,9 @@ def test_fornitore_diverso_richiede_documento_identita():
     assert [m.percorso for m in es.quadri_mancanti] == ["quadro[EG].DocumentiIdentita"]
 
 
-def test_ef_casi_fuori_perimetro_non_generati():
-    d = caso_a10()  # immobili in due comuni: circoscrizione dall'elenco delle conservatorie (non nelle fonti)
+def test_ef_casi_fuori_perimetro_non_generati(monkeypatch):
+    monkeypatch.delenv("SUCCESSIONI_CONTROLLI_SUC13", raising=False)   # senza elenco delle conservatorie: due comuni bloccati
+    d = caso_a10()  # immobili in due comuni: circoscrizione dall'elenco delle conservatorie (componente di controllo)
     d["opzioni"]["telematico"]["beni"]["b_terr0001"]["codice_comune"] = "F205"
     es = esporta_xml(d, contesto_caso_a10())
     assert es.completo is False and es.xml is None

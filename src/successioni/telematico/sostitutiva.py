@@ -18,6 +18,7 @@ I dati specifici stanno in ``opzioni.telematico.dichiarazione``::
     ipotecaria_versata   EF6  (rigo EF8 della dichiarazione sostituita), euro interi
     catastale_versata    EF12 (rigo EF14 della dichiarazione sostituita), euro interi
     successione_versata  EF18bis col. 3 (imposta di successione gia' versata), euro interi
+    circoscrizioni_nuove (facoltativo, solo codice 1) numero di circoscrizioni delle nuove trascrizioni; senza: tutte
 """
 from __future__ import annotations
 
@@ -30,7 +31,7 @@ from .. import valori as V
 from . import supplemento as SUP
 
 CHIAVI_SOSTITUTIVA = ("codice_sostitutiva", "prima_anno", "prima_volume", "prima_numero",
-                      "ipotecaria_versata", "catastale_versata", "successione_versata")
+                      "ipotecaria_versata", "catastale_versata", "successione_versata", "circoscrizioni_nuove")
 FONTE_TIPO = "fornituraSUC13_v1.xsd Frontespizio/TipoDichiarazione; Fascicolo I p. PDF 11-12"
 FONTE_ESTREMI = "fornituraSUC13_v1.xsd EstremiPrimaDichiarazione_Type; Fascicolo I p. PDF 13"
 FONTE_VERSATE = "Fascicolo I pp. PDF 42-47 (righi EF6, EF12, EF18bis col. 3); annotazioni XSD ...Versata"
@@ -47,6 +48,7 @@ class Sostitutiva:
     ipotecaria_versata: int
     catastale_versata: int
     successione_versata: int
+    circoscrizioni_nuove: int | None = None   # solo codice 1: circoscrizioni delle nuove trascrizioni (default: tutte)
 
 
 def e_sostitutiva(dati: dict) -> bool:
@@ -108,9 +110,15 @@ def leggi(dati: dict, data_decesso: date | None = None) -> tuple[Sostitutiva | N
         err.append(("VALORE_NON_VALIDO", _PERC + "prima_numero", f"numero {num!r}: solo cifre, al massimo 6 (DatoTL_Type)",
                     FONTE_ESTREMI))
     versate = [_intero(dati, k, err) for k in ("ipotecaria_versata", "catastale_versata", "successione_versata")]
+    nuove = None
+    if SUP.dich(dati, "circoscrizioni_nuove") not in (None, ""):
+        nuove = _intero(dati, "circoscrizioni_nuove", err)
+        if nuove < 1 or cod != "1":
+            err.append(("VALORE_NON_VALIDO", _PERC + "circoscrizioni_nuove", "campo ammesso solo con il codice 1 e con valore "
+                        "almeno 1 (Fascicolo I pp. PDF 45-46)", FONTE_VERSATE))
     if err:
         return None, err
-    return Sostitutiva(cod, anno, vol, num, *versate), []
+    return Sostitutiva(cod, anno, vol, num, *versate, circoscrizioni_nuove=nuove), []
 
 
 def tipo_dichiarazione_xml(s: Sostitutiva | None) -> dict:

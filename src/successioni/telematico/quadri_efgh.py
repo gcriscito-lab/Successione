@@ -6,13 +6,13 @@ istruzioni ``Succ_FASCICOLO_I_Nov_23.pdf`` (pagina PDF = pagina stampata). Nessu
 
 PERIMETRO (il resto e' ``non_supportato`` oppure ``quadri_mancanti`` con il motivo):
 
-- EF: successioni aperte dal 2025-01-01, prima dichiarazione, immobili in un solo comune, senza agevolazioni/riduzioni
+- EF: successioni aperte dal 2025-01-01, prima dichiarazione o sostitutiva 1/2, immobili anche in piu' comuni (circoscrizioni da ``conservatorie.py``, col componente di controllo configurato), senza agevolazioni/riduzioni
   salvo la prima casa (codici P, X, Z: rigo EF4 e Sezione II di EH, vedi ``prima_casa.py``); Sezioni I (ipotecaria 2%), II (catastale 1%), III (tassa ipotecaria 120 euro per circoscrizione), IV (bollo
   85 euro per circoscrizione), V-bis (imposta di successione da ``calcolo.calcola_da_xml`` sul file dichiarato),
   totale EF19. Non coperti: agevolazioni (G, M, Y, Z senza P, trust), regola dei valori fiscali dei soli terreni
-  (Fascicolo I p. 40), imposta proporzionale inferiore alla fissa (fonti non concordi, vedi sotto), piu' comuni
-  (l'individuazione della conservatoria richiede l'elenco dell'Agenzia), attestazione/copia conforme, crediti
-  d'imposta, sostitutive, sanzioni e interessi, rateazione.
+  (Fascicolo I p. 40), imposta proporzionale inferiore alla fissa (fonti non concordi, vedi sotto),
+  attestazione/copia conforme, crediti
+  d'imposta, sostitutive con rimborso o tardive con imposta aggiuntiva, sanzioni e interessi, rateazione.
 - EG: righi EG1 DichSost, EG5 DocumentiPassivita, EG6 AlberoGenealogico, EG7 DocumentiIdentita, EG8 Altro; i
   contenuti vengono SOLO da ``documenti.base64.dati_file_attachment`` (nome maiuscolo/conforme a cm:DatoAN_Type).
 - EH: Sezione I con dichiarante erede/chiamato (carica 1), defunto deceduto (non morte presunta), devoluzione per
@@ -32,6 +32,7 @@ from . import fonti as FO
 from . import formati as F
 from . import prima_casa as PC
 from . import riduzioni_art25 as RA
+from . import conservatorie as CO
 from . import sostitutiva as SO
 from . import supplemento as SUP
 
@@ -144,9 +145,13 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         # circoscrizioni (EF15, EF16): solo immobili del catasto ordinario; per i tavolari il controllo ufficiale SUC13 2.3.1
         # (locale, 2026-11-03) individua 0 circoscrizioni
         comuni = sorted({r["codice_comune"] for r in immobili if r["quadro"] in ("EB", "EC")})
-        if len(comuni) > 1:
-            motivi.append(f"immobili in piu' comuni {comuni}: la circoscrizione si individua dall'elenco delle "
-                          "conservatorie (sito dell'Agenzia, Fascicolo I p. 44), non disponibile nelle fonti")
+        circoscrizioni = None
+        if len(comuni) == 1:
+            circoscrizioni = {comuni[0]}          # stesso comune -> una circoscrizione (Fascicolo I p. 44)
+        elif len(comuni) > 1:
+            circoscrizioni, perche = CO.circoscrizioni(comuni)
+            if circoscrizioni is None:
+                motivi.append(f"immobili in piu' comuni {comuni}: {perche} (Fascicolo I p. 44)")
         if not motivi:
             imp = str(int(imponibile))
             fa1 = _fa(el + "/SezioneI_ImpostaIpotecaria/ImpostaProporzionale/ImpostaProporzionale_Imposta")
@@ -190,7 +195,10 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             ef["SezioneII_ImpostaCatastale"] = s2
             # codice 2: «il campo non deve essere compilato» (Fascicolo I pp. PDF 45-46); codice 1: solo le circoscrizioni
             # delle nuove trascrizioni (qui un unico comune, quindi al piu' una)
-            n = len(comuni) if not sost or sost.codice == "1" else 0
+            n = len(circoscrizioni) if circoscrizioni and (not sost or sost.codice == "1") else 0
+            if n and sost and sost.circoscrizioni_nuove:
+                # codice 1: solo le circoscrizioni delle nuove trascrizioni (Fascicolo I pp. PDF 45-46)
+                n = min(n, sost.circoscrizioni_nuove)
             if n:
                 ef["SezioneIII_TassaIpotecaria"] = {"Circoscrizioni_Numero": str(n),
                                                     "Circoscrizioni_Imposta": str(TASSA_CIRCOSCRIZIONE * n)}

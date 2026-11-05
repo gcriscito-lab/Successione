@@ -120,6 +120,7 @@ ETICHETTE_DICHIARAZIONE: dict[str, str] = {
     "ipotecaria_versata": "Imposta ipotecaria già versata (EF6)",
     "catastale_versata": "Imposta catastale già versata (EF12)",
     "successione_versata": "Imposta di successione già versata (EF18bis col. 3)",
+    "circoscrizioni_nuove": "Circoscrizioni delle nuove trascrizioni (solo codice 1)",
     "azienda_data_deposito": "Azienda: data di deposito",
     "azienda_camera_commercio": "Azienda: camera di commercio",
 }

@@ -21,7 +21,7 @@ Implementazione: `src/successioni/telematico/sostitutiva.py`; prove: `tests/test
 - Codice 3 (solo frontespizio ed EG): NON supportato, nessun XML.
 - Imposta gia' versata superiore alla riliquidata (rimborso): non coperto.
 - Tardive con imposta aggiuntiva, sanzioni e interessi: non coperti.
-- Immobili in piu' comuni (conservatorie): non coperti.
+- Immobili in piu' comuni: coperti (vedi `telematico/conservatorie.py`); con il codice 1 il campo facoltativo `circoscrizioni_nuove` limita le circoscrizioni alle nuove trascrizioni (default: tutte).
 
 ## Evidenza
 Controllo ufficiale SUC13 2.3.1 eseguito in locale il 2026-11-05: esito positivo per i codici 1 e 2 su dati sintetici. Non e' un invio ne' una verifica con l'Agenzia.

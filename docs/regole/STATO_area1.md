@@ -93,7 +93,7 @@ implica EF16 col. 1 e EF18 (non coperti).
 
 ### Non finito (stato al congelamento)
 - EF: agevolazioni (G, M, P/X/Y/Z, trust), soli terreni (valori fiscali), proporzionale < fissa (fonti non concordi),
-  piu' comuni (elenco conservatorie), attestazione/copia conforme, crediti, sostitutive, sanzioni, rateazione ->
+  attestazione/copia conforme, crediti, sostitutive, sanzioni, rateazione ->
   `quadri_mancanti` (EF) o `non_supportato` con motivo.
 - EG: testamento, inventario, imposta estera, agevolazioni/riduzioni -> `non_supportato`. Conformita' PDF/A non
   verificata dall'export (avviso).
