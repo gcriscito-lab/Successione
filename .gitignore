@@ -29,3 +29,5 @@ build/
 artifacts/
 .DS_Store
 Thumbs.db
+configurazione.json
+.claude/worktrees/
