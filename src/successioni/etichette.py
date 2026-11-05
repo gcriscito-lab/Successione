@@ -39,7 +39,7 @@ ETICHETTE: dict[str, dict[str, str]] = {
         "diritto": "Diritto del defunto", "quota_defunto": "Quota del defunto", "valore": "Valore",
         "provenienza": "Provenienza", "data_visura": "Data della visura catastale",
         "discordanza_intestatario": "Discordanza dati intestatario", "passaggi_senza_atti_legali": "Passaggi senza atti legali",
-        "rendita_proposta": "Rendita proposta (DOCFA)", "diritto_abitazione": "Diritto di abitazione del coniuge", "bene_aziendale": "Bene aziendale", "graffati": "Immobili graffati", "immobili_aziendali": "Immobili aziendali dell'azienda",
+        "rendita_proposta": "Rendita proposta (DOCFA)", "diritto_abitazione": "Diritto di abitazione del coniuge", "bene_aziendale": "Bene aziendale", 
         "comune_catastale": "Comune catastale", "codice_comune_catastale": "Codice comune catastale",
         "partita_tavolare": "Partita tavolare", "corpo_tavolare": "Corpo tavolare",
         "porzione_materiale": "Porzione materiale", "sistema_tavolare": "Sistema tavolare",
