@@ -36,7 +36,7 @@ Archivio, interfaccia locale, MCP, PDF/A e file XML funzionano e sono provati ne
 
 ## Cosa NON c'è o è limitato
 - Quadri non coperti: EI, EL, EM, EN, EO, EP, EQ, agevolazioni e riduzioni, rinunce, legatari, testamento, immobili in più comuni, rateazione. Selezionarli blocca la finalizzazione.
-- Dichiarazione sostitutiva: la pratica non è finalizzabile (l'XML scrive ancora «prima dichiarazione»).
+- Dichiarazione sostitutiva: codici 1 e 2 gestiti (controllo ufficiale locale positivo su dati sintetici, 2026-11-05); codice 3, rimborsi e tardive con imposta aggiuntiva non finalizzabili.
 - I dati richiesti dall'export (sesso, provincia, codici comune, stato civile…) si impostano solo da MCP o API, non dalla GUI (rilievo R20).
 - Con Java 11 o successivi il controllo ufficiale si ferma se la fornitura ha allegati EG (manca una libreria di sistema): serve Java 8 o una libreria aggiuntiva (proposta P9 in `docs/PROPOSTE_telematico.md`). L'adattatore di oggi fallisce con Java 21 in quel caso.
 - Il calcolo dell'imposta copre il perimetro dichiarato. Il dubbio 82,0875 contro 82,08 resta aperto (`docs/regole/dubbio_arrotondamento.md`).

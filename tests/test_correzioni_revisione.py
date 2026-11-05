@@ -45,7 +45,11 @@ def test_r2_sostitutiva_non_finalizzabile(sv):
     sv.aggiorna(pid, 1, [{"op": "set", "sezione": "opzioni", "campi": {"tipo_dichiarazione": "sostitutiva"}}])
     v = sv.verifica(pid)
     assert not v["finalizzabile"]
-    assert "SOSTITUTIVA_NON_SUPPORTATA" in [r["codice"] for r in v["rilievi"]]
+    assert "DATO_MANCANTE" in [r["codice"] for r in v["rilievi"]]   # senza codice ed estremi (codici 1 e 2 sono gestiti)
+    sv.aggiorna(pid, 2, [{"op": "set", "sezione": "opzioni", "campi": {"telematico": {"dichiarazione": {"codice_sostitutiva": "3"}}}}])
+    v = sv.verifica(pid)
+    assert not v["finalizzabile"]
+    assert "SOSTITUTIVA_NON_SUPPORTATA" in [r["codice"] for r in v["rilievi"]]   # il codice 3 non e' gestito
 
 
 def test_r1_finalizzabile_richiede_file_xml_completo(sv):

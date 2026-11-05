@@ -44,7 +44,9 @@ CHIAVI = {
 CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",
                         "tempistica_pagamento", "pagamento_rateale", "dichiara_copie_conformi",
                         "devoluzione_per_testamento", "testamento", "azienda_data_deposito", "azienda_camera_commercio",
-                        "prima_casa", "riduzioni_art25"}
+                        "prima_casa", "riduzioni_art25",
+                        "codice_sostitutiva", "prima_anno", "prima_volume", "prima_numero", "ipotecaria_versata",
+                        "catastale_versata", "successione_versata"}
 # Sezione Testamento del frontespizio (annotazioni XSD: Pubblicazione, Registrazione, TestamentoEstero)
 CHIAVI_TESTAMENTO = {"estero", "pubblico_ufficiale", "data_pubblicazione", "ufficio_registrazione", "serie",
                      "numero_registrazione", "sottonumero_registrazione", "data_registrazione"}

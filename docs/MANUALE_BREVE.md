@@ -37,7 +37,7 @@ Un file non si invia due volte: dopo un tentativo, anche incerto, si riconcilia 
 ## Cosa il programma NON fa
 - Non invia nulla all'Agenzia e non usa credenziali: l'invio nell'app è una prova simulata, quello reale si fa con gli strumenti ufficiali.
 - Quadri non coperti: EI, EL, EM, EN, EO, EP, EQ, agevolazioni e riduzioni, rinunce, rappresentanti di legatari, testamento estero, rateazione. Testamento con eredi e legatari persone fisiche: supportato (controllo locale su dati sintetici). Selezionarli blocca la finalizzazione.
-- La dichiarazione sostitutiva non è finalizzabile.
+- La dichiarazione sostitutiva è gestita per i codici 1 e 2 (indica estremi della prima dichiarazione, con volume 88888 o 88889, e le imposte già versate); il codice 3 (solo documentazione) non è supportato. Restano esclusi rimborsi, tardive con imposta aggiuntiva e sanzioni.
 - I dati strutturati hanno una maschera nell'interfaccia: superficie, ripartizione, estremi di trascrizione/registrazione nell'ispettore del bene o della passività; dati della dichiarazione (stato civile, presentatore, versamento, testamento) e «Agevolazione prima casa (Sezione II del quadro EH)» nel frontespizio; codice P/X/Z nell'ispettore della riga di devoluzione (scheda DV); tipo di titolo, con «esente» (valore in ValoreEsente), nell'ispettore del quadro EO. Gli aiuti e i valori ammessi stanno in `schema.STRUTTURATI` e riportano solo le fonti di `docs/regole/prima_casa.md` e dell'XSD. Resta solo da MCP o API la rateazione (`pagamento_rateale`, non supportata).
 - Nessun esito locale autorizza l'uso su una pratica reale.
 

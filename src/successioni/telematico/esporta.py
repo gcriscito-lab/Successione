@@ -45,6 +45,7 @@ from . import modello_xsd as M
 from . import prima_casa as PC
 from . import riduzioni_art25 as RA
 from . import quadri_efgh as EFGH
+from . import sostitutiva as SO
 from . import supplemento as SUP
 from . import xsd as X
 
@@ -1431,8 +1432,12 @@ class _Export:
         ben = {k: str(v) for k, v in (("NumeroEredi", n1), ("NumeroChiamati", n3), ("NumeroLegatari", n2)) if v}
         firma = {f"Casella{q}": "1" for q in quadri_presenti}
         firma["FirmaDichiarante"] = "1"
-        fr = {"CodiceFiscaleDefunto": cfd,
-              "TipoDichiarazione": {"PrimaDichiarazione": "1", "Devoluzione": self.devoluzione_fr()}}
+        self.sost, errori_sost = SO.leggi(self.d, ddec)
+        for cod, perc, msg, fonte in errori_sost:
+            self.err(cod, perc, msg, fonte)
+        tipo_dich = SO.tipo_dichiarazione_xml(self.sost)
+        tipo_dich["Devoluzione"] = self.devoluzione_fr()
+        fr = {"CodiceFiscaleDefunto": cfd, "TipoDichiarazione": tipo_dich}
         if ben:
             fr["Beneficiari"] = ben
         fr["DatiDefunto"] = {"DatiAnagrafici": ana_d, "UlterioriDati": {
@@ -1551,12 +1556,6 @@ class _Export:
         if ctx.tipo_fornitore not in ("1", "10"):
             self.err("VALORE_NON_VALIDO", "contesto.tipo_fornitore", "TipoFornitore ammette 1 o 10",
                      FO.fonte_spec(15, "§3.3.1"))
-        tipo_dich = (self.d.get("opzioni", {}) or {}).get("tipo_dichiarazione") or "originaria"
-        if tipo_dich != "originaria":
-            # il frontespizio e' sempre serializzato come prima dichiarazione: nessun file per tipi non gestiti
-            self.err("SOSTITUTIVA_NON_SUPPORTATA", "opzioni.tipo_dichiarazione",
-                     f"tipo di dichiarazione '{tipo_dich}' non gestito (dati della dichiarazione sostituita, casella nel "
-                     "frontespizio): XML non generato", "docs/MATRICE_COPERTURA.md")
         if not isinstance(ctx.identificativo, str) or not _ID_DICH.fullmatch(ctx.identificativo):
             self.err("VALORE_NON_VALIDO", "contesto.identificativo", "5 cifre, non tutte zero (Identificativo_Type)",
                      "fornitura_v2.xsd Identificativo_Type")
@@ -1578,6 +1577,7 @@ class _Export:
         self.handicap_ea: dict[str, bool] = {}
         self.fornitore_diverso_da_dichiarante = False
         self.totale_da_versare = 0
+        self.sost = None   # dichiarazione sostitutiva (telematico/sostitutiva.py)
         self.defunto = self.presentatore = None
         self.testamento_x, self.test_reg = None, None
         self.eh_navi, self.eh_aeromobili, self.ei_beni = [], [], []

@@ -113,6 +113,13 @@ ETICHETTE_DICHIARAZIONE: dict[str, str] = {
     "versamento.cf_titolare": "Codice fiscale del titolare del conto",
     "firma_dichiarante": "Firma del dichiarante",
     "dichiara_copie_conformi": "Dichiarazione di conformità delle copie allegate",
+    "codice_sostitutiva": "Tipo di sostitutiva (codice)",
+    "prima_anno": "Prima dichiarazione: anno",
+    "prima_volume": "Prima dichiarazione: volume",
+    "prima_numero": "Prima dichiarazione: numero",
+    "ipotecaria_versata": "Imposta ipotecaria già versata (EF6)",
+    "catastale_versata": "Imposta catastale già versata (EF12)",
+    "successione_versata": "Imposta di successione già versata (EF18bis col. 3)",
     "azienda_data_deposito": "Azienda: data di deposito",
     "azienda_camera_commercio": "Azienda: camera di commercio",
 }

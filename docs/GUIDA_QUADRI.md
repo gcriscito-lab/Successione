@@ -36,7 +36,7 @@ Questa guida spiega, in modo sintetico, come compilare ogni quadro dell'interfac
 **Esempio:** Defunto `RSSMRA40A01H501K`, presentatore `RSSNNA70A41H501J` con carica 1.
 
 **Non supportato:**
-- sostitutive/integrative, testamento con legatari o rappresentanti (EA tipo 2/3, carica 7/9), legge estera, eventi eccezionali, data opzione, beneficio d'inventario, residenza estera, cariche 2-9, rappresentato, casi particolari, Versamento/F24, ImportoDaVersare, campi servizio, lingua.
+- integrative (codice 3), testamento con legatari o rappresentanti (EA tipo 2/3, carica 7/9), legge estera, eventi eccezionali, data opzione, beneficio d'inventario, residenza estera, cariche 2-9, rappresentato, casi particolari, Versamento/F24, ImportoDaVersare, campi servizio, lingua.
 
 ---
 
@@ -159,7 +159,7 @@ Questa guida spiega, in modo sintetico, come compilare ogni quadro dell'interfac
 **Esempio:** Importo da versare 44.132 euro, IBAN `IT57A0123456789000000001234`.
 
 **Non supportato:**
-- agevolazioni, soli terreni, proporzionale < fissa, più comuni, copia conforme, crediti, sostitutive, sanzioni, rateazione.
+- agevolazioni, soli terreni, proporzionale < fissa, più comuni, copia conforme, crediti, sostitutive con rimborso o tardive con imposta aggiuntiva, sanzioni, rateazione. Le sostitutive codici 1 e 2 sono coperte (vedi `docs/regole/sostitutiva.md`).
 
 ---
 

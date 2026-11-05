@@ -145,10 +145,9 @@ def rilievi_quadri(dati: dict) -> list[Errore]:
             out.append(Errore("QUADRO_NON_SUPPORTATO", f"quadro[{q['id']}]",
                               f"il quadro {q['id']} è selezionato ma non ancora supportato ({q.get('motivo', '')}): "
                               "la bozza è conservata, la pratica non è finalizzabile", "docs/MATRICE_COPERTURA.md"))
-    if (dati.get("opzioni", {}) or {}).get("tipo_dichiarazione") == "sostitutiva":
-        out.append(Errore("SOSTITUTIVA_NON_SUPPORTATA", "quadro[AN]",
-                          "la dichiarazione sostitutiva non e' ancora gestita (dati della dichiarazione sostituita, casella nel frontespizio): "
-                          "la bozza e' conservata ma la pratica non e' finalizzabile", "docs/MATRICE_COPERTURA.md"))
+    from .telematico import sostitutiva as _sost   # import locale: il pacchetto telematico importa questo modulo
+    for cod, perc, msg, fonte in _sost.rilievi(dati):
+        out.append(Errore(cod, perc, msg + ": la pratica non e' finalizzabile", fonte))
     for coll in ("persone", "beni", "passivita", "documenti_ref"):
         for e in dati.get(coll, []):
             qid = quadro_di(coll, e)

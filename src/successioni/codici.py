@@ -17,6 +17,7 @@ import re
 # tipo del bene: «immobile» = fabbricato o terreno, «altro» = gli altri beni) e «dichiarazione.<chiave>» (opzioni.telematico).
 REGOLE: dict[str, tuple[str, str]] = {
     "dichiarazione.stato_civile": ("StatoCivile_Type", "stato civile del defunto"),
+    "dichiarazione.codice_sostitutiva": ("DichiarazioneSostitutiva_Type", "tipo di dichiarazione sostitutiva"),
     "dichiarazione.tempistica_pagamento": ("TempisticaPagamento_Type", "tempistica del pagamento"),
     "dichiarazione.presentatore.codice_carica": ("CodiciCarica_Type", "carica del presentatore"),
     "persone.grado_parentela": ("GradoParentela_Type", "grado di parentela"),

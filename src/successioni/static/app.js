@@ -738,6 +738,9 @@ function schedaPersona(titolo, ruolo, vis) {
 const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore booleano nel modello), altrimenti testo
   ["stato_civile", "stato civile"], ["devoluzione_per_legge", "devoluzione per legge", "bool"], ["firma_dichiarante", "firma del dichiarante", "bool"],
   ["tempistica_pagamento", "tempistica del pagamento"],
+  ["codice_sostitutiva", "tipo di sostitutiva (codice)"], ["prima_anno", "prima dichiarazione: anno"], ["prima_volume", "prima dichiarazione: volume"],
+  ["prima_numero", "prima dichiarazione: numero"], ["ipotecaria_versata", "imposta ipotecaria già versata (EF6)"],
+  ["catastale_versata", "imposta catastale già versata (EF12)"], ["successione_versata", "imposta di successione già versata (EF18bis col. 3)"],
   ["dichiara_copie_conformi", "dichiarazione di conformità delle copie allegate", "bool"],
   ["azienda_data_deposito", "azienda: data di deposito"],
   ["azienda_camera_commercio", "azienda: camera di commercio"],
@@ -862,8 +865,9 @@ function renderFront(main) {
   sel.value = tipo;
   sel.addEventListener('change', () => salvaOps([{ op: 'set', sezione: 'opzioni', campi: { tipo_dichiarazione: sel.value } }]));
   successione.insertBefore(h('div', { class: 'rg' }, h('label', {}, 'Tipo di dichiarazione'), sel), successione.children[1] || null);
-  if (tipo === 'sostitutiva') successione.append(h('p', { class: 'nota' }, 'La gestione della dichiarazione precedente non è completa: la sostitutiva resta non finalizzabile.'));
+  if (tipo === 'sostitutiva') successione.append(h('p', { class: 'nota' }, 'Sostitutiva: sono gestiti i codici 1 e 2 (il codice 3, solo documentazione, no). Compila gli estremi della prima dichiarazione e le imposte già versate; la sostitutiva deve contenere tutti i quadri, non solo le modifiche.'));
   grid.append(successione);
+  if (tipo === 'sostitutiva') grid.append(sezioneDatiDichiarazione(['codice_sostitutiva', 'prima_anno', 'prima_volume', 'prima_numero', 'ipotecaria_versata', 'catastale_versata', 'successione_versata'], 'Dichiarazione sostituita e imposte già versate'));
   const presentatore = sezioneDatiDichiarazione(CAMPI_DICH.filter(([k]) => k.startsWith('presentatore.')).map(([k]) => k), '3. Presentatore e contatti');
   presentatore.classList.add('intera');
   presentatore.append(schedaPersona('Anagrafica del presentatore', 'presentatore', ['cognome', 'nome', 'codice_fiscale', 'sesso', 'data_nascita', 'luogo_nascita', 'provincia_nascita', 'relazione_con_defunto']));

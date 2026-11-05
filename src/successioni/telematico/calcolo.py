@@ -187,9 +187,12 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
     fr = dich.find(SUC + "Frontespizio")
     dd = fr.find(f"{SUC}DatiDefunto/{SUC}UlterioriDati/{SUC}DataDecesso").text
     data_decesso = date(int(dd[4:]), int(dd[2:4]), int(dd[:2]))
-    if fr.find(f"{SUC}TipoDichiarazione/{SUC}PrimaDichiarazione") is None:
-        ns.append(Errore("CALCOLO_NON_SUPPORTATO", "Frontespizio/TipoDichiarazione", "dichiarazione sostitutiva o "
-                         "integrativa non supportata dal calcolo", _g(8, "riferimento a EF18-bis")))
+    # sostitutiva codici 1 e 2: l'imposta si ricalcola su tutti i dati della dichiarazione, non sulle sole modifiche
+    # (Fascicolo I p. PDF 47, EF18bis col. 2); il codice 3 non contiene i quadri del calcolo
+    if (fr.find(f"{SUC}TipoDichiarazione/{SUC}PrimaDichiarazione") is None and
+            fr.findtext(f"{SUC}TipoDichiarazione/{SUC}DichiarazioneSostitutiva") not in ("1", "2")):
+        ns.append(Errore("CALCOLO_NON_SUPPORTATO", "Frontespizio/TipoDichiarazione", "dichiarazione integrativa (codice 3) "
+                         "o tipo non riconosciuto: non supportata dal calcolo", _g(8, "riferimento a EF18-bis")))
     carica = fr.findtext(f"{SUC}Presentatore/{SUC}CodiceCarica")
     soggetti = []
     for m, mod in enumerate(dich.findall(f"{SUC}QuadroEA/{SUC}Modulo"), 1):

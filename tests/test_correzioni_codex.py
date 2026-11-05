@@ -286,7 +286,7 @@ def test_r02_sostitutiva_non_genera_xml_ne_preparazione(tmp_path):
     s.aggiorna(pid, rev, [{'op': 'set', 'sezione': 'opzioni', 'campi': {'tipo_dichiarazione': 'sostitutiva'}}])
     r = s.esporta(pid)
     assert not r['generato'] and not r['completo']
-    assert any(e['codice'] == 'SOSTITUTIVA_NON_SUPPORTATA' for e in r['errori']), r['errori']
+    assert any(e['codice'] == 'DATO_MANCANTE' for e in r['errori']), r['errori']   # sostitutiva senza codice ed estremi
     with pytest.raises(DatiNonValidi):
         s.invio_prepara(pid)
 

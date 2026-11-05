@@ -7,6 +7,7 @@
   integrato con risposta ritardata (riprodotto sul codice precedente), non ancora con Playwright: non installato qui.
 - R05: `gui_aspetto.js` usa `selectOption` per la provincia; matrice riallineata su Frontespizio/EG/EH. Restano da fare le
   altre voci della revisione (sezione 4): sostitutive, devoluzione legittima, pluricomune, collegamenti reali, stampa ministeriale.
+- Sostitutive codici 1 e 2 implementate (`telematico/sostitutiva.py`, `tests/test_sostitutiva.py`, `docs/regole/sostitutiva.md`); controllo ufficiale SUC13 2.3.1 locale positivo il 2026-11-05 su dati sintetici. Codice 3 non supportato.
 - Le sezioni seguenti sono cronologia storica: possono descrivere come assenti funzioni poi realizzate.
 
 

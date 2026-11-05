@@ -32,6 +32,7 @@ from . import fonti as FO
 from . import formati as F
 from . import prima_casa as PC
 from . import riduzioni_art25 as RA
+from . import sostitutiva as SO
 from . import supplemento as SUP
 
 DEC_2025 = date(2025, 1, 1)
@@ -160,8 +161,20 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             if agevolati:
                 s1["PrimaCasa"] = {"PrimaCasa_Numero": str(n_pc), "AgevolazionePX_Valore": str(int(valore_pc)),
                                    "PrimaCasa_Imposta": str(fissa_pc)}
-            s1["ImpostaIpotecariaDovuta"] = str(ip + fissa_pc)
-            s1["ImpostaIpotecariaDaVersare"] = str(ip + fissa_pc)
+            sost = x.sost
+            dovuta_ip, dovuta_cat = ip + fissa_pc, cat + fissa_pc
+            da_ip, da_cat = dovuta_ip, dovuta_cat
+            s1["ImpostaIpotecariaDovuta"] = str(dovuta_ip)
+            if sost:
+                # EF6/EF12 (gia' versata) e EF8/EF14 (da versare): Fascicolo I pp. PDF 42-44; con il codice 1 l'importo da
+                # versare, se dovuto, non puo' essere inferiore alla misura fissa (200 euro)
+                da_ip, da_cat = int(SO.netto(dovuta_ip, sost.ipotecaria_versata)), int(SO.netto(dovuta_cat, sost.catastale_versata))
+                if sost.codice == "1":
+                    da_ip, da_cat = max(da_ip, IMPOSTA_FISSA), max(da_cat, IMPOSTA_FISSA)
+                if sost.ipotecaria_versata:
+                    s1["ImpostaIpotecariaVersata"] = str(sost.ipotecaria_versata)
+            if da_ip:
+                s1["ImpostaIpotecariaDaVersare"] = str(da_ip)
             ef["SezioneI_ImpostaIpotecaria"] = s1
             s2: dict = {}
             if prop_cat:
@@ -169,16 +182,21 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                                               "ImpostaProporzionale_Imposta": str(cat)}
             if agevolati:
                 s2["ImpostaCatastaleFissa"] = str(fissa_pc)
-            s2["ImpostaCatastaleDovuta"] = str(cat + fissa_pc)
-            s2["ImpostaCatastaleDaVersare"] = str(cat + fissa_pc)
+            s2["ImpostaCatastaleDovuta"] = str(dovuta_cat)
+            if sost and sost.catastale_versata:
+                s2["ImpostaCatastaleVersata"] = str(sost.catastale_versata)
+            if da_cat:
+                s2["ImpostaCatastaleDaVersare"] = str(da_cat)
             ef["SezioneII_ImpostaCatastale"] = s2
-            n = len(comuni)
+            # codice 2: «il campo non deve essere compilato» (Fascicolo I pp. PDF 45-46); codice 1: solo le circoscrizioni
+            # delle nuove trascrizioni (qui un unico comune, quindi al piu' una)
+            n = len(comuni) if not sost or sost.codice == "1" else 0
             if n:
                 ef["SezioneIII_TassaIpotecaria"] = {"Circoscrizioni_Numero": str(n),
                                                     "Circoscrizioni_Imposta": str(TASSA_CIRCOSCRIZIONE * n)}
                 ef["SezioneIV_ImpostaBollo"] = {"Circoscrizioni_Numero": str(n),
                                                "Circoscrizioni_Imposta": str(BOLLO_CIRCOSCRIZIONE * n)}
-            da_versare += ip + cat + 2 * fissa_pc + TASSA_CIRCOSCRIZIONE * n + BOLLO_CIRCOSCRIZIONE * n
+            da_versare += da_ip + da_cat + TASSA_CIRCOSCRIZIONE * n + BOLLO_CIRCOSCRIZIONE * n
             x.calcoli_ef = {
                 "EF1": {"imponibile": imp, "imposta": ip, "fonte": fa1 + "; " + FO.fonte_fasc1(40, "rigo EF1")},
                 "EF4": {"numero": n_pc, "valore": str(int(valore_pc)), "imposta": fissa_pc,
@@ -194,6 +212,12 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             }
             if not agevolati:
                 x.calcoli_ef.pop("EF4")
+            if sost:
+                x.calcoli_ef["EF6/EF8/EF12/EF14"] = {
+                    "codice_sostitutiva": sost.codice, "ipotecaria": {"dovuta": dovuta_ip, "versata": sost.ipotecaria_versata,
+                                                                       "da_versare": da_ip},
+                    "catastale": {"dovuta": dovuta_cat, "versata": sost.catastale_versata, "da_versare": da_cat},
+                    "fonte": SO.FONTE_VERSATE}
     if dd >= DEC_2025 and not motivi:
         vbis, extra, m2 = _sezione_vbis(x, xml_pre)
         motivi += m2
@@ -225,7 +249,13 @@ def _sezione_vbis(x, xml_pre):
         mot = "; ".join(m.messaggio for m in r.motivi) or r.stato
         return None, 0, [f"imposta di successione (EF18bis) non determinata: stato del calcolo '{r.stato}' ({mot})"]
     imposta = r.imposta_ef18bis
+    sost = x.sost
+    versata = sost.successione_versata if sost else 0
     if imposta <= 10:
+        if versata:
+            x.avv("IMPOSTA_VERSATA_DA_RIMBORSARE", "opzioni.telematico.dichiarazione.successione_versata",
+                  f"imposta di successione gia' versata ({versata}) con imposta riliquidata non dovuta: l'eventuale "
+                  "rimborso si chiede all'ufficio (Fascicolo I p. PDF 47, col. 3)", SO.FONTE_VERSATE)
         # Fascicolo I p. 47 col. 1: casella barrata se non e' dovuta alcuna imposta (es. importo <= 10 euro);
         # annotazione ImpostaDaVersare: se il risultato e' minore o uguale a 10 euro deve essere uguale a zero
         x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
@@ -234,6 +264,20 @@ def _sezione_vbis(x, xml_pre):
     # Fascicolo I p.6 (dodici mesi) e p.48 (tempistica 1/2). Le decorrenze particolari,
     # sospensioni e il ravvedimento non sono implementati: non finalizzare una tardiva
     # con imposta di successione dovuta, neppure cambiando semplicemente codice 1 in 2.
+    if versata > imposta:
+        return None, 0, [f"imposta di successione gia' versata ({versata}) superiore a quella riliquidata ({imposta}): "
+                         "la parte eccedente si chiede a rimborso (Fascicolo I p. PDF 47) e il tracciato ammette "
+                         "ImpostaVersata solo fino all'imposta calcolata: caso non coperto"]
+    residuo = imposta - versata
+    da_versare_imp = residuo if residuo > 10 else 0   # annotazione ImpostaDaVersare: <= 10 euro -> zero
+    if sost and da_versare_imp == 0:
+        # nessuna somma ulteriore: niente tardivita', tempistica o sanzioni da valutare
+        ic = {"Imposta": str(imposta)}
+        if versata:
+            ic["ImpostaVersata"] = str(versata)
+        x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
+                                      "xpath": f"{x.XP_DICH}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione"}
+        return {"ImpostaCalcolata": ic}, 0, []
     try:
         termine_ordinario = x.data_decesso.replace(year=x.data_decesso.year + 1)
     except ValueError:  # 29 febbraio: nessuna regola di calendario fiscale indovinata
@@ -251,11 +295,14 @@ def _sezione_vbis(x, xml_pre):
               f"dovuta ({imposta}): indicare la tempistica di pagamento 1 (entro 90 giorni) o 2 (contestuale)",
               _fa(el + "/ImpostaCalcolata/TempisticaPagamento") + "; " + FO.fonte_fasc1(48, "rigo EF18ter col. 1"))
         return None, 0, []
-    ic = {"Imposta": str(imposta), "ImpostaDaVersare": str(imposta), "TempisticaPagamento": temp}
+    ic = {"Imposta": str(imposta)}
+    if versata:
+        ic["ImpostaVersata"] = str(versata)
+    ic.update({"ImpostaDaVersare": str(da_versare_imp), "TempisticaPagamento": temp})
     x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
                                   "xpath": f"{x.XP_DICH}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione"}
     # EF19: EF18bis col. 5 solo con pagamento contestuale (codice 2) (Fascicolo I p. 48)
-    return {"ImpostaCalcolata": ic}, (imposta if temp == "2" else 0), []
+    return {"ImpostaCalcolata": ic}, (da_versare_imp if temp == "2" else 0), []
 
 
 # ============================================================================================== EG
