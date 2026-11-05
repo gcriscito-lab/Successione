@@ -40,6 +40,7 @@ from lxml import etree
 
 from ..schema import Errore
 from . import fonti as FO
+from . import agevolazioni as AG
 from . import riduzioni_art25 as RA
 
 DECORRENZA = date(2025, 1, 1)
@@ -242,7 +243,7 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                 # art. 25): i codici prima casa P, X, Y, Z non modificano l'imposta di successione (Fascicolo I p. PDF 57,
                 # quadro sinottico: solo imposte ipotecaria e catastale fisse)
                 agev, rid = _testo(dv, "Agevolazioni") or None, _testo(dv, "Riduzioni") or None
-                if agev not in (None, "P", "X", "Y", "Z") + RA.CODICI_AGEV:
+                if agev not in (None, "P", "X", "Y", "Z") + RA.CODICI_AGEV + AG.CODICI:
                     ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/Devoluzione", f"agevolazione {agev} non "
                                      "supportata dal calcolo", _g(5, "riduzioni e agevolazioni")))
                 tc_riga = tipo_cespite if q == "ER" else ("ES" if q == "EO" and esente_eo else None)
@@ -260,6 +261,7 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                 qe_el = dv.find(f"{SUC}Quota/{SUC}QuotaElementi")
                 devs.append((pos, q, tc_riga, _num(qv.text if qv is not None else None),
                              {"agev": agev if agev in RA.CODICI_AGEV else None, "rid": rid,
+                              "esente": agev in AG.ESENTI_SUCCESSIONE,      # guida p. 1: QE senza i righi A, D, C, G, N, E, H
                               "valore": _num(val_riga), "vps": _num(vps_riga),
                               "ie": ie_riga, "qn": int(_testo(qe_el, "QuotaNumeratore") or 0) if qe_el is not None else 0,
                               "qd": int(_testo(qe_el, "QuotaDenominatore") or 1) if qe_el is not None else 1}))
@@ -421,7 +423,8 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
         # diritto dichiarato esente dall'imposta»; indicazione dei titoli esenti «opzionale», con valenza solo verso gli
         # operatori finanziari) e guida p. 1 (QE = valore imponibile). La guida non elenca il tipo 3 fra le esclusioni
         # A, D, C, G, N, E, H: l'esclusione e' un'interpretazione dichiarata, riportata nelle note del risultato.
-        qe = sum((v for p, q, tc, v, ex in d["devoluzioni"] if p == pos and tc not in ("DN", "ES")), Fraction(0))
+        qe = sum((v for p, q, tc, v, ex in d["devoluzioni"] if p == pos and tc not in ("DN", "ES") and not ex.get("esente")),
+                 Fraction(0))
         qdn = sum((v for p, q, tc, v, ex in d["devoluzioni"] if p == pos and tc == "DN"), Fraction(0))
         qp = sum((v for p, v in d["passivo"] if p == pos), Fraction(0))
         an = max(qe + qdn - qp, Fraction(0))

@@ -68,7 +68,7 @@ EL_VPS = "QuadroEC/Modulo/Fabbricati/ValorePrecSucc"
 EL_IV = "QuadroEH/PrimoModulo/SezioneIV_AltreAgevRiduz"
 FONTE_SINOTTICO = FO.fonte_fasc1(62, "quadro sinottico delle riduzioni dell'imposta di successione") + "; " + \
     FO.fonte_fasc1(63, "descrizione dei codici 1-5, L, R, F, Q")
-CHIAVI_RIDUZIONI = {"dichiara_requisiti", "l", "successione_precedente", "donazione_precedente"}
+CHIAVI_RIDUZIONI = {"dichiara_requisiti", "l", "a", "successione_precedente", "donazione_precedente"}
 CHIAVI_L = {"num_protocollo", "data"}
 CHIAVI_SUCC = {"ufficio", "anno", "volume", "numero"}
 CHIAVI_DON = {"ufficio", "serie", "numero", "sottonumero"}
@@ -262,8 +262,8 @@ def sezione_eh(x) -> dict | None:
     fonte = FO.fonte_annotazione(EL_IV) + "; " + FO.fonte_fasc1(53, "Sezione IV altre agevolazioni e riduzioni")
     if not x.ra_eh:
         if dati is not None:
-            x.err("DATI_INCOERENTI", base, "la Sezione IV del quadro EH puo' essere compilata solo con L, Q o riduzioni "
-                  "art. 25 c. 1 richieste dal dichiarante", fonte)
+            x.err("DATI_INCOERENTI", base, "la Sezione IV del quadro EH puo' essere compilata solo con A, C, D, E, L, Q o "
+                  "riduzioni art. 25 c. 1 richieste dal dichiarante", fonte)
         return None
     if not isinstance(dati, dict):
         x.err("DATO_MANCANTE", base, "con riduzioni richieste dal dichiarante indicare i dati della Sezione IV del quadro EH "
@@ -278,29 +278,37 @@ def sezione_eh(x) -> dict | None:
               "confermare esplicitamente (true)", fonte)
         ok = False
     sez: dict = {}
-    if "L" in x.ra_eh:
-        l = dati.get("l")
-        el = EL_IV + "/EsenzioneImpostaSuccessione/AgevolazTipoL"
+    esenz: dict = {}
+    for cod, chiave, tipo_xml, flag in (("A", "a", "AgevolazTipoA", "FlagA"), ("L", "l", "AgevolazTipoL", "FlagL")):
+        if cod not in x.ra_eh:
+            continue
+        l = dati.get(chiave)
+        el = EL_IV + "/EsenzioneImpostaSuccessione/" + tipo_xml
         if not isinstance(l, dict) or set(l) - CHIAVI_L or not l.get("num_protocollo") or not l.get("data"):
-            x.err("DATO_MANCANTE", base + ".l", "con il codice L richiesto dal dichiarante indicare {num_protocollo, data} "
-                  "(estremi della richiesta/attestazione dei beni culturali)", FO.fonte_annotazione(el) + "; " +
-                  FO.fonte_fasc1(53, "N.B. richiesta di attestazione"))
+            x.err("DATO_MANCANTE", base + "." + chiave, f"con il codice {cod} richiesto dal dichiarante indicare "
+                  "{num_protocollo, data} (estremi della richiesta/attestazione dei beni culturali)",
+                  FO.fonte_annotazione(el) + "; " + FO.fonte_fasc1(53, "N.B. richiesta di attestazione"))
             ok = False
         else:
             if not 7 <= len(str(l["num_protocollo"])) <= 16:
-                x.err("VALORE_NON_VALIDO", base + ".l.num_protocollo", "il numero protocollo L deve avere da 7 a 16 caratteri",
-                      "controllo ufficiale SUC13 2.3.1 eseguito in locale, diagnostico 3128 ('Numero protocollo L'); "
-                      "non e' scritto negli XSD")
+                x.err("VALORE_NON_VALIDO", base + f".{chiave}.num_protocollo", f"il numero protocollo {cod} deve avere da 7 a 16 "
+                      "caratteri", "controllo ufficiale SUC13 2.3.1 eseguito in locale, diagnostico 3128 ('Numero protocollo "
+                      "L'); non e' scritto negli XSD")
                 ok = False
             try:
-                sez["EsenzioneImpostaSuccessione"] = {"AgevolazTipoL": {
-                    "FlagL": "1", "NumProtocollo": F.an(l["num_protocollo"], 35), "Data": F.data(l["data"], non_oltre=x.oggi)},
-                    "FirmaDichiarante": "1"}
+                esenz[tipo_xml] = {flag: "1", "NumProtocollo": F.an(l["num_protocollo"], 35),
+                                   "Data": F.data(l["data"], non_oltre=x.oggi)}
             except F.ValoreXml as e:
-                x.err("VALORE_NON_VALIDO", base + ".l", str(e), FO.fonte_annotazione(el))
+                x.err("VALORE_NON_VALIDO", base + "." + chiave, str(e), FO.fonte_annotazione(el))
                 ok = False
+    if esenz:
+        sez["EsenzioneImpostaSuccessione"] = {**esenz, "FirmaDichiarante": "1"}
+    from . import agevolazioni as AG
+    flag_agev = AG.flags_agevolazioni_eh(x)          # FlagC, FlagD, FlagE (modello EH, sezione Agevolazioni)
     if "Q" in x.ra_eh:
-        sez["Agevolazioni"] = {"FlagQ": "1", "FirmaDichiarante": "1"}
+        flag_agev["FlagQ"] = "1"
+    if flag_agev:
+        sez["Agevolazioni"] = {**flag_agev, "FirmaDichiarante": "1"}
     if "art25" in x.ra_eh:
         r = _riduzioni_art25_eh(x, dati, base, fonte)
         if r is None:

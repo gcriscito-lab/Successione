@@ -43,6 +43,7 @@ from . import devoluzione_legge as DL
 from . import formati as F
 from . import identificativi as ID
 from . import modello_xsd as M
+from . import agevolazioni as AG
 from . import prima_casa as PC
 from . import riduzioni_art25 as RA
 from . import quadri_efgh as EFGH
@@ -1330,6 +1331,7 @@ class _Export:
                 if agev:
                     PC.registra(self, d["id"], b["id"], pid, agev, quadro)
                 RA.leggi_riga(self, d, b, quadro, perc, pid)
+                AG.leggi_riga(self, d, b, quadro, perc, pid)
             somma += Fraction(n, den)
             self.persona_dev[d["id"]] = pid
             righe.append((self.pos_ea[pid], dir_r, d["id"], n, den))
@@ -1674,7 +1676,8 @@ class _Export:
     # ---------------------------------------------------------------- EE
     def quadro_ee(self) -> dict | None:
         """Totali dalle annotazioni XSD di QuadroEE (nessun bene aziendale o agevolazione A nel perimetro)."""
-        imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC", "EL", "EM"))
+        con_a = {r["bene_id"] for r in getattr(self, "ag_righe", []) if r["codice"] == "A"}   # annotazioni di QuadroEE: al netto di A
+        imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC", "EL", "EM") and k not in con_a)
         altri = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "ER")
         titoli = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "EO")
         aziende = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "EN")
@@ -1969,6 +1972,7 @@ class _Export:
         self.eh_navi, self.eh_aeromobili, self.ei_beni = [], [], []
         PC.inizializza(self)
         RA.inizializza(self)
+        AG.inizializza(self)
 
         self.classifica_persone()
         self.ordina_ea()
@@ -2017,6 +2021,7 @@ class _Export:
             str(SUP.attr(self.d, "beni", b, "tipo_cespite") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_er)
         PC.valida(self)
         RA.valida(self)
+        AG.valida(self)
         if self.ea:
             assegnati = {d.get("persona_id") for d in self.d.get("devoluzioni", [])}
             for p in self.ea:

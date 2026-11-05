@@ -636,7 +636,7 @@ def test_neg_allegati_obbligatori_mancanti():
     (lambda d: (rid(d, "d_casaanna", agevolazioni="Q")), "Q nel quadro EC"),                # Q su fabbricato non aziendale
     (lambda d: (rid(d, "d_terranna", agevolazioni="R"), rid(d, "d_terrluca", agevolazioni="R"),
                 rid(d, "d_casaanna", agevolazioni="R")), "2 righe con codice R"),
-    (lambda d: (rid(d, "d_casaanna", agevolazioni="G")), "non supportata"),
+    (lambda d: (rid(d, "d_casaanna", agevolazioni="G")), "agevolazioni=G"),                 # G: gestita solo in EN (agevolazioni.py)
 ])
 def test_neg_casi_non_supportati_bloccano_l_esportazione(mod, testo):
     d = base()

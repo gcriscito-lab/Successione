@@ -111,7 +111,7 @@ def test_decesso_anteriore_al_2025_non_supportato():
 def test_agevolazioni_nel_file_non_supportate():
     es = esporta_xml(caso_completo(), contesto(scopo="bozza_tecnica"))
     xml = es.xml.replace(b"<suc:CodiceDiritto_Rip>1</suc:CodiceDiritto_Rip>",
-                         b"<suc:CodiceDiritto_Rip>1</suc:CodiceDiritto_Rip><suc:Agevolazioni>G</suc:Agevolazioni>", 1)
+                         b"<suc:CodiceDiritto_Rip>1</suc:CodiceDiritto_Rip><suc:Agevolazioni>K</suc:Agevolazioni>", 1)   # codice inesistente
     r = calcola_da_xml(xml)
     assert r.stato == "non_supportato"
 

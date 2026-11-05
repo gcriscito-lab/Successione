@@ -267,12 +267,16 @@ def test_p_su_terreno_non_ammesso():
 
 
 def test_codici_non_supportati_bloccano():
-    for codice in ("Y", "A", "G"):
+    for codice in ("Y",):
         d = caso_prima_casa()
         _agev(d, "d_casaanna", codice)
         _tel(d)["dichiarazione"].pop("prima_casa")
         es = _blocco(d)
         assert any(f"agevolazioni={codice}: agevolazione non supportata" in s for s in es.non_supportato), codice
+    d = caso_prima_casa()                      # G: ora gestita, ma solo nel quadro EN (tests/test_agevolazioni.py)
+    _agev(d, "d_casaanna", "G")
+    _tel(d)["dichiarazione"].pop("prima_casa")
+    assert any("agevolazioni=G nel quadro EC: non supportato" in s for s in _blocco(d).non_supportato)
     d = caso_prima_casa()
     _agev(d, "d_casaanna", "K")
     assert ("devoluzioni[d_casaanna].agevolazioni", "VALORE_NON_VALIDO") in _errori(_blocco(d))
@@ -428,7 +432,7 @@ def test_importazione_rifiuta_le_agevolazioni():
 
 def test_calcolo_blocca_ancora_le_altre_agevolazioni():
     es = _es(caso_prima_casa())
-    xml = es.xml.replace(b"<suc:Agevolazioni>P</suc:Agevolazioni>", b"<suc:Agevolazioni>G</suc:Agevolazioni>")
+    xml = es.xml.replace(b"<suc:Agevolazioni>P</suc:Agevolazioni>", b"<suc:Agevolazioni>K</suc:Agevolazioni>")   # codice inesistente
     r = calcola_da_xml(xml)
     assert r.stato != "completato" and any(m.codice == "CALCOLO_NON_SUPPORTATO" for m in r.motivi)
 
