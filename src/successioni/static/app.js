@@ -805,6 +805,23 @@ const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore boo
   ["testamento.ufficio_registrazione", "testamento: ufficio di registrazione"], ["testamento.serie", "testamento: serie"],
   ["testamento.numero_registrazione", "testamento: numero registrazione"], ["testamento.sottonumero_registrazione", "testamento: sottonumero"],
   ["testamento.data_registrazione", "testamento: data registrazione"],
+  ["separazione_con_colpa", "separazione con colpa del coniuge superstite (stato civile 5)", "bool"],
+  ["no_scioglimento_unione_civile", "nessuna domanda di scioglimento dell'unione civile (stato civile 7)", "bool"],
+  ["reintegro_1.ufficio_registrazione", "reintegro dei diritti 1: ufficio di registrazione"],
+  ["reintegro_1.serie", "reintegro dei diritti 1: serie"],
+  ["reintegro_1.numero_registrazione", "reintegro dei diritti 1: numero"],
+  ["reintegro_1.sottonumero_registrazione", "reintegro dei diritti 1: sottonumero"],
+  ["reintegro_1.data_registrazione", "reintegro dei diritti 1: data di registrazione"],
+  ["reintegro_2.ufficio_registrazione", "reintegro dei diritti 2: ufficio di registrazione"],
+  ["reintegro_2.serie", "reintegro dei diritti 2: serie"],
+  ["reintegro_2.numero_registrazione", "reintegro dei diritti 2: numero"],
+  ["reintegro_2.sottonumero_registrazione", "reintegro dei diritti 2: sottonumero"],
+  ["reintegro_2.data_registrazione", "reintegro dei diritti 2: data di registrazione"],
+  ["reintegro_3.ufficio_registrazione", "reintegro dei diritti 3: ufficio di registrazione"],
+  ["reintegro_3.serie", "reintegro dei diritti 3: serie"],
+  ["reintegro_3.numero_registrazione", "reintegro dei diritti 3: numero"],
+  ["reintegro_3.sottonumero_registrazione", "reintegro dei diritti 3: sottonumero"],
+  ["reintegro_3.data_registrazione", "reintegro dei diritti 3: data di registrazione"],
 ];
 function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazione') {
   const tel = (S.P.dati.opzioni || {}).telematico || {};
@@ -930,11 +947,15 @@ function renderFront(main) {
   const dich = ((S.P.dati.opzioni.telematico || {}).dichiarazione || {});
   const testamento = h('details', { class: 'gruppo-opzionale', open: dich.devoluzione_per_testamento === true || !!dich.testamento }, h('summary', {}, 'Testamento · dati da compilare se presente'),
     sezioneDatiDichiarazione(CAMPI_DICH.filter(([k]) => k.startsWith('testamento.')).map(([k]) => k), 'Estremi del testamento'));
+  const chiaviReintegro = CAMPI_DICH.filter(([k]) => k.startsWith('reintegro_')).map(([k]) => k);
+  const stato = h('details', { class: 'gruppo-opzionale', open: dich.separazione_con_colpa != null || dich.no_scioglimento_unione_civile != null || chiaviReintegro.some(k => k.split('.').reduce((o, c) => (o == null ? undefined : o[c]), dich) != null) },
+    h('summary', {}, 'Separazione, unione civile e reintegro dei diritti · quadro EH'),
+    sezioneDatiDichiarazione(['separazione_con_colpa', 'no_scioglimento_unione_civile', ...chiaviReintegro], 'Dichiarazioni sullo stato civile e sugli accordi di reintegro'));
   const primaCasa = h('details', { class: 'gruppo-opzionale', open: !!dich.prima_casa }, h('summary', {}, 'Agevolazione prima casa'), sezionePrimaCasa());
   const riduzioni = h('details', { class: 'gruppo-opzionale', open: !!dich.riduzioni_art25 }, h('summary', {}, 'Riduzioni art. 25 e codici L, Q'), sezioneRiduzioni());
   const aziende = h('details', { class: 'gruppo-opzionale', open: S.P.dati.beni.some(b => b.tipo === 'azienda') }, h('summary', {}, 'Dati delle aziende · se presenti'),
     sezioneDatiDichiarazione(['azienda_data_deposito', 'azienda_camera_commercio'], 'Deposito e camera di commercio'));
-  main.append(testamento, primaCasa, riduzioni, aziende);
+  main.append(testamento, stato, primaCasa, riduzioni, aziende);
   const att = new Set(S.P.dati.opzioni.quadri_attivi || S.schema.predefiniti);
   const box = h('details', { class: 'gruppo-opzionale' }, h('summary', {}, 'Quadri inclusi nella pratica · ' + att.size + ' selezionati'));
   for (const q of S.schema.quadri.filter(x => x.gruppo !== 'frontespizio' && x.id !== 'DV' && (!x.generato || att.has(x.id)))) {

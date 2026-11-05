@@ -64,8 +64,9 @@ BOLLO_CIRCOSCRIZIONE = 85
 SEZIONI_EG = ("DichSost", "Testamento", "Inventario", "CertificazioneImpostaVersataEstero", "DocumentiPassivita",
               "AlberoGenealogico", "DocumentiIdentita", "Altro", "PrimaCasa", "AgevolazioniImposteIpocatastali",
               "RiduzioniImposteSuccessione")
-EG_SUPPORTATE = {"DichSost", "Testamento", "DocumentiPassivita", "AlberoGenealogico", "DocumentiIdentita", "Altro",
-                 "PrimaCasa", "RiduzioniImposteSuccessione", "CertificazioneImpostaVersataEstero"}
+EG_SUPPORTATE = {"DichSost", "Testamento", "Inventario", "DocumentiPassivita", "AlberoGenealogico", "DocumentiIdentita", "Altro",
+                 "PrimaCasa", "AgevolazioniImposteIpocatastali", "RiduzioniImposteSuccessione",
+                 "CertificazioneImpostaVersataEstero"}
 
 
 def _snake(nome: str) -> str:
@@ -493,8 +494,7 @@ def quadro_eg(x) -> dict | None:
                   _fa(el + "/Testamento"))
             continue
         if sez not in EG_SUPPORTATE:
-            x.ns.append(f"{perc}: rigo EG {sez} non supportato in questa versione (testamento, inventario, imposta "
-                        "estera, agevolazioni e riduzioni)")
+            x.ns.append(f"{perc}: rigo EG {sez} non supportato in questa versione")
             continue
         if dr.get("persona_id") not in (None, "") and dr["persona_id"] not in {p["id"] for p in x.d.get("persone", [])}:
             x.err("RIFERIMENTO_INESISTENTE", perc + ".persona_id", "persona inesistente", "src/successioni/schema.py")
@@ -749,14 +749,9 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     ana_d = (fr.get("DatiDefunto") or {}).get("DatiAnagrafici")
     data_dec = ((fr.get("DatiDefunto") or {}).get("UlterioriDati") or {}).get("DataDecesso")
     stato_civile = (fr.get("DatiDefunto") or {}).get("UlterioriDati", {}).get("StatoCivile")
-    if stato_civile == "5":
-        x.ns.append("quadro EH: stato civile 5 (separato) richiede la dichiarazione sulla separazione (Separazione), "
-                    "non supportata")
-    if stato_civile == "7":
-        x.ns.append("quadro EH: stato civile 7 richiede FlagNoScioglimentoUnioneCivile, non supportato")
-    if any(x.handicap_ea.values()):
-        x.ns.append("quadro EH: soggetti con disabilita' richiedono la sezione Interdetti (rigo/modulo e certificatore),"
-                    " non supportata")
+    sep_unione = _eh_separazione_unione(x, stato_civile)
+    interdetti = _eh_interdetti(x)
+    reintegri = _eh_reintegri(x)
     eredi, visti = [], set()
     for p in x.ea:
         if x.tipo_ea.get(p["id"]) not in ("1", "2", "3", "4"):
@@ -774,10 +769,14 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
                                                              "Comune": comune, "Provincia": prov}},
         "Dichiarante": {"PresenzaDichiarante": "1"},
         "Testamento": _eh_testamento(x),
-        "Interdetti": {"FlagAssenzaInterdetti": "1"},
+        "Interdetti": ({"PresenzaInterdetti": {"FlagInterdetti": "1", **interdetti[0]}} if interdetti
+                       else {"FlagAssenzaInterdetti": "1"}),
         "Rinuncia": _eh_rinuncia(x, 0),
         "FirmaDichiarante": "1",
     }
+    sez.update(sep_unione)
+    if reintegri:
+        sez["ReintegroDiritti"] = {"FlagReintegro": "1", "RegistrazioneReintegroDiritti": reintegri[0]}
     for chiave, elenco, flag in (("Navi", x.eh_navi, "FlagNavi"), ("Aeromobili", x.eh_aeromobili, "FlagAeromobili")):
         if len(elenco) > 1:
             x.ns.append(f"quadro EH: {len(elenco)} {chiave.lower()} nel quadro {'EQ' if chiave == 'Navi' else 'EP'}: la sezione "
@@ -800,14 +799,17 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
         sez["Aziende"] = az
     if eredi:
         sez["Eredi"] = eredi[:3]
-    if eg and "DocumentiPassivita" in eg:
+    if eg and ("DocumentiPassivita" in eg or "Inventario" in eg):
         conf = SUP.dich(x.d, "dichiara_copie_conformi")
         if conf is not True:
             x.err("DATO_MANCANTE", "opzioni.telematico.dichiarazione.dichiara_copie_conformi", "con i documenti delle "
-                  "passivita' (rigo EG5) il dichiarante deve attestare che sono copie degli originali (EH, lettera l): "
-                  "confermare esplicitamente (true)",
-                  _fa(el + "/FlagPassivita") + "; " + FO.fonte_fasc1(52, "lettera l"))
-        sez["FlagPassivita"] = "1"
+                  "passivita' (rigo EG5) o con l'inventario/prospetto (rigo EG3) il dichiarante deve attestare che sono copie "
+                  "degli originali (EH, lettera l): confermare esplicitamente (true)",
+                  _fa(el + "/FlagPassivita") + "; " + _fa(el + "/FlagProspetto") + "; " + FO.fonte_fasc1(52, "lettera l"))
+        if "DocumentiPassivita" in eg:
+            sez["FlagPassivita"] = "1"
+        if "Inventario" in eg:
+            sez["FlagProspetto"] = "1"             # annotazione: obbligatorio in presenza del rigo EG3
     eh: dict = {"PrimoModulo": {"SezioneI_DichSost": sez}}
     sez2 = PC.sezione_eh(x)
     if sez2:
@@ -822,10 +824,104 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     if altri:
         eh["Modulo"] = [{"SezioneI_DichSost": {"Eredi": blocco}} for blocco in altri]
     _eh_rinunce_ulteriori(x, eh)
+    _eh_moduli_ulteriori(eh, "PresenzaInterdetti", interdetti[1:])
+    _eh_moduli_ulteriori(eh, "ReintegroDiritti", reintegri[1:])
     if None in (comune, prov):
         return None
     x.mappa["quadro:EH"] = {"coll": None, "quadro": "EH", "xpath": f"{x.XP_DICH}/suc:QuadroEH"}
     return eh
+
+
+def _eh_moduli_ulteriori(eh: dict, chiave: str, elementi: list) -> None:
+    """Dal secondo elemento in poi un rigo per modulo (``Modulo/SezioneI_DichSost/<chiave>``, «puo' essere presente solo se nel
+    modulo precedente e' presente il rigo corrispondente»): il k-esimo elemento ulteriore va nel k-esimo modulo successivo."""
+    for k, el in enumerate(elementi):
+        moduli = eh.setdefault("Modulo", [])
+        while len(moduli) <= k:
+            moduli.append({"SezioneI_DichSost": {}})
+        moduli[k]["SezioneI_DichSost"][chiave] = el
+
+
+def _eh_separazione_unione(x, stato_civile) -> dict:
+    """Separazione (lettera g) e unione civile (lettera h) della Sezione I (annotazioni XSD di Separazione e
+    FlagNoScioglimentoUnioneCivile; Fascicolo I pp. PDF 18 e 51). Dati: ``separazione_con_colpa`` (stato civile 5) e
+    ``no_scioglimento_unione_civile`` (stato civile 7)."""
+    el = "QuadroEH/PrimoModulo/SezioneI_DichSost"
+    perc = "opzioni.telematico.dichiarazione."
+    sep, nus = SUP.dich(x.d, "separazione_con_colpa"), SUP.dich(x.d, "no_scioglimento_unione_civile")
+    out: dict = {}
+    legge = SUP.dich(x.d, "devoluzione_per_testamento") is not True
+    if stato_civile == "5":
+        if sep not in (True, False):
+            x.err("DATO_MANCANTE", perc + "separazione_con_colpa", "stato civile 5 (separato/a): indicare se e' stata pronunciata "
+                  "una sentenza di separazione passata in giudicato per colpa del coniuge superstite o di entrambi (si/no)",
+                  _fa(el + "/Separazione") + "; " + FO.fonte_fasc1(51, "lettera g"))
+        elif sep:
+            out["Separazione"] = {"FlagSeparazione": "1"}
+            if legge and any(g == "01" for g in x.grado_ea.values()):
+                x.err("REGOLA_SEPARAZIONE", perc + "separazione_con_colpa", "separazione con addebito: con la devoluzione per legge "
+                      "il coniuge (grado 01) non puo' essere beneficiario (annotazione XSD di FlagSeparazione; Fascicolo I p. PDF 18)",
+                      _fa(el + "/Separazione/FlagSeparazione"))
+        else:
+            out["Separazione"] = {"FlagAssenzaSeparazione": "1"}
+    elif sep not in (None, False):
+        x.err("DATI_INCOERENTI", perc + "separazione_con_colpa", "la separazione con colpa si indica solo con stato civile 5 "
+              "(separato/a)", _fa(el + "/Separazione/FlagSeparazione"))
+    if stato_civile == "7":
+        if nus is True:
+            out["FlagNoScioglimentoUnioneCivile"] = "1"
+        else:
+            x.err("DATO_MANCANTE", perc + "no_scioglimento_unione_civile", "stato civile 7 (parte dell'unione civile): confermare "
+                  "esplicitamente (true) che non e' stata presentata domanda di scioglimento dell'unione civile",
+                  _fa(el + "/FlagNoScioglimentoUnioneCivile") + "; " + FO.fonte_fasc1(51, "lettera h"))
+    elif nus not in (None, False):
+        x.err("DATI_INCOERENTI", perc + "no_scioglimento_unione_civile", "la dichiarazione sull'unione civile si indica solo con "
+              "stato civile 7", _fa(el + "/FlagNoScioglimentoUnioneCivile"))
+    return out
+
+
+def _eh_interdetti(x) -> list[dict]:
+    """Soggetti con disabilita' grave o interdetti (lettera e): un rigo EH7 per soggetto con il numero di rigo e di modulo del
+    quadro EA e gli estremi del verbale o della sentenza (``certificatore_disabilita``, al massimo 35 caratteri)."""
+    el = "QuadroEH/PrimoModulo/SezioneI_DichSost/Interdetti/PresenzaInterdetti"
+    out = []
+    for p in sorted((p for p in x.ea if x.handicap_ea.get(p["id"])), key=lambda p: x.pos_ea[p["id"]]):
+        perc = f"persone[{p['id']}].certificatore_disabilita"
+        x.usa(p, "certificatore_disabilita")
+        v = SUP.attr(x.d, "persone", p, "certificatore_disabilita")
+        if v in (None, ""):
+            x.err("DATO_MANCANTE", perc, "persona con disabilita' grave o interdetta: indicare gli estremi del verbale della "
+                  "commissione (L. 104/1992 art. 4) o della sentenza di interdizione/inabilitazione (al massimo 35 caratteri)",
+                  _fa(el + "/Certificatore") + "; " + FO.fonte_fasc1(51, "lettera e"))
+            continue
+        try:
+            cert = F.an(v, 35)
+        except F.ValoreXml as e:
+            x.err("VALORE_NON_VALIDO", perc, str(e), _fa(el + "/Certificatore"))
+            continue
+        m, r = x.pos_ea[p["id"]]
+        out.append({"IdentificazioneSoggetto": {"Rigo": str(r), "Modulo": str(m)}, "Certificatore": cert})
+    return out
+
+
+def _eh_reintegri(x) -> list[dict]:
+    """Accordi di reintegrazione dei diritti di legittima lesi (lettera d): fino a tre accordi (``reintegro_1`` .. ``reintegro_3``,
+    ciascuno con gli estremi di registrazione: ufficio, serie, numero, sottonumero, data)."""
+    el = "QuadroEH/PrimoModulo/SezioneI_DichSost/ReintegroDiritti"
+    out = []
+    for n in (1, 2, 3):
+        sez = SUP.dich(x.d, f"reintegro_{n}")
+        if sez in (None, ""):
+            continue
+        reg = x.estremi_registrazione(sez, f"opzioni.telematico.dichiarazione.reintegro_{n}",
+                                      _fa(el + "/RegistrazioneReintegroDiritti") + "; " + FO.fonte_fasc1(51, "lettera d"))
+        if reg is not None:
+            if any(reg == o for o in out):
+                x.err("DATI_INCOERENTI", f"opzioni.telematico.dichiarazione.reintegro_{n}", "estremi di registrazione duplicati "
+                      "(annotazione XSD: non possono essere presenti righe duplicate)", _fa(el + "/RegistrazioneReintegroDiritti"))
+            else:
+                out.append(reg)
+    return out
 
 
 def _rinunciatari_ordinati(x) -> list[tuple[str, dict]]:
