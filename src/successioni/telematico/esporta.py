@@ -303,6 +303,181 @@ class _Export:
             return None
         return cf_r, str(gr_r)
 
+    # ------------------------------------------------------------------ EA: residenza estera, rinuncia, denominazione
+    def residenza_estera(self, p: dict, base: str, el: str) -> dict | None:
+        """Sezione ``ResidenzaEstera`` del soggetto EA (Fascicolo I p. PDF 18, «Residente all'estero»; XSD Residenza_Estera_Type +
+        StatoEstero): CodiceStatoEstero (3 caratteri, tabella stati esteri), StatoFederato, LocalitaEstero, IndirizzoEstero,
+        StatoEstero (nome, al massimo 34 caratteri)."""
+        v = SUP.attr(self.d, "persone", p, "residenza_estera")
+        self.usa(p, "residenza_estera")
+        if v in (None, ""):
+            return None
+        perc = f"opzioni.telematico.persone[{p['id']}].residenza_estera"
+        fonte = FO.fonte_xsd(el + "/ResidenzaEstera") + "; " + FO.fonte_fasc1(18, "Residente all'estero")
+        chiavi = {"codice_stato", "stato", "stato_federato", "localita", "indirizzo"}
+        if not isinstance(v, dict) or set(v) - chiavi:
+            self.err("VALORE_NON_VALIDO", perc, f"atteso un oggetto con le chiavi {sorted(chiavi)}", fonte)
+            return None
+        out: dict = {}
+        ok = True
+        for k, nome, lim, obbl in (("codice_stato", "CodiceStatoEstero", 3, True), ("stato_federato", "StatoFederato", 24, False),
+                                    ("localita", "LocalitaEstero", None, False), ("indirizzo", "IndirizzoEstero", None, True),
+                                    ("stato", "StatoEstero", 34, True)):
+            val = v.get(k)
+            if val in (None, ""):
+                if obbl:
+                    self.err("DATO_MANCANTE", f"{perc}.{k}", "obbligatorio per i residenti all'estero", fonte)
+                    ok = False
+                continue
+            try:
+                s = F.an(str(val), lim)
+                if k == "codice_stato" and len(s) != 3:
+                    raise F.ValoreXml("il codice dello Stato estero ha tre caratteri")
+                out[nome] = s
+            except F.ValoreXml as e:
+                self.err("VALORE_NON_VALIDO", f"{perc}.{k}", str(e), fonte)
+                ok = False
+        if ok and "CodiceStatoEstero" in out:
+            from . import stati_esteri as SE
+            tab = SE.tabella()
+            if tab is not None and out["CodiceStatoEstero"] not in tab:
+                self.err("VALORE_NON_VALIDO", f"{perc}.codice_stato", f"codice {out['CodiceStatoEstero']} assente dalla tabella degli "
+                         "Stati esteri del componente di controllo", fonte)
+                ok = False
+        if not ok:
+            return None
+        # ordine dello schema: CodiceStatoEstero, StatoFederato, LocalitaEstero, IndirizzoEstero, StatoEstero
+        return {k: out[k] for k in ("CodiceStatoEstero", "StatoFederato", "LocalitaEstero", "IndirizzoEstero", "StatoEstero") if k in out}
+
+    def estremi_registrazione(self, sez, perc: str, fonte: str) -> dict | None:
+        """EstremiRegistrazione_Type da un oggetto {ufficio_registrazione, serie, numero_registrazione, sottonumero_registrazione,
+        data_registrazione} (stesse regole della sezione Testamento)."""
+        if not isinstance(sez, dict) or not sez:
+            self.err("DATO_MANCANTE", perc, "indicare gli estremi di registrazione (ufficio, serie, numero, data)", fonte)
+            return None
+        ok = True
+        for k in ("ufficio_registrazione", "serie", "numero_registrazione", "data_registrazione"):
+            if sez.get(k) in (None, ""):
+                self.err("DATO_MANCANTE", f"{perc}.{k}", "obbligatorio", fonte)
+                ok = False
+        if not ok:
+            return None
+        try:
+            uff = codice_enum(sez["ufficio_registrazione"], "UfficioDiRegistrazione_Type")
+        except F.ValoreXml as e:
+            self.err("VALORE_NON_VALIDO", perc + ".ufficio_registrazione", str(e), fonte)
+            ok = False
+        if not re.fullmatch(r"[1-4][A-Z]?", str(sez["serie"])):
+            self.err("VALORE_NON_VALIDO", perc + ".serie", "una cifra da 1 a 4, con lettera maiuscola facoltativa (reg:Serie_Type)", fonte)
+            ok = False
+        if not re.fullmatch(r"\d{1,6}", str(sez["numero_registrazione"])):
+            self.err("VALORE_NON_VALIDO", perc + ".numero_registrazione", "solo cifre, al massimo 6", fonte)
+            ok = False
+        sn = sez.get("sottonumero_registrazione")
+        if sn not in (None, "") and len(str(sn)) > 3:
+            self.err("VALORE_NON_VALIDO", perc + ".sottonumero_registrazione", "al massimo 3 caratteri", fonte)
+            ok = False
+        try:
+            data = F.data(sez["data_registrazione"], non_oltre=self.oggi)
+        except F.ValoreXml as e:
+            self.err("VALORE_NON_VALIDO", perc + ".data_registrazione", str(e), fonte)
+            ok = False
+        if not ok:
+            return None
+        reg = {"UfficioDiRegistrazione": uff, "Serie": str(sez["serie"]), "NumeroRegistrazione": str(sez["numero_registrazione"])}
+        if sn not in (None, ""):
+            reg["SottonumeroRegistrazione"] = str(sn)
+        reg["DataRegistrazione"] = data
+        return reg
+
+    def denominazione(self, p: dict, base: str, grado, el: str) -> str | None:
+        """Denominazione/ragione sociale al posto di cognome e nome per i soggetti diversi da persone fisiche (XSD Soggetto/Denominazione
+        e annotazioni di GradoParentela: con la denominazione il grado puo' essere 35, 36, 37, 38 o 39; con i gradi 36-39 la denominazione
+        e' obbligatoria). I gradi 37-39 (enti) sono esclusi dalle basi dell'imposta ipotecaria e catastale proporzionale e non
+        sono soggetti a imposta di successione (Fascicolo I pp. PDF 40 e 43; Guida di calcolo p. 10)."""
+        den = SUP.attr(self.d, "persone", p, "denominazione")
+        self.usa(p, "denominazione")
+        perc = f"opzioni.telematico.persone[{p['id']}].denominazione"
+        fonte = FO.fonte_annotazione(el + "/GradoParentela") + "; " + FO.fonte_annotazione(el + "/CodiceFiscale")
+        ente = grado in ("37", "38", "39")
+        if den in (None, ""):
+            if ente:
+                self.err("DATO_MANCANTE", perc, f"con il grado {grado} la denominazione e' obbligatoria", fonte)
+            return None
+        if grado not in ("35", "36", "37", "38", "39"):
+            self.err("VALORE_NON_VALIDO", perc, "con la denominazione il grado di parentela puo' essere solo 35, 36, 37, 38 o 39",
+                     fonte)
+            return None
+        try:
+            return F.an(str(den), 150, tipo="AN2")
+        except F.ValoreXml as e:
+            self.err("VALORE_NON_VALIDO", perc, str(e), fonte)
+            return None
+
+    def rinuncia(self, p: dict, base: str, tipo, grado, el: str) -> bool:
+        """Rinuncia all'eredita' del soggetto EA (XSD Soggetto/Rinuncia e QuadroEH/.../Rinuncia; Fascicolo I p. PDF 17): ammessa per
+        il tipo 3 (chiamato che ha rinunciato) e obbligatoria per il tipo 4 (coniuge superstite rinunciatario, grado 01); mai per
+        l'erede (tipo 1). Gli estremi dell'atto di rinuncia (EH, rigo 8) sono obbligatori. Restituisce True se il soggetto e'
+        rinunciatario."""
+        v = SUP.attr(self.d, "persone", p, "rinuncia")
+        self.usa(p, "rinuncia", "rinuncia_estremi")
+        perc = f"opzioni.telematico.persone[{p['id']}]"
+        fonte = FO.fonte_annotazione(el + "/Rinuncia") + "; " + FO.fonte_fasc1(17, "Tipo soggetto, codice 3 e 4")
+        if v not in (None, False, True):
+            self.err("VALORE_NON_VALIDO", perc + ".rinuncia", "atteso true/false", fonte)
+            return False
+        rinuncia = v is True or tipo == "4"
+        if not rinuncia:
+            if SUP.attr(self.d, "persone", p, "rinuncia_estremi") not in (None, ""):
+                self.err("DATI_INCOERENTI", perc + ".rinuncia_estremi", "gli estremi della rinuncia si indicano solo per i "
+                         "soggetti rinunciatari", fonte)
+            return False
+        if tipo == "4" and grado != "01":
+            self.err("REGOLA_TIPO_SOGGETTO", base + ".tipo_soggetto", "il tipo soggetto 4 (coniuge superstite rinunciatario) "
+                     "richiede il grado di parentela 01", FO.fonte_annotazione(el + "/GradoParentela"))
+        if tipo not in ("3", "4"):
+            self.err("REGOLA_TIPO_SOGGETTO", perc + ".rinuncia", "la rinuncia e' ammessa per il chiamato (tipo 3, che ha gia' "
+                     "rinunciato) e per il coniuge superstite rinunciatario (tipo 4); non per l'erede (tipo 1) ne' per il "
+                     "legatario in questa versione", fonte)
+            return False
+        if self.presentatore is not None and p["id"] == self.presentatore.get("id"):
+            self.err("REGOLA_RINUNCIA", perc + ".rinuncia", "il dichiarante non puo' essere indicato come rinunciatario nel "
+                     "quadro EH", FO.fonte_annotazione("QuadroEH/PrimoModulo/SezioneI_DichSost/Rinuncia/PresenzaRinuncia/"
+                                                      "IdentificazioneSoggetto"))
+        reg = self.estremi_registrazione(SUP.attr(self.d, "persone", p, "rinuncia_estremi"), perc + ".rinuncia_estremi",
+                                         FO.fonte_annotazione("QuadroEH/PrimoModulo/SezioneI_DichSost/Rinuncia/PresenzaRinuncia")
+                                         + "; " + FO.fonte_fasc1(17, "Rinuncia"))
+        self.rinunce[p["id"]] = reg
+        return True
+
+    def controlla_soggetti_multi_riga(self, cf_visti: dict) -> None:
+        """Soggetto presente su piu' righi del quadro EA (es. erede e legatario): annotazioni XSD di CodiceFiscale e TipoSoggetto.
+        Il grado di parentela e la disabilita' devono coincidere su tutti i righi, il tipo soggetto deve essere diverso, e il
+        chiamato (3), l'erede (1) e il coniuge rinunciatario (4) non possono coesistere fra loro per lo stesso soggetto."""
+        el = "QuadroEA/Modulo/Soggetto"
+        for cf_, ids in cf_visti.items():
+            if len(ids) < 2:
+                continue
+            fonte = FO.fonte_annotazione(el + "/CodiceFiscale") + "; " + FO.fonte_annotazione(el + "/TipoSoggetto") + \
+                "; " + FO.fonte_fasc1(17, "Tipo soggetto: erede e legatario su due righi")
+            perc = f"persone[{', '.join(ids)}]"
+            tipi = [self.tipo_ea.get(i) for i in ids]
+            if None in tipi or any(self.grado_ea.get(i) is None for i in ids):
+                continue                                           # gia' segnalato sul singolo soggetto
+            if len(set(tipi)) != len(tipi):
+                self.err("REGOLA_SOGGETTO_MULTI_RIGA", perc, "lo stesso soggetto su piu' righi deve avere tipi soggetto diversi", fonte)
+            if len({self.grado_ea[i] for i in ids}) > 1:
+                self.err("REGOLA_SOGGETTO_MULTI_RIGA", perc, "il grado di parentela deve coincidere su tutti i righi dello stesso "
+                         "soggetto (in assenza di rappresentazione o trust)", fonte)
+            if len({self.handicap_ea[i] for i in ids}) > 1:
+                self.err("REGOLA_SOGGETTO_MULTI_RIGA", perc, "la disabilita' deve coincidere su tutti i righi dello stesso soggetto", fonte)
+            insieme = set(tipi)
+            if "3" in insieme and insieme & {"1", "4"} or {"1", "4"} <= insieme:
+                self.err("REGOLA_SOGGETTO_MULTI_RIGA", perc, "i tipi soggetto 1 (erede), 3 (chiamato) e 4 (coniuge rinunciatario) non "
+                         "possono coesistere per lo stesso soggetto", fonte)
+            if not insieme <= {"1", "2", "3", "4"}:
+                self.ns.append(f"{perc}: soggetto su piu' righi con tipi {sorted(insieme)} non supportato")
+
     def quadro_ea(self) -> dict | None:
         if not self.ea:
             return None
@@ -320,10 +495,7 @@ class _Export:
             el = "QuadroEA/Modulo/Soggetto"
             cfv = self.val("persone", p, "codice_fiscale", cf_persona, elemento=el + "/CodiceFiscale")
             if cfv:
-                if cfv in cf_visti:
-                    self.ns.append(f"{base}: stesso codice fiscale di persone[{cf_visti[cfv]}] (soggetto su piu' righi "
-                                   "con qualifiche diverse): non supportato")
-                cf_visti[cfv] = p["id"]
+                cf_visti.setdefault(cfv, []).append(p["id"])
             ruolo = p.get("ruolo")
             tipo = SUP.attr(self.d, "persone", p, "tipo_soggetto")
             self.usa(p, "tipo_soggetto")
@@ -341,8 +513,13 @@ class _Export:
                 except F.ValoreXml as e:
                     self.err("VALORE_NON_VALIDO", base + ".tipo_soggetto", str(e), FO.fonte_xsd(el + "/TipoSoggetto"))
                     tipo = None
-                if tipo not in (None, "1", "3"):
-                    self.ns.append(f"{base}: tipo soggetto {tipo} (rinunciatario, trust, altro) non supportato")
+                if tipo == "5":
+                    self.ns.append(f"{base}: tipo soggetto 5 (trust) non supportato: servono le sezioni Trust del quadro EA, TrustDisab ed "
+                                   "EF3bis, il dichiarante con codice carica 9, l'atto istitutivo in EG e la verifica del perimetro "
+                                   "del modello telematico (Fascicolo I p. PDF 17), non ancora provate col controllo ufficiale")
+                elif tipo == "6":
+                    self.ns.append(f"{base}: tipo soggetto 6 (altro) non supportato: con questo tipo non possono esserci altri soggetti nel "
+                                   "quadro EA (annotazione XSD di TipoSoggetto), caso non provato col controllo ufficiale")
             grado = SUP.attr(self.d, "persone", p, "grado_parentela")
             self.usa(p, "grado_parentela", "relazione_con_defunto")
             rel = p.get("relazione_con_defunto")
@@ -375,8 +552,9 @@ class _Export:
             if legge and grado == "36" and len(self.ea) > 1:
                 self.err("REGOLA_GRADO_LEGGE", base + ".grado_parentela", "grado 36 (Stato) ammesso solo se unico "
                          "soggetto del quadro", FO.fonte_annotazione(el + "/GradoParentela"))
-            if grado in ("36", "37", "38", "39"):
-                self.ns.append(f"{base}: soggetti diversi da persone fisiche (denominazione) non supportati")
+            if grado == "36":
+                self.ns.append(f"{base}: grado 36 (Stato) non supportato: l'annotazione XSD vieta di indicare il soggetto nelle "
+                               "devoluzioni, e senza devoluzioni il quadro dei beni non e' compilabile (caso non provato col controllo)")
             ph = SUP.attr(self.d, "persone", p, "portatore_handicap")
             self.usa(p, "portatore_handicap")
             if ph not in (None, False, True):
@@ -385,11 +563,22 @@ class _Export:
             if p.get("data_decesso") not in (None, ""):
                 self.ns.append(f"{base}.data_decesso: soggetto EA deceduto (rappresentazione/trasmissione) non supportato")
                 self.usa(p, "data_decesso")
-            ana = self.anagrafica(p, el + "/DatiAnagrafici")
-            s = {"CodiceFiscale": cfv, "TipoSoggetto": tipo, "GradoParentela": grado}
+            den = self.denominazione(p, base, grado, el)
+            ana = den if den else self.anagrafica(p, el + "/DatiAnagrafici")
+            rinunciatario = self.rinuncia(p, base, tipo, grado, el)
+            s = {"CodiceFiscale": cfv, "TipoSoggetto": tipo}
+            if rinunciatario:
+                s["Rinuncia"] = "1"
+            s["GradoParentela"] = grado
             if ph is True:
                 s["PortatoreHandicap"] = "1"
-            s["DatiAnagrafici"] = ana
+            if den:
+                s["Denominazione"] = den
+            else:
+                s["DatiAnagrafici"] = ana
+            res_estera = self.residenza_estera(p, base, el)
+            if res_estera:
+                s["ResidenzaEstera"] = res_estera
             if rapp:
                 s["SuccessionePerRappresentazione"] = {"CodiceFiscaleSoggettoRappresentato": rapp[0], "GradoParentela": rapp[1]}
                 self.rapp_ea[p["id"]] = rapp
@@ -404,6 +593,11 @@ class _Export:
         if coniugi > 1:
             self.err("REGOLA_GRADO_CONIUGE", "persone", "ammesso un solo rigo con grado di parentela '01'",
                      FO.fonte_annotazione("QuadroEA/Modulo/Soggetto/GradoParentela"))
+        self.controlla_soggetti_multi_riga(cf_visti)
+        tipi4 = [i for i, t in self.tipo_ea.items() if t == "4"]
+        if len(tipi4) > 1:
+            self.err("REGOLA_TIPO_SOGGETTO", "persone", "ammesso un solo rigo con tipo soggetto 4 (coniuge superstite "
+                     "rinunciatario)", FO.fonte_annotazione("QuadroEA/Modulo/Soggetto/TipoSoggetto"))
         return {"Modulo": [{"Soggetto": soggetti[i:i + 3]} for i in range(0, len(soggetti), 3)]}
 
     # ---------------------------------------------------------------- beni
@@ -1100,6 +1294,11 @@ class _Export:
                 self.err("DEVOLUZIONE_SOGGETTO", perc + ".persona_id", "il beneficiario deve essere un soggetto del "
                          "quadro EA (erede o chiamato)", FO.fonte_annotazione(el + "/IdentificazioneSoggetto"))
                 continue
+            if pid in self.rinunce:
+                self.err("DEVOLUZIONE_RINUNCIATARIO", perc + ".persona_id", "un soggetto rinunciatario non puo' essere "
+                         "beneficiario di una devoluzione (annotazione XSD di IdentificazioneSoggetto)",
+                         FO.fonte_annotazione(el + "/IdentificazioneSoggetto"))
+                continue
             if pid in persone_viste:
                 self.err("DEVOLUZIONE_DUPLICATA", perc, "lo stesso beneficiario compare piu' volte sullo stesso bene con "
                          "lo stesso diritto", FO.fonte_annotazione(el + "/IdentificazioneSoggetto"))
@@ -1763,6 +1962,7 @@ class _Export:
         self.sost = None   # dichiarazione sostitutiva (telematico/sostitutiva.py)
         self.estero_bene: dict[str, bool] = {}   # beni sedenti all'estero (immobili con provincia EE o casella «bene sito all'estero»)
         self.imposta_estera: dict[str, int] = {}  # imposta versata all'estero per bene (euro interi): richiede EG4
+        self.rinunce: dict[str, dict | None] = {}   # rinunciatari EA -> estremi di registrazione (EH rigo 8)
         self.terreni_vf: dict[str, dict] = {}   # reddito dominicale, quota del defunto e tipologia dei terreni EB (valori fiscali, EF1/EF9)
         self.defunto = self.presentatore = None
         self.testamento_x, self.test_reg = None, None
@@ -1777,8 +1977,10 @@ class _Export:
         if SUP.dich(self.d, "devoluzione_per_testamento") is True:
             pass  # con testamento le quote non sono quelle di legge (annotazioni Quota/CodiceDiritto_Rip): nessun controllo
         elif self.ea and all(self.grado_ea.get(p["id"]) for p in self.ea):
-            self.quote_legge = DL.quote_di_legge({p["id"]: self.grado_ea[p["id"]] for p in self.ea},
-                                                 {p["id"]: self.tipo_ea.get(p["id"]) for p in self.ea}, dict(self.rapp_ea))
+            # i rinunciatari non sono beneficiari di quote: restano fuori dal calcolo (e dalle devoluzioni)
+            attivi = [p for p in self.ea if p["id"] not in self.rinunce]
+            self.quote_legge = DL.quote_di_legge({p["id"]: self.grado_ea[p["id"]] for p in attivi},
+                                                 {p["id"]: self.tipo_ea.get(p["id"]) for p in attivi}, dict(self.rapp_ea))                 if attivi else None
             if self.quote_legge is None:
                 self.avv("QUOTE_DI_LEGGE_NON_VERIFICATE", "quadro[EA]", "configurazione di eredi non coperta dal "
                          "controllo delle quote di legge (coperti: figli, coniuge, genitori e fratelli nelle combinazioni delle tabelle di p. 69-70 dell'Allegato 5): le quote "
@@ -1818,7 +2020,7 @@ class _Export:
         if self.ea:
             assegnati = {d.get("persona_id") for d in self.d.get("devoluzioni", [])}
             for p in self.ea:
-                if p["id"] not in assegnati:
+                if p["id"] not in assegnati and p["id"] not in self.rinunce:     # i rinunciatari non hanno devoluzioni
                     self.err("SOGGETTO_SENZA_DEVOLUZIONE", f"persone[{p['id']}]", "ogni soggetto del quadro EA deve "
                              "comparire nella devoluzione di almeno un bene", FO.fonte_annotazione("QuadroEA/Modulo/Soggetto"))
         elif self.d.get("devoluzioni"):

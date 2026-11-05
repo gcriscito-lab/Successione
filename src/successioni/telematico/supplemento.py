@@ -32,7 +32,8 @@ from .. import valori as V
 
 CHIAVI = {
     "persone": {"sesso", "provincia_nascita", "tipo_soggetto", "grado_parentela", "portatore_handicap",
-                "comune_decesso", "provincia_decesso", "rappresentato_cf", "rappresentato_grado"},
+                "comune_decesso", "provincia_decesso", "rappresentato_cf", "rappresentato_grado", "rinuncia",
+                "rinuncia_estremi", "residenza_estera", "denominazione"},
     "beni": {"provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo", "indirizzo",
              "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe", "zona_censuaria",
              "consistenza", "tipo_cespite", "estremi_trascrizione", "estremi_registrazione",

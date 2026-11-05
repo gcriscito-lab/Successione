@@ -107,6 +107,10 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         return None
     # gli immobili esteri (provincia EE) non entrano nelle basi EF1/EF9 ne' nelle circoscrizioni (annotazioni XSD di QuadroEF)
     immobili = [r for r in x.righe_dev.values() if r["quadro"] in ("EB", "EC", "EL", "EM") and not r.get("estero")]
+    if any(x.grado_ea.get(r["persona_id"]) in ("36", "37", "38", "39") for r in immobili):
+        # «non deve essere indicato il valore delle quote relative agli immobili devoluti a uno dei soggetti 36-39» (EF1, EF9):
+        # le righe degli enti non entrano nelle basi proporzionali; la regola e' provata solo per i casi coperti dai test
+        immobili = [r for r in immobili if x.grado_ea.get(r["persona_id"]) not in ("36", "37", "38", "39")]
     obbligatorio = dd >= DEC_2025 or (bool(x.ea) and bool(immobili))
     if not obbligatorio:
         return None
@@ -710,13 +714,17 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     if any(x.handicap_ea.values()):
         x.ns.append("quadro EH: soggetti con disabilita' richiedono la sezione Interdetti (rigo/modulo e certificatore),"
                     " non supportata")
-    eredi = []
+    eredi, visti = [], set()
     for p in x.ea:
         if x.tipo_ea.get(p["id"]) not in ("1", "2", "3", "4"):
             continue
         sogg = x.soggetti_ea.get(p["id"]) or {}
-        eredi.append({"CodiceFiscale": sogg.get("CodiceFiscale"), "GradoParentela": sogg.get("GradoParentela"),
-                      "DatiAnagrafici": sogg.get("DatiAnagrafici")})
+        if sogg.get("CodiceFiscale") in visti:      # soggetto su piu' righi del quadro EA: un solo rigo nell'elenco EH (controllo 2092)
+            continue
+        visti.add(sogg.get("CodiceFiscale"))
+        voce = {"CodiceFiscale": sogg.get("CodiceFiscale"), "GradoParentela": sogg.get("GradoParentela")}
+        voce.update({"Denominazione": sogg["Denominazione"]} if "Denominazione" in sogg else {"DatiAnagrafici": sogg.get("DatiAnagrafici")})
+        eredi.append(voce)
     sez: dict = {
         "Presentatore": pres,
         "DatiDefunto": {"DatiAnagrafici": ana_d, "Decesso": {"FlagDeceduto": "1", "DataDecesso": data_dec,
@@ -724,7 +732,7 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
         "Dichiarante": {"PresenzaDichiarante": "1"},
         "Testamento": _eh_testamento(x),
         "Interdetti": {"FlagAssenzaInterdetti": "1"},
-        "Rinuncia": {"FlagAssenzaRinuncia": "1"},
+        "Rinuncia": _eh_rinuncia(x, 0),
         "FirmaDichiarante": "1",
     }
     for chiave, elenco, flag in (("Navi", x.eh_navi, "FlagNavi"), ("Aeromobili", x.eh_aeromobili, "FlagAeromobili")):
@@ -770,10 +778,46 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     altri = [eredi[i:i + 3] for i in range(3, len(eredi), 3)]
     if altri:
         eh["Modulo"] = [{"SezioneI_DichSost": {"Eredi": blocco}} for blocco in altri]
+    _eh_rinunce_ulteriori(x, eh)
     if None in (comune, prov):
         return None
     x.mappa["quadro:EH"] = {"coll": None, "quadro": "EH", "xpath": f"{x.XP_DICH}/suc:QuadroEH"}
     return eh
+
+
+def _rinunciatari_ordinati(x) -> list[tuple[str, dict]]:
+    """Rinunciatari del quadro EA con i loro estremi, nell'ordine del quadro (modulo, rigo)."""
+    return sorted(((pid, reg) for pid, reg in x.rinunce.items()), key=lambda t: x.pos_ea[t[0]])
+
+
+def _presenza_rinuncia(x, pid: str, reg: dict | None) -> dict | None:
+    if reg is None:
+        return None                                    # estremi non validi: errore gia' registrato
+    m, r = x.pos_ea[pid]
+    return {"IdentificazioneSoggetto": {"Rigo": str(r), "Modulo": str(m)}, "RegistrazioneRinuncia": reg}
+
+
+def _eh_rinuncia(x, indice: int) -> dict:
+    """Sezione Rinuncia del primo modulo EH: assenza o prima rinuncia (annotazioni XSD di QuadroEH/.../Rinuncia). Le rinunce
+    ulteriori vanno nei moduli successivi (``_eh_rinunce_ulteriori``)."""
+    elenco = _rinunciatari_ordinati(x)
+    if not elenco:
+        return {"FlagAssenzaRinuncia": "1"}
+    pres = _presenza_rinuncia(x, *elenco[0])
+    return {"PresenzaRinuncia": {"FlagRinuncia": "1", **pres}} if pres else {"FlagAssenzaRinuncia": "1"}
+
+
+def _eh_rinunce_ulteriori(x, eh: dict) -> None:
+    """Dalla seconda rinuncia in poi: un rigo EH8 per modulo (``Modulo/SezioneI_DichSost/PresenzaRinuncia``, che «puo' essere
+    presente solo se nel modulo precedente e' presente il rigo relativo alla rinuncia»)."""
+    for k, (pid, reg) in enumerate(_rinunciatari_ordinati(x)[1:]):
+        pres = _presenza_rinuncia(x, pid, reg)
+        if pres is None:
+            continue
+        moduli = eh.setdefault("Modulo", [])
+        while len(moduli) <= k:
+            moduli.append({"SezioneI_DichSost": {}})
+        moduli[k]["SezioneI_DichSost"]["PresenzaRinuncia"] = pres
 
 
 def _pn(v) -> str:
