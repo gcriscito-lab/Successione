@@ -1002,10 +1002,10 @@ function renderFront(main) {
   const chiaviSanzioni = CAMPI_DICH.filter(([k]) => /^(sanzione|interessi)_/.test(k)).map(([k]) => k);
   const valorizzata = k => k.split('.').reduce((o, c) => (o == null ? undefined : o[c]), dich) != null;
   const pagamenti = h('details', { class: 'gruppo-opzionale', open: chiaviCrediti.some(valorizzata) || chiaviSanzioni.some(valorizzata) },
-    h('summary', {}, 'Crediti d'imposta, sanzioni e interessi · quadri EF ed EH'),
-    sezioneDatiDichiarazione(chiaviCrediti, 'Crediti d'imposta (Legge 448/1998 art. 7 c. 2; DL 73/2021 art. 64 c. 7)'),
+    h('summary', {}, 'Crediti d\'imposta, sanzioni e interessi · quadri EF ed EH'),
+    sezioneDatiDichiarazione(chiaviCrediti, 'Crediti d\'imposta (Legge 448/1998 art. 7 c. 2; DL 73/2021 art. 64 c. 7)'),
     sezioneDatiDichiarazione(chiaviSanzioni, 'Sanzioni e interessi del ravvedimento (importi calcolati dal professionista)'));
-  const morte = h('details', { class: 'gruppo-opzionale', open: !!dich.morte_presunta }, h('summary', {}, 'Possesso temporaneo dei beni dell'assente (carica 8) · morte presunta'),
+  const morte = h('details', { class: 'gruppo-opzionale', open: !!dich.morte_presunta }, h('summary', {}, 'Possesso temporaneo dei beni dell\'assente (carica 8) · morte presunta'),
     sezioneDatiDichiarazione(['morte_presunta.tribunale', 'morte_presunta.data_deposito', 'morte_presunta.sentenza'], 'Sentenza di morte presunta'));
   const primaCasa = h('details', { class: 'gruppo-opzionale', open: !!dich.prima_casa }, h('summary', {}, 'Agevolazione prima casa'), sezionePrimaCasa());
   const riduzioni = h('details', { class: 'gruppo-opzionale', open: !!dich.riduzioni_art25 }, h('summary', {}, 'Riduzioni art. 25 e codici L, Q'), sezioneRiduzioni());
