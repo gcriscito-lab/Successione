@@ -71,9 +71,9 @@ _EST = ["codice_stato_estero", "stato_estero", "stato_federato", "localita_ester
 _BEST = ["bene_estero", "imposta_estera"]
 _TAV = ["comune_catastale", "codice_comune_catastale", "partita_tavolare", "corpo_tavolare", "sistema_tavolare"]
 CAMPI_BENI = {
-    "EB": _BASE + _IMM + _EST + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita", "discordanza_intestatario", "passaggi_senza_atti_legali"],
-    "EC": _BASE + _IMM + _EST + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
-                          "discordanza_intestatario", "passaggi_senza_atti_legali"],
+    "EB": _BASE + _IMM + _EST + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita", "bene_aziendale", "discordanza_intestatario", "passaggi_senza_atti_legali"],
+    "EC": _BASE + _IMM + _EST + ["sezione", "categoria", "rendita", "rendita_proposta", "indirizzo", "classe", "zona_censuaria", "consistenza",
+                          "diritto_abitazione", "bene_aziendale", "discordanza_intestatario", "passaggi_senza_atti_legali"],
     "EL": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"] + _TAV,
     "EM": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
                           "porzione_materiale"] + _TAV,

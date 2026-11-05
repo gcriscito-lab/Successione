@@ -53,6 +53,8 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         "comune_catastale": "str", "codice_comune_catastale": "str", "partita_tavolare": "str", "corpo_tavolare": "str",
         "porzione_materiale": "str", "particella_denominatore": "str", "sistema_tavolare": "str",
         "discordanza_intestatario": "str", "passaggi_senza_atti_legali": "str",
+        # Immobili particolari (docs/regole/immobili_particolari.md): rendita proposta (DOCFA) e bene aziendale (casella EB/EC)
+        "rendita_proposta": "str", "bene_aziendale": "str", "diritto_abitazione": "str",
     },
     "devoluzioni": {
         "bene_id": "ref:beni", "persona_id": "ref:persone", "quota": "quota", "diritto": "str",
@@ -68,6 +70,7 @@ AIUTI: dict[str, str] = {
                    "Esempio: immobile da 200.000 euro posseduto per 1/2: indicare 100.000. Indicare l'intero valore raddoppia attivo e imposta.",
     "beni.quota_defunto": "Frazione del bene posseduta dal defunto (es. 1/2). Non è la quota dell'erede.",
     "beni.rendita": "Rendita catastale in euro, con il punto decimale (es. 1240.50).",
+    "beni.graffati": "Immobili graffati al fabbricato (fino a 4 per rigo): sezione urbana, foglio, particella, subalterno. Nei dati principali si indica la sola prima particella.",
     "devoluzioni.quota": "Quota dell'erede sul diritto del defunto (es. 1/3). È un dato diverso dalla quota del defunto sul bene.",
     "persone.sesso": "M o F, come richiesto dal file telematico.",
     "beni.data_visura": "Data della visura catastale da cui hai ricavato i dati dell'immobile. Il Fascicolo I chiede visure di non piu' di tre mesi prima della presentazione: il programma avvisa se e' piu' vecchia. Non entra nel file XML.",
@@ -127,6 +130,33 @@ STRUTTURATI: dict[str, dict] = {
         "etichetta": "passaggi senza atti legali", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
         "aiuto": "Casella del quadro EB/EC: ci sono passaggi di proprieta' non risultanti da atti legali. Genera il quadro EI.",
         "opzioni": [_opz("si", "si'", "Casella spuntata."), _opz("no", "no", "Casella non spuntata.")]},
+    "beni.rendita_proposta": {
+        "etichetta": "rendita proposta (DOCFA)", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
+        "aiuto": "Si' se in catasto l'immobile ha solo la rendita proposta con DOCFA: nel campo «rendita» va il valore proposto e si "
+                 "chiede la determinazione (codice 1). La volonta' va manifestata con una dichiarazione sostitutiva allegata nel quadro EG "
+                 "(rigo «Altro»). Fascicolo I pp. 29-30.",
+        "opzioni": [_opz("si", "si'", "Rendita proposta: determinazione richiesta."), _opz("no", "no", "Rendita definitiva.")]},
+    "beni.diritto_abitazione": {
+        "etichetta": "diritto di abitazione del coniuge superstite", "tipo": "enum",
+        "aiuto": "Solo per l'immobile su cui con l'apertura della successione si costituisce il diritto di abitazione del coniuge superstite "
+                 "(art. 540 c.c.). Il codice dice se il coniuge chiede la prima casa (P, Z, X) o no, e se ha rinunciato all'eredita' ma non al "
+                 "legato ex lege. NON ancora supportato dall'esportazione: richiede la devoluzione con diritti distinti (abitazione e nuda "
+                 "proprieta') e la loro valutazione. Il dato si conserva in bozza. Fascicolo I p. 31-32.",
+        "opzioni": [
+            _opz("1", "prima casa: immobile principale (P)", "Il coniuge superstite chiede la prima casa sull'immobile principale."),
+            _opz("2", "prima casa: immobile contiguo (Z)", "Il coniuge superstite chiede la prima casa sull'immobile contiguo."),
+            _opz("3", "prima casa: pertinenza (X)", "Il coniuge superstite chiede la prima casa sulla pertinenza."),
+            _opz("4", "senza prima casa", "Il coniuge superstite non chiede la prima casa."),
+            _opz("5", "coniuge rinunciatario all'eredita': prima casa, principale (P)", "Ha rinunciato all'eredita' ma non al legato ex lege."),
+            _opz("6", "coniuge rinunciatario all'eredita': prima casa, contiguo (Z)", "Ha rinunciato all'eredita' ma non al legato ex lege."),
+            _opz("7", "coniuge rinunciatario all'eredita': prima casa, pertinenza (X)", "Ha rinunciato all'eredita' ma non al legato ex lege."),
+            _opz("8", "coniuge rinunciatario all'eredita': senza prima casa", "Ha rinunciato all'eredita' ma non al legato ex lege."),
+        ]},
+    "beni.bene_aziendale": {
+        "etichetta": "bene aziendale", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
+        "aiuto": "Si' se l'immobile e' un bene aziendale (ditta individuale): va compilato anche il quadro EN con l'azienda a cui appartiene "
+                 "e il collegamento dell'immobile. Fascicolo I pp. 21 e 29.",
+        "opzioni": [_opz("si", "si'", "Immobile aziendale."), _opz("no", "no", "Immobile non aziendale.")]},
     "beni.sistema_tavolare": {
         "etichetta": "sistema tavolare", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
         "aiuto": "Si' se l'immobile e' nel sistema tavolare (quadri EL/EM), anche fuori dalle province tavolari.",

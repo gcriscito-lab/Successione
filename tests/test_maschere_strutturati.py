@@ -77,10 +77,11 @@ def test_ogni_voce_ha_etichetta_e_aiuto_e_il_titolo_esente_spiega_valore_esente(
 
 
 def test_gli_aiuti_non_citano_regole_fuori_dalle_fonti():
-    """Le uniche pagine citate sono quelle di docs/regole/prima_casa.md (Fascicolo I p. 26, 26-27, 57, 60)."""
+    """Le uniche pagine citate sono quelle di docs/regole/prima_casa.md (Fascicolo I p. 26, 26-27, 57, 60) e di
+    docs/regole/immobili_particolari.md (p. 21, 29, 29-30: bene aziendale, rendita proposta)."""
     testo = " ".join(o["aiuto"] for d in S.STRUTTURATI.values() for o in d.get("opzioni", [])) + " ".join(
         d["aiuto"] for d in S.STRUTTURATI.values())
-    assert set(re.findall(r"p\. (\d+(?:-\d+)?)", testo)) <= {"26", "26-27", "57", "60"}
+    assert set(re.findall(r"p\. (\d+(?:-\d+)?)", testo)) <= {"26", "26-27", "57", "60", "21", "29", "29-30", "31-32"}
 
 
 def test_lo_schema_web_espone_le_maschere(tmp_path):
@@ -107,7 +108,7 @@ def test_la_gui_ha_una_maschera_per_ogni_chiave_di_supplemento():
     # dati strutturati con maschera propria in app.js (renderStrutturati)
     gestiti_js = {"persone.portatore_handicap", "beni.superficie", "beni.estremi_trascrizione", "beni.estremi_registrazione",
                   "passivita.ripartizione", "persone.rinuncia", "persone.denominazione", "persone.rinuncia_estremi",
-                  "persone.residenza_estera"}
+                  "persone.residenza_estera", "beni.graffati", "beni.immobili_aziendali"}
     for k in gestiti_js:
         assert k.split(".")[1] in js, k
     assert set(senza_maschera) - gestiti_js == set(), senza_maschera
