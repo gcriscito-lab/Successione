@@ -35,6 +35,7 @@ from . import agevolazioni as AG
 from . import prima_casa as PC
 from . import riduzioni_art25 as RA
 from . import conservatorie as CO
+from . import pagamenti as PG
 from . import sostitutiva as SO
 from . import supplemento as SUP
 
@@ -237,24 +238,44 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                 s1["PrimaCasa"] = {"PrimaCasa_Numero": str(n_pc), "AgevolazionePX_Valore": str(int(valore_pc)),
                                    "PrimaCasa_Imposta": str(fissa_pc)}
             sost = x.sost
+            cred = PG.crediti(x)
             dovuta_ip, dovuta_cat = ip + fissa_pc + fissa_g + fissa_m, cat + fissa_pc
             if immobili_prop and vf is None:
                 dovuta_ip = max(dovuta_ip, fissa)      # annotazione XSD ImpostaIpotecariaDovuta
             if prop_cat and vf is None:
                 dovuta_cat = max(dovuta_cat, fissa)    # annotazione XSD ImpostaCatastaleDovuta
-            da_ip, da_cat = dovuta_ip, dovuta_cat
             s1["ImpostaIpotecariaDovuta"] = str(dovuta_ip)
-            if sost:
-                # EF6/EF12 (gia' versata) e EF8/EF14 (da versare): Fascicolo I pp. PDF 42-44; con il codice 1 l'importo da
-                # versare, se dovuto, non puo' essere inferiore alla misura fissa (200 euro)
-                da_ip, da_cat = int(SO.netto(dovuta_ip, sost.ipotecaria_versata)), int(SO.netto(dovuta_cat, sost.catastale_versata))
-                if sost.codice == "1":
-                    da_ip, da_cat = max(da_ip, fissa), max(da_cat, fissa)
-                if sost.ipotecaria_versata:
-                    s1["ImpostaIpotecariaVersata"] = str(sost.ipotecaria_versata)
+            # EF8 = EF5 - EF6 (gia' versata) - EF7 (credito), non negativo; EF14 = EF11 - EF12 - EF13 (Fascicolo I pp. PDF 42-44).
+            # Con la sostitutiva codice 1 l'importo da versare, se dovuto, non puo' essere inferiore alla misura fissa.
+            versata_ip = sost.ipotecaria_versata if sost else 0
+            versata_cat = sost.catastale_versata if sost else 0
+            cred_ip, cred_cat = (cred.ipotecaria, cred.catastale) if cred else (0, 0)
+            for nome, dov, ver, rigo in (("ipotecaria", dovuta_ip, versata_ip, "EF6"), ("catastale", dovuta_cat, versata_cat, "EF12")):
+                if ver > dov:
+                    # l'eccedenza non si esporta (da versare = 0) e si chiede a rimborso con istanza all'ufficio (Fascicolo I p. PDF 44)
+                    x.avv("ECCEDENZA_IMPOSTA_VERSATA_DA_RIMBORSARE", f"opzioni.telematico.dichiarazione.{nome}_versata",
+                          f"imposta {nome} gia' versata ({ver}, {rigo}) superiore a quella dovuta ({dov}): eccedenza di {ver - dov} euro "
+                          "da chiedere a rimborso all'ufficio (non si indica nel file)", FO.fonte_fasc1(44, "EF14, rimborso"))
+            da_ip = int(SO.netto(dovuta_ip - versata_ip, cred_ip))
+            # annotazione di EF13: «puo' essere valorizzato solo se EF5 - EF6 - EF7 = 0, non maggiore della differenza EF11 - EF12»
+            if cred_cat and dovuta_ip - versata_ip - cred_ip > 0:
+                x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.credito_catastale", "il credito per l'imposta catastale "
+                      "(EF13) si puo' usare solo dopo aver azzerato l'imposta ipotecaria da versare (EF5 - EF6 - EF7 = 0)",
+                      PG.FONTE_CREDITI)
+            if cred_cat > dovuta_cat - versata_cat:
+                x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.credito_catastale", f"il credito EF13 ({cred_cat}) non puo' "
+                      f"superare la differenza EF11 - EF12 ({dovuta_cat - versata_cat})", PG.FONTE_CREDITI)
+            da_cat = int(SO.netto(dovuta_cat - versata_cat, cred_cat))
+            x._residuo_cat_dopo_crediti = dovuta_cat - versata_cat - cred_cat       # per EF18bis col. 4 (EF11 - EF12 - EF13 = 0)
+            if sost and sost.codice == "1":
+                da_ip, da_cat = max(da_ip, fissa), max(da_cat, fissa)
+            if versata_ip:
+                s1["ImpostaIpotecariaVersata"] = str(versata_ip)
+            if cred_ip:
+                s1["CreditoImposta"] = str(cred_ip)
             if da_ip:
                 s1["ImpostaIpotecariaDaVersare"] = str(da_ip)
-            if s1.keys() - {"ImpostaIpotecariaDovuta", "ImpostaIpotecariaDaVersare", "ImpostaIpotecariaVersata"}:
+            if s1.keys() - {"ImpostaIpotecariaDovuta", "ImpostaIpotecariaDaVersare", "ImpostaIpotecariaVersata", "CreditoImposta"}:
                 ef["SezioneI_ImpostaIpotecaria"] = s1
             else:
                 da_ip = dovuta_ip = 0        # tutti gli immobili esenti (C, D, E, H): nessun rigo dell'imposta ipotecaria
@@ -268,11 +289,17 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                 s2["ImpostaCatastaleDovuta"] = str(dovuta_cat)
                 if sost and sost.catastale_versata:
                     s2["ImpostaCatastaleVersata"] = str(sost.catastale_versata)
+                if cred_cat:
+                    s2["CreditoImposta"] = str(cred_cat)
                 if da_cat:
                     s2["ImpostaCatastaleDaVersare"] = str(da_cat)
                 ef["SezioneII_ImpostaCatastale"] = s2
             else:
                 da_cat = dovuta_cat = 0      # nessun immobile soggetto a imposta catastale
+                x._residuo_cat_dopo_crediti = 0
+                if cred_cat:
+                    x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.credito_catastale", "credito EF13 senza imposta "
+                          "catastale dovuta", PG.FONTE_CREDITI)
             # codice 2: «il campo non deve essere compilato» (Fascicolo I pp. PDF 45-46); codice 1: solo le circoscrizioni
             # delle nuove trascrizioni (qui un unico comune, quindi al piu' una)
             n = len(circoscrizioni) if circoscrizioni and (not sost or sost.codice == "1") else 0
@@ -288,6 +315,7 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                 ef["SezioneIV_ImpostaBollo"] = {"Circoscrizioni_Numero": str(n),
                                                "Circoscrizioni_Imposta": str(BOLLO_CIRCOSCRIZIONE * n)}
             da_versare += da_ip + da_cat + tassa * n + BOLLO_CIRCOSCRIZIONE * n
+            x._tributi_presenti = {"ipotecaria": bool(da_ip), "catastale": bool(da_cat), "tassa_ipotecaria": bool(n), "bollo": bool(n)}
             x.calcoli_ef = {
                 "EF1": {"imponibile": imp, "imposta": ip, "fonte": fa1 + "; " + FO.fonte_fasc1(40, "rigo EF1")},
                 "EF4": {"numero": n_pc, "valore": str(int(valore_pc)), "imposta": fissa_pc,
@@ -309,6 +337,16 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                                                                        "da_versare": da_ip},
                     "catastale": {"dovuta": dovuta_cat, "versata": sost.catastale_versata, "da_versare": da_cat},
                     "fonte": SO.FONTE_VERSATE}
+    cred = PG.crediti(x)
+    if cred and not motivi and not ef:
+        if cred.ipotecaria or cred.catastale:
+            x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.credito_ipotecaria", "credito d'imposta sulle imposte "
+                  "ipotecaria/catastale (EF7, EF13) senza imposte ipocatastali dovute", PG.FONTE_CREDITI)
+    if cred and dd < DEC_2025 and cred.successione:
+        x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.credito_successione", "credito sull'imposta di successione (EF18bis "
+              "col. 4): per le successioni aperte prima del 2025 la sezione V-bis non c'e' (imposta liquidata dall'ufficio)",
+              PG.FONTE_CREDITI)
+    vbis = None
     if dd >= DEC_2025 and not motivi:
         vbis, extra, m2 = _sezione_vbis(x, xml_pre)
         motivi += m2
@@ -324,7 +362,17 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         _avviso_tardiva(x, dd)
     if da_versare:
         ef["TotaleDaVersare"] = F.euro_centesimi(da_versare)
-    x.totale_da_versare = da_versare
+    # Sezione VI: sanzioni e interessi DICHIARATI dal professionista (non calcolati). EF19 resta la somma dei tributi; l'importo da
+    # versare del frontespizio e' EF19 + EF24 colonne 1 e 2 (annotazione di ImportoDaVersare e componente ufficiale, messaggio 3376)
+    presenti = dict(getattr(x, "_tributi_presenti", {}))
+    ic = (vbis or {}).get("ImpostaCalcolata") or {}
+    presenti["successione"] = bool(ic.get("ImpostaDaVersare")) and ic.get("TempisticaPagamento") == "2"
+    if dd >= DEC_2025 and vbis is None:
+        presenti["successione"] = True       # V-bis non generata (errore o blocco gia' segnalato): niente errore a cascata
+    sez_vi, extra_vi = PG.sezione_vi(x, presenti)
+    if sez_vi:
+        ef["SezioneVI_SanzioniInteressi"] = sez_vi
+    x.totale_da_versare = da_versare + extra_vi
     x.mappa["quadro:EF"] = {"coll": None, "quadro": "EF", "xpath": f"{x.XP_DICH}/suc:QuadroEF",
                             "totale_da_versare": str(da_versare), "calcoli": dict(getattr(x, "calcoli_ef", {}))}
     return ef or None
@@ -338,7 +386,7 @@ def _avviso_tardiva(x, dd) -> None:
         termine = dd.replace(year=dd.year + 1)
     except ValueError:
         return
-    if x.oggi > termine:
+    if x.oggi > termine and not PG.sanzioni(x):
         x.avv("EF_TARDIVA_SANZIONI_NON_CALCOLATE", "quadro[EF]",
               f"dichiarazione presentata oltre il termine di dodici mesi dal decesso ({termine.isoformat()}): per le imposte "
               "ipotecarie, catastali e gli altri tributi autoliquidati versati in ritardo possono essere dovuti sanzioni e interessi "
@@ -370,21 +418,44 @@ def _sezione_vbis(x, xml_pre):
         x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
                                       "xpath": f"{x.XP_DICH}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione"}
         _rateale_senza_importo(x)
+        cred0 = PG.crediti(x)
+        if cred0 and cred0.successione:
+            x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.credito_successione", "credito sull'imposta di successione "
+                  "indicato ma imposta non dovuta", PG.FONTE_CREDITI)
         return {"ImpostaNonDovuta": "1"}, 0, []
     # Fascicolo I p.6 (dodici mesi) e p.48 (tempistica 1/2). Le decorrenze particolari,
     # sospensioni e il ravvedimento non sono implementati: non finalizzare una tardiva
     # con imposta di successione dovuta, neppure cambiando semplicemente codice 1 in 2.
     if versata > imposta:
-        return None, 0, [f"imposta di successione gia' versata ({versata}) superiore a quella riliquidata ({imposta}): "
-                         "la parte eccedente si chiede a rimborso (Fascicolo I p. PDF 47) e il tracciato ammette "
-                         "ImpostaVersata solo fino all'imposta calcolata: caso non coperto"]
+        # il tracciato ammette ImpostaVersata solo fino all'imposta calcolata (annotazione XSD): l'eccedenza non si esporta e si
+        # chiede a rimborso con istanza all'ufficio (Fascicolo I p. PDF 47, col. 3; lo scomputo fra tributi non e' definito dallo schema)
+        x.avv("ECCEDENZA_IMPOSTA_VERSATA_DA_RIMBORSARE", "opzioni.telematico.dichiarazione.successione_versata",
+              f"imposta di successione gia' versata ({versata}) superiore a quella riliquidata ({imposta}): nel file si indica "
+              f"{imposta}; l'eccedenza di {versata - imposta} euro va chiesta a rimborso all'ufficio", SO.FONTE_VERSATE)
+        versata = imposta
+    cred = PG.crediti(x)
+    credito = cred.successione if cred else 0
     residuo = imposta - versata
+    if credito:
+        # annotazioni di EF18bis col. 4: «puo' essere valorizzato solo se EF11 - EF12 - EF13 = 0; non maggiore di EF18bis imposta -
+        # imposta gia' versata»
+        if getattr(x, "_residuo_cat_dopo_crediti", 0) > 0:
+            x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.credito_successione", "il credito sull'imposta di successione "
+                  "(EF18bis col. 4) si usa solo dopo aver azzerato l'imposta catastale da versare (EF11 - EF12 - EF13 = 0)",
+                  PG.FONTE_CREDITI)
+        if credito > residuo:
+            x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.credito_successione", f"il credito ({credito}) non puo' "
+                  f"superare l'imposta di successione al netto del gia' versato ({residuo})", PG.FONTE_CREDITI)
+            credito = residuo
+        residuo -= credito
     da_versare_imp = residuo if residuo > 10 else 0   # annotazione ImpostaDaVersare: <= 10 euro -> zero
     if sost and da_versare_imp == 0:
         # nessuna somma ulteriore: niente tardivita', tempistica o sanzioni da valutare
         ic = {"Imposta": str(imposta)}
         if versata:
             ic["ImpostaVersata"] = str(versata)
+        if credito:
+            ic["CreditoImposta"] = str(credito)
         x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
                                       "xpath": f"{x.XP_DICH}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione"}
         _rateale_senza_importo(x)
@@ -394,11 +465,27 @@ def _sezione_vbis(x, xml_pre):
     except ValueError:  # 29 febbraio: nessuna regola di calendario fiscale indovinata
         return None, 0, ["termine di presentazione per decesso il 29 febbraio da verificare: caso non coperto "
                          "(Fascicolo I p.6, p.48)"]
-    if x.oggi > termine_ordinario:
-        return None, 0, ["dichiarazione tardiva rispetto al termine ordinario di dodici mesi: decorrenze "
-                         "particolari, sanzioni/interessi e tempistica di pagamento non coperti; "
-                         "non finalizzabile (Fascicolo I p.6 e p.48, EF18ter col.1)"]
     temp = SUP.dich(x.d, "tempistica_pagamento")
+    if x.oggi > termine_ordinario:
+        # tardiva: Fascicolo I p. PDF 48 (codice 1 ammesso se si presenta entro i 90 giorni previsti per il pagamento; oltre, codice 2)
+        # e p. PDF 49 (sanzioni e interessi del ravvedimento, Sezione VI). Il tasso legale non e' nelle fonti: gli importi li indica il
+        # professionista. Senza importi dichiarati per l'imposta di successione la tardiva resta bloccata.
+        from datetime import timedelta
+        entro_pagamento = x.oggi <= termine_ordinario + timedelta(days=90)
+        dichiarate = PG.sanzioni(x).get("successione")
+        if temp == "1" and entro_pagamento:
+            pass     # pagamento nei termini: nessuna sanzione dovuta sull'imposta di successione
+        elif dichiarate is None:
+            return None, 0, [f"dichiarazione tardiva (oltre {termine_ordinario.isoformat()}, termine di dodici mesi dal decesso) con imposta "
+                             "di successione dovuta: indicare le sanzioni e gli interessi del ravvedimento calcolati dal professionista "
+                             "(sanzione_successione / interessi_successione; con importo 0 se non dovuti), oppure presentare entro 90 "
+                             "giorni dal termine con tempistica 1 (Fascicolo I pp. PDF 48-49; il tasso legale non e' nelle fonti)"]
+        elif temp != "2":
+            x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.tempistica_pagamento", "dichiarazione presentata oltre i 90 "
+                  "giorni dal termine di presentazione: il pagamento e' contestuale (tempistica 2); le sanzioni sull'imposta di "
+                  "successione si indicano solo con la tempistica 2 (annotazione XSD di ImpostaSuccessione)",
+                  FO.fonte_fasc1(48, "rigo EF18ter col. 1") + "; " + PG.FONTE_SANZIONI)
+            return None, 0, []
     if temp not in ("1", "2"):
         x.err("DATO_MANCANTE", "opzioni.telematico.dichiarazione.tempistica_pagamento", "imposta di successione "
               f"dovuta ({imposta}): indicare la tempistica di pagamento 1 (entro 90 giorni) o 2 (contestuale)",
@@ -407,6 +494,8 @@ def _sezione_vbis(x, xml_pre):
     ic = {"Imposta": str(imposta)}
     if versata:
         ic["ImpostaVersata"] = str(versata)
+    if credito:
+        ic["CreditoImposta"] = str(credito)
     ic.update({"ImpostaDaVersare": str(da_versare_imp), "TempisticaPagamento": temp})
     acconto = _rateazione(x, da_versare_imp, ic)
     if acconto is None:
@@ -595,6 +684,10 @@ def quadro_eg(x) -> dict | None:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "rendita proposta (DOCFA): la volonta' di "
                                  "avvalersene va manifestata con una dichiarazione sostitutiva allegata nel quadro EG, rigo 'Altro'",
                                  _fa(el + "/Altro") + "; " + FO.fonte_fasc1(30, "Determinazione rendita")))
+    if PG.crediti(x) and "Altro" not in per_sez:
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "credito d'imposta (Legge 448/1998 art. 7 c. 2, "
+                                 "DL 73/2021 art. 64 c. 7): occorre allegare nel quadro EG, rigo EG8 'Altro', la dichiarazione sostitutiva "
+                                 "di atto notorio con i requisiti del credito", _fa(el + "/Altro") + "; " + FO.fonte_fasc1(42, "EF7")))
     if getattr(x, "ag_altro", False) and "Altro" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "agevolazione H (immobili demoliti o "
                                  "inagibili): la documentazione va allegata nel quadro EG, rigo EG8 'Altro'",
@@ -853,12 +946,21 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     elif x.pc_dichiarante is None and SUP.dich(x.d, "prima_casa") is not None:
         x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.prima_casa", "la Sezione II del quadro EH puo' essere "
               "compilata solo con l'agevolazione P richiesta dal dichiarante", _fa("QuadroEH/PrimoModulo/SezioneII_AgevPrimaCasa"))
+    sez3, sez3b = PG.sezioni_eh(x)
+    if sez3:
+        eh["PrimoModulo"]["SezioneIII_CreditoImposta"] = sez3
     sez4 = RA.sezione_eh(x)
     if sez4:
         eh["PrimoModulo"]["SezioneIV_AltreAgevRiduz"] = sez4
     altri = [eredi[i:i + 3] for i in range(3, len(eredi), 3)]
     if altri:
         eh["Modulo"] = [{"SezioneI_DichSost": {"Eredi": blocco}} for blocco in altri]
+    if sez3b:
+        # secondo rigo di acquisti (tipologia 1 o 2): primo ``Modulo`` successivo, Sezione III (annotazione XSD: almeno 2 righi)
+        moduli = eh.setdefault("Modulo", [])
+        if not moduli:
+            moduli.append({})
+        moduli[0]["SezioneIII_CreditoImposta"] = sez3b
     _eh_rinunce_ulteriori(x, eh)
     _eh_moduli_ulteriori(eh, "PresenzaInterdetti", interdetti[1:])
     _eh_moduli_ulteriori(eh, "ReintegroDiritti", reintegri[1:])

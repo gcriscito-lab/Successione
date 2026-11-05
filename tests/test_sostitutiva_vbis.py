@@ -87,12 +87,15 @@ def test_b_residuo_zero_non_richiede_tempistica():
     assert not _t(doc, f"{IC}/suc:ImpostaDaVersare")
 
 
-def test_c_versata_superiore_all_imposta_non_genera_xml():
+def test_c_versata_superiore_all_imposta_va_a_rimborso():
+    # Pacchetto 9: l'XSD vieta ImpostaVersata > Imposta; l'eccedenza non blocca piu' l'XML, il versato e' limitato
+    # all'imposta riliquidata e l'avviso ECCEDENZA_IMPOSTA_VERSATA_DA_RIMBORSARE indica l'importo da chiedere a rimborso
     imp = imposta(esporta(caso("2")))
     es = esporta(caso("2", successione_versata=str(imp + 1)))
-    assert es.xml is None and not es.completo
-    testo = " ".join(e.messaggio for e in es.quadri_mancanti + es.errori)
-    assert "superiore a quella riliquidata" in testo, testo
+    assert es.xml is not None and es.completo
+    doc = valido(es)
+    assert [e.text for e in _t(doc, f"{IC}/suc:ImpostaVersata")] == [str(imp)] and not _t(doc, f"{IC}/suc:ImpostaDaVersare")
+    assert "ECCEDENZA_IMPOSTA_VERSATA_DA_RIMBORSARE" in {a.codice for a in es.avvisi}
 
 
 def test_d_imposta_non_dovuta_con_versata_da_rimborsare():

@@ -20,6 +20,8 @@ REGOLE: dict[str, tuple[str, str]] = {
     "dichiarazione.residenza_estera_defunto": ("ResidenzaEstera_Type", "residenza estera del defunto"),
     "dichiarazione.codice_sostitutiva": ("DichiarazioneSostitutiva_Type", "tipo di dichiarazione sostitutiva"),
     "dichiarazione.tempistica_pagamento": ("TempisticaPagamento_Type", "tempistica del pagamento"),
+    "dichiarazione.credito_tipologia": ("TipoImposta_Type", "tipologia di imposta del credito"),
+    "dichiarazione.credito_tipologia_2": ("TipoImposta_Type", "tipologia di imposta del credito (secondo acquisto)"),
     "dichiarazione.presentatore.codice_carica": ("CodiciCarica_Type", "carica del presentatore"),
     "persone.grado_parentela": ("GradoParentela_Type", "grado di parentela"),
     "persone.rappresentato_grado": ("GradoParentela2_Type", "grado del rappresentato"),
