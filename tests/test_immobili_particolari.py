@@ -188,3 +188,80 @@ def test_graffati_dati_mancanti():
 @pytest.mark.parametrize("voci,sezione", [([G1], None), ([G1, G2, G3, G4], None), ([{**G1, "sezione": "AB"}, {**G3, "sezione": "AB"}], "AB")])
 def test_graffati_controllo_ufficiale(tmp_path, voci, sezione):
     positivo(completo(graffati(voci, sezione)), tmp_path)
+
+
+# ------------------------------------------------------------------------------------------------- immobili aziendali (EB/EC + EN)
+from telematico_casi import caso_azienda  # noqa: E402
+
+
+def aziendale(immobili=("b_casa0001",), valore_az="20000", collegati=None, mod=None):
+    d = copy.deepcopy(caso_azienda())
+    for bid in immobili:
+        next(b for b in d["beni"] if b["id"] == bid)["bene_aziendale"] = "si"
+    d["opzioni"]["telematico"]["beni"].setdefault("b_azien001", {})["immobili_aziendali"] = list(immobili if collegati is None else collegati)
+    next(b for b in d["beni"] if b["id"] == "b_azien001")["valore"] = valore_az
+    d["opzioni"]["telematico"]["dichiarazione"]["tempistica_pagamento"] = "2"
+    if mod:
+        mod(d)
+    return esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
+
+
+def test_immobile_aziendale_scrive_casella_e_collegamento():
+    es = completo(aziendale())
+    assert x(es, D + "/suc:QuadroEC//suc:BeneAziendale/text()") == ["1"]
+    ia = D + "/suc:QuadroEN//suc:ImmobiliAziendali"
+    assert x(es, ia + "/suc:Quadro/text()") == ["EC"]
+    assert x(es, ia + "/suc:Identificativo/suc:Rigo/text()") == ["1"] and x(es, ia + "/suc:Identificativo/suc:Modulo/text()") == ["1"]
+
+
+def test_ee_esclude_gli_immobili_aziendali_dal_totale_immobili():
+    senza = completo(esporta_xml(caso_azienda(), contesto_caso_a10(data_riferimento=date(2026, 3, 9))))
+    con = completo(aziendale())
+    tot = lambda es: int(x(es, D + "/suc:QuadroEE//suc:TotaleValoreImmobili/text()")[0])
+    assert tot(senza) - tot(con) == 126000          # il valore della casa non e' piu' fra gli immobili (e' compreso nell'azienda)
+
+
+def test_due_immobili_aziendali_in_un_collegamento():
+    es = completo(aziendale(("b_casa0001", "b_terr0001")))
+    assert x(es, D + "/suc:QuadroEN//suc:ImmobiliAziendali/suc:Quadro/text()") == ["EC", "EB"] or \
+        sorted(x(es, D + "/suc:QuadroEN//suc:ImmobiliAziendali/suc:Quadro/text()")) == ["EB", "EC"]
+
+
+def test_immobile_aziendale_non_collegato_o_collegamento_errato():
+    es = aziendale(collegati=[])
+    assert es.xml is None and any(e.codice == "IMMOBILE_AZIENDALE_NON_COLLEGATO" for e in es.errori)
+    es = aziendale(immobili=(), collegati=["b_casa0001"])        # collegato ma senza la casella
+    assert es.xml is None and any(e.codice == "RIFERIMENTO_INESISTENTE" for e in es.errori)
+    es = aziendale(collegati=["b_casa0001", "b_casa0001"])
+    assert es.xml is None and any(e.codice == "REGOLA_IMMOBILI_AZIENDALI" for e in es.errori)
+
+
+def test_immobile_aziendale_senza_quadro_en():
+    d = copy.deepcopy(caso_a10())
+    next(b for b in d["beni"] if b["id"] == "b_casa0001")["bene_aziendale"] = "si"
+    es = esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
+    assert es.xml is None and any(e.codice == "QUADRO_EN_OBBLIGATORIO" for e in es.errori)
+
+
+def test_immobile_aziendale_con_agevolazione_non_ammessa():
+    def mod(d):
+        d["opzioni"]["telematico"].setdefault("devoluzioni", {})["d_casaanna"] = {"agevolazioni": "P"}
+    es = aziendale(mod=mod)
+    assert es.xml is None and any(e.codice == "REGOLA_BENE_AZIENDALE" for e in es.errori)
+
+
+@pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.parametrize("immobili,valore_az", [(("b_casa0001",), "20000"), (("b_casa0001", "b_terr0001"), "20000"), (("b_casa0001",), "3000000")])
+def test_immobile_aziendale_controllo_ufficiale(tmp_path, immobili, valore_az):
+    positivo(completo(aziendale(immobili, valore_az)), tmp_path)
+
+
+@pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+def test_immobile_aziendale_imposta_alterata_respinta(tmp_path):
+    """Con l'imposta di successione dovuta il controllo verifica il calcolo: un'imposta alterata viene respinta."""
+    es = completo(aziendale(valore_az="3000000"))
+    imposta = x(es, D + "/suc:QuadroEF//suc:ImpostaCalcolata/suc:Imposta/text()")[0]
+    xml = es.xml.replace(f">{imposta}<".encode(), f">{int(imposta) + 100}<".encode())
+    assert xml != es.xml
+    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    assert stato == "negativo", dgn["diagnostici"]

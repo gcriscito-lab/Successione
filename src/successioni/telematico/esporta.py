@@ -848,6 +848,36 @@ class _Export:
             out["PassaggiSenzaAttiLegali"] = "1"
         return out
 
+    def flag_aziendale(self, b: dict, tavolare: bool) -> dict:
+        """Casella «Bene aziendale» di EB/EC (annotazioni XSD: «dovra' essere compilato il quadro EN»; Fascicolo I pp. PDF 21 e 29)."""
+        from .quadri_efgh import _flag
+        self.usa(b, "bene_aziendale")
+        if not _flag(SUP.attr(self.d, "beni", b, "bene_aziendale")):
+            return {}
+        if tavolare:
+            self.ns.append(f"beni[{b['id']}].bene_aziendale: bene aziendale nei quadri tavolari EL/EM non supportato")
+            return {}
+        self.immobili_az.add(b["id"])
+        return {"BeneAziendale": "1"}
+
+    def verifica_immobili_aziendali(self, ha_en: bool) -> None:
+        """Coerenza fra la casella «Bene aziendale» e il quadro EN (annotazioni XSD di BeneAziendale, ImmobiliAziendali e di
+        Agevolazioni: «in presenza di bene aziendale il campo non deve essere presente oppure deve avere valore D o Q o G»)."""
+        el = "QuadroEN/Modulo/Aziende/ImmobiliAziendali"
+        if self.immobili_az and not ha_en:
+            self.err("QUADRO_EN_OBBLIGATORIO", "beni", "immobili con la casella «Bene aziendale» ma nessuna azienda nel quadro EN",
+                     FO.fonte_annotazione(el))
+            return
+        for bid in sorted(self.immobili_az - self.az_collegati):
+            self.err("IMMOBILE_AZIENDALE_NON_COLLEGATO", f"beni[{bid}].bene_aziendale", "l'immobile aziendale non e' indicato nel "
+                     "quadro EN: aggiungilo agli immobili aziendali di un'azienda", FO.fonte_annotazione(el))
+        for did, r in self.righe_dev.items():
+            agev = self.agev_dev.get(did)
+            if r["bene_id"] in self.immobili_az and agev not in (None, "D", "Q", "G"):
+                self.err("REGOLA_BENE_AZIENDALE", f"devoluzioni[{did}]", f"immobile aziendale con agevolazione {agev}: con la casella "
+                         "«Bene aziendale» il campo puo' mancare oppure valere D, Q o G",
+                         FO.fonte_annotazione("QuadroEC/Modulo/Fabbricati/DevoluzioneEC/Devoluzione/Agevolazioni"))
+
     def riga_eb(self, b: dict, tavolare: bool = False) -> dict | None:
         c, el = "beni", "QuadroEB/Modulo/Terreni"
         for campo in ("sezione", "categoria"):
@@ -906,6 +936,7 @@ class _Export:
                 "CodiceDiritto_P": dir_p, "TipologiaTerreno": tip, "Valore": valore}
         self._niente_estero_in_italia(b)
         riga.update(self._flag_ei(b, "EB", luogo, cat, None, tavolare))
+        riga.update(self.flag_aziendale(b, tavolare))
         return riga
 
     def rendita_proposta_ec(self, b: dict, df: dict, rend, categoria_f: bool, eld: str, tavolare: bool) -> None:
@@ -1025,6 +1056,7 @@ class _Export:
                 "CodiceDiritto_P": dir_p, "Valore": valore}
         self._niente_estero_in_italia(b)
         riga.update(self._flag_ei(b, "EC", luogo, cat, df.get("SezioneUrbana"), tavolare))
+        riga.update(self.flag_aziendale(b, tavolare))
         graffati = self.graffati_ec(b, df.get("SezioneUrbana"), tavolare)
         if graffati:
             riga["Graffati"] = graffati
@@ -1247,7 +1279,38 @@ class _Export:
             riga["Inventario"] = inventario
         riga["CodiceDiritto_P"] = dir_p
         riga["Valore"] = valore
+        ia = self.immobili_aziendali_en(b, el)
+        if ia:
+            riga["ImmobiliAziendali"] = ia
         return riga
+
+    def immobili_aziendali_en(self, b: dict, el: str) -> list[dict]:
+        """Immobili aziendali dell'azienda (fino a 9): quadro, rigo e modulo dell'immobile nel quadro EB/EC gia' costruito."""
+        self.usa(b, "immobili_aziendali")
+        voci = SUP.attr(self.d, "beni", b, "immobili_aziendali")
+        if voci in (None, "", []):
+            return []
+        perc = f"beni[{b['id']}].immobili_aziendali"
+        fonte = FO.fonte_annotazione(el + "/ImmobiliAziendali")
+        if not isinstance(voci, list) or any(not isinstance(v, (str, dict)) for v in voci):
+            self.err("VALORE_NON_VALIDO", perc, "attesa una lista di identificativi di immobili", fonte)
+            return []
+        ids = [v if isinstance(v, str) else str(v.get("bene_id") or "") for v in voci]
+        if len(ids) > 9:
+            self.ns.append(f"{perc}: piu' di nove immobili aziendali (ContinuazioneImmobiliAziendali) non supportato")
+            return []
+        out = []
+        for i, bid in enumerate(ids):
+            ref = self.mappa.get(bid)
+            if bid in ids[:i]:
+                self.err("REGOLA_IMMOBILI_AZIENDALI", f"{perc}[{i}]", "lo stesso immobile non puo' comparire piu' volte nella stessa azienda", fonte)
+            elif not ref or ref.get("coll") != "beni" or ref.get("quadro") not in ("EB", "EC") or bid not in self.immobili_az:
+                self.err("RIFERIMENTO_INESISTENTE", f"{perc}[{i}]", f"{bid!r}: non e' un immobile (EB/EC) con la casella «Bene aziendale» "
+                         "esportato in questa dichiarazione", fonte)
+            else:
+                self.az_collegati.add(bid)
+                out.append({"Quadro": ref["quadro"], "Identificativo": {"Rigo": str(ref["rigo"]), "Modulo": str(ref["modulo"])}})
+        return out
 
     def riga_eo(self, b: dict) -> dict | None:
         """Quadro EO, rigo Titoli: quotati (1), non quotati (2), esenti (3, ValoreEsente), fondi comuni (4). Beni esteri: non supportati."""
@@ -1745,7 +1808,8 @@ class _Export:
     def quadro_ee(self) -> dict | None:
         """Totali dalle annotazioni XSD di QuadroEE (nessun bene aziendale o agevolazione A nel perimetro)."""
         con_a = {r["bene_id"] for r in getattr(self, "ag_righe", []) if r["codice"] == "A"}   # annotazioni di QuadroEE: al netto di A
-        imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC", "EL", "EM") and k not in con_a)
+        imm = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) in ("EB", "EC", "EL", "EM") and k not in con_a
+                  and k not in self.immobili_az)       # annotazione TotaleValoreImmobili: al netto dei beni aziendali
         altri = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "ER")
         titoli = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "EO")
         aziende = sum(v for k, v in self.valore_beni.items() if self.quadro_bene.get(k) == "EN")
@@ -2034,6 +2098,8 @@ class _Export:
         self.estero_bene: dict[str, bool] = {}   # beni sedenti all'estero (immobili con provincia EE o casella «bene sito all'estero»)
         self.imposta_estera: dict[str, int] = {}  # imposta versata all'estero per bene (euro interi): richiede EG4
         self.rinunce: dict[str, dict | None] = {}   # rinunciatari EA -> estremi di registrazione (EH rigo 8)
+        self.immobili_az: set[str] = set()      # immobili con la casella «Bene aziendale» (EB/EC)
+        self.az_collegati: set[str] = set()     # immobili aziendali richiamati da un'azienda del quadro EN
         self.rp_altro = False   # rendita proposta: serve la dichiarazione sostitutiva nel quadro EG (rigo «Altro»)
         self.terreni_vf: dict[str, dict] = {}   # reddito dominicale, quota del defunto e tipologia dei terreni EB (valori fiscali, EF1/EF9)
         self.defunto = self.presentatore = None
@@ -2088,6 +2154,7 @@ class _Export:
             str(b.get("numero_iscrizione") or ""), b["id"])), self.riga_eq)
         qer = self.quadro_beni("ER", sorted(per_q["ER"], key=lambda b: (
             str(SUP.attr(self.d, "beni", b, "tipo_cespite") or ""), str(b.get("descrizione") or ""), b["id"])), self.riga_er)
+        self.verifica_immobili_aziendali(bool(qen))
         PC.valida(self)
         RA.valida(self)
         AG.valida(self)

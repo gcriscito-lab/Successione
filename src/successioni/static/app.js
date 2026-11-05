@@ -568,6 +568,7 @@ function renderStrutturati(ins, q, r) {
     ins.append(h('button', { onclick: () => { scrivi(campo, [...righe, structuredClone(predefinito)]); renderIns(); } }, 'Aggiungi ' + titolo.toLowerCase()));
   };
   if (q.coll === 'passivita') tabella('ripartizione', 'Ripartizione', [['persona_id', 'ref:persone'], ['quota', 'quota']], { persona_id: '', quota: '1/1' });
+  if (q.id === 'EN') tabella('immobili_aziendali', 'Immobile aziendale', [['bene_id', 'ref:beni']], { bene_id: '' });
   if (q.id === 'EC') tabella('graffati', 'Immobile graffato', [['sezione', 'str'], ['foglio', 'str'], ['particella', 'str'], ['subalterno', 'str']], {});
   if (q.id === 'EB' || q.id === 'EC') {
     tabella('estremi_trascrizione', 'Trascrizione', [['ufficio', 'str'], ['registro_particolare', 'str'], ['anno', 'str']], {});

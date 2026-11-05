@@ -214,6 +214,7 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
         tipo_cespite = None
         esente_eo = False
         val_riga, vps_riga = None, None   # Valore e ValorePrecSucc del cespite; i righi di continuazione li ereditano
+        az_riga = False                   # il cespite (EB, EC, EL, EM) e' un bene aziendale
         ie_riga = None                    # ImpostaVersataEstero del cespite (intero cespite), ereditata dai righi di continuazione
         for riga in (x for mod in quad.findall(SUC + "Modulo") for x in mod):
             if q == "EO":
@@ -234,11 +235,21 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                 bi = bi or tipo_cespite == "BI"
             # beni esteri e imposta estera: supportati (detrazione DET.estero, guida pp. 7-8); restano esclusi il bene aziendale e il
             # diritto di abitazione
-            for nome in ("BeneAziendale", "DirittoAbitazione"):
+            if q in ("EB", "EC", "EL", "EM") and _testo(riga, "Valore") is not None:
+                az_riga = riga.find(SUC + "BeneAziendale") is not None      # i righi di continuazione ereditano la casella
+            for nome in ("DirittoAbitazione",):
                 if riga.find(SUC + nome) is not None:
                     ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/{nome}", f"{nome}: riduzioni, beni aziendali o "
                                      "agevolazioni non supportati dal calcolo", _g(5, "riduzioni")))
             for dv in riga.iter(SUC + "Devoluzione"):
+                if az_riga and q in ("EB", "EC", "EL", "EM"):
+                    # immobile aziendale: il suo valore e' compreso nel valore dell'azienda del quadro EN (Fascicolo I pp. PDF 21 e 29:
+                    # «quadro EN, indicandone l'intero valore»; annotazioni di QuadroEE): non si conta due volte nella QE
+                    agev_az = _testo(dv, "Agevolazioni") or None
+                    if agev_az not in (None, "D"):
+                        ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/Devoluzione", f"immobile aziendale con agevolazione "
+                                         f"{agev_az}: non supportato dal calcolo", _g(5, "riduzioni e agevolazioni")))
+                    continue
                 # Guida al calcolo p. 1 (QE: esclusi solo i codici A, D, C, G, N, E, H) e p. 5 (riduzioni: solo L, Q, R, F e
                 # art. 25): i codici prima casa P, X, Y, Z non modificano l'imposta di successione (Fascicolo I p. PDF 57,
                 # quadro sinottico: solo imposte ipotecaria e catastale fisse)

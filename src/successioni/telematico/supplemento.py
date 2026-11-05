@@ -38,7 +38,7 @@ CHIAVI = {
              "natura", "tipologia_terreno", "superficie", "reddito_dominicale", "classe", "zona_censuaria",
              "consistenza", "tipo_cespite", "estremi_trascrizione", "estremi_registrazione",
              "valore_prec_succ", "bene_estero", "imposta_estera", "codice_stato_estero", "stato_estero",
-             "stato_federato", "localita_estero", "graffati"},
+             "stato_federato", "localita_estero", "graffati", "immobili_aziendali"},
     "passivita": {"tipo", "estremi_documento", "data_documento", "possesso", "bene_id", "ripartizione"},
     # agevolazioni della sezione devoluzione (docs/regole/prima_casa.md): oggi solo i codici P, X, Z
     "devoluzioni": {"agevolazioni", "riduzioni"},
