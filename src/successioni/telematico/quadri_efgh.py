@@ -31,6 +31,7 @@ from .. import valori as V
 from ..schema import Errore
 from . import fonti as FO
 from . import formati as F
+from . import agevolazioni as AG
 from . import prima_casa as PC
 from . import riduzioni_art25 as RA
 from . import conservatorie as CO
@@ -114,7 +115,20 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         # QuadroEF/SezioneI_ImpostaIpotecaria/ImpostaProporzionale e SezioneII_ImpostaCatastale/ImpostaProporzionale:
         # «l'agevolazione prima casa si estende a tutti i beneficiari ... in relazione a quel bene») ed entrano nel rigo EF4
         agevolati = [r for r in immobili if r["bene_id"] in x.pc_beni]
-        immobili_prop = [r for r in immobili if r["bene_id"] not in x.pc_beni]
+        # altre agevolazioni (agevolazioni.py; Fascicolo I p. PDF 57): C, D, E, H esenti da I e C; G ed M a imposta ipotecaria
+        # fissa (EF2, EF3) e catastale esente; A ed N restano nella base proporzionale. M si estende a tutti i beneficiari del bene
+        beni_m = AG.beni_con_m(x)
+        fuori_ag = [r for r in immobili if r["bene_id"] not in x.pc_beni and
+                    (r["bene_id"] in beni_m or r.get("agevolazione") in AG.FUORI_BASE_PROPORZIONALE)]
+        immobili_prop = [r for r in immobili if r["bene_id"] not in x.pc_beni and r not in fuori_ag]
+        riga_g = AG.sezione_g(x, immobili)
+        righe_m = [r for r in immobili if r["bene_id"] in beni_m and r["bene_id"] not in x.pc_beni]
+        valore_m = sum((r["quota_valore"] for r in righe_m), Decimal(0))
+        if riga_g and Decimal(riga_g["valore"]) != Decimal(riga_g["valore"]).to_integral_value():
+            motivi.append("somma dei 'Valore quota' degli immobili con agevolazione G non intera: arrotondamento non indicato dalle fonti")
+        if valore_m != valore_m.to_integral_value():
+            motivi.append(f"somma dei 'Valore quota' degli immobili con agevolazione M {valore_m} non intera: arrotondamento "
+                          "non indicato dalle fonti")
         imponibile = sum((r["quota_valore"] for r in immobili_prop), Decimal(0))
         valore_pc = sum((r["quota_valore"] for r in agevolati), Decimal(0))
         n_pc = x.pc_numero
@@ -161,7 +175,8 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         # 200 euro solo nel totale dovuto in presenza dei righi EF1/EF9 (vedi sotto)
         # circoscrizioni (EF15, EF16): solo immobili del catasto ordinario; per i tavolari il controllo ufficiale SUC13 2.3.1
         # (locale, 2026-11-03) individua 0 circoscrizioni
-        comuni = sorted({r["codice_comune"] for r in immobili if r["quadro"] in ("EB", "EC")})
+        # H (immobili demoliti o inagibili): esclusi dalle circoscrizioni (annotazione Circoscrizioni_Numero)
+        comuni = sorted({r["codice_comune"] for r in immobili if r["quadro"] in ("EB", "EC") and r.get("agevolazione") != "H"})
         circoscrizioni = None
         if len(comuni) == 1:
             circoscrizioni = {comuni[0]}          # stesso comune -> una circoscrizione (Fascicolo I p. 44)
@@ -187,11 +202,17 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             if immobili_prop:
                 s1["ImpostaProporzionale"] = {"ImpostaProporzionale_Imponibile": imp,
                                               "ImpostaProporzionale_Imposta": str(ip)}
+            fissa_g = IMPOSTA_FISSA if riga_g else 0
+            fissa_m = IMPOSTA_FISSA if righe_m else 0
+            if riga_g:
+                s1["AgevolazioneG"] = {"AgevolazioneG_Valore": str(int(riga_g["valore"])), "AgevolazioneG_Imposta": str(fissa_g)}
+            if righe_m:
+                s1["AgevolazioneM"] = {"AgevolazioneM_Valore": str(int(valore_m)), "AgevolazioneM_Imposta": str(fissa_m)}
             if agevolati:
                 s1["PrimaCasa"] = {"PrimaCasa_Numero": str(n_pc), "AgevolazionePX_Valore": str(int(valore_pc)),
                                    "PrimaCasa_Imposta": str(fissa_pc)}
             sost = x.sost
-            dovuta_ip, dovuta_cat = ip + fissa_pc, cat + fissa_pc
+            dovuta_ip, dovuta_cat = ip + fissa_pc + fissa_g + fissa_m, cat + fissa_pc
             if immobili_prop and vf is None:
                 dovuta_ip = max(dovuta_ip, IMPOSTA_FISSA)      # annotazione XSD ImpostaIpotecariaDovuta
             if prop_cat and vf is None:
@@ -208,19 +229,25 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                     s1["ImpostaIpotecariaVersata"] = str(sost.ipotecaria_versata)
             if da_ip:
                 s1["ImpostaIpotecariaDaVersare"] = str(da_ip)
-            ef["SezioneI_ImpostaIpotecaria"] = s1
+            if s1.keys() - {"ImpostaIpotecariaDovuta", "ImpostaIpotecariaDaVersare", "ImpostaIpotecariaVersata"}:
+                ef["SezioneI_ImpostaIpotecaria"] = s1
+            else:
+                da_ip = dovuta_ip = 0        # tutti gli immobili esenti (C, D, E, H): nessun rigo dell'imposta ipotecaria
             s2: dict = {}
             if prop_cat:
                 s2["ImpostaProporzionale"] = {"ImpostaProporzionale_Imponibile": str(int(imponibile_cat)),
                                               "ImpostaProporzionale_Imposta": str(cat)}
             if agevolati:
                 s2["ImpostaCatastaleFissa"] = str(fissa_pc)
-            s2["ImpostaCatastaleDovuta"] = str(dovuta_cat)
-            if sost and sost.catastale_versata:
-                s2["ImpostaCatastaleVersata"] = str(sost.catastale_versata)
-            if da_cat:
-                s2["ImpostaCatastaleDaVersare"] = str(da_cat)
-            ef["SezioneII_ImpostaCatastale"] = s2
+            if s2:
+                s2["ImpostaCatastaleDovuta"] = str(dovuta_cat)
+                if sost and sost.catastale_versata:
+                    s2["ImpostaCatastaleVersata"] = str(sost.catastale_versata)
+                if da_cat:
+                    s2["ImpostaCatastaleDaVersare"] = str(da_cat)
+                ef["SezioneII_ImpostaCatastale"] = s2
+            else:
+                da_cat = dovuta_cat = 0      # nessun immobile soggetto a imposta catastale
             # codice 2: «il campo non deve essere compilato» (Fascicolo I pp. PDF 45-46); codice 1: solo le circoscrizioni
             # delle nuove trascrizioni (qui un unico comune, quindi al piu' una)
             n = len(circoscrizioni) if circoscrizioni and (not sost or sost.codice == "1") else 0
@@ -500,6 +527,22 @@ def quadro_eg(x) -> dict | None:
             x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiIdentita", "documento d'identita' "
                                      "di chi sottoscrive la richiesta di riduzioni (rigo EG7)",
                                      FO.fonte_fasc1(50, "dichiarazioni sostitutive rese da soggetti diversi dal dichiarante")))
+    if getattr(x, "ag_eg10", False):
+        # annotazione QuadroEG/AgevolazioniImposteIpocatastali: obbligatorio con C, D, E per soggetti diversi dal dichiarante;
+        # Fascicolo I p. PDF 50: rigo EG10 e copia del documento d'identita' di chi sottoscrive
+        if "AgevolazioniImposteIpocatastali" not in per_sez:
+            x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].AgevolazioniImposteIpocatastali",
+                                     "richiesta delle agevolazioni C, D o E di un beneficiario diverso dal dichiarante: "
+                                     "allegare la dichiarazione sostitutiva (rigo EG10)",
+                                     _fa(el + "/AgevolazioniImposteIpocatastali") + "; " + FO.fonte_fasc1(50, "rigo EG10")))
+        if "DocumentiIdentita" not in per_sez:
+            x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiIdentita", "documento d'identita' "
+                                     "di chi sottoscrive la richiesta di agevolazioni (rigo EG7)",
+                                     FO.fonte_fasc1(50, "dichiarazioni sostitutive rese da soggetti diversi dal dichiarante")))
+    if getattr(x, "ag_altro", False) and "Altro" not in per_sez:
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "agevolazione H (immobili demoliti o "
+                                 "inagibili): la documentazione va allegata nel quadro EG, rigo EG8 'Altro'",
+                                 _fa(el + "/Altro") + "; " + FO.fonte_fasc1(50, "dichiarazione sostitutiva per l'agevolazione H")))
     if x.ra_altro and "Altro" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "codice R (fondi rustici): "
                                  "l'attestazione dell'ufficio regionale va allegata alla dichiarazione nel quadro EG; la "
