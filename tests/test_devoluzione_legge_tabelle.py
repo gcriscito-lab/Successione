@@ -84,3 +84,50 @@ def test_configurazioni_non_coperte(gradi):
 
 def test_tipi_misti_non_coperti():
     assert quote_di_legge({"a": F, "b": F}, {"a": "1", "b": "3"}) is None
+
+
+# ---- rappresentazione e premorti: Fascicolo I pp. 18-19 (esempio ministeriale) -------------------------------------------
+from successioni.telematico.devoluzione_legge import quote_di_legge as _q  # noqa: E402
+
+
+def qr(gradi, rapp):
+    return _q(gradi, {k: "1" for k in gradi}, rapp)
+
+
+def test_esempio_ministeriale_due_figli_rinunciatari_con_nipoti():
+    # figlio 1 con tre figli, figlio 2 con un figlio, immobile da 60.000: 10.000 a ciascuno dei tre nipoti e 30.000 all'altro
+    g = {"n1": "04", "n2": "04", "n3": "04", "m1": "04"}
+    r = {"n1": ("CF_FIGLIO1", "02"), "n2": ("CF_FIGLIO1", "02"), "n3": ("CF_FIGLIO1", "02"), "m1": ("CF_FIGLIO2", "02")}
+    assert qr(g, r) == {"n1": Fr(1, 6), "n2": Fr(1, 6), "n3": Fr(1, 6), "m1": Fr(1, 2)}
+    assert [60000 * qr(g, r)[k] for k in ("n1", "m1")] == [10000, 30000]
+
+
+def test_figlio_premorto_e_figlio_vivo():
+    g = {"f": "02", "n1": "04", "n2": "04"}
+    assert qr(g, {"n1": ("CF_P", "02"), "n2": ("CF_P", "02")}) == {"f": Fr(1, 2), "n1": Fr(1, 4), "n2": Fr(1, 4)}
+
+
+def test_coniuge_con_stirpi_conta_ogni_stirpe_come_un_figlio():
+    g = {"c": "01", "f": "02", "n1": "04", "n2": "04"}      # una stirpe di due nipoti + un figlio = due figli: 1/3 al coniuge
+    assert qr(g, {"n1": ("CF_P", "02"), "n2": ("CF_P", "02")}) == {"c": Fr(1, 3), "f": Fr(1, 3), "n1": Fr(1, 6), "n2": Fr(1, 6)}
+    g = {"c": "01", "n1": "04", "n2": "04"}                  # una sola stirpe: come un figlio unico (1/2 e 1/2)
+    assert qr(g, {"n1": ("CF_P", "02"), "n2": ("CF_P", "02")}) == {"c": Fr(1, 2), "n1": Fr(1, 4), "n2": Fr(1, 4)}
+
+
+def test_fratello_premorto_rappresentato_dai_nipoti():
+    g = {"g": "10", "n1": "15", "n2": "15"}                  # germano vivo + due nipoti di un germano premorto: stirpi alla pari
+    assert qr(g, {"n1": ("CF_P", "10"), "n2": ("CF_P", "10")}) == {"g": Fr(1, 2), "n1": Fr(1, 4), "n2": Fr(1, 4)}
+    g = {"g": "10", "n1": "15"}                              # stirpe di un fratello unilaterale premorto: peso 1 contro 2
+    assert qr(g, {"n1": ("CF_P", "11")}) == {"g": Fr(2, 3), "n1": Fr(1, 3)}
+
+
+@pytest.mark.parametrize("gradi,rapp", [
+    ({"n": "04"}, {"n": ("CF_P", "10")}),                    # nipote di figlio che rappresenta un fratello
+    ({"n": "15"}, {"n": ("CF_P", "02")}),                    # nipote di fratello che rappresenta un figlio
+    ({"n": "02"}, {"n": ("CF_P", "02")}),                    # grado non ammesso per la rappresentazione
+    ({"n": "04"}, {"n": ("", "02")}),                        # rappresentato senza codice fiscale
+    ({"n": "04", "f": "02", "g": "03"}, {"n": ("CF_P", "02")}),   # i figli escludono i genitori
+    ({"n": "04"}, {"x": ("CF_P", "02")}),                    # rappresentante assente dal quadro
+])
+def test_rappresentazione_non_coperta(gradi, rapp):
+    assert qr(gradi, rapp) is None

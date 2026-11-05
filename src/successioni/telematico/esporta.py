@@ -266,6 +266,43 @@ class _Export:
         for i, p in enumerate(self.ea):
             self.pos_ea[p["id"]] = (i // 3 + 1, i % 3 + 1)
 
+    def rappresentazione(self, p: dict, base: str, grado, legge: bool, el: str, cf_soggetto) -> tuple[str, str] | None:
+        """Sezione «Successione per rappresentazione» (annotazioni XSD di SuccessionePerRappresentazione; Fascicolo I pp. PDF 18-19):
+        obbligatoria con devoluzione per legge per i gradi 04, 15; ammessa solo per 04, 06, 08, 15, 20, 27. Il rappresentato e'
+        un figlio (02) per i discendenti dei figli, un fratello (10/11) per i discendenti dei fratelli."""
+        cf_r = SUP.attr(self.d, "persone", p, "rappresentato_cf")
+        gr_r = SUP.attr(self.d, "persone", p, "rappresentato_grado")
+        self.usa(p, "rappresentato_cf", "rappresentato_grado")
+        perc = f"opzioni.telematico.persone[{p['id']}]"
+        fonte = FO.fonte_annotazione(el + "/SuccessionePerRappresentazione") + "; " + DL.FONTE_RAPPRESENTAZIONE
+        possibile = grado in DL.GRADI_RAPPRESENTANTE
+        if cf_r in (None, "") and gr_r in (None, ""):
+            if legge and grado in ("04", "15"):
+                self.err("DATO_MANCANTE", perc + ".rappresentato_cf", f"grado {grado} con devoluzione per legge: indicare "
+                         "codice fiscale e grado del rappresentato (sezione Successione per rappresentazione)", fonte)
+            elif legge and possibile:
+                self.ns.append(f"{base}: grado {grado} senza i dati del rappresentato: quote di legge non determinabili")
+            return None
+        if not possibile:
+            self.err("VALORE_NON_VALIDO", perc + ".rappresentato_cf", f"la rappresentazione e' ammessa solo per i gradi "
+                     f"{', '.join(DL.GRADI_RAPPRESENTANTE)} (grado del soggetto: {grado})", fonte)
+            return None
+        try:
+            cf_r = F.cf(cf_r)
+        except F.ValoreXml as e:
+            self.err("VALORE_NON_VALIDO", perc + ".rappresentato_cf", str(e), fonte)
+            return None
+        atteso = ("02",) if grado in DL.GRADI_RAPPRESENTANTE_RETTA else ("10", "11")
+        if str(gr_r) not in atteso:
+            self.err("VALORE_NON_VALIDO", perc + ".rappresentato_grado", f"con grado {grado} il rappresentato ha grado "
+                     f"{' o '.join(atteso)} (annotazione XSD di GradoParentela)", fonte)
+            return None
+        if cf_r == cf_soggetto or cf_r == str((self.defunto or {}).get("codice_fiscale") or "").strip().upper():
+            self.err("VALORE_NON_VALIDO", perc + ".rappresentato_cf", "il rappresentato deve essere diverso dal soggetto e "
+                     "dal defunto", fonte)
+            return None
+        return cf_r, str(gr_r)
+
     def quadro_ea(self) -> dict | None:
         if not self.ea:
             return None
@@ -275,6 +312,7 @@ class _Export:
         soggetti, cf_visti, coniugi = [], {}, 0
         self.tipo_ea: dict[str, str] = {}
         self.grado_ea: dict[str, str] = {}
+        self.rapp_ea: dict[str, tuple[str, str]] = {}   # rappresentante -> (CF rappresentato, grado del rappresentato)
         self.handicap_ea: dict[str, bool] = {}
         self.soggetti_ea: dict[str, dict] = {}
         for p in self.ea:
@@ -333,9 +371,7 @@ class _Export:
             if legge and grado in ("12", "13", "14", "17", "18", "19", "23", "24", "25", "26", "35", "37", "38", "39"):
                 self.err("REGOLA_GRADO_LEGGE", base + ".grado_parentela", f"con devoluzione per legge il grado {grado} "
                          "non e' ammesso (affini, estranei, enti)", FO.fonte_annotazione(el + "/GradoParentela"))
-            if legge and grado in ("04", "15"):
-                self.ns.append(f"{base}: grado {grado} con devoluzione per legge richiede la sezione 'Successione per "
-                               "rappresentazione', non supportata")
+            rapp = self.rappresentazione(p, base, grado, legge, el, cfv)
             if legge and grado == "36" and len(self.ea) > 1:
                 self.err("REGOLA_GRADO_LEGGE", base + ".grado_parentela", "grado 36 (Stato) ammesso solo se unico "
                          "soggetto del quadro", FO.fonte_annotazione(el + "/GradoParentela"))
@@ -354,6 +390,9 @@ class _Export:
             if ph is True:
                 s["PortatoreHandicap"] = "1"
             s["DatiAnagrafici"] = ana
+            if rapp:
+                s["SuccessionePerRappresentazione"] = {"CodiceFiscaleSoggettoRappresentato": rapp[0], "GradoParentela": rapp[1]}
+                self.rapp_ea[p["id"]] = rapp
             self.tipo_ea[p["id"]] = tipo
             self.soggetti_ea[p["id"]] = s
             self.grado_ea[p["id"]] = grado
@@ -1596,7 +1635,7 @@ class _Export:
             pass  # con testamento le quote non sono quelle di legge (annotazioni Quota/CodiceDiritto_Rip): nessun controllo
         elif self.ea and all(self.grado_ea.get(p["id"]) for p in self.ea):
             self.quote_legge = DL.quote_di_legge({p["id"]: self.grado_ea[p["id"]] for p in self.ea},
-                                                 {p["id"]: self.tipo_ea.get(p["id"]) for p in self.ea})
+                                                 {p["id"]: self.tipo_ea.get(p["id"]) for p in self.ea}, dict(self.rapp_ea))
             if self.quote_legge is None:
                 self.avv("QUOTE_DI_LEGGE_NON_VERIFICATE", "quadro[EA]", "configurazione di eredi non coperta dal "
                          "controllo delle quote di legge (coperti: figli, coniuge, genitori e fratelli nelle combinazioni delle tabelle di p. 69-70 dell'Allegato 5): le quote "

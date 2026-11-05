@@ -27,6 +27,8 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         # Dati richiesti dall'export XML (prima solo in opzioni.telematico): se presenti qui hanno la precedenza.
         "sesso": "enum:M|F", "provincia_nascita": "str", "tipo_soggetto": "str", "grado_parentela": "str",
         "comune_decesso": "str", "provincia_decesso": "str",
+        # Successione per rappresentazione (EA): codice fiscale e grado del rappresentato (figlio 02, fratello 10/11)
+        "rappresentato_cf": "str", "rappresentato_grado": "str",
     },
     "beni": {
         "tipo": "enum:" + "|".join(TIPI_BENE), "descrizione": "str",
@@ -63,6 +65,8 @@ AIUTI: dict[str, str] = {
     "devoluzioni.quota": "Quota dell'erede sul diritto del defunto (es. 1/3). È un dato diverso dalla quota del defunto sul bene.",
     "persone.sesso": "M o F, come richiesto dal file telematico.",
     "persone.grado_parentela": "Codice del grado di parentela con il defunto, come nelle istruzioni del quadro EA (es. 02).",
+    "persone.rappresentato_cf": "Solo per chi succede per rappresentazione (grado 04, 06, 08, 15, 20, 27): codice fiscale del rappresentato (figlio o fratello del defunto, premorto o rinunciatario).",
+    "persone.rappresentato_grado": "Grado di parentela del rappresentato con il defunto: 02 (figlio/a) per i discendenti dei figli, 10 o 11 (fratello/sorella germano o unilaterale) per i discendenti dei fratelli.",
     "beni.codice_comune": "Codice catastale del comune (4 caratteri, es. H501).",
     "beni.natura": "Natura del terreno secondo le istruzioni del quadro EB (es. T).",
     "persone.codice_fiscale": "16 caratteri. Il carattere di controllo viene verificato in esportazione.",

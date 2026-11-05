@@ -21,6 +21,7 @@ ETICHETTE: dict[str, dict[str, str]] = {
         "grado_parentela": "Grado di parentela", "relazione_con_defunto": "Relazione con il defunto",
         "data_decesso": "Data del decesso", "comune_decesso": "Comune del decesso",
         "provincia_decesso": "Provincia del decesso",
+        "rappresentato_cf": "Rappresentato: codice fiscale", "rappresentato_grado": "Rappresentato: grado di parentela",
     },
     "beni": {
         "tipo": "Tipo di bene", "descrizione": "Descrizione",
@@ -140,7 +141,7 @@ ORDINE: dict[str, list[str]] = {
                         "relazione_con_defunto"],
     "AN.dichiarazione": list(ETICHETTE_DICHIARAZIONE),
     "EA": ["codice_fiscale", "ruolo", "tipo_soggetto", "grado_parentela", "relazione_con_defunto", "cognome", "nome",
-           "provincia_nascita", "luogo_nascita", "data_nascita", "sesso"],
+           "provincia_nascita", "luogo_nascita", "data_nascita", "sesso", "rappresentato_cf", "rappresentato_grado"],
     "EB": ["tipo", "descrizione"] + _UBIC + ["sezione", "foglio", "particella", "subalterno", "natura", "tipologia_terreno",
            "reddito_dominicale", "rendita"] + _DIRITTO_VALORE + ["provenienza", "discordanza_intestatario",
            "passaggi_senza_atti_legali"],

@@ -15,18 +15,24 @@ from telematico_casi import caso_a10, contesto_caso_a10
 from test_telematico_controllo import _esegui, _motivo_salto
 
 C, F, G, GER, UNI = '01', '02', '03', '10', '11'
-RELAZIONE = {C: 'coniuge', F: 'figlio', G: 'genitore', GER: 'fratello', UNI: 'fratello unilaterale'}
-SESSO = {C: 'F', F: 'M', G: 'M', GER: 'M', UNI: 'F'}
-NASCITA = {C: '1942-04-04', F: '1970-01-01', G: '1915-05-05', GER: '1945-06-06', UNI: '1948-07-07'}
+NIP = '04'   # nipote in linea retta (succede per rappresentazione)
+RELAZIONE = {C: 'coniuge', F: 'figlio', G: 'genitore', GER: 'fratello', UNI: 'fratello unilaterale', NIP: 'nipote'}
+SESSO = {C: 'F', F: 'M', G: 'M', GER: 'M', UNI: 'F', NIP: 'F'}
+NASCITA = {C: '1942-04-04', F: '1970-01-01', G: '1915-05-05', GER: '1945-06-06', UNI: '1948-07-07', NIP: '2000-08-08'}
 
 
-def caso_con_eredi(gradi: list[str], stato_civile: str, valori: dict | None = None) -> tuple[dict, dict[str, Fraction]]:
+def caso_con_eredi(gradi: list[str], stato_civile: str, valori: dict | None = None,
+                   rappresentati: dict[int, int] | None = None) -> tuple[dict, dict[str, Fraction]]:
     """``caso_a10`` con gli eredi indicati (grado del quadro EA), devoluzioni secondo ``quote_di_legge``."""
     d = copy.deepcopy(caso_a10())
     d['persone'] = [p for p in d['persone'] if p['ruolo'] == 'defunto']
     tel = d['opzioni']['telematico']
     tel['persone'] = {'p_defunto1': tel['persone']['p_defunto1']}
     ids = []
+    # rappresentati: indice dell'erede -> numero del figlio/fratello premorto che rappresenta (CF sintetico dedicato)
+    # CF distinti (data di nascita diversa): le stirpi si distinguono dal CF del rappresentato
+    premorti = {n: genera_cf_sintetico('Rossi', f'Premorto{n}', 'M', f'196{n}-03-0{n}', 'H501') for n in set((rappresentati or {}).values())}
+    rapp_ids = {}
     for i, g in enumerate(gradi):
         pid = f'p_erede{i:03d}'
         nome = f'Erede{"ABCDEFGH"[i]}'
@@ -35,8 +41,11 @@ def caso_con_eredi(gradi: list[str], stato_civile: str, valori: dict | None = No
                              'data_nascita': NASCITA[g], 'luogo_nascita': 'Roma', 'ruolo': 'erede',
                              'relazione_con_defunto': RELAZIONE[g]})
         tel['persone'][pid] = {'sesso': SESSO[g], 'provincia_nascita': 'RM', 'grado_parentela': g}
+        if i in (rappresentati or {}):
+            tel['persone'][pid].update(rappresentato_cf=premorti[rappresentati[i]], rappresentato_grado='02')
+            rapp_ids[pid] = (premorti[rappresentati[i]], '02')
         ids.append(pid)
-    quote = quote_di_legge(dict(zip(ids, gradi)), {i: '1' for i in ids})
+    quote = quote_di_legge(dict(zip(ids, gradi)), {i: '1' for i in ids}, rapp_ids or None)
     assert quote is not None
     dich = tel['dichiarazione']
     dich['stato_civile'] = stato_civile
@@ -71,8 +80,8 @@ def esporta(d):
     return esporta_xml(d, contesto_caso_a10(cf_fornitore=cf, data_riferimento=date(2026, 3, 9)))
 
 
-def genera(gradi, stato_civile, valori=None):
-    d, quote = caso_con_eredi(gradi, stato_civile, valori)
+def genera(gradi, stato_civile, valori=None, rappresentati=None):
+    d, quote = caso_con_eredi(gradi, stato_civile, valori, rappresentati)
     return esporta(d), quote
 
 
@@ -85,6 +94,10 @@ CONFIGURAZIONI = {
     'due_genitori_unilaterale': ([G, G, UNI], '4'),
     'coniuge_genitore_germano': ([C, G, GER], '2', VALORI_12_7),          # 8/12, 3/12, 1/12 (p. 69)
     'due_genitori_germano_unilaterale': ([G, G, GER, UNI], '4', VALORI_12_7),  # genitori 4/7, fratelli 3/7 (p. 70)
+    # rappresentazione (Fascicolo I pp. 18-19): i nipoti 04 succedono ai figli premorti, quote per stirpi
+    'rapp_A_ministeriale': ([NIP, NIP, NIP, NIP], '4', VALORI_12_7, {0: 1, 1: 1, 2: 1, 3: 2}),   # 1/6 x3 e 1/2
+    'rapp_B_figlio_e_due_nipoti': ([F, NIP, NIP], '4', VALORI_12_7, {1: 1, 2: 1}),                # 1/2, 1/4, 1/4
+    'rapp_C_coniuge_figlio_due_nipoti': ([C, F, NIP, NIP], '2', VALORI_12_7, {2: 1, 3: 1}),       # 1/3, 1/3, 1/6, 1/6
 }
 
 
@@ -151,3 +164,63 @@ def test_quote_attese_dalle_tabelle_per_le_due_configurazioni_aggiunte():
     assert sorted(q5.values()) == [Fraction(1, 12), Fraction(3, 12), Fraction(8, 12)]
     _, q6 = caso_con_eredi(*CONFIGURAZIONI['due_genitori_germano_unilaterale'])
     assert sorted(q6.values()) == [Fraction(1, 7), Fraction(2, 7), Fraction(2, 7), Fraction(2, 7)]
+
+
+ATTESE_RAPPRESENTAZIONE = {
+    'rapp_A_ministeriale': [Fraction(1, 6)] * 3 + [Fraction(1, 2)],
+    'rapp_B_figlio_e_due_nipoti': [Fraction(1, 2), Fraction(1, 4), Fraction(1, 4)],
+    'rapp_C_coniuge_figlio_due_nipoti': [Fraction(1, 3), Fraction(1, 3), Fraction(1, 6), Fraction(1, 6)],
+}
+
+
+@pytest.mark.parametrize('nome', sorted(ATTESE_RAPPRESENTAZIONE))
+def test_quote_per_stirpi_attese(nome):
+    _, quote = caso_con_eredi(*CONFIGURAZIONI[nome])
+    assert [quote[k] for k in sorted(quote)] == ATTESE_RAPPRESENTAZIONE[nome]
+
+
+def scambia_minima_con_massima(xml: bytes) -> bytes:
+    """Per ogni bene (quote che sommano a 1, anche se spezzate in piu' sezioni da tre soggetti) scambia la prima quota
+    minima con la prima massima: il nipote di una stirpe riceve la quota del nipote unico e viceversa."""
+    doc = etree.fromstring(xml)
+    nodi = doc.xpath('//*[local-name()="Devoluzione"]/*[local-name()="Quota"]')
+    def frazione(q):
+        return Fraction(int(q.xpath('string(.//*[local-name()="QuotaNumeratore"])')),
+                        int(q.xpath('string(.//*[local-name()="QuotaDenominatore"])')))
+    gruppi, corrente, somma = [], [], Fraction(0)
+    for q in nodi:
+        corrente.append(q)
+        somma += frazione(q)
+        if somma == 1:
+            gruppi.append(corrente)
+            corrente, somma = [], Fraction(0)
+    assert gruppi and not corrente, 'quote dei beni non ricomponibili'
+    for g in gruppi:
+        fr = [frazione(q) for q in g]
+        a, b = g[fr.index(min(fr))], g[fr.index(max(fr))]
+        assert min(fr) != max(fr)
+        for nome in ('QuotaNumeratore', 'QuotaDenominatore', 'QuotaValore'):
+            ea, eb = a.xpath(f'.//*[local-name()="{nome}"]')[0], b.xpath(f'.//*[local-name()="{nome}"]')[0]
+            ea.text, eb.text = eb.text, ea.text
+    return etree.tostring(doc, xml_declaration=True, encoding='UTF-8')
+
+
+@pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or '')
+def test_controllo_ufficiale_respinge_scambio_fra_nipote_e_nipote_unico(tmp_path):
+    es, quote = genera(*CONFIGURAZIONI['rapp_A_ministeriale'])
+    assert es.xml is not None
+    assert _esegui(es.xml, tmp_path / 'ok')[0] == 'positivo'
+    # scambio fra il primo nipote (1/6) e il nipote unico dell'altro figlio (1/2)
+    stato, dgn, wri, _ = _esegui(scambia_minima_con_massima(es.xml), tmp_path / 'alterato')
+    assert stato == 'negativo', dgn['diagnostici']
+    assert 'Dati di devoluzione non coerenti' in wri, wri[-1500:]
+
+
+def test_grado_04_senza_rappresentato_cf_da_dato_mancante():
+    d, _ = caso_con_eredi(*CONFIGURAZIONI['rapp_B_figlio_e_due_nipoti'])
+    for pid, dati in d['opzioni']['telematico']['persone'].items():
+        dati.pop('rappresentato_cf', None)
+        dati.pop('rappresentato_grado', None)
+    es = esporta(d)
+    assert es.xml is None
+    assert any(e.codice == 'DATO_MANCANTE' and e.percorso.endswith('.rappresentato_cf') for e in es.errori),         [e.asdict() for e in es.errori]

@@ -32,60 +32,86 @@ FONTE = ("Succ_FASCICOLO_I_Nov_23.pdf p. 69 (Allegato 5 - Devoluzione); fornitur
 TIPI_PASSIVITA_LIBERE = {"1", "2", "11", "12"}  # annotazione RipartizioneED/Ripartizione/Quota
 
 
-def _parti_uguali(ids: list[str], totale: Fraction) -> dict[str, Fraction]:
-    return {p: totale / len(ids) for p in ids}
+GRADI_RAPPRESENTANTE_RETTA = ("04", "06", "08")      # nipote, pronipote, figlio/a di pronipote (discendenti dei figli)
+GRADI_RAPPRESENTANTE_COLLATERALE = ("15", "20", "27")  # nipote di zio, figlio/a di nipote, nipote di nipote (discendenti di fratelli)
+GRADI_RAPPRESENTANTE = GRADI_RAPPRESENTANTE_RETTA + GRADI_RAPPRESENTANTE_COLLATERALE
+FONTE_RAPPRESENTAZIONE = ("Succ_FASCICOLO_I_Nov_23.pdf pp. PDF 18-19 (successione per rappresentazione: si divide per stirpi e poi "
+                          "fra i rappresentanti di ciascuna stirpe); fornituraSUC13_v1.xsd, annotazioni di "
+                          "SuccessionePerRappresentazione")
 
 
-def _fratelli(germani: list[str], unilaterali: list[str], totale: Fraction) -> dict[str, Fraction]:
-    unita = 2 * len(germani) + len(unilaterali)
-    out = {p: totale * 2 / unita for p in germani}
-    out.update({p: totale / unita for p in unilaterali})
+def _stirpi(ids: list[str], pesi: list[int], totale: Fraction) -> dict[str, Fraction]:
+    """Ripartisce ``totale`` fra stirpi (liste di persone) secondo i pesi; dentro ogni stirpe in parti uguali."""
+    # ``ids``: una stirpe per elemento, come stringa 'a|b|c'
+    somma = sum(pesi)
+    out: dict[str, Fraction] = {}
+    for gruppo, peso in zip(ids, pesi):
+        membri = gruppo.split("|")
+        for m in membri:
+            out[m] = totale * peso / somma / len(membri)
     return out
 
 
-def quote_di_legge(gradi: dict[str, str], tipi: dict[str, str]) -> dict[str, Fraction] | None:
+def quote_di_legge(gradi: dict[str, str], tipi: dict[str, str],
+                   rappresentati: dict[str, tuple[str, str]] | None = None) -> dict[str, Fraction] | None:
     """Quote di legge per persona (id -> frazione) oppure ``None`` se la configurazione non e' coperta.
 
-    ``gradi``: id -> codice GradoParentela del quadro EA; ``tipi``: id -> TipoSoggetto. Le annotazioni chiedono le
-    quote di legge solo se i tipi soggetto sono tutti '1' o tutti '3'."""
+    ``gradi``: id -> codice GradoParentela del quadro EA; ``tipi``: id -> TipoSoggetto; ``rappresentati``: per chi succede per
+    rappresentazione, id -> (codice fiscale del rappresentato, grado del rappresentato). Le annotazioni chiedono le quote di legge
+    solo se i tipi soggetto sono tutti '1' o tutti '3'. I figli/fratelli premorti non compaiono: si riconoscono dai loro
+    discendenti, che formano una stirpe (conta come un figlio/fratello) e dividono in parti uguali la quota della stirpe."""
+    rapp = rappresentati or {}
     if not gradi or set(gradi) != set(tipi):
         return None
     if not (set(tipi.values()) == {"1"} or set(tipi.values()) == {"3"}):
         return None
-    per = {g: [p for p, x in sorted(gradi.items()) if x == g] for g in ("01", "02", "03", "10", "11")}
-    if sum(len(v) for v in per.values()) != len(gradi):
-        return None                      # gradi non coperti (nonni, nipoti, altri parenti, estranei...)
-    coniuge, figli, genitori = per["01"], per["02"], per["03"]
-    germani, unilaterali = per["10"], per["11"]
-    fratelli = germani + unilaterali
+    if set(rapp) - set(gradi):
+        return None
+    per = {g: [p for p, x in sorted(gradi.items()) if x == g and p not in rapp] for g in ("01", "02", "03", "10", "11")}
+    n_normali = sum(len(v) for v in per.values())
+    gruppi: dict[tuple[str, str], list[str]] = {}
+    for p, (cf, gr) in sorted(rapp.items()):
+        if gradi[p] not in GRADI_RAPPRESENTANTE or gr not in ("02", "10", "11") or not cf:
+            return None
+        if (gradi[p] in GRADI_RAPPRESENTANTE_RETTA) != (gr == "02"):
+            return None                      # i discendenti dei figli rappresentano un figlio; quelli dei fratelli un fratello
+        gruppi.setdefault((cf, gr), []).append(p)
+    if n_normali + len(rapp) != len(gradi):
+        return None                          # gradi non coperti (nonni, altri parenti, estranei...)
+    coniuge, genitori = per["01"], per["03"]
     if len(coniuge) > 1 or len(genitori) > 2:
         return None
-    if figli:                            # i figli escludono ascendenti e collaterali
+    # stirpi: ogni figlio/fratello presente e' una stirpe; i rappresentanti dello stesso rappresentato formano una stirpe
+    figli = per["02"] + ["|".join(v) for (cf, gr), v in gruppi.items() if gr == "02"]
+    fr_germ = per["10"] + ["|".join(v) for (cf, gr), v in gruppi.items() if gr == "10"]
+    fr_unil = per["11"] + ["|".join(v) for (cf, gr), v in gruppi.items() if gr == "11"]
+    fratelli = fr_germ + fr_unil
+    pesi_fr = [2] * len(fr_germ) + [1] * len(fr_unil)
+    if figli:                            # i figli (e le loro stirpi) escludono ascendenti e collaterali
         if genitori or fratelli:
             return None
         if not coniuge:
-            return _parti_uguali(figli, Fraction(1))
+            return _stirpi(figli, [1] * len(figli), Fraction(1))
         if len(figli) == 1:
-            return {coniuge[0]: Fraction(1, 2), figli[0]: Fraction(1, 2)}
-        return {coniuge[0]: Fraction(1, 3), **_parti_uguali(figli, Fraction(2, 3))}
+            return {coniuge[0]: Fraction(1, 2), **_stirpi(figli, [1], Fraction(1, 2))}
+        return {coniuge[0]: Fraction(1, 3), **_stirpi(figli, [1] * len(figli), Fraction(2, 3))}
     if coniuge and not genitori and not fratelli:
         return {coniuge[0]: Fraction(1)}
     if genitori and fratelli:
         if coniuge:                      # tabella p. 69: coniuge 8/12, genitori 3/12, fratelli 1/12
-            return {coniuge[0]: Fraction(8, 12), **_parti_uguali(genitori, Fraction(3, 12)),
-                    **_fratelli(germani, unilaterali, Fraction(1, 12))}
-        g_unita, f_unita = 2 * len(genitori), 2 * len(germani) + len(unilaterali)
+            return {coniuge[0]: Fraction(8, 12), **_stirpi(genitori, [1] * len(genitori), Fraction(3, 12)),
+                    **_stirpi(fratelli, pesi_fr, Fraction(1, 12))}
+        g_unita, f_unita = 2 * len(genitori), sum(pesi_fr)
         quota_genitori = max(Fraction(1, 2), Fraction(g_unita, g_unita + f_unita))
-        return {**_parti_uguali(genitori, quota_genitori),
-                **_fratelli(germani, unilaterali, 1 - quota_genitori)}
+        return {**_stirpi(genitori, [1] * len(genitori), quota_genitori), **_stirpi(fratelli, pesi_fr, 1 - quota_genitori)}
     resto = Fraction(1, 3) if coniuge else Fraction(1)
     if not genitori and not fratelli:
         return None
     out: dict[str, Fraction] = {coniuge[0]: Fraction(2, 3)} if coniuge else {}
     if genitori:
-        out.update(_parti_uguali(genitori, resto))
+        out.update(_stirpi(genitori, [1] * len(genitori), resto))
     else:
-        out.update(_fratelli(germani, unilaterali, resto))
+        out.update(_stirpi(fratelli, pesi_fr, resto))
     return out
 
 

@@ -21,6 +21,7 @@ REGOLE: dict[str, tuple[str, str]] = {
     "dichiarazione.tempistica_pagamento": ("TempisticaPagamento_Type", "tempistica del pagamento"),
     "dichiarazione.presentatore.codice_carica": ("CodiciCarica_Type", "carica del presentatore"),
     "persone.grado_parentela": ("GradoParentela_Type", "grado di parentela"),
+    "persone.rappresentato_grado": ("GradoParentela2_Type", "grado del rappresentato"),
     "persone.tipo_soggetto": ("TipoSoggetto_Type", "tipo di soggetto"),
     "beni.categoria": ("CodiciCategoriaCatastale_Type", "categoria catastale"),
     "beni.natura": ("CodiciNatura_Type", "natura"),
