@@ -170,6 +170,12 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                      sha256=r["xml_sha256"], completo=r["completo"]), headers={"Cache-Control": "no-store"})
 
     @api
+    async def scarica_dcm(request):
+        dcm, m = sv.file_controllato_dcm(request.path_params["pid"])
+        return Response(dcm, media_type="application/octet-stream", headers={"Content-Disposition":
+                        f'attachment; filename="{m["nome"] or "file_controllato.dcm"}"', "Cache-Control": "no-store"})
+
+    @api
     async def stampa_modello_api(request):
         return sv.stampa_modello(request.path_params["pid"])
 
@@ -296,7 +302,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/ripristina", ripristina, methods=["POST"]),
         Route(P + "/esporta", esporta, methods=["POST"]), Route(P + "/elaborati", elaborati),
         Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa), Route(P + "/stampa-modello", stampa_modello_api, methods=["POST"]),
-        Route(P + "/stampa-modello.pdf", scarica_stampa_modello),
+        Route(P + "/stampa-modello.pdf", scarica_stampa_modello), Route(P + "/file.dcm", scarica_dcm),
         Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),

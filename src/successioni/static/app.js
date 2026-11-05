@@ -622,6 +622,8 @@ async function insFile(dest) {
     try { const r = await post('/api/pratiche/' + pid + '/stampa-modello', {}); msg('Modello ministeriale generato (' + r.pagine + ' pagine). Prova locale: controllane il contenuto prima di usarlo.', 'o'); window.open('/api/pratiche/' + pid + '/stampa-modello.pdf', '_blank', 'noopener'); }
     catch (e) { msg(e.message, 'e'); }
   } }, 'Stampa modello ministeriale')));
+  if (ct.stato === 'positivo' && ct.job_adattatore) elaborati.append(h('div', { class: 'az' },
+    h('a', { href: '/api/pratiche/' + pid + '/file.dcm', download: '' }, 'Scarica file controllato (.dcm)')));
   elaborati.append(h('div', { class: 'az' }, h('button', { class: 'gh', disabled: ex.stato !== 'aggiornato' || !ex.generato, onclick: async () => {
     if (nMod()) return msg('Salva le modifiche e rigenera il file prima del controllo.', 'e');
     try { const r = await post('/api/pratiche/' + pid + '/controllo-ufficiale', {}); msg('Controllo ufficiale: ' + r.stato_controllo + ' (' + r.esito + ').', r.stato_controllo === 'positivo' ? 'o' : 'e'); }

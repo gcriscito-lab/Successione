@@ -141,9 +141,13 @@ class ElaboratiMixin:
         j = self._job_ultimo(TIPO_EXPORT, pratica_id)
         xml_path = self.arch.base / exp["percorso"]
         adattatore = controllo_ufficiale(self.arch)
+        from .collegamenti.controllo import ControlloJar
+        # Con il componente reale si chiede sempre il file controllato (.dcm): senza, il componente cancella la copia di lavoro
+        # anche a controllo positivo (prova generale del 2026-11-05) e il risultato sembrerebbe un'alterazione dell'input.
+        extra = {"produci_dcm": True} if isinstance(adattatore, ControlloJar) else {}
         r = adattatore.esegui(xml_path, chiave=chiave, pratica_id=pratica_id,
                              revisione=j["input"]["revisione"],
-                             impronta_dichiarativa=j["input"]["impronta_dichiarativa"])
+                             impronta_dichiarativa=j["input"]["impronta_dichiarativa"], **extra)
         det = r.dettaglio or {}
         reg = adattatore.job.leggi(r.job_id, TIPO_JOB)["risultato"] if r.job_id else {}   # dettagli registrati dall'adattatore
         ris = {"esito": r.esito.value, "stato_controllo": det.get("stato_controllo", "non_eseguito"),
@@ -154,6 +158,22 @@ class ElaboratiMixin:
         inp = {"xml_sha256": exp["xml_sha256"], "impronta_dichiarativa": j["input"]["impronta_dichiarativa"]}
         jid = self._job_scrivi(TIPO_CONTROLLO, pratica_id, "completato", inp, ris)
         return {"pratica_id": pratica_id, "job_id": jid, **ris}
+
+    def file_controllato_dcm(self, pratica_id: str) -> tuple[bytes, dict]:
+        """File controllato (.dcm) prodotto dal componente ufficiale per l'export corrente, se il controllo e' positivo."""
+        from .collegamenti.base import DepositoArtefatti
+        from .collegamenti.controllo import TIPO_JOB, controllo_ufficiale
+        st = self.stato_elaborati(pratica_id)
+        ctl = st["controllo_ufficiale"]
+        if ctl.get("stato") != "positivo" or not ctl.get("job_adattatore"):
+            raise DatiNonValidi("nessun file controllato disponibile: serve un controllo ufficiale positivo sul file aggiornato",
+                                stato_controllo=ctl.get("stato"))
+        ad = controllo_ufficiale(self.arch)
+        reg = ad.job.leggi(ctl["job_adattatore"], TIPO_JOB)["risultato"]
+        art = next((a for a in reg.get("artefatti", []) if a.get("ruolo") == "file_controllato_dcm"), None)
+        if art is None:
+            raise DatiNonValidi("il controllo non ha prodotto il file controllato (.dcm): riesegui il controllo ufficiale")
+        return DepositoArtefatti(self.arch).leggi(art), {"job": ctl["job_adattatore"], "nome": art.get("nome")}
 
     # ------------------------------------------------------------------ stampa del modello ministeriale
     def stampa_modello(self, pratica_id: str) -> dict:

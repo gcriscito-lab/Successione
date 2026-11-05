@@ -46,3 +46,15 @@ def test_stampa_modello_dallo_stesso_xml(tmp_path):
     (s.arch.base / r['percorso']).write_bytes(b'%PDF-alterato')
     with pytest.raises(DatiNonValidi):
         s.file_stampa_modello(pid)
+
+
+@pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+def test_controllo_ufficiale_dal_servizio_produce_dcm(tmp_path):
+    """Prova generale 2026-11-05: il servizio deve chiedere il .dcm, altrimenti il componente cancella la copia di lavoro e un
+    controllo positivo sembra un input alterato."""
+    s, pid = pratica_con_allegati(tmp_path)
+    assert s.esporta(pid)['completo']
+    c = s.controllo_ufficiale_pratica(pid)
+    assert c['stato_controllo'] == 'positivo' and c['esito'] == 'passato', c
+    dcm, m = s.file_controllato_dcm(pid)
+    assert len(dcm) > 1000 and m['nome'].endswith('.dcm')
