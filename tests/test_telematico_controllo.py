@@ -158,14 +158,7 @@ def test_ef_casi_fuori_perimetro_non_generati(monkeypatch):
     assert es.completo is False and es.xml is None
     m = [x for x in es.quadri_mancanti if x.percorso == "quadro[EF]"]
     assert m and "conservatorie" in m[0].messaggio and "p. PDF 39" in m[0].fonte
-
-    d = caso_a10()  # soli terreni: regola dei valori fiscali (Fascicolo I p. 40) non coperta
-    d["beni"] = [b for b in d["beni"] if b["id"] != "b_casa0001"]
-    d["devoluzioni"] = [x for x in d["devoluzioni"] if x["bene_id"] != "b_casa0001"]
-    d["passivita"] = [p for p in d["passivita"] if p["id"] != "ps_mutuo01"]
-    del d["opzioni"]["telematico"]["beni"]["b_casa0001"], d["opzioni"]["telematico"]["passivita"]["ps_mutuo01"]
-    es = esporta_xml(d, contesto_caso_a10())
-    assert any("soli terreni" in x.messaggio for x in es.quadri_mancanti if x.percorso == "quadro[EF]")
+    # i soli terreni (regola dei valori fiscali) sono ora coperti: vedi tests/test_ef_soli_terreni.py
 
 
 def test_imposta_dovuta_richiede_tempistica_e_va_nel_totale():

@@ -30,6 +30,7 @@ import hashlib
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import date
+from decimal import Decimal
 from fractions import Fraction
 
 from lxml import etree
@@ -558,6 +559,7 @@ class _Export:
         self.comune_bene[b["id"]] = luogo.get("Italia", luogo)["CodiceComune"]
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
+        self.terreni_vf[b["id"]] = {"rd": Decimal(rd.replace(",", ".")) if rd else None, "quota": fposs, "tip": tip}
         riga = {"Luogo": luogo, "DatiTerreni": {"DatiCatastali": cat, "DatiTerreni": dt}, "Possesso": poss,
                 "CodiceDiritto_P": dir_p, "TipologiaTerreno": tip, "Valore": valore}
         riga.update(self._flag_ei(b, "EB", luogo, cat, None, tavolare))
@@ -990,6 +992,7 @@ class _Export:
                 riga_dev["Riduzioni"] = self.rid_dev[did]
             if did in self.righe_dev:
                 self.righe_dev[did]["agevolazione"] = self.agev_dev.get(did)
+                self.righe_dev[did]["riduzione"] = self.rid_dev.get(did)
             out.append(riga_dev)
         return out
 
@@ -1578,6 +1581,7 @@ class _Export:
         self.fornitore_diverso_da_dichiarante = False
         self.totale_da_versare = 0
         self.sost = None   # dichiarazione sostitutiva (telematico/sostitutiva.py)
+        self.terreni_vf: dict[str, dict] = {}   # reddito dominicale, quota del defunto e tipologia dei terreni EB (valori fiscali, EF1/EF9)
         self.defunto = self.presentatore = None
         self.testamento_x, self.test_reg = None, None
         self.eh_navi, self.eh_aeromobili, self.ei_beni = [], [], []

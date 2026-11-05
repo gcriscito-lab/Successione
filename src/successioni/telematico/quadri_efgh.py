@@ -10,7 +10,7 @@ PERIMETRO (il resto e' ``non_supportato`` oppure ``quadri_mancanti`` con il moti
   salvo la prima casa (codici P, X, Z: rigo EF4 e Sezione II di EH, vedi ``prima_casa.py``); Sezioni I (ipotecaria 2%), II (catastale 1%), III (tassa ipotecaria 120 euro per circoscrizione), IV (bollo
   85 euro per circoscrizione), V-bis (imposta di successione da ``calcolo.calcola_da_xml`` sul file dichiarato),
   totale EF19. Non coperti: agevolazioni (G, M, Y, Z senza P, trust), regola dei valori fiscali dei soli terreni
-  (Fascicolo I p. 40), imposta proporzionale inferiore alla fissa (fonti non concordi, vedi sotto),
+  (Fascicolo I p. 40), (imposta proporzionale inferiore alla fissa: ora coperta, vedi sotto),
   attestazione/copia conforme, crediti
   d'imposta, sostitutive con rimborso o tardive con imposta aggiuntiva, sanzioni e interessi, rateazione.
 - EG: righi EG1 DichSost, EG5 DocumentiPassivita, EG6 AlberoGenealogico, EG7 DocumentiIdentita, EG8 Altro; i
@@ -127,9 +127,25 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         if any(r["diritto"] == "10" for r in immobili):
             motivi.append("immobili gravati da oneri reali (codice diritto 10): esclusi dalle circoscrizioni "
                           "(Fascicolo I p. 44), caso non coperto")
-        if not any(r["quadro"] in ("EC", "EM") for r in immobili):
-            motivi.append("soli terreni senza fabbricati: confronto con i valori fiscali dei terreni (Fascicolo I "
-                          "p. 40, rigo EF1; annotazione ImpostaProporzionale_Imposta) non coperto")
+        # soli terreni non edificabili, senza agevolazioni ne' riduzioni, senza fabbricati: regola dei valori fiscali
+        # (annotazioni XSD ImpostaProporzionale_Imposta di EF1 ed EF9; Fascicolo I pp. PDF 40 e 43)
+        solo_terreni = (not any(r["quadro"] in ("EC", "EM") for r in immobili) and all(r["quadro"] == "EB" for r in immobili))
+        vf = None
+        if solo_terreni:
+            beni_ids = sorted({r["bene_id"] for r in immobili})          # una riga di devoluzione per beneficiario: ogni bene una volta
+            info = [x.terreni_vf.get(b) for b in beni_ids]
+            non_edif = all(i and i["tip"] == "3" for i in info)
+            liberi = all(not r.get("agevolazione") and not r.get("riduzione") for r in immobili)
+            if non_edif and liberi:
+                rd_mancanti = [b for b, i in zip(beni_ids, info) if i["rd"] is None]
+                if rd_mancanti:
+                    motivi.append(f"soli terreni non edificabili: reddito dominicale mancante per {sorted(set(rd_mancanti))}: "
+                                  "il valore fiscale (reddito x quota del defunto x 112,5) non e' determinabile")
+                else:
+                    vf = sum((i["rd"] * Decimal(i["quota"].numerator) / Decimal(i["quota"].denominator) for i in info),
+                             Decimal(0)) * Decimal("112.5")
+            else:
+                solo_terreni = False   # terreni edificabili o con agevolazioni: imposta proporzionale ordinaria
         if immobili_prop and imponibile != imponibile.to_integral_value():
             motivi.append(f"somma dei 'Valore quota' degli immobili {imponibile} non intera: l'arrotondamento "
                           "dell'imponibile EF1/EF9 (cm:DatoNP_Type) non e' indicato dalle fonti")
@@ -139,10 +155,10 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         imponibile_cat = sum((r["quota_valore"] for r in prop_cat), Decimal(0))
         ip = arrotonda_euro(imponibile * ALIQUOTA_IPOTECARIA)
         cat = arrotonda_euro(imponibile_cat * ALIQUOTA_CATASTALE)
-        if (immobili_prop and ip < IMPOSTA_FISSA) or (prop_cat and cat < IMPOSTA_FISSA):
-            motivi.append(f"imposta proporzionale ({ip} / {cat}) inferiore alla fissa: il Fascicolo I (p. 40 e 43) "
-                          "chiede 200 nella colonna 2, l'annotazione XSD solo nel totale dovuto (EF5/EF11): fonti non "
-                          "concordi, caso non coperto")
+        # imposta proporzionale inferiore alla fissa: il Fascicolo I (pp. 40 e 43) parla di «indicare 200 euro» ma il controllo
+        # ufficiale SUC13 2.3.1 (prova locale 2026-11-05) respinge 200 nella colonna 2 («valore corretto» = imposta calcolata) e
+        # accetta l'annotazione XSD di ImpostaIpotecariaDovuta/ImpostaCatastaleDovuta: colonna 2 = imposta calcolata, minimo di
+        # 200 euro solo nel totale dovuto in presenza dei righi EF1/EF9 (vedi sotto)
         # circoscrizioni (EF15, EF16): solo immobili del catasto ordinario; per i tavolari il controllo ufficiale SUC13 2.3.1
         # (locale, 2026-11-03) individua 0 circoscrizioni
         comuni = sorted({r["codice_comune"] for r in immobili if r["quadro"] in ("EB", "EC")})
@@ -160,6 +176,13 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             fissa_pc = IMPOSTA_FISSA * n_pc
             ip = ip if immobili_prop else 0
             cat = cat if prop_cat else 0
+            if vf is not None:
+                x.vf_terreni = vf
+                if vf < ip + cat:
+                    # il minore fra valori fiscali e imposte proporzionali: 2/3 all'ipotecaria, 1/3 alla catastale
+                    ip, cat = arrotonda_euro(vf * 2 / 3), arrotonda_euro(vf / 3)
+                else:
+                    ip, cat = max(ip, IMPOSTA_FISSA), max(cat, IMPOSTA_FISSA)
             s1: dict = {}
             if immobili_prop:
                 s1["ImpostaProporzionale"] = {"ImpostaProporzionale_Imponibile": imp,
@@ -169,6 +192,10 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                                    "PrimaCasa_Imposta": str(fissa_pc)}
             sost = x.sost
             dovuta_ip, dovuta_cat = ip + fissa_pc, cat + fissa_pc
+            if immobili_prop and vf is None:
+                dovuta_ip = max(dovuta_ip, IMPOSTA_FISSA)      # annotazione XSD ImpostaIpotecariaDovuta
+            if prop_cat and vf is None:
+                dovuta_cat = max(dovuta_cat, IMPOSTA_FISSA)    # annotazione XSD ImpostaCatastaleDovuta
             da_ip, da_cat = dovuta_ip, dovuta_cat
             s1["ImpostaIpotecariaDovuta"] = str(dovuta_ip)
             if sost:

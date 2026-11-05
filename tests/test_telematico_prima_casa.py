@@ -376,11 +376,12 @@ def test_chiave_non_gestita_nel_supplemento_devoluzioni():
     assert any("devoluzioni[d_casaanna].campo_inesistente" in s for s in es.non_supportato)
 
 
-def test_imposta_proporzionale_residua_sotto_la_fissa_resta_bloccata():
+def test_imposta_proporzionale_residua_sotto_la_fissa_ora_coperta():
+    # 300 / 150 euro < 200: colonna 2 = imposta calcolata; con la prima casa il dovuto include gia' la fissa del rigo EF4
     d = caso_prima_casa()
-    next(b for b in d["beni"] if b["id"] == "b_terr0001")["valore"] = "15000"    # 300 / 150 euro < 200
+    next(b for b in d["beni"] if b["id"] == "b_terr0001")["valore"] = "15000"
     es = _es(d)
-    assert es.quadri_mancanti and "inferiore alla fissa" in es.quadri_mancanti[0].messaggio
+    assert es.errori == [] and es.completo and not es.quadri_mancanti
 
 
 def test_sezione_urbana_riportata_nella_sezione_ii():
