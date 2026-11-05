@@ -45,12 +45,20 @@ _ESEMPIO = {"SUCCESSIONI_JAVA": "java.exe", "SUCCESSIONI_GS": "gswin64c.exe", "S
             "SUCCESSIONI_QPDF": "qpdf.exe", "SUCCESSIONI_ICC": "srgb.icc"}
 MINIMO_TIMEOUT, MASSIMO_TIMEOUT = 10, 7200
 INTERFACCIA_DEFAULT = {"tema": "sistema", "font": "sistema", "dimensione": 14,
-                       "interlinea": "normale", "larghezza_pannello": 360, "larghezza_nav": 240}
+                       "interlinea": "normale", "larghezza_pannello": 360, "larghezza_nav": 240,
+                       # personalizzazione dell'app
+                       "accento": "predefinito", "densita": "normale", "contrasto": "normale", "movimento": "normale",
+                       "avvio": "elenco", "nome_studio": "", "quadri_predefiniti": []}
+LUNGHEZZA_NOME_STUDIO = 60
+QUADRI_SCEGLIBILI = ("EA", "EB", "EC", "ER", "ED", "EF", "EG", "EH", "EI", "EL", "EM", "EN", "EO", "EP", "EQ")
 # Intervalli (minimo, massimo) in pixel dei valori numerici; "dimensione" e' la grandezza del carattere.
 INTERVALLI_INTERFACCIA = {"dimensione": (12, 22), "larghezza_pannello": (280, 760), "larghezza_nav": (180, 480)}
 SCELTE_INTERFACCIA = {"tema": ("sistema", "chiaro", "scuro", "seppia"),
                       "font": ("sistema", "segoe", "arial", "verdana", "georgia", "consolas"),
-                      "interlinea": ("compatta", "normale", "ampia")}
+                      "interlinea": ("compatta", "normale", "ampia"),
+                      "accento": ("predefinito", "blu", "verde", "viola", "arancio", "rosso", "grafite"),
+                      "densita": ("compatta", "normale", "ampia"), "contrasto": ("normale", "alto"),
+                      "movimento": ("normale", "ridotto"), "avvio": ("elenco", "ultima")}
 
 
 def _valida_interfaccia(valori: dict) -> dict:
@@ -59,14 +67,20 @@ def _valida_interfaccia(valori: dict) -> dict:
     for k, v in valori.items():
         if k not in INTERFACCIA_DEFAULT:
             raise DatiNonValidi(f"preferenza dell'interfaccia sconosciuta: {k}")
-        if k in SCELTE_INTERFACCIA:
+        if k == "nome_studio":
+            if not isinstance(v, str) or len(v) > LUNGHEZZA_NOME_STUDIO or any(ord(c) < 32 for c in v):
+                raise DatiNonValidi(f"nome_studio: testo di al massimo {LUNGHEZZA_NOME_STUDIO} caratteri, senza a capo")
+        elif k == "quadri_predefiniti":
+            if (not isinstance(v, list) or any(q not in QUADRI_SCEGLIBILI for q in v) or len(set(v)) != len(v)):
+                raise DatiNonValidi("quadri_predefiniti: elenco senza ripetizioni di quadri fra " + ", ".join(QUADRI_SCEGLIBILI))
+        elif k in SCELTE_INTERFACCIA:
             if v not in SCELTE_INTERFACCIA[k]:
                 raise DatiNonValidi(f"{k}: valore non ammesso")
         else:
             minimo, massimo = INTERVALLI_INTERFACCIA[k]
             if isinstance(v, bool) or not isinstance(v, int) or not minimo <= v <= massimo:
                 raise DatiNonValidi(f"{k}: indicare un intero da {minimo} a {massimo}")
-    return valori.copy()
+    return {k: (list(v) if isinstance(v, list) else v) for k, v in valori.items()}
 
 
 def preferenze_interfaccia(contenuto: dict) -> dict:

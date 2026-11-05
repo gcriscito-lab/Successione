@@ -40,6 +40,8 @@ Un file non si invia due volte: dopo un tentativo, anche incerto, si riconcilia 
   generati ne' backup; pulsante «Pulisci ora»); avviso se la **visura catastale** di un immobile ha piu' di 90 giorni o manca la data (il Fascicolo chiede visure di non piu'
   di tre mesi), con opzione per trasformarlo in blocco della finalizzazione; **Claude in sola lettura** (puo' leggere pratiche e controlli ma non modificare nulla; vale subito).
   Per ogni immobile indica la «Data della visura catastale»: e' un dato interno, non va nell'XML.
+- **Personalizzazione (Impostazioni → Aspetto):** tema, carattere, dimensione e spaziatura, **colore di accento**, **densita' delle tabelle**, **contrasto alto**, **animazioni ridotte**,
+  nome dello studio in intestazione, **quadri proposti nelle nuove pratiche** e se all'avvio riaprire l'ultima pratica. Le preferenze restano sul computer, nel file di configurazione.
 - **Barra di stato:** mostra sempre l'archivio in uso; la scheda File mostra le versioni (programma, regole, specifiche, controllo) con cui e' stato generato il file.
 - `successioni backup <cartella>` copia database e allegati.
 - `successioni ripristina <backup> --destinazione <cartella nuova>` ripristina solo in una cartella nuova: non sovrascrive mai dati esistenti.

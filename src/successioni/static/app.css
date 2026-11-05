@@ -212,3 +212,14 @@ tbody tr:focus-visible { outline-offset:-2px; }
 }
 @media (max-width:480px) { .brand { font-size:0; gap:0; } .brand img { width:28px; height:28px; } }
 @media (prefers-reduced-motion: reduce) { .lat { transition:none !important; } }
+
+/* Personalizzazione (Impostazioni): densita' delle tabelle, contrasto elevato, movimento ridotto. L'accento e' impostato da applicaAspetto. */
+:root[data-densita="compatta"] td, :root[data-densita="compatta"] th { padding-top:2px; padding-bottom:2px; }
+:root[data-densita="compatta"] .voce { padding-top:1px; padding-bottom:1px; }
+:root[data-densita="ampia"] td, :root[data-densita="ampia"] th { padding-top:11px; padding-bottom:11px; }
+:root[data-densita="ampia"] .voce { padding-top:8px; padding-bottom:8px; }
+:root[data-contrasto="alto"] { --t2:#1d1d1f; --sep:rgba(0,0,0,.55); --sep-f:rgba(0,0,0,.75); }
+:root[data-contrasto="alto"][data-tema="scuro"] { --t:#ffffff; --t2:#f2f2f5; --sep:rgba(255,255,255,.6); --sep-f:rgba(255,255,255,.8); }
+:root[data-contrasto="alto"] :focus-visible { outline:3px solid var(--blu); outline-offset:2px; }
+:root[data-contrasto="alto"] input, :root[data-contrasto="alto"] select, :root[data-contrasto="alto"] textarea { border:1.5px solid var(--sep-f); }
+:root[data-movimento="ridotto"] *, :root[data-movimento="ridotto"] *::before, :root[data-movimento="ridotto"] *::after { transition:none !important; animation:none !important; scroll-behavior:auto !important; }

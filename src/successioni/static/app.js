@@ -19,7 +19,10 @@ S.fornitoreDirty = {};
 const nMod = () => S.dirty.size + S.nuove.size + S.dichDirty.size + S.supDirty.size + (Object.keys(S.fornitoreDirty).length ? 1 : 0);
 const nuovoId = coll => ({ persone: "p", beni: "b", devoluzioni: "d", passivita: "ps", documenti_ref: "dr" }[coll]) + "_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const uguale = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 14, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240 };
+const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 14, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240,
+  accento: 'predefinito', densita: 'normale', contrasto: 'normale', movimento: 'normale', avvio: 'elenco', nome_studio: '', quadri_predefiniti: [] };
+const ACCENTI = { blu: ['#0a74ff', '#6cb0ff'], verde: ['#1e7a37', '#6fd18a'], viola: ['#6e3fd1', '#b79cff'], arancio: ['#b25e00', '#ffb454'], rosso: ['#c4001a', '#ff8a92'], grafite: ['#3a3f4a', '#c4c9d4'] };
+const hexRgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
 const FONT_UI = { sistema: 'system-ui, "Segoe UI", sans-serif', segoe: '"Segoe UI", system-ui, sans-serif',
   arial: 'Arial, sans-serif', verdana: 'Verdana, sans-serif', georgia: 'Georgia, serif', consolas: 'Consolas, monospace' };
 let preferenze = { ...ASPETTO_DEFAULT };
@@ -28,6 +31,12 @@ function applicaAspetto(valori) {
   const p = { ...ASPETTO_DEFAULT, ...valori }, root = document.documentElement;
   root.dataset.tema = p.tema === 'sistema' ? (sistemaScuro.matches ? 'scuro' : 'chiaro') : p.tema;
   root.style.setProperty('--f-ui', FONT_UI[p.font] || FONT_UI.sistema);
+  // personalizzazione: accento (con la variante adatta al tema scuro), densita', contrasto, movimento, nome dello studio
+  const acc = ACCENTI[p.accento];
+  if (acc) { const col = acc[root.dataset.tema === 'scuro' ? 1 : 0]; root.style.setProperty('--blu', col); root.style.setProperty('--blu-t', hexRgba(col, 0.14)); }
+  else { root.style.removeProperty('--blu'); root.style.removeProperty('--blu-t'); }
+  root.dataset.densita = p.densita; root.dataset.contrasto = p.contrasto; root.dataset.movimento = p.movimento;
+  const brand = $('#bHome'); if (brand) { brand.lastChild.textContent = 'Successioni' + (p.nome_studio ? ' · ' + p.nome_studio : ''); document.title = 'Successioni' + (p.nome_studio ? ' · ' + p.nome_studio : ''); }
   root.style.setProperty('--dimensione-base', Math.max(12, Math.min(22, Number(p.dimensione) || 14)) + 'px');
   root.style.setProperty('--interlinea', ({ compatta: 1.3, normale: 1.5, ampia: 1.8 })[p.interlinea] || 1.5);
   const nav = limiteNav() ? Math.min(limiteNav(), Math.max(180, Number(p.larghezza_nav) || 240)) : 240;
@@ -42,6 +51,7 @@ function applicaAspetto(valori) {
 /* Limiti delle larghezze: la vista centrale deve restare di almeno 340 px; il menu dei quadri puo' crescere fino a 480 px. */
 function limiteNav() { return window.innerWidth <= 960 ? 0 : Math.max(180, Math.min(480, window.innerWidth - 340 - 280)); }
 function limitePannello(nav) { return Math.max(280, Math.min(760, window.innerWidth - (nav || preferenze.larghezza_nav || 240) - 340)); }
+const quadriPredefiniti = () => (preferenze.quadri_predefiniti && preferenze.quadri_predefiniti.length ? ['AN', ...preferenze.quadri_predefiniti.filter(q => q !== 'AN')] : S.schema.predefiniti);
 function memorizzaAspetto(p) {
   preferenze = { ...ASPETTO_DEFAULT, ...p }; applicaAspetto(preferenze);
   try { localStorage.setItem('successioni.aspetto', JSON.stringify(preferenze)); } catch (_) { /* il file sul PC resta la fonte */ }
@@ -126,6 +136,7 @@ async function init() {
     try { const imp = await api('/api/impostazioni'); memorizzaAspetto(imp.interfaccia); STUDIO.profilo = imp.profilo || {}; } catch (_) { /* l'app resta utilizzabile */ }
     STUDIO.archivio = i.archivio || '';
     await caricaPratiche(); renderSb(); aggiornaBottoni();
+    try { const ultima = localStorage.getItem('successioni.ultima'); if (preferenze.avvio === 'ultima' && ultima && S.pratiche.some(p => p.id === ultima)) await apri(ultima); } catch (_) { /* resta l'elenco */ }
   } catch (e) { msg("Avvio non riuscito: " + e.message, "e"); }
 }
 async function caricaPratiche() {
@@ -135,6 +146,7 @@ async function caricaPratiche() {
   for (const p of S.pratiche) ul.append(h("li", {}, h("button", { title: p.titolo + " (rev. " + p.revisione + ")", "aria-current": S.P && S.P.pratica_id === p.id ? "true" : "false", onclick: () => apri(p.id) }, h("span", {}, p.titolo), h("span", { class: "mut" }, "rev. " + p.revisione))));
 }
 async function apri(id, sel) {
+  try { localStorage.setItem('successioni.ultima', id); } catch (_) { /* facoltativo */ }
   if (S.writeBusy) { msg("Salvataggio in corso: attendi prima di cambiare pratica.", "e"); return; }
   if (nMod() && !confirm("Ci sono modifiche non salvate: continuare senza salvarle?")) return;
   S.gen++;   // invalida le risposte asincrone (es. codice fiscale) richieste per la pratica precedente
@@ -1110,7 +1122,7 @@ function wizRender() {
     }
   }
   if (W.passo === 2) {
-    d.quadri = d.quadri || [...S.schema.predefiniti];
+    d.quadri = d.quadri || [...quadriPredefiniti()];
     c.append(h("p", { class: "mut" }, "Seleziona i quadri da compilare. Potrai cambiare scelta nel frontespizio. I quadri EE, EF, EH ed EI non compaiono: li genera il programma."));
     for (const q of S.schema.quadri.filter(x => x.gruppo !== "frontespizio" && x.id !== "DV" && !x.generato)) {
       const cb = h("input", { type: "checkbox", id: "wq_" + q.id }); cb.checked = d.quadri.includes(q.id);
@@ -1118,7 +1130,7 @@ function wizRender() {
       c.append(h("label", { class: "chk", for: "wq_" + q.id }, cb, h("span", {}, q.id + " — " + q.titolo + (q.supportato ? "" : " (copertura limitata: blocca la finalizzazione)"))));
     }
   }
-  if (W.passo === 3) c.append(h("p", {}, "Verrà creata la dichiarazione «" + titoloWiz() + "» con " + (d.quadri || S.schema.predefiniti).length + " quadri selezionati, tipo " + (d.tipo || "originaria") + "."), h("p", { class: "mut" }, "Potrai completare ogni dato nei quadri; i controlli ti mostreranno cosa manca."));
+  if (W.passo === 3) c.append(h("p", {}, "Verrà creata la dichiarazione «" + titoloWiz() + "» con " + (d.quadri || quadriPredefiniti()).length + " quadri selezionati, tipo " + (d.tipo || "originaria") + "."), h("p", { class: "mut" }, "Potrai completare ogni dato nei quadri; i controlli ti mostreranno cosa manca."));
 }
 async function wizDaCF(valore) {
   const d = W.dati;
@@ -1159,6 +1171,21 @@ function impAspettoRender(p) {
   scelte('font', 'Carattere', [['sistema', 'Carattere del sistema'], ['segoe', 'Segoe UI'], ['arial', 'Arial'], ['verdana', 'Verdana'], ['georgia', 'Georgia'], ['consolas', 'Consolas']]);
   scelte('dimensione', 'Dimensione del testo', Array.from({ length: 11 }, (_, i) => [String(i + 12), (i + 12) + ' px']));
   scelte('interlinea', 'Spaziatura delle righe', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
+  scelte('accento', 'Colore di accento', [['predefinito', 'Predefinito del tema'], ['blu', 'Blu'], ['verde', 'Verde'], ['viola', 'Viola'], ['arancio', 'Arancio'], ['rosso', 'Rosso'], ['grafite', 'Grafite']]);
+  scelte('densita', 'Densità delle tabelle', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
+  scelte('contrasto', 'Contrasto', [['normale', 'Normale'], ['alto', 'Alto (bordi e testi più marcati)']]);
+  scelte('movimento', 'Animazioni', [['normale', 'Normali'], ['ridotto', 'Ridotte']]);
+  scelte('avvio', 'All’avvio', [['elenco', 'Mostra l’elenco delle pratiche'], ['ultima', 'Riapri l’ultima pratica']]);
+  const nome = h('input', { id: 'aspetto_nome_studio', maxlength: '60', value: IMP.aspetto.nome_studio || '', placeholder: 'es. Studio Rossi' });
+  nome.addEventListener('input', () => { IMP.aspetto.nome_studio = nome.value; applicaAspetto(IMP.aspetto); });
+  grid.append(h('div', { class: 'campo' }, h('label', { for: 'aspetto_nome_studio' }, 'Nome dello studio (in intestazione)'), nome));
+  const quadriGrid = h('div', { class: 'aspetto-griglia', role: 'group', 'aria-label': 'Quadri proposti nelle nuove pratiche' },
+    ['EA', 'EB', 'EC', 'ER', 'ED', 'EF', 'EG', 'EH', 'EI', 'EL', 'EM', 'EN', 'EO', 'EP', 'EQ'].map(q => {
+      const el = h('input', { type: 'checkbox', id: 'qp_' + q, checked: (IMP.aspetto.quadri_predefiniti || []).includes(q) });
+      el.addEventListener('change', () => { const s = new Set(IMP.aspetto.quadri_predefiniti || []); el.checked ? s.add(q) : s.delete(q); IMP.aspetto.quadri_predefiniti = [...s]; });
+      return h('label', { class: 'chk', for: 'qp_' + q }, el, h('span', {}, q));
+    }));
+  grid.append(h('div', { class: 'campo', style: 'grid-column:1/-1' }, h('label', {}, 'Quadri proposti nelle nuove pratiche (vuoto = quelli standard)'), quadriGrid));
   $('#impAspetto').replaceChildren(h('h3', {}, 'Aspetto e leggibilità'), grid,
     h('div', { class: 'aspetto-anteprima' }, h('strong', {}, 'Anteprima del carattere'), h('p', {}, 'Dichiarazione di successione · Roma (RM) · € 1.234,56')),
     h('p', { class: 'mut' }, 'Trascina il separatore accanto ai dati per allargare o restringere il pannello. La larghezza viene ricordata.'),
