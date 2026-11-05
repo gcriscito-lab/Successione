@@ -1,0 +1,28 @@
+# Piano dei moduli mancanti (ramo `sviluppo-moduli`)
+
+Creato il 2026-11-05. Il ramo stabile per la pratica reale di sabato e' il tag `stabile-pratica-reale-20261105` (ramo
+`claude/successioni-dichiarazioni-app-fhcwbe`): **non si tocca fino a dopo la pratica**. Qui si sviluppa tutto il resto.
+
+## Regole di lavoro
+- Ogni regola viene dalle fonti (`fonti/`: XSD con annotazioni, Fascicolo I e II, Specifiche, Allegato): mai dalla memoria. Se la fonte non basta, il caso resta
+  **bloccato con un motivo esplicito** e va nel registro dei dubbi.
+- Accettazione di ogni pacchetto: test dai valori delle fonti + **controllo ufficiale SUC13 2.3.1 locale positivo** su almeno 3 casi sintetici e, dove si puo', un
+  negativo (alterazione respinta). Dove il controllo e le fonti discordano, vince il controllo e lo si documenta (come per il minimo fisso).
+- Un pacchetto = un ramo di lavoro, una scheda in `docs/regole/<tema>.md`, test dedicati; la matrice di copertura si aggiorna in integrazione.
+
+## Pacchetti
+| # | Pacchetto | Contenuto (dalla matrice) | Stato |
+|---|---|---|---|
+| 1 | Successioni 2014-2024 | quadro EF senza sezione V-bis, imposta fissa per periodo | onda 1 |
+| 2 | Agevolazioni | A, N, G, M, H, C, D, E (righe EF2, AgevolazioneM, esclusioni da EE) | onda 1 |
+| 3 | Soggetti | rinunciatari (tipo 4), trust (5), enti/Stato (gradi 36-39), residenza estera, soggetto su piu' righi | onda 1 |
+| 4 | Beni esteri | provincia EE, imposta versata all'estero e detrazione, certificazione in EG | onda 1 |
+| 5 | Immobili particolari | graffati, rendita proposta, immobili aziendali, diritto di abitazione, discordanza (EI), piu' di tre estremi EI | onda 2 |
+| 6 | Frontespizio | integrativa codice 3, cariche 2-9, legge estera, eventi eccezionali, beneficio d'inventario, residenza estera del defunto | onda 2 |
+| 7 | EG ed EH | inventario, sezioni III-IV di EH, separazione, unione civile, disabili/interdetti, morte presunta | onda 2 |
+| 8 | ED e passivita' | piu' di tre destinatari, titoli esenti con passivita' collegate | onda 2 |
+| 9 | Pagamenti | crediti d'imposta, rimborsi nelle sostitutive; sanzioni/interessi solo con fonte dei tassi | onda 3 |
+| 10 | Quote di legge | nonni e altri ascendenti, rinunce nella devoluzione | onda 3 |
+| 11 | Personalizzazione dell'app | tema, accento, densita', intestazione dello studio, quadri predefiniti, avvio | in corso (fuori dalle regole fiscali) |
+
+Fuori da questo piano (servono credenziali o campioni): collegamenti Entratel/catasto/ricevute, lettore di visure PDF.
