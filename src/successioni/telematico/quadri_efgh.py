@@ -623,16 +623,14 @@ def _flag(v) -> bool:
 
 
 def _estremi_ei(x, b: dict, campo: str, voci, spec, base: str, fonte: str) -> list[dict]:
-    """Estremi di trascrizione o registrazione di un immobile: ``spec`` = [(chiave, elemento XSD, tipo)], massimo 3."""
+    """Estremi di trascrizione o registrazione di un immobile: ``spec`` = [(chiave, elemento XSD, tipo)]. Piu' di tre estremi sono
+    ammessi: il chiamante li distribuisce su moduli successivi (campo Continuazione, annotazione XSD di QuadroEI_new)."""
     from .esporta import codice_enum   # import locale: esporta importa questo modulo
     out = []
     if voci in (None, ""):
         return out
     if not isinstance(voci, list):
         x.err("VALORE_NON_VALIDO", f"{base}.{campo}", "attesa una lista di estremi", fonte)
-        return out
-    if len(voci) > 3:
-        x.ns.append(f"{base}.{campo}: piu' di tre estremi (campo Continuazione, moduli successivi) non supportato")
         return out
     for i, v in enumerate(voci):
         perc = f"{base}.{campo}[{i}]"
@@ -666,7 +664,7 @@ def _estremi_ei(x, b: dict, campo: str, voci, spec, base: str, fonte: str) -> li
 
 def quadro_ei(x, fr: dict) -> dict | None:
     """Quadro EI (dichiarazione sostitutiva per la voltura): generato dai beni EB/EC con «discordanza dati intestatario» o
-    «passaggi senza atti legali» (Fascicolo I p. 54). Piu' di tre estremi per immobile (Continuazione): non supportato."""
+    «passaggi senza atti legali» (Fascicolo I p. 54). Piu' di tre estremi per immobile: Continuazione e moduli successivi."""
     el = "QuadroEI_new/PrimoModulo"
     if not x.ei_beni or fr is None:
         return None
@@ -704,13 +702,30 @@ def quadro_ei(x, fr: dict) -> dict | None:
                "DatiCatastali": e["cat"]}
         if e["quadro"] == "EC" and e.get("sezione"):
             imm["SezioneUrbana"] = e["sezione"]
-        sez = {"Immobile": imm}
-        if tr:
-            sez["EstremiTrascrizione"] = tr
-        if rg:
-            sez["EstremiRegistrazione"] = rg
-        sez["FirmaDichiarante"] = "1"
-        sezioni.append(sez)
+        # fino a tre estremi per tipo in ogni modulo; oltre, «Continuazione» e un modulo successivo con gli ulteriori estremi e SENZA i
+        # dati dell'immobile (annotazioni XSD di EstremiTrascrizione, EstremiRegistrazione e Continuazione)
+        n_moduli = max(1, -(-max(len(tr), len(rg)) // 3))
+        # il controllo ufficiale SUC13 2.3.1 (prova locale 2026-11-05) scarta la continuazione se in un modulo entrambe le liste sono
+        # piene e il modulo successivo non contiene almeno un estremo di ciascun tipo (diagnostici 3413/3414): XSD e controllo
+        # discordano, vince il controllo
+        for k in range(n_moduli - 1):
+            piene = len(tr[3 * k:3 * k + 3]) == 3 and len(rg[3 * k:3 * k + 3]) == 3
+            if piene and not (tr[3 * k + 3:3 * k + 6] and rg[3 * k + 3:3 * k + 6]):
+                x.ns.append(f"{base}: {len(tr)} estremi di trascrizione e {len(rg)} di registrazione: con entrambe le liste piene il "
+                            "modulo di continuazione deve contenere almeno un estremo di ciascun tipo (il controllo ufficiale lo "
+                            "richiede): caso non esprimibile")
+                break
+        for k in range(n_moduli):
+            sez = {"Immobile": imm} if k == 0 else {}
+            if tr[3 * k:3 * k + 3]:
+                sez["EstremiTrascrizione"] = tr[3 * k:3 * k + 3]
+            if rg[3 * k:3 * k + 3]:
+                sez["EstremiRegistrazione"] = rg[3 * k:3 * k + 3]
+            if k < n_moduli - 1:
+                sez["Continuazione"] = "1"
+            if k == 0:
+                sez["FirmaDichiarante"] = "1"
+            sezioni.append(sez)
     if sezioni:
         primo["SezioneII_DatiIntestatario"] = sezioni[0]
     out = {"PrimoModulo": primo}

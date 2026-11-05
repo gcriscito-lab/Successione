@@ -87,9 +87,10 @@ def test_estremi_non_validi():
     assert ("beni[b_casa0001].estremi_registrazione[0].volume", "DATO_MANCANTE") in c
 
 
-def test_piu_di_tre_estremi_non_supportati():
+def test_piu_di_tre_estremi_ora_supportati_con_continuazione():
+    # dal 2026-11-05: Continuazione e moduli successivi (tests/test_immobili_particolari.py)
     es = _es(tel=lambda t: t["b_casa0001"].update(estremi_trascrizione=[TR, TR, TR, TR]))
-    assert es.xml is None and any("piu' di tre estremi" in s for s in es.non_supportato)
+    assert es.errori == [] and es.non_supportato == [] and es.xml is not None
 
 
 def test_due_immobili_con_discordanza_generano_un_modulo_in_piu():
