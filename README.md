@@ -2,12 +2,13 @@
 
 Progetto per un'applicazione locale Windows destinata alla compilazione delle dichiarazioni di successione e delle domande di volture catastali.
 
-Il repository contiene una beta locale: archivio condiviso fra GUI e MCP, compilazione, allegati, export XML,
-controllo SUC13 configurabile e percorso di invio manuale tracciato. La copertura fiscale e i collegamenti autenticati
-non sono completi: vedere `docs/ESITO_CORREZIONI_20261103.md` e `docs/MATRICE_COPERTURA.md`.
+Il programma compila, controlla e prepara le dichiarazioni nel perimetro descritto in `docs/MATRICE_COPERTURA.md`: archivio condiviso fra GUI e MCP,
+allegati e PDF/A, export XML SUC13 con controllo ufficiale locale, stampa del modello ministeriale e percorso di invio manuale tracciato.
+Non trasmette nulla all'Agenzia: le prove sono locali, su dati sintetici. Collegamenti autenticati (Entratel, catasto, ricevute) e parte della copertura
+fiscale non sono completi. **Indice della documentazione: `docs/README.md`.** Per una pratica reale: `docs/GUIDA_PRIMA_PRATICA_REALE.md`.
 
-Sulla postazione con l'ambiente `.venv` già presente, `Avvia-programma-aggiornato.cmd` avvia questi sorgenti aggiornati.
-Questa scorciatoia non ricostruisce o aggiorna un'eventuale installazione autonoma precedente.
+Avvio rapido: `Avvia-pratica-reale.cmd` (archivio dedicato alle pratiche reali) oppure `Avvia-programma-aggiornato.cmd` (archivio predefinito).
+Queste scorciatoie usano i sorgenti dell'ambiente `.venv` e non aggiornano un'eventuale installazione autonoma precedente.
 
 ## Inizia qui
 

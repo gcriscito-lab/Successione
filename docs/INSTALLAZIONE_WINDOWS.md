@@ -86,7 +86,7 @@ Per verificare la visibilita degli strumenti in Claude Code, eseguire `claude mc
 - Documentazione Python 3.13 su Windows: `https://docs.python.org/3.13/using/windows.html` (consultato il 2026-11-01).
 
 ## Da collaudare su Windows
-In coerenza con quanto riportato in `docs/COLLAUDO_WINDOWS_CODEX_20261102.md` e `docs/STATO_area4.md`, gli aspetti ancora da verificare sul sistema target sono:
+In coerenza con quanto riportato in `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md` e `docs/archivio/STATO_area4.md`, gli aspetti ancora da verificare sul sistema target sono:
 
 1. **Client effettivo Claude Desktop**: collaudo del caricamento automatico di `claude_desktop_config.json` (generato con `--scrivi-claude-desktop`), riavvio dell'applicazione e verifica della visibilita dei 18 strumenti `successioni_*` nell'interfaccia grafica.
 2. **Ambiente WSL**: verifica del comportamento in ambienti WSL (accertarsi che il server operi come processo Windows nativo per condividere lo stesso archivio dati con la GUI).

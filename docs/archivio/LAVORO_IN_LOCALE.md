@@ -12,7 +12,7 @@ python -m venv .venv
 pip install -e ".[test]"
 python -m pytest -q
 ```
-Atteso: tutti i test passano; quelli che richiedono componenti esterni (controllo ufficiale SUC13 con Java 8, veraPDF, pacchetto Windows costruito) risultano saltati finché non imposti le variabili descritte in `docs/BETA_DA_REVISIONARE.md` e `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+Atteso: tutti i test passano; quelli che richiedono componenti esterni (controllo ufficiale SUC13 con Java 8, veraPDF, pacchetto Windows costruito) risultano saltati finché non imposti le variabili descritte in `docs/archivio/BETA_DA_REVISIONARE.md` e `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 
 Per avviare il programma: `$env:SUCCESSIONI_DATA = "$env:USERPROFILE\Successioni-prova"; python -m successioni.cli gui`.
 
@@ -24,7 +24,7 @@ Per avviare il programma: `$env:SUCCESSIONI_DATA = "$env:USERPROFILE\Successioni
 5. **Una sola fonte**: prima di lavorare `git pull`; a fine lavoro `git push` sul branch. Non usare `--force`. Le patch di altri strumenti si integrano con `git am` su ramo temporaneo e con i test verdi.
 
 ## Dove ripartire
-- Stato e prossimi passi: `docs/STATO_LAVORI.md`, `docs/BETA_DA_REVISIONARE.md`, `docs/RISPOSTA_ALLA_REVISIONE.md`.
+- Stato e prossimi passi: `docs/STATO_LAVORI.md`, `docs/archivio/BETA_DA_REVISIONARE.md`, `docs/archivio/RISPOSTA_ALLA_REVISIONE.md`.
 - Istruzioni al programmatore: `CLAUDE.md`. Specifica e collaudo: `docs/02_SPECIFICA_E_COLLAUDO.md`.
 - Compiti piccoli per agenti gratuiti con il lanciatore: `docs/COMPITI_PER_AGENTI_GRATUITI.md`.
 - Prove da fare sul PC: `docs/COLLAUDO_RIPRENDIBILE.md`, `docs/PDFA.md` (veraPDF), configurazione del client MCP (`Configura-MCP.cmd` nel pacchetto).

@@ -11,6 +11,7 @@ function h(tag, attrs, ...kids) {
   return e;
 }
 const S = { schema: null, pratiche: [], P: null, Q: null, sel: "AN", riga: null, tab: "dati", dirty: new Map(), nuove: new Map(), salvata: null, writeBusy: false, gen: 0 };
+const STUDIO = { profilo: {}, archivio: '', ultimoBackup: null };   // profilo dello studio, archivio in uso, ultimo backup
 const STATI = { vuoto: "da compilare", compilato: "compilato", rilievi: "rilievi", non_supportato: "non supportato", inattivo: "non selezionato" };
 S.dichDirty = new Map();
 S.supDirty = new Map();
@@ -122,7 +123,8 @@ async function init() {
     const i = await api("/api/info");
     mostraInfo(i);
     S.schema = await api("/api/schema");
-    try { memorizzaAspetto((await api('/api/impostazioni')).interfaccia); } catch (_) { /* l'app resta utilizzabile */ }
+    try { const imp = await api('/api/impostazioni'); memorizzaAspetto(imp.interfaccia); STUDIO.profilo = imp.profilo || {}; } catch (_) { /* l'app resta utilizzabile */ }
+    STUDIO.archivio = i.archivio || '';
     await caricaPratiche(); renderSb(); aggiornaBottoni();
   } catch (e) { msg("Avvio non riuscito: " + e.message, "e"); }
 }
@@ -163,9 +165,10 @@ function aggiornaBottoni() {
 }
 function renderSb() {
   const sb = $("#sb"); sb.replaceChildren();
-  if (!S.P) { sb.append(h("span", {}, "Nessuna pratica aperta")); return; }
+  const arch = STUDIO.archivio ? h("span", { class: "arch", title: STUDIO.archivio, style: "font-weight:600" }, "Archivio: " + STUDIO.archivio.split(/[\\/]/).filter(Boolean).pop()) : null;
+  if (!S.P) { sb.append(...[arch, h("span", {}, "Nessuna pratica aperta")].filter(Boolean)); return; }
   const n = S.Q.rilievi.length;
-  sb.append(...[h("span", {}, "Revisione " + S.P.revisione),
+  sb.append(...[arch, h("span", {}, "Revisione " + S.P.revisione),
     S.salvata ? h("span", { class: "ok" }, "Salvata alle " + S.salvata) : null,
     nMod() ? h("span", { style: "color:var(--am)" }, nMod() + (nMod() === 1 ? " modifica non salvata" : " modifiche non salvate")) : null,
     n ? h("button", { onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, n + (n === 1 ? " rilievo" : " rilievi")) : h("span", {}, "Nessun rilievo"),
@@ -578,6 +581,8 @@ async function insFile(dest) {
     riga_stato('File XML', ex.stato, ex.generato ? (ex.completo ? 'Completo nel perimetro supportato' : 'Bozza tecnica: non trasmissibile') : 'Nessun file generato'),
     riga_stato('Schema XSD', st.xsd.stato), riga_stato('Controllo ufficiale', ct.stato, ct.versione_controllo),
     riga_stato('Trasmissione', st.trasmissione.stato, st.trasmissione.nota));
+  if (ex.versioni) stato.append(h('p', { class: 'mut', style: 'font-size:0.9231rem' }, 'Versioni del file: programma ' + ex.versioni.applicazione + ' · regole ' + ex.versioni.regole +
+    ' · specifiche ' + ex.versioni.specifiche_suc + (ct.versione_controllo ? ' · controllo ' + ct.versione_controllo : '')));
   if (ct.azione_richiesta) stato.append(h('p', { class: 'nota', style: 'white-space:pre-wrap' }, ct.azione_richiesta));
   const fornitore = h('section', { class: 'grp', id: 'fornitore' }, h('h2', {}, 'Fornitore e impegno alla trasmissione'),
     h('p', { class: 'mut' }, 'Chi presenta il file: dichiarante o intermediario. Il profilo si compila una volta per questa pratica.'));
@@ -597,7 +602,12 @@ async function insFile(dest) {
   impegnoIn.addEventListener('change', () => modifica('impegno_codice', impegnoIn.value || null));
   dataIn.addEventListener('input', () => modifica('data_impegno', dataIso(dataIn.value) || null));
   fornitore.append(h('label', {}, 'Codice fiscale del fornitore', cfIn), h('label', {}, 'Tipo fornitore', tipoIn), dettagli,
-    h('div', { class: 'az' }, h('button', { class: 'gh', onclick: salvaTutto }, 'Salva profilo')));
+    h('div', { class: 'az' }, h('button', { class: 'gh', onclick: salvaTutto }, 'Salva profilo'),
+      STUDIO.profilo && STUDIO.profilo.cf ? h('button', { class: 'gh', type: 'button', onclick: () => {
+        for (const [k, v] of Object.entries(STUDIO.profilo)) modifica(k, v);
+        cfIn.value = STUDIO.profilo.cf || ''; tipoIn.value = STUDIO.profilo.tipo || tipoIn.value; impegnoIn.value = STUDIO.profilo.impegno_codice || '';
+        dettagli.hidden = tipoIn.value !== '10'; msg('Profilo dello studio applicato: premi «Salva profilo» per confermarlo sulla pratica.', 'o');
+      } }, 'Applica profilo dello studio') : null));
   const elaborati = h('section', { class: 'grp' }, h('h2', {}, 'Generazione e controllo'));
   const esegui = async scopo => {
     if (S.writeBusy) return;
@@ -608,6 +618,8 @@ async function insFile(dest) {
       if (!r.generato) msg('File non generato: ' + motivi.slice(0, 3).join(' | ') + '. Nessun file parziale è stato prodotto.', 'e');
       else msg((r.completo ? 'File generato e valido per lo schema.' : 'Bozza tecnica generata. ' + r.avvertenza)
         + ((r.avvisi || []).length ? ' Avvertenze: ' + r.avvisi.map(a => a.messaggio).join(' | ') : ''), r.completo ? 'o' : 'e');
+      if (r.backup && r.backup.errore) msg('Attenzione: backup automatico non riuscito (' + r.backup.errore + ')', 'e');
+      else if (r.backup && r.backup.eseguito) STUDIO.ultimoBackup = r.backup.nome;
       if (S.P.pratica_id === pid) { await ricarica(); render(); }
     } catch (e) { msg(e.message, 'e'); }
   };
@@ -1129,7 +1141,7 @@ async function wizAvanti() {
 }
 
 /* Impostazioni: percorsi degli strumenti esterni (server: /api/impostazioni), con stato di rilevamento. */
-const IMP = { voci: [], iniziali: {}, aspetto: null };
+const IMP = { voci: [], iniziali: {}, aspetto: null, profilo: {} };
 function impAspettoRender(p) {
   IMP.aspetto = { ...preferenze, ...p };
   const grid = h('div', { class: 'aspetto-griglia' });
@@ -1149,7 +1161,35 @@ function impAspettoRender(p) {
     h('p', { class: 'mut' }, 'Trascina il separatore accanto ai dati per allargare o restringere il pannello. La larghezza viene ricordata.'),
     h('button', { type: 'button', class: 'gh', onclick: () => { impAspettoRender(ASPETTO_DEFAULT); applicaAspetto(IMP.aspetto); } }, 'Ripristina aspetto predefinito'));
 }
+function impProfiloRender(p) {
+  IMP.profilo = { ...p };
+  const campo = (chiave, titolo, el) => { el.id = 'prof_' + chiave; el.setAttribute('aria-label', titolo); return h('div', { class: 'campo' }, h('label', { for: el.id }, titolo), el); };
+  const cf = h('input', { class: 'mono', value: p.cf || '', placeholder: 'codice fiscale', oninput: e => { IMP.profilo.cf = e.target.value.trim().toUpperCase(); } });
+  const tipo = h('select', {}, h('option', { value: '' }, 'Non indicato'), h('option', { value: '1' }, 'Dichiarante (1)'), h('option', { value: '10' }, 'Intermediario (10)'));
+  tipo.value = p.tipo || ''; tipo.addEventListener('change', () => { IMP.profilo.tipo = tipo.value; });
+  const imp = h('select', {}, h('option', { value: '' }, 'Non indicato'), h('option', { value: '1' }, 'Predisposta dal dichiarante (1)'), h('option', { value: '2' }, 'Predisposta dall’intermediario (2)'));
+  imp.value = p.impegno_codice || ''; imp.addEventListener('change', () => { IMP.profilo.impegno_codice = imp.value; });
+  $('#impProfilo').replaceChildren(h('h3', {}, 'Profilo dello studio'),
+    h('p', { class: 'mut' }, 'Chi presenta il file. Viene proposto in ogni nuova pratica e si può cambiare pratica per pratica.'),
+    h('div', { class: 'aspetto-griglia' }, campo('cf', 'Codice fiscale del fornitore', cf), campo('tipo', 'Tipo fornitore', tipo), campo('impegno', 'Impegno a trasmettere', imp)));
+}
+async function impBackupRender() {
+  const box = $('#impBackup');
+  let b = { cartella: '', backup: [] };
+  try { b = await api('/api/backup'); } catch (_) { /* elenco non disponibile: il pulsante resta */ }
+  const ultimo = b.backup[0];
+  box.replaceChildren(h('h3', {}, 'Backup'),
+    h('p', { class: 'mut' }, 'Cartella: ' + (b.cartella || '—') + (ultimo ? ' · ultimo: ' + ultimo.creato.replace('T', ' ') : ' · nessun backup ancora') +
+      '. Prima di generare un file si fa una copia automatica (al massimo una ogni 30 minuti). Per proteggerti da un guasto del disco imposta una cartella su un\'altra unità (Strumenti e percorsi).'),
+    h('button', { type: 'button', class: 'gh', onclick: async ev => {
+      ev.target.disabled = true;
+      try { const r = await post('/api/backup', {}); msg('Backup creato e verificato: ' + r.nome, 'o'); STUDIO.ultimoBackup = r.nome; renderSb(); }
+      catch (e) { msg('Backup non riuscito: ' + e.message, 'e'); }
+      ev.target.disabled = false; impBackupRender();
+    } }, 'Crea backup ora'));
+}
 function impRender(s) {
+  impProfiloRender(s.profilo || {}); impBackupRender();
   IMP.voci = s.voci; IMP.iniziali = Object.fromEntries(s.voci.map(v => [v.chiave, v.valore || ""]));
   impAspettoRender(s.interfaccia);
   $("#impFile").textContent = "File di configurazione: " + s.file;
@@ -1168,7 +1208,9 @@ async function impSalva() {
   const modifiche = {};
   for (const v of IMP.voci) if (v.modificabile) { const x = $("#imp_" + v.chiave).value.trim(); if (x !== IMP.iniziali[v.chiave]) modifiche[v.chiave] = x; }
   try {
-    const s = await post("/api/impostazioni", { modifiche, interfaccia: IMP.aspetto });
+    const profilo = Object.fromEntries(Object.entries(IMP.profilo).filter(([, v]) => v));
+    const s = await post("/api/impostazioni", { modifiche, interfaccia: IMP.aspetto, profilo });
+    STUDIO.profilo = s.profilo || {};
     memorizzaAspetto(s.interfaccia);
     impRender(s); $("#impErr").textContent = "";
     msg("Impostazioni salvate." + (s.avvisi.length ? " " + s.avvisi.join(" ") : ""), "o");

@@ -18,7 +18,7 @@ from .archivio import Archivio
 from .errori import (ChiaveRiutilizzata, ConflittoRevisione, DatiNonValidi, ErroreServizio,  # noqa: F401
                      NonTrovato, ora)
 
-VERSIONE_REGOLE = "0.1-bozza"
+from .versioni import VERSIONE_REGOLE  # noqa: E402,F401
 CANALI = ("gui", "mcp", "cli")
 
 
@@ -90,6 +90,10 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
             origine = "proposto_assistente" if canale == "mcp" else "inserito"
             for i, op in enumerate(iniziali or []):
                 self._applica(dati, op, origine, canale, i)
+            from . import impostazioni
+            profilo = impostazioni.profilo_studio(self.arch.base)
+            if profilo and not (dati.get("opzioni") or {}).get("fornitore"):
+                dati.setdefault("opzioni", {})["fornitore"] = dict(profilo)      # predefinito dello studio, modificabile per pratica
             errori = S.valida_forma(dati)
             if errori:
                 raise DatiNonValidi("dati iniziali non validi: pratica non creata", errori=[e.asdict() for e in errori])

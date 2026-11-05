@@ -1,7 +1,7 @@
 # Collaudo riprendibile dei collegamenti sul PC Windows del professionista
 
 Aggiornamento 2026-11-02: controllo ufficiale locale Windows positivo e due negativi predisposti verificati;
-rapporto `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`. Entratel e invii/ricevute reali restano da collaudare.
+rapporto `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`. Entratel e invii/ricevute reali restano da collaudare.
 
 Procedure per A10, A13, A14, A15, A18, A19 (`docs/02_SPECIFICA_E_COLLAUDO.md` §12). Ogni passo scrive nello stesso
 archivio dell'app (cartella `SUCCESSIONI_DATA`, predefinita `%LOCALAPPDATA%\Successioni`) e stampa un JSON con

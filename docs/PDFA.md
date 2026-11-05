@@ -1,8 +1,8 @@
 # Documenti, allegati EG e PDF/A (area 2)
 
-Aggiornato: 2026-11-02. Collaudo Windows e correzioni: `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+Aggiornato: 2026-11-02. Collaudo Windows e correzioni: `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 Codice: `src/successioni/pdfa.py`, `src/successioni/allegati.py`, `src/successioni/documenti/`.
-Test: `tests/test_pdfa.py`, `tests/test_documenti_*.py`. Stato riprendibile: `docs/STATO_area2.md`.
+Test: `tests/test_pdfa.py`, `tests/test_documenti_*.py`. Stato riprendibile: `docs/archivio/STATO_area2.md`.
 
 | Requisito | Stato | Evidenza |
 |---|---|---|

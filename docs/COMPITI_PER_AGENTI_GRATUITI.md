@@ -26,14 +26,14 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 
 ## C2. Manuale breve per il professionista
 **File:** `docs/MANUALE_BREVE.md` (nuovo).
-**Cosa fare:** istruzioni in linguaggio semplice, senza tecnicismi: avvio, nuova dichiarazione guidata, quadri, controlli, scheda File («bozza tecnica» che cosa significa), allegati e PDF/A («non verificato» senza veraPDF), backup e ripristino (`successioni backup <cartella>` e `successioni ripristina <backup> --destinazione <cartella nuova>`), dove sono i dati, cosa il programma NON fa (nessun invio, quadri non supportati). Fonti dei fatti: `docs/BETA_DA_REVISIONARE.md`, `docs/STATO_area4.md`, `scripts/windows/LEGGIMI.txt`, `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+**Cosa fare:** istruzioni in linguaggio semplice, senza tecnicismi: avvio, nuova dichiarazione guidata, quadri, controlli, scheda File («bozza tecnica» che cosa significa), allegati e PDF/A («non verificato» senza veraPDF), backup e ripristino (`successioni backup <cartella>` e `successioni ripristina <backup> --destinazione <cartella nuova>`), dove sono i dati, cosa il programma NON fa (nessun invio, quadri non supportati). Fonti dei fatti: `docs/archivio/BETA_DA_REVISIONARE.md`, `docs/archivio/STATO_area4.md`, `scripts/windows/LEGGIMI.txt`, `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 **Accettazione:** nessuna funzione citata che non esista (ogni comando verificabile con `--help`); massimo 3 pagine; nessun elenco di sigle senza spiegazione.
 
 ## C3. Guida all'installazione e configurazione MCP
 **File:** `docs/INSTALLAZIONE_WINDOWS.md` (nuovo). `docs/CONFIGURAZIONE_MCP.md` esiste gia': non toccarlo.
-**Contesto:** `scripts/windows/LEGGIMI.txt`, `docs/STATO_area4.md`, `docs/CONFIGURAZIONE_MCP.md`, `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
-**Cosa fare:** ricavare dal contenuto già scritto in `docs/STATO_area4.md`, `scripts/windows/` e `packaging/`. Per MCP: comando e variabili d'ambiente reali (`python -m successioni.mcp_server`, `SUCCESSIONI_DATA`), come verificare che gli strumenti con prefisso `successioni_` siano visibili, cosa succede se il client si chiude (lo stato è nei dati). Citare la documentazione ufficiale del client con URL e data solo se consultata davvero; altrimenti scrivere «da verificare».
-**Accettazione:** ogni comando e percorso citato esiste nel repository; sezione finale «Da collaudare su Windows» coerente con `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+**Contesto:** `scripts/windows/LEGGIMI.txt`, `docs/archivio/STATO_area4.md`, `docs/CONFIGURAZIONE_MCP.md`, `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+**Cosa fare:** ricavare dal contenuto già scritto in `docs/archivio/STATO_area4.md`, `scripts/windows/` e `packaging/`. Per MCP: comando e variabili d'ambiente reali (`python -m successioni.mcp_server`, `SUCCESSIONI_DATA`), come verificare che gli strumenti con prefisso `successioni_` siano visibili, cosa succede se il client si chiude (lo stato è nei dati). Citare la documentazione ufficiale del client con URL e data solo se consultata davvero; altrimenti scrivere «da verificare».
+**Accettazione:** ogni comando e percorso citato esiste nel repository; sezione finale «Da collaudare su Windows» coerente con `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 
 ## C4. Test aggiuntivi su valori, schema e servizio
 **File:** `tests/test_valori_schema_extra.py` (nuovo).

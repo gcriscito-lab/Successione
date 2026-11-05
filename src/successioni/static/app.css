@@ -207,7 +207,7 @@ tbody tr:focus-visible { outline-offset:-2px; }
   .ins { overflow:visible; border-top:.5px solid var(--sep); padding:12px; }
   .ins > .seg { position:static; }
   .sb { position:sticky; bottom:0; z-index:20; flex-wrap:nowrap; overflow-x:auto; gap:12px; padding:5px 10px; scrollbar-width:none; }
-  .sb > * { white-space:nowrap; flex:none; } .sb > :first-child:not(:only-child), .sb > :last-child:not(:only-child) { display:none; }
+  .sb > * { white-space:nowrap; flex:none; } .sb > :first-child:not(:only-child):not(.arch), .sb > :last-child:not(:only-child) { display:none; }
   .generali-griglia { grid-template-columns:1fr; }
 }
 @media (max-width:480px) { .brand { font-size:0; gap:0; } .brand img { width:28px; height:28px; } }

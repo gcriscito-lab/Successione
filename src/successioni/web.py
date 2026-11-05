@@ -82,7 +82,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def info(request):
-        return {"versione": __version__, "pid": os.getpid(),
+        from .versioni import versioni
+        return {"versione": __version__, "versioni": versioni(), "archivio": str(sv.arch.base), "pid": os.getpid(),
                 "pdfa": {"ghostscript": bool(pdfa.trova_gs()), "veraPDF": bool(pdfa.trova_verapdf())}}
 
     @api
@@ -170,6 +171,14 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                      sha256=r["xml_sha256"], completo=r["completo"]), headers={"Cache-Control": "no-store"})
 
     @api
+    async def backup_crea(request):
+        return sv.backup_archivio("manuale")
+
+    @api
+    async def backup_elenco(request):
+        return sv.elenco_backup()
+
+    @api
     async def scarica_dcm(request):
         dcm, m = sv.file_controllato_dcm(request.path_params["pid"])
         return Response(dcm, media_type="application/octet-stream", headers={"Content-Disposition":
@@ -224,7 +233,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def impostazioni_salva(request):
         from . import impostazioni
         b = await request.json()
-        return impostazioni.salva(b.get("modifiche", {}), interfaccia=b.get("interfaccia"))
+        return impostazioni.salva(b.get("modifiche", {}), interfaccia=b.get("interfaccia"), profilo=b.get("profilo"))
 
     async def corpo(request):
         return await request.json() if (await request.body()) else {}
@@ -286,6 +295,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     P = "/api/pratiche/{pid}"
     return Starlette(routes=[
         Route("/api/codice-fiscale", cf_decodifica), Route("/api/importa", importa, methods=["POST"]),
+        Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
         Route(P + "/ricevute/{tid}", ricevute, methods=["GET", "POST"]),

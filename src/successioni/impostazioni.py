@@ -35,6 +35,9 @@ VOCI: tuple[tuple[str, str, str, str], ...] = (
     ("SUCCESSIONI_VERAPDF", "veraPDF", "file", "Verifica indipendente della conformita' PDF/A."),
     ("SUCCESSIONI_QPDF", "qpdf", "file", "Controlli strutturali e suddivisione dei PDF."),
     ("SUCCESSIONI_ICC", "Profilo colore sRGB (.icc)", "file", "Di solito rilevato da Ghostscript; serve alla conversione PDF/A."),
+    ("SUCCESSIONI_BACKUP", "Cartella dei backup", "cartella",
+     "Dove si salvano le copie di sicurezza. Per proteggersi da un guasto del disco scegli un'altra unita' o un disco esterno; "
+     "se vuota, accanto alla cartella dei dati."),
     ("SUCCESSIONI_FONTI", "Cartella delle fonti ufficiali", "cartella", "Specifiche e moduli dell'Agenzia usati dal programma."),
 )
 CHIAVI = {v[0]: v for v in VOCI}
@@ -160,6 +163,45 @@ def _dettaglio(chiave: str, valore: str | None) -> tuple[bool, str]:
     return True, ""
 
 
+# Profilo dello studio: dati del fornitore (chi presenta il file) applicati come predefiniti alle nuove pratiche.
+CHIAVI_PROFILO = ("cf", "tipo", "impegno_codice")
+
+
+def _valida_profilo(p) -> dict:
+    from .telematico import formati as F
+    if not isinstance(p, dict):
+        raise DatiNonValidi("profilo dello studio: atteso un oggetto")
+    for k in p:
+        if k not in CHIAVI_PROFILO:
+            raise DatiNonValidi(f"profilo dello studio: campo sconosciuto {k!r}", ammessi=list(CHIAVI_PROFILO))
+    out: dict = {}
+    if p.get("cf") not in (None, ""):
+        try:
+            out["cf"] = F.cf(p["cf"])
+        except F.ValoreXml as e:
+            raise DatiNonValidi(f"profilo dello studio: codice fiscale non valido ({e})") from None
+    if p.get("tipo") not in (None, ""):
+        if str(p["tipo"]) not in ("1", "10"):
+            raise DatiNonValidi("profilo dello studio: tipo fornitore 1 (dichiarante) o 10 (intermediario)")
+        out["tipo"] = str(p["tipo"])
+    if p.get("impegno_codice") not in (None, ""):
+        if str(p["impegno_codice"]) not in ("1", "2"):
+            raise DatiNonValidi("profilo dello studio: impegno a trasmettere 1 o 2")
+        out["impegno_codice"] = str(p["impegno_codice"])
+    return out
+
+
+def profilo_studio(cartella_dati: Path | str | None = None) -> dict:
+    """Profilo salvato (vuoto se assente o non valido). Si legge dal file di configurazione accanto ai dati indicati."""
+    env = os.environ.get("SUCCESSIONI_CONFIG")
+    f = Path(env) if env else (Path(cartella_dati) / "configurazione.json" if cartella_dati else file_configurazione())
+    try:
+        d = json.loads(f.read_text(encoding="utf-8-sig"))
+        return _valida_profilo(d.get("profilo", {})) if isinstance(d, dict) else {}
+    except (OSError, ValueError, DatiNonValidi):
+        return {}
+
+
 def stato() -> dict:
     """Impostazioni correnti, con origine del valore e stato di rilevamento di ciascuno strumento."""
     nel_file = _leggi_file()
@@ -177,7 +219,8 @@ def stato() -> dict:
                      "salvato": nel_file.get(chiave) if isinstance(nel_file.get(chiave), str) else None,
                      "origine": origine, "a_posto": ok, "dettaglio": descr,
                      "modificabile": tipo != "sola_lettura"})
-    return {"file": str(file_configurazione()), "voci": voci, "interfaccia": preferenze_interfaccia(nel_file)}
+    return {"file": str(file_configurazione()), "voci": voci, "interfaccia": preferenze_interfaccia(nel_file),
+            "profilo": profilo_studio()}
 
 
 def _valida(chiave: str, valore) -> str:
@@ -210,14 +253,20 @@ def _valida(chiave: str, valore) -> str:
     return v
 
 
-def salva(modifiche: dict, interfaccia: dict | None = None) -> dict:
+def salva(modifiche: dict, interfaccia: dict | None = None, profilo: dict | None = None) -> dict:
     """Applica e salva le modifiche (valore vuoto = rimuove l'impostazione). Tutto o niente: se un valore e' errato non si
     scrive nulla. Restituisce lo stato aggiornato piu' gli eventuali `avvisi`."""
-    if not isinstance(modifiche, dict) or (not modifiche and not interfaccia):
+    if not isinstance(modifiche, dict) or (not modifiche and not interfaccia and profilo is None):
         raise DatiNonValidi("nessuna modifica indicata")
     nuove = {k: _valida(k, v) for k, v in modifiche.items()}
     aspetto = _valida_interfaccia(interfaccia) if interfaccia is not None else None
+    nuovo_profilo = _valida_profilo(profilo) if profilo is not None else None
     contenuto = _leggi_file_stretto()
+    if nuovo_profilo is not None:
+        if nuovo_profilo:
+            contenuto["profilo"] = nuovo_profilo
+        else:
+            contenuto.pop("profilo", None)
     if aspetto is not None:
         contenuto["interfaccia"] = {**preferenze_interfaccia(contenuto), **aspetto}
     avvisi = []

@@ -217,4 +217,4 @@ L'accettazione deve basarsi su casi positivi, negativi, salvataggio/riapertura, 
 - Aggiornamenti delle fonti ministeriali successivi ai materiali locali: verificata l'integrità delle copie presenti, senza una nuova ricerca normativa o aggiornamento remoto. Il rapporto descrive il software e i suoi limiti; non certifica la vigenza universale delle regole fiscali.
 - Assenza assoluta di ulteriori bug o vulnerabilità: lettura del codice, test e riproduzioni forniscono evidenze nei percorsi esaminati. I quattro difetti sopra sono verificati; gli altri limiti sono indicati come capacità residue o collaudi mancanti.
 
-Il codice non è stato corretto in questa revisione. Non ho consultato `docs/REVISIONE_INDIPENDENTE.md`, per mantenere indipendente il giudizio come richiesto dal brief.
+Il codice non è stato corretto in questa revisione. Non ho consultato `docs/archivio/REVISIONE_INDIPENDENTE.md`, per mantenere indipendente il giudizio come richiesto dal brief.

@@ -1,7 +1,7 @@
 # Correzioni della revisione esterna Codex
 
 Aggiornamento successivo: i collaudi locali Windows del 2 novembre, con veraPDF e SUC13 reali,
-sono in `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`. I risultati sotto descrivono la verifica del 1 novembre.
+sono in `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`. I risultati sotto descrivono la verifica del 1 novembre.
 
 1 novembre 2026. Base: `2e2b503d1bb4a22c6ae499600846e2c70d5bdb56`, branch
 `claude/successioni-dichiarazioni-app-fhcwbe`. Il rapporto originale
@@ -58,7 +58,7 @@ Comandi dalla radice del repository:
 node --check src/successioni/static/app.js
 node --check tests/e2e/gui_flusso.js
 node --check tests/e2e/gui_regressioni.js
-git diff --cached --check -- . ':(exclude)docs/REVISIONE_ESTERNA_CODEX.md'
+git diff --cached --check -- . ':(exclude)docs/archivio/REVISIONE_ESTERNA_CODEX.md'
 ```
 
 Risultati: **232 passati, 34 saltati, zero fallimenti**, 1 warning, in 70,19 secondi.

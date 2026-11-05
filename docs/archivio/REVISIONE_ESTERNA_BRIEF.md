@@ -4,7 +4,7 @@ Documento da consegnare a un revisore esterno (ad esempio Codex). Il revisore no
 
 ## Regole
 - Lavora in sola lettura sul codice. L'unico file da creare è il rapporto `docs/REVISIONE_ESTERNA_<revisore>.md`.
-- Non leggere `docs/REVISIONE_INDIPENDENTE.md` finché il tuo rapporto non è concluso: serve a confrontare due revisioni separate.
+- Non leggere `docs/archivio/REVISIONE_INDIPENDENTE.md` finché il tuo rapporto non è concluso: serve a confrontare due revisioni separate.
 - Non usare dati reali. Il repository contiene solo dati sintetici e documenti pubblici dell'Agenzia delle Entrate. Nessun invio reale, nessuna credenziale.
 - Le regole fiscali vengono dalle fonti in `fonti/` e dal sito ufficiale dell'Agenzia, non dalla memoria. Cita sempre documento e pagina, oppure elemento XSD, oppure URL.
 

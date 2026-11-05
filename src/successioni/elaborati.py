@@ -72,6 +72,9 @@ class ElaboratiMixin:
         from .telematico.xsd import valida_xsd
         if scopo not in SCOPI:
             raise DatiNonValidi("scopo non ammesso", ammessi=list(SCOPI))
+        from . import backup_archivio as BK
+        from .versioni import versioni
+        backup = BK.automatico_se_serve(self.arch, "prima-export")   # copia di sicurezza prima di generare (max una ogni 30 min)
         d = self.leggi(pratica_id)
         forn = (d["dati"].get("opzioni", {}) or {}).get("fornitore", {}) or {}
         cf = (cf_fornitore or forn.get("cf") or "").strip().upper()
@@ -99,11 +102,11 @@ class ElaboratiMixin:
                "errori": [e.asdict() for e in es.errori], "non_supportato": list(es.non_supportato),
                "avvisi": [e.asdict() for e in es.avvisi],
                "quadri_mancanti": [e.asdict() for e in es.quadri_mancanti], "xsd_errori": xsd_errori,
-               "versione": es.versione, "ambito": es.ambito}
+               "versione": es.versione, "ambito": es.ambito, "versioni": versioni()}
         inp = {"impronta_dichiarativa": d["impronta_dichiarativa"], "revisione": d["revisione"], "scopo": scopo,
                "cf_fornitore": cf, "tipo_fornitore": tipo}
         jid = self._job_scrivi(TIPO_EXPORT, pratica_id, "completato", inp, ris)
-        return {"pratica_id": pratica_id, "job_id": jid, **ris,
+        return {"pratica_id": pratica_id, "job_id": jid, **ris, "backup": backup,
                 "avvertenza": (None if es.completo else
                                "Il file NON è una dichiarazione completa e non è trasmissibile: serve solo ai controlli tecnici.")
                 if es.xml is not None else None}
@@ -127,6 +130,16 @@ class ElaboratiMixin:
                                     allegato_id=r["id"])
             out[r["id"]] = {"percorso": p, "nome": r["nome"]}
         return out
+
+    # ------------------------------------------------------------------ backup
+    def backup_archivio(self, motivo: str = "manuale") -> dict:
+        """Copia verificata di database, allegati ed elaborati nella cartella dei backup."""
+        from . import backup_archivio as BK
+        return BK.crea(self.arch, motivo)
+
+    def elenco_backup(self) -> dict:
+        from . import backup_archivio as BK
+        return {"cartella": str(BK.cartella_backup(self.arch)), "backup": BK.elenco(self.arch)}
 
     # ------------------------------------------------------------------ controllo ufficiale
     def controllo_ufficiale_pratica(self, pratica_id: str, *, chiave: str | None = None) -> dict:
@@ -228,6 +241,7 @@ class ElaboratiMixin:
             export = {"stato": "aggiornato" if e["input"].get("impronta_dichiarativa") == imp else "obsoleto",
                       "job_id": e["id"], "generato": r.get("generato"), "completo": r.get("completo"), "scopo": r.get("scopo"),
                       "xml_sha256": r.get("xml_sha256"), "percorso": r.get("percorso"), "revisione": e["input"].get("revisione"),
+                      "versioni": r.get("versioni"),
                       "n_errori": len(r.get("errori", [])), "non_supportato": r.get("non_supportato", []),
                       "quadri_mancanti": [x["percorso"] for x in r.get("quadri_mancanti", [])]}
         xsd = {"stato": "non_eseguito"}

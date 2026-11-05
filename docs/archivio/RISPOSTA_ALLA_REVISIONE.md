@@ -1,6 +1,6 @@
 # Risposta ai rilievi della revisione indipendente
 
-Rapporto: `docs/REVISIONE_INDIPENDENTE.md` (commit esaminato `08c3587`). Stato al momento della scrittura; ogni correzione ha un test di
+Rapporto: `docs/archivio/REVISIONE_INDIPENDENTE.md` (commit esaminato `08c3587`). Stato al momento della scrittura; ogni correzione ha un test di
 regressione in `tests/test_correzioni_revisione.py`. «Corretto» significa corretto e provato con test locali.
 
 | Rilievo | Gravità | Esito | Dove |
@@ -22,5 +22,5 @@ regressione in `tests/test_correzioni_revisione.py`. «Corretto» significa corr
 
 I rilievi non elencati (bassi) restano nel rapporto. Nessun rilievo è stato chiuso senza test.
 
-Altri rilievi chiusi da Codex (CE01-CE10) e integrati il 2026-11-02: vedi `docs/CORREZIONI_CODEX.md`.
+Altri rilievi chiusi da Codex (CE01-CE10) e integrati il 2026-11-02: vedi `docs/archivio/CORREZIONI_CODEX.md`.
 Correzione dell'interfaccia del 2026-11-02: il messaggio «Salvato» ora compare dopo il ricaricamento dello stato, non prima.

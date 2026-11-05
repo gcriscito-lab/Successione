@@ -136,6 +136,11 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         return sv.controllo_ufficiale_pratica(pratica_id)
 
     @tool(ann=LOCALE)
+    def backup_archivio() -> dict:
+        """Crea e verifica una copia di sicurezza dell'archivio (pratiche, allegati, file generati) nella cartella dei backup. Da fare prima di generare il file definitivo o di modifiche importanti. Restituisce percorso e dimensione; non cancella nulla."""
+        return sv.backup_archivio("mcp")
+
+    @tool(ann=LOCALE)
     def stampa_modello(pratica_id: str) -> dict:
         """Genera in locale il PDF del modello ministeriale compilato dallo stesso XML del file telematico completo e aggiornato, con il codice di stampa del componente ufficiale SUC13 (richiede Java e componente configurati). Restituisce pagine e impronta; il file si scarica dall'interfaccia. Prova locale: non e' una verifica con l'Agenzia ne' una firma; la fedelta' visiva va controllata per i quadri usati."""
         return sv.stampa_modello(pratica_id)

@@ -31,6 +31,12 @@ Nella scheda File, sezione «Invio»:
 Un file non si invia due volte: dopo un tentativo, anche incerto, si riconcilia invece di reinviare. Se cambi i dati della pratica, la copia diventa obsoleta.
 
 ## Backup e ripristino
+- **Dall'interfaccia:** Impostazioni → Backup → «Crea backup ora» (copia verificata di pratiche, allegati e file generati). Prima di ogni «Genera file» il programma
+  fa anche una copia automatica (al massimo una ogni 30 minuti, ne conserva le ultime 10). Claude puo' farlo con lo strumento `successioni_backup_archivio`.
+- **Dove:** `SUCCESSIONI_BACKUP` (Impostazioni → Strumenti e percorsi) oppure, se vuota, accanto alla cartella dei dati. Per proteggerti da un guasto del disco imposta
+  una cartella su un'altra unita' o su un disco esterno. Se il backup automatico non riesce, il programma lo segnala ma non blocca il lavoro.
+- **Profilo dello studio:** Impostazioni → Profilo dello studio (codice fiscale, tipo di fornitore, impegno a trasmettere): proposto in ogni nuova pratica.
+- **Barra di stato:** mostra sempre l'archivio in uso; la scheda File mostra le versioni (programma, regole, specifiche, controllo) con cui e' stato generato il file.
 - `successioni backup <cartella>` copia database e allegati.
 - `successioni ripristina <backup> --destinazione <cartella nuova>` ripristina solo in una cartella nuova: non sovrascrive mai dati esistenti.
 
@@ -42,7 +48,7 @@ Un file non si invia due volte: dopo un tentativo, anche incerto, si riconcilia 
 - Stampa del modello ministeriale: disponibile (pulsante «Stampa modello ministeriale» nella vista File) se Java e il componente di controllo sono configurati; è una prova locale con il codice di stampa dell'Agenzia, da controllare prima di usarla. Gli allegati EG compaiono come flag, non come pagine.
 - Nessun esito locale autorizza l'uso su una pratica reale.
 
-Fonti: `docs/BETA_DA_REVISIONARE.md`, `docs/RISPOSTA_ALLA_REVISIONE.md`, `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+Fonti: `docs/archivio/BETA_DA_REVISIONARE.md`, `docs/archivio/RISPOSTA_ALLA_REVISIONE.md`, `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 
 ## Compilazione dal codice fiscale
 Scrivendo un codice fiscale di persona fisica (16 caratteri) nella procedura guidata, nelle schede del defunto e del presentatore o nella riga di un erede, il programma compila **solo i campi ancora vuoti**: data di nascita, sesso, comune e provincia di nascita (il comune dalle tabelle del componente di controllo SUC13, se configurato; altrimenti resta il codice catastale e un avviso). Il secolo non è nel codice fiscale: viene dedotto e, se ambiguo, segnalato. È un suggerimento: verifica sempre i dati. Un carattere di controllo errato viene segnalato senza bloccare. Anche l'assistente può usarlo: strumento `successioni_decodifica_codice_fiscale`.

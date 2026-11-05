@@ -14,7 +14,7 @@ Output effettivo di git rev-parse HEAD:
 
 Non attribuisco al progetto difetti nuovi per i limiti dichiarati: veraPDF, Desktop Telematico, servizi Entratel, invio/ricevute reali, client Claude Windows, quadri esclusi e dubbio 82,0875/82,08. I rilievi sotto riguardano comportamenti ulteriori, riprodotti sul codice indicato.
 
-Non ho letto docs/REVISIONE_INDIPENDENTE.md né docs/RISPOSTA_ALLA_REVISIONE.md. Non ho modificato il codice, le fonti o i test, non ho usato credenziali e non ho effettuato trasmissioni. Gli esperimenti hanno utilizzato esclusivamente fixture pubbliche/sintetiche e archivi temporanei separati. Nessun commit o push di questa revisione.
+Non ho letto docs/archivio/REVISIONE_INDIPENDENTE.md né docs/archivio/RISPOSTA_ALLA_REVISIONE.md. Non ho modificato il codice, le fonti o i test, non ho usato credenziali e non ho effettuato trasmissioni. Gli esperimenti hanno utilizzato esclusivamente fixture pubbliche/sintetiche e archivi temporanei separati. Nessun commit o push di questa revisione.
 
 ## 2. Quadrature eseguite
 

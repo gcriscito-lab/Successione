@@ -1,8 +1,8 @@
 # Matrice di copertura SUC13 (area 1: XML, regole, calcolo)
 
-Aggiornata il 2026-11-01 dopo le correzioni CE01-CE10 (docs/CORREZIONI_CODEX.md).
+Aggiornata il 2026-11-01 dopo le correzioni CE01-CE10 (docs/archivio/CORREZIONI_CODEX.md).
 Collaudo aggiuntivo 2026-11-02: controllo ufficiale locale Windows, export dal pacchetto con allegati PDF/A
-validati da veraPDF; evidenze e limiti in `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+validati da veraPDF; evidenze e limiti in `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 Proprieta' dell'area 1 (docs/CONTRATTI_MODULI.md). Stati:
 
 - **implementato-collaudato**: superato il collaudo nell'ambiente ufficiale (Desktop Telematico/servizi). *Nessuna voce.*

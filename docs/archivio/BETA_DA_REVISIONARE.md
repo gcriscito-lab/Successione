@@ -4,9 +4,9 @@ Etichetta Git: `beta-1`, sul branch `claude/successioni-dichiarazioni-app-fhcwbe
 Stato: **beta tecnica per la revisione. Non è utilizzabile su una pratica reale e non trasmette nulla.**
 
 Nota successiva al congelamento: il rapporto sul commit `2e2b503` e' in
-`docs/REVISIONE_ESTERNA_CODEX.md`; le correzioni CE01-CE10 e le nuove prove Windows sono
-in `docs/CORREZIONI_CODEX.md`. I risultati storici sotto non sono un collaudo della versione corretta.
-Il successivo collaudo locale Windows con veraPDF e SUC13 e' in `docs/COLLAUDO_WINDOWS_CODEX_20261102.md`.
+`docs/archivio/REVISIONE_ESTERNA_CODEX.md`; le correzioni CE01-CE10 e le nuove prove Windows sono
+in `docs/archivio/CORREZIONI_CODEX.md`. I risultati storici sotto non sono un collaudo della versione corretta.
+Il successivo collaudo locale Windows con veraPDF e SUC13 e' in `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md`.
 
 ## In una riga
 Archivio, interfaccia locale, MCP, PDF/A e file XML funzionano e sono provati nel cloud Linux. Un caso sintetico ha superato il controllo ufficiale SUC13 in locale, secondo la registrazione dell'agente (non ancora riprodotta da chi coordina). Mancano i collaudi su Windows, con veraPDF, con Entratel e con i servizi dell'Agenzia.
@@ -40,14 +40,14 @@ Archivio, interfaccia locale, MCP, PDF/A e file XML funzionano e sono provati ne
 - I dati richiesti dall'export (sesso, provincia, codici comune, stato civile…) si impostano solo da MCP o API, non dalla GUI (rilievo R20).
 - Con Java 11 o successivi il controllo ufficiale si ferma se la fornitura ha allegati EG (manca una libreria di sistema): serve Java 8 o una libreria aggiuntiva (proposta P9 in `docs/PROPOSTE_telematico.md`). L'adattatore di oggi fallisce con Java 21 in quel caso.
 - Il calcolo dell'imposta copre il perimetro dichiarato. Il dubbio 82,0875 contro 82,08 resta aperto (`docs/regole/dubbio_arrotondamento.md`).
-- Documenti di installazione, manuale breve e configurazione MCP non sono stati scritti: il contenuto essenziale è in `docs/STATO_area4.md`.
+- Documenti di installazione, manuale breve e configurazione MCP non sono stati scritti: il contenuto essenziale è in `docs/archivio/STATO_area4.md`.
 - Nessun invio reale, nessun accesso autenticato, nessuna credenziale.
 
 ## Da collaudare su Windows o con servizi reali
-Installazione e avvio (A01), MCP con il client Claude effettivo (A03), validazione PDF/A con veraPDF (A11), controllo con Desktop Telematico (A10 completo), risultanze catastali via Entratel (A13-A14), invio e ricevute (A17-A19). Procedure: `docs/COLLAUDO_RIPRENDIBILE.md`, `docs/PDFA.md`, `docs/STATO_area4.md`.
+Installazione e avvio (A01), MCP con il client Claude effettivo (A03), validazione PDF/A con veraPDF (A11), controllo con Desktop Telematico (A10 completo), risultanze catastali via Entratel (A13-A14), invio e ricevute (A17-A19). Procedure: `docs/COLLAUDO_RIPRENDIBILE.md`, `docs/PDFA.md`, `docs/archivio/STATO_area4.md`.
 
 ## Rilievi noti aperti
-Elenco in `docs/RISPOSTA_ALLA_REVISIONE.md`. In particolare R12 (esito `.esi` negativo e rischio di doppio invio) va risolto prima di qualsiasi trasmissione.
+Elenco in `docs/archivio/RISPOSTA_ALLA_REVISIONE.md`. In particolare R12 (esito `.esi` negativo e rischio di doppio invio) va risolto prima di qualsiasi trasmissione.
 
 ## Provarla in cinque minuti
 ```bash
@@ -58,4 +58,4 @@ python3 -m pytest -q
 Facoltativo, controllo ufficiale locale: scaricare i componenti dal JNLP ufficiale (`fonti/Programma e controlli/`), impostare `SUCCESSIONI_CONTROLLI_SUC13=<cartella dei jar>` e rilanciare `pytest`.
 
 ## Per i revisori
-Ambito e formato: `docs/REVISIONE_ESTERNA_BRIEF.md`. Il rapporto del revisore interno su Opus è `docs/REVISIONE_INDIPENDENTE.md`: un revisore esterno non deve leggerlo prima di aver finito il suo.
+Ambito e formato: `docs/archivio/REVISIONE_ESTERNA_BRIEF.md`. Il rapporto del revisore interno su Opus è `docs/archivio/REVISIONE_INDIPENDENTE.md`: un revisore esterno non deve leggerlo prima di aver finito il suo.

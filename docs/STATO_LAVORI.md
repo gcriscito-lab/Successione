@@ -35,7 +35,7 @@ Avvertenza: `with_server.py` può lasciare il server attivo; chiudere per PID pr
 
 ## Subagenti (rilanciati su Opus)
 Tre agenti lavorano su file distinti (contratti in `docs/CONTRATTI_MODULI.md`): regole/XSD/XML, documenti/PDF-A, collegamenti.
-Ognuno tiene traccia in `docs/regole/STATO_area1.md`, `docs/STATO_area2.md`, `docs/STATO_area3.md`. Alla consegna: verificare direttamente,
+Ognuno tiene traccia in `docs/regole/STATO_area1.md`, `docs/archivio/STATO_area2.md`, `docs/archivio/STATO_area3.md`. Alla consegna: verificare direttamente,
 integrare, poi revisore indipendente. I loro file nel repository sono bozze finché non consegnano.
 
 ## Limiti dichiarati
@@ -53,5 +53,5 @@ Applicati due commit di Codex (`0aebdce` correzioni CE01-CE10, `1206a30` collaud
 Verifica di chi coordina, in questo container Linux: la patch si applica pulita, ho letto le parti sensibili (ripristino con verifica di integrità,
 protezione dei percorsi dei file statici, lock di processo, adattatore del controllo) e la suite intera dà **259 passati, 8 saltati, 0 falliti**
 (i saltati richiedono componenti esterni non configurati qui). Le prove su Windows (veraPDF 1.30.3, Ghostscript 10.08.0, pacchetto autonomo, controllo
-SUC13 con Java 8, ripresa del job) sono **riportate da Codex** in `docs/COLLAUDO_WINDOWS_CODEX_20261102.md` e NON sono state riprodotte da me.
+SUC13 con Java 8, ripresa del job) sono **riportate da Codex** in `docs/archivio/COLLAUDO_WINDOWS_CODEX_20261102.md` e NON sono state riprodotte da me.
 Restano da collaudare: Entratel, catasto reale, invio e ricevute, client Claude effettivo, SmartScreen e antivirus, disinstallazione, WSL.
