@@ -423,6 +423,113 @@ class _Export:
             self.err("VALORE_NON_VALIDO", perc, str(e), FO.fonte_xsd(elemento))
             return None, None
 
+    # ---------------------------------------------------------------- beni esteri
+    def imposta_estera_bene(self, b: dict, elemento: str) -> str | None:
+        """ImpostaVersataEstero del bene (euro interi, DatoNP_Type) oppure ``None``. L'importo e' quello dell'INTERO cespite: la
+        quota del beneficiario si ricava con la quota di devoluzione (guida al calcolo p. 8: IE = imposta x quota)."""
+        v = SUP.attr(self.d, "beni", b, "imposta_estera")
+        self.usa(b, "imposta_estera")
+        if v in (None, ""):
+            return None
+        try:
+            s = F.euro_intero(v)
+        except (F.ValoreXml, V.ValoreNonValido) as e:
+            self.err("VALORE_NON_VALIDO", f"beni[{b['id']}].imposta_estera", str(e), FO.fonte_xsd(elemento))
+            return None
+        self.imposta_estera[b["id"]] = int(s)
+        return s
+
+    def beni_esteri(self, b: dict, quadro: str) -> dict | None:
+        """``BeniEsteri`` dei quadri EN, EO, EP, EQ, ER (BeneSitoEstero + ImpostaVersataEstero), ``None`` per un bene italiano."""
+        from .quadri_efgh import _flag
+        el = f"Quadro{quadro}/Modulo/{_RIGA[quadro]}/BeniEsteri"
+        self.usa(b, "bene_estero")
+        estero = _flag(SUP.attr(self.d, "beni", b, "bene_estero"))
+        imposta = self.imposta_estera_bene(b, el + "/ImpostaVersataEstero")
+        if not estero:
+            if imposta is not None:
+                self.err("DATI_INCOERENTI", f"beni[{b['id']}].imposta_estera", "imposta versata all'estero indicata per un bene "
+                         "non sito all'estero (casella «bene estero»)", FO.fonte_xsd(el))
+            return None
+        self.estero_bene[b["id"]] = True
+        out = {"BeneSitoEstero": "1"}
+        if imposta is not None:
+            out["ImpostaVersataEstero"] = imposta
+        return out
+
+    def _provincia_ee(self, b: dict) -> bool:
+        v = SUP.attr(self.d, "beni", b, "provincia")
+        return isinstance(v, str) and v.strip().upper() == "EE"
+
+    def luogo_estero(self, b: dict, quadro: str) -> dict | None:
+        """Luogo di un immobile estero (provincia EE): sezione ``Estero`` (reg:Luogo_Type, Residenza_Estera_Type + StatoEstero).
+        Fonti: typesReg_v2.xsd Luogo_Type; datiFiscali_v4.xsd Residenza_Estera_Type; Fascicolo I pp. PDF 22 e 29."""
+        c = "beni"
+        el = f"Quadro{quadro}/Modulo/{'Terreni' if quadro == 'EB' else 'Fabbricati'}/Luogo/Estero"
+        fonte = FO.fonte_xsd(el) + "; " + FO.fonte_fasc1(22 if quadro == "EB" else 29, "Codice dello Stato estero/Stato estero/...")
+
+        def codice(v):
+            s = str(v).strip().upper()
+            if not re.fullmatch(r"[0-9A-Z]{3}", s):
+                raise F.ValoreXml(f"{v!r}: codice dello Stato estero di 3 caratteri (Appendice del Modello Unico, es. 029)")
+            return s
+        out = {
+            "CodiceStatoEstero": self.val(c, b, "codice_stato_estero", codice, elemento=el + "/CodiceStatoEstero", fonte=fonte),
+            "StatoFederato": self.val(c, b, "stato_federato", lambda v: F.an(v, 24), elemento=el + "/StatoFederato", obbl=False),
+            "LocalitaEstero": self.val(c, b, "localita_estero", lambda v: F.an(v, 50), elemento=el + "/LocalitaEstero",
+                                       obbl=False),
+            "IndirizzoEstero": self.val(c, b, "indirizzo", lambda v: F.an(v, 80), elemento=el + "/IndirizzoEstero", fonte=fonte),
+            "StatoEstero": self.val(c, b, "stato_estero", lambda v: F.an(v, 34), elemento=el + "/StatoEstero", fonte=fonte),
+        }
+        if any(out[k] is None for k in ("CodiceStatoEstero", "IndirizzoEstero", "StatoEstero")):
+            return None
+        for facoltativo in ("StatoFederato", "LocalitaEstero"):
+            if out[facoltativo] is None:
+                del out[facoltativo]
+        self.usa(b, "provincia")
+        if b.get("comune") not in (None, ""):      # nome del comune: non previsto per gli immobili esteri
+            self.usa(b, "comune")
+            self.interno(b, "comune")
+        return {"Provincia": "EE", "Estero": out}
+
+    def _niente_estero_in_italia(self, b: dict) -> None:
+        """Gli immobili italiani non hanno dati dello Stato estero ne' imposta estera (si usa la provincia EE)."""
+        for campo in ("imposta_estera", "codice_stato_estero", "stato_estero", "stato_federato", "localita_estero", "bene_estero"):
+            self.usa(b, campo)
+            if SUP.attr(self.d, "beni", b, campo) not in (None, "", False):
+                self.err("DATI_INCOERENTI", f"beni[{b['id']}].{campo}", "dato estero su un immobile con provincia italiana: "
+                         "per un immobile estero indicare la provincia EE", FO.fonte_fasc1(22, "provincia EE"))
+
+    def _riga_immobile_estero(self, b: dict, quadro: str, luogo: dict) -> dict | None:
+        """Rigo EB/EC di un immobile estero: niente dati catastali (DatiTerreni/DatiFabbricati «non valorizzare» se EE),
+        ma possesso, diritto, valore e imposta versata all'estero (Fascicolo I pp. PDF 22 e 29)."""
+        c = "beni"
+        el = f"Quadro{quadro}/Modulo/{'Terreni' if quadro == 'EB' else 'Fabbricati'}"
+        # Il controllo ufficiale SUC13 2.3.1 (diagnostico 3072, prova locale 2026-11-05) respinge anche la tipologia del terreno su un
+        # immobile estero («non devono essere inseriti i dati identificativi italiani»), che l'XSD lascerebbe facoltativa.
+        for campo in ("sezione", "foglio", "particella", "subalterno", "natura", "categoria", "classe", "zona_censuaria",
+                      "consistenza", "rendita", "reddito_dominicale", "superficie", "tipologia_terreno",
+                      "discordanza_intestatario", "passaggi_senza_atti_legali"):
+            v = SUP.attr(self.d, c, b, campo)
+            if v not in (None, "", False):
+                self.usa(b, campo)
+                self.ns.append(f"beni[{b['id']}].{campo}: campo non previsto per un immobile estero (provincia EE): "
+                               "i dati catastali non vanno valorizzati")
+        poss, _ = self.quota_possesso(b, el + "/Possesso")
+        dir_p = self.diritto_defunto(b, "CodiciDirittoImmobili_Type", el + "/CodiceDiritto_P")
+        valore = self.valore_bene(b, el + "/Valore")
+        imposta = self.imposta_estera_bene(b, el + "/ImpostaVersataEstero")
+        if None in (luogo, poss, dir_p, valore):
+            return None
+        self.estero_bene[b["id"]] = True
+        self.diritto_bene[b["id"]] = dir_p
+        self.valore_beni[b["id"]] = int(valore)
+        riga = {"Luogo": luogo, "Possesso": poss, "CodiceDiritto_P": dir_p}
+        if imposta is not None:
+            riga["ImpostaVersataEstero"] = imposta
+        riga["Valore"] = valore
+        return riga
+
     def luogo(self, b: dict, quadro: str, *, indirizzo_obbl: bool, tavolare: bool = False) -> dict | None:
         c, el = "beni", f"Quadro{quadro}/Modulo/{'Terreni' if quadro == 'EB' else 'Fabbricati'}/Luogo"
         if tavolare:
@@ -431,8 +538,7 @@ class _Export:
         if prov is None:
             return None
         if prov == "EE":
-            self.ns.append(f"beni[{b['id']}]: immobile all'estero (provincia EE) non supportato")
-            return None
+            return self.luogo_estero(b, quadro)
         if prov not in X.enumerazioni("PENonTavolare_Type"):
             if prov in X.enumerazioni("PN_Type"):
                 self.ns.append(f"beni[{b['id']}]: provincia {prov} del sistema tavolare (quadri EL/EM) non supportata")
@@ -555,6 +661,8 @@ class _Export:
                 self.ns.append(f"beni[{b['id']}].{campo}: campo non previsto dal tracciato dei terreni "
                                "(reg:DatiCatastali_Type / reg:DatiCatastaliTerreni_Type)")
         luogo = self.luogo(b, "EB", indirizzo_obbl=False, tavolare=tavolare)
+        if not tavolare and self._provincia_ee(b):
+            return self._riga_immobile_estero(b, "EB", luogo)
         cat = self.catastali(b, "EB")
         natura = self.val(c, b, "natura", lambda v: codice_enum(str(v).upper(), "CodiciNatura_Type"),
                           elemento=el + "/DatiTerreni/DatiTerreni/Natura")
@@ -601,6 +709,7 @@ class _Export:
         self.terreni_vf[b["id"]] = {"rd": Decimal(rd.replace(",", ".")) if rd else None, "quota": fposs, "tip": tip}
         riga = {"Luogo": luogo, "DatiTerreni": {"DatiCatastali": cat, "DatiTerreni": dt}, "Possesso": poss,
                 "CodiceDiritto_P": dir_p, "TipologiaTerreno": tip, "Valore": valore}
+        self._niente_estero_in_italia(b)
         riga.update(self._flag_ei(b, "EB", luogo, cat, None, tavolare))
         return riga
 
@@ -608,6 +717,8 @@ class _Export:
         c, el = "beni", "QuadroEC/Modulo/Fabbricati"
         eld = el + "/DatiFabbricati/DatiFabbricati"
         luogo = self.luogo(b, "EC", indirizzo_obbl=True, tavolare=tavolare)
+        if not tavolare and self._provincia_ee(b):
+            return self._riga_immobile_estero(b, "EC", luogo)
         cat = self.catastali(b, "EC")
         df: dict = {}
         sez = self.val(c, b, "sezione", lambda v: F.an(str(v), 3), elemento=eld + "/SezioneUrbana", obbl=False)
@@ -652,6 +763,7 @@ class _Export:
             self.info_ec[b["id"]] = {"luogo": luogo, "cat": cat, "sezione": df.get("SezioneUrbana"), "categoria": categ}
         riga = {"Luogo": luogo, "DatiFabbricati": {"DatiCatastali": cat, "DatiFabbricati": df}, "Possesso": poss,
                 "CodiceDiritto_P": dir_p, "Valore": valore}
+        self._niente_estero_in_italia(b)
         riga.update(self._flag_ei(b, "EC", luogo, cat, df.get("SezioneUrbana"), tavolare))
         return riga
 
@@ -675,7 +787,11 @@ class _Export:
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
         self.tipo_cespite[b["id"]] = tc
-        return {"TipoCespite": tc, "Descrizione": descr, "Possesso": poss, "CodiceDiritto_P": dir_p, "Valore": valore}
+        riga = {"TipoCespite": tc, "Descrizione": descr, "Possesso": poss, "CodiceDiritto_P": dir_p, "Valore": valore}
+        be = self.beni_esteri(b, "ER")
+        if be:
+            riga["BeniEsteri"] = be
+        return riga
 
     def _anno_xml(self, b: dict, campo: str, elemento: str):
         """DatoDA_Type: anno aaaa tra 1800 e 2099, non futuro."""
@@ -716,11 +832,15 @@ class _Export:
         poss, _ = self.quota_possesso(b, el + "/Possesso")
         dir_p = self.diritto_defunto(b, "CodiciDirittoNonImmobili", el + "/CodiceDiritto_P")
         valore = self.valore_bene(b, el + "/Valore")
+        be = self.beni_esteri(b, quadro)
         if tipo_xml is None or None in (poss, dir_p, valore):
             return None
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
-        return {"Tipo": tipo_xml, "Possesso": poss, "CodiceDiritto_P": dir_p, "Valore": valore}
+        riga = {"Tipo": tipo_xml, "Possesso": poss, "CodiceDiritto_P": dir_p, "Valore": valore}
+        if be:
+            riga["BeniEsteri"] = be
+        return riga
 
     def riga_ep(self, b: dict) -> dict | None:
         """Quadro EP, rigo Aeromobili (Tipo: marca/modello, anno costruzione, nazionalita', anno e numero di immatricolazione)."""
@@ -815,7 +935,10 @@ class _Export:
         self.usa(b, "codice_fiscale_emittente")
         fonte_cf = FO.fonte_annotazione(el + "/Descrizione/CodiceFiscale")
         cf = None
-        if cf_az in (None, ""):
+        be_en = self.beni_esteri(b, "EN")
+        if cf_az in (None, "") and be_en:
+            cf = None       # azienda sita all'estero: il codice fiscale non e' richiesto (annotazione CodiceFiscale)
+        elif cf_az in (None, ""):
             self.err("DATO_MANCANTE", f"beni[{b['id']}].codice_fiscale_emittente",
                      "codice fiscale dell'azienda obbligatorio per i beni non esteri", fonte_cf)
         else:
@@ -850,11 +973,13 @@ class _Export:
                      "diritto 1 e 2", FO.fonte_annotazione(el + "/CodiceDiritto_P"))
             dir_p = None
         valore = self.valore_bene(b, el + "/Valore")
-        if None in (den, cf, dir_p, valore) or inventario is not None:
+        if None in (den, dir_p, valore) or (cf is None and not be_en) or inventario is not None:
             return None
         self.diritto_bene[b["id"]] = dir_p
         self.valore_beni[b["id"]] = int(valore)
-        riga = {"Descrizione": {"Denominazione": den, "CodiceFiscale": cf}}
+        riga = {"Descrizione": {"Denominazione": den, **({"CodiceFiscale": cf} if cf else {})}}
+        if be_en:
+            riga["BeniEsteri"] = be_en
         if inventario:
             riga["Inventario"] = inventario
         riga["CodiceDiritto_P"] = dir_p
@@ -946,6 +1071,12 @@ class _Export:
             riga["DataDocumento"] = data_doc
         riga["Possesso"] = {**poss, ("ValoreEsente" if esente else "Valore"): valore}
         riga["CodiceDiritto_C"] = dir_c
+        be = self.beni_esteri(b, "EO")
+        if be:
+            riga["BeniEsteri"] = be
+            if "CodiceFiscale" in riga:     # annotazione CodiceFiscale: non presente se e' barrata «Bene sito all'estero»
+                self.err("DATI_INCOERENTI", f"beni[{b['id']}].codice_fiscale_emittente", "titolo estero: il codice fiscale "
+                         "dell'emittente non va indicato", fonte_cf)
         return riga
 
     def devoluzioni_bene(self, b: dict, quadro: str) -> list[dict]:
@@ -987,10 +1118,19 @@ class _Export:
                 self.ns.append(f"{perc}: diritto devoluto {dir_r} diverso dal diritto del defunto {dir_def} (il valore "
                                "quota richiede le regole di valutazione dei diritti, Fascicolo I p. PDF 24): non supportato")
                 continue
-            agev = PC.leggi_riga(self, d, b, quadro, perc)
-            if agev:
-                PC.registra(self, d["id"], b["id"], pid, agev, quadro)
-            RA.leggi_riga(self, d, b, quadro, perc, pid)
+            if self.estero_bene.get(b["id"]) and quadro in ("EB", "EC"):
+                # immobile estero: le agevolazioni (P, X, Y, Z: «Provincia diverso da EE») e le riduzioni non sono ammesse
+                for campo in ("agevolazioni", "riduzioni"):
+                    if SUP.attr(self.d, "devoluzioni", d, campo) not in (None, ""):
+                        self.usa(d, campo)
+                        self.err("REGOLA_AGEVOLAZIONE_ESTERO", f"{perc}.{campo}", "immobile estero: agevolazioni e riduzioni "
+                                 "non ammesse (annotazione XSD di Agevolazioni)", FO.fonte_annotazione(el + "/Agevolazioni"))
+                agev = None
+            else:
+                agev = PC.leggi_riga(self, d, b, quadro, perc)
+                if agev:
+                    PC.registra(self, d["id"], b["id"], pid, agev, quadro)
+                RA.leggi_riga(self, d, b, quadro, perc, pid)
             somma += Fraction(n, den)
             self.persona_dev[d["id"]] = pid
             righe.append((self.pos_ea[pid], dir_r, d["id"], n, den))
@@ -1014,7 +1154,8 @@ class _Export:
                 self.quota_valore[did] = cent
                 self.righe_dev[did] = {"quadro": quadro, "bene_id": b["id"], "persona_id": self.persona_dev[did],
                                        "diritto": dir_r, "quota_valore": cent,
-                                       "codice_comune": self.comune_bene.get(b["id"])}
+                                       "codice_comune": self.comune_bene.get(b["id"]),
+                                       "estero": bool(self.estero_bene.get(b["id"]))}
                 if not esatto:
                     self.avv("ARROTONDAMENTO_VALORE_QUOTA", f"devoluzioni[{did}]",
                              f"valore quota {valore} x {n}/{den} non esatto al centesimo: arrotondato a {qv} "
@@ -1620,6 +1761,8 @@ class _Export:
         self.fornitore_diverso_da_dichiarante = False
         self.totale_da_versare = 0
         self.sost = None   # dichiarazione sostitutiva (telematico/sostitutiva.py)
+        self.estero_bene: dict[str, bool] = {}   # beni sedenti all'estero (immobili con provincia EE o casella «bene sito all'estero»)
+        self.imposta_estera: dict[str, int] = {}  # imposta versata all'estero per bene (euro interi): richiede EG4
         self.terreni_vf: dict[str, dict] = {}   # reddito dominicale, quota del defunto e tipologia dei terreni EB (valori fiscali, EF1/EF9)
         self.defunto = self.presentatore = None
         self.testamento_x, self.test_reg = None, None

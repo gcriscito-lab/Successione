@@ -64,7 +64,7 @@ SEZIONI_EG = ("DichSost", "Testamento", "Inventario", "CertificazioneImpostaVers
               "AlberoGenealogico", "DocumentiIdentita", "Altro", "PrimaCasa", "AgevolazioniImposteIpocatastali",
               "RiduzioniImposteSuccessione")
 EG_SUPPORTATE = {"DichSost", "Testamento", "DocumentiPassivita", "AlberoGenealogico", "DocumentiIdentita", "Altro",
-                 "PrimaCasa", "RiduzioniImposteSuccessione"}
+                 "PrimaCasa", "RiduzioniImposteSuccessione", "CertificazioneImpostaVersataEstero"}
 
 
 def _snake(nome: str) -> str:
@@ -105,7 +105,8 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
     dd = x.data_decesso
     if dd is None:
         return None
-    immobili = [r for r in x.righe_dev.values() if r["quadro"] in ("EB", "EC", "EL", "EM")]
+    # gli immobili esteri (provincia EE) non entrano nelle basi EF1/EF9 ne' nelle circoscrizioni (annotazioni XSD di QuadroEF)
+    immobili = [r for r in x.righe_dev.values() if r["quadro"] in ("EB", "EC", "EL", "EM") and not r.get("estero")]
     obbligatorio = dd >= DEC_2025 or (bool(x.ea) and bool(immobili))
     if not obbligatorio:
         return None
@@ -503,6 +504,13 @@ def quadro_eg(x) -> dict | None:
     if testamento and "Testamento" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Testamento", "copia del testamento (rigo EG2) "
                                  "obbligatoria con la devoluzione per testamento", _fa(el + "/Testamento")))
+    if getattr(x, "imposta_estera", None) and "CertificazioneImpostaVersataEstero" not in per_sez:
+        # annotazione CertificazioneImpostaVersataEstero: obbligatorio in presenza di imposta versata all'estero in almeno un
+        # quadro EB, EC, EO, EP, EQ, ER (e annotazione di ImpostaVersataEstero: «deve essere presente il campo EG4»)
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].CertificazioneImpostaVersataEstero",
+                                 "imposta versata all'estero: allegare la certificazione (rigo EG4)",
+                                 _fa(el + "/CertificazioneImpostaVersataEstero") + "; " +
+                                 FO.fonte_fasc1(23, "Imposta versata all'estero: certificazione nel rigo EG")))
     if x.valore_passivita and "DocumentiPassivita" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiPassivita", "documenti "
                                  "comprovanti le passivita' (rigo EG5) obbligatori in presenza del quadro ED",

@@ -213,6 +213,7 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
         tipo_cespite = None
         esente_eo = False
         val_riga, vps_riga = None, None   # Valore e ValorePrecSucc del cespite; i righi di continuazione li ereditano
+        ie_riga = None                    # ImpostaVersataEstero del cespite (intero cespite), ereditata dai righi di continuazione
         for riga in (x for mod in quad.findall(SUC + "Modulo") for x in mod):
             if q == "EO":
                 # Titolo esente (TipoTitolo 3 / Possesso/ValoreEsente): il «Valore Quota» comprende il valore esente
@@ -223,16 +224,19 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                 poss = riga.find(SUC + "Possesso")
                 if poss is not None:
                     val_riga, vps_riga = _testo(poss, "Valore"), _testo(poss, "ValorePrecSucc")
+                    ie_riga = _imposta_estera(riga)
             elif _testo(riga, "Valore") is not None:
                 val_riga, vps_riga = _testo(riga, "Valore"), _testo(riga, "ValorePrecSucc")
+                ie_riga = _imposta_estera(riga)
             if q == "ER" and _testo(riga, "TipoCespite"):
                 tipo_cespite = _testo(riga, "TipoCespite")
                 bi = bi or tipo_cespite == "BI"
-            for nome in ("ImpostaVersataEstero", "BeniEsteri", "BeneAziendale", "DirittoAbitazione"):
+            # beni esteri e imposta estera: supportati (detrazione DET.estero, guida pp. 7-8); restano esclusi il bene aziendale e il
+            # diritto di abitazione
+            for nome in ("BeneAziendale", "DirittoAbitazione"):
                 if riga.find(SUC + nome) is not None:
-                    ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/{nome}", f"{nome}: riduzioni, beni esteri o "
-                                     "agevolazioni non supportati dal calcolo", _g(5, "riduzioni") + "; " +
-                                     _g(7, "imposta estera")))
+                    ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/{nome}", f"{nome}: riduzioni, beni aziendali o "
+                                     "agevolazioni non supportati dal calcolo", _g(5, "riduzioni")))
             for dv in riga.iter(SUC + "Devoluzione"):
                 # Guida al calcolo p. 1 (QE: esclusi solo i codici A, D, C, G, N, E, H) e p. 5 (riduzioni: solo L, Q, R, F e
                 # art. 25): i codici prima casa P, X, Y, Z non modificano l'imposta di successione (Fascicolo I p. PDF 57,
@@ -253,9 +257,12 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
                 ide = dv.find(SUC + "IdentificazioneSoggetto")
                 pos = (int(_testo(ide, "Modulo")), int(_testo(ide, "Rigo")))
                 qv = dv.find(f"{SUC}Quota/{SUC}QuotaValore")
+                qe_el = dv.find(f"{SUC}Quota/{SUC}QuotaElementi")
                 devs.append((pos, q, tc_riga, _num(qv.text if qv is not None else None),
                              {"agev": agev if agev in RA.CODICI_AGEV else None, "rid": rid,
-                              "valore": _num(val_riga), "vps": _num(vps_riga)}))
+                              "valore": _num(val_riga), "vps": _num(vps_riga),
+                              "ie": ie_riga, "qn": int(_testo(qe_el, "QuotaNumeratore") or 0) if qe_el is not None else 0,
+                              "qd": int(_testo(qe_el, "QuotaDenominatore") or 1) if qe_el is not None else 1}))
     passivo = []
     for rip in dich.iter(SUC + "Ripartizione"):
         ide = rip.find(SUC + "IdentificazioneSoggetto")
@@ -264,6 +271,48 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
         passivo.append((pos, _num(qv.text if qv is not None else None)))
     return {"data_decesso": data_decesso, "carica": carica, "soggetti": soggetti, "devoluzioni": devs,
             "passivo": passivo, "bi": bi}, ns
+
+
+def _imposta_estera(riga) -> int | None:
+    """ImpostaVersataEstero del rigo: direttamente (EB, EC) o dentro BeniEsteri (EN, EO, EP, EQ, ER); ``None`` se assente."""
+    n = riga.find(SUC + "ImpostaVersataEstero")
+    if n is None:
+        be = riga.find(SUC + "BeniEsteri")
+        n = be.find(SUC + "ImpostaVersataEstero") if be is not None else None
+    return int(n.text) if n is not None and (n.text or "").strip().isdigit() else None
+
+
+# ------------------------------------------------------------------------------------------- detrazione imposta estera
+def detrazione_estera_esatta(righe: list[dict], isl: Fraction, qe: Fraction) -> Fraction:
+    """DET.estero con aritmetica esatta. Guida al calcolo pp. 7-8: e = valore quota del bene estero x ISL / QE;
+    IE = imposta versata all'estero x quota di devoluzione; DET.estero = e se IE >= e, altrimenti IE; somma sui cespiti."""
+    if qe <= 0 or isl <= 0:
+        return Fraction(0)
+    det = Fraction(0)
+    for r in righe:
+        if r["ie"]:
+            e = r["qv"] * isl / qe
+            ie = Fraction(r["ie"]) * Fraction(r["qn"], r["qd"])
+            det += e if ie >= e else ie
+    return det
+
+
+def detrazione_estera_componente(righe: list[dict], isl: Fraction, qe: Fraction) -> Fraction:
+    """Stessa detrazione con le scale del componente ufficiale (ispezione statica di
+    ``CalcolaImpostaSuccessione.setDET`` e ``calcolaImpostaEsteraDET``, controlliXMLREG2013.jar): valore quota e imposta versata
+    come ``double``; e = (valore quota x (ISL / QE a 10 decimali HALF_UP)) a 4 decimali HALF_UP; quota di devoluzione =
+    numeratore / denominatore a 5 decimali HALF_UP; IE = imposta x quota; DET = IE se IE < e, altrimenti e; somma sui cespiti
+    con imposta estera > 0. ISN = ISL - RID - DET, non negativa."""
+    if qe <= 0 or isl <= 0:
+        return Fraction(0)
+    r10 = _half_up(isl / qe, 10)
+    det = Fraction(0)
+    for r in righe:
+        if r["ie"]:
+            e = _half_up(_dbl(r["qv"]) * r10, 4)
+            ie = _dbl(Fraction(r["ie"])) * _half_up(Fraction(r["qn"], r["qd"]), 5)
+            det += ie if ie < e else e
+    return det
 
 
 # ------------------------------------------------------------------------------------------- riduzioni
@@ -394,13 +443,17 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
                      for p, q, tc, v, ex in d["devoluzioni"] if p == pos and (ex["agev"] or ex["rid"])]
         rid_e = riduzioni_esatte(righe_rid, isl, qe)
         rid = sum(rid_e.values(), Fraction(0))
-        isn = max(isl - rid, Fraction(0))  # DET = 0 nel perimetro
+        righe_det = [{"qv": v, **{k: ex[k] for k in ("ie", "qn", "qd")}}
+                     for p, q, tc, v, ex in d["devoluzioni"] if p == pos and ex["ie"]]
+        det = detrazione_estera_esatta(righe_det, isl, qe)
+        isn = max(isl - rid - det, Fraction(0))
         # candidato 'componente_ispezionato': PR e ISL a 2 decimali HALF_UP (CalcolaImpostaSuccessione)
         pr_c = max(_half_up(Fraction(1, 10) * (qn - qdn), 2) - qdn, Fraction(0)) if applica_pr else Fraction(0)
         isl_c = _half_up((qn + pr_c) * al, 2)
         rid_c_d = riduzioni_componente(righe_rid, isl_c, qe)
         rid_c = sum(rid_c_d.values(), Fraction(0))
-        isn_c = max(isl_c - rid_c, Fraction(0))
+        det_c = detrazione_estera_componente(righe_det, isl_c, qe)
+        isn_c = max(isl_c - rid_c - det_c, Fraction(0))
         tot_esatto += isn
         tot_comp = _half_up(tot_comp + isn_c, 2)
         passi = [
@@ -422,7 +475,9 @@ def calcola_da_xml(xml: bytes) -> RisultatoCalcolo:
             *_passaggi_rid(righe_rid, rid_e),
             Passaggio("RID", "riduzioni: Rid.art25 + Rid.agevL + Rid.agevQ + Rid.agevR + Rid.agevF" +
                       ("" if righe_rid else " (nessuna richiesta)"), esatto(rid), _g(7, "RID")),
-            Passaggio("DET", "detrazione imposta estera: nessuna nel perimetro supportato", "0", _g(8, "DET.estero")),
+            Passaggio("DET", "detrazione imposta estera: DET.estero = min(e, IE), e = valore quota estero x ISL / QE, "
+                      "IE = imposta versata all'estero x quota di devoluzione" if righe_det else
+                      "detrazione imposta estera: nessuna imposta versata all'estero", esatto(det), _g(8, "DET.estero")),
             Passaggio("ISN", "ISL - RID - DET", esatto(isn), _g(8, "ISN")),
         ]
         ris.beneficiari.append(QuotaBeneficiario(f"{pos[0]}/{pos[1]}", s["cf"], s["tipo"], s["grado"], passi,

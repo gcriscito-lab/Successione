@@ -28,6 +28,9 @@ ETICHETTE: dict[str, dict[str, str]] = {
         "provincia": "Provincia", "comune": "Comune", "comune_amministrativo": "Comune amministrativo",
         "codice_comune": "Codice comune", "codice_comune_amministrativo": "Codice comune amministrativo",
         "indirizzo": "Indirizzo o localita'",
+        "bene_estero": "Bene sito all'estero (1)", "imposta_estera": "Imposta versata all'estero (euro)",
+        "codice_stato_estero": "Codice dello Stato estero", "stato_estero": "Stato estero",
+        "stato_federato": "Stato federato, provincia o contea", "localita_estero": "Localita' estera",
         "sezione": "Sezione urbana", "foglio": "Foglio", "particella": "Particella",
         "particella_denominatore": "Denominatore della particella", "subalterno": "Subalterno",
         "zona_censuaria": "Zona censuaria", "categoria": "Categoria catastale", "classe": "Classe",
@@ -132,6 +135,7 @@ ETICHETTE_DICHIARAZIONE: dict[str, str] = {
 # Chiavi: id del quadro; «AN» = anagrafica del defunto, «AN.presentatore» = anagrafica del presentatore,
 # «AN.dichiarazione» = dati della dichiarazione (chiavi di ETICHETTE_DICHIARAZIONE).
 _UBIC = ["provincia", "comune", "comune_amministrativo", "codice_comune", "codice_comune_amministrativo", "indirizzo"]
+_ESTERO_IMM = ["codice_stato_estero", "stato_estero", "stato_federato", "localita_estero", "imposta_estera"]
 _TAVOLARE = ["comune_catastale", "codice_comune_catastale", "partita_tavolare", "corpo_tavolare", "sistema_tavolare"]
 _DIRITTO_VALORE = ["diritto", "quota_defunto", "valore"]
 ORDINE: dict[str, list[str]] = {
@@ -142,10 +146,10 @@ ORDINE: dict[str, list[str]] = {
     "AN.dichiarazione": list(ETICHETTE_DICHIARAZIONE),
     "EA": ["codice_fiscale", "ruolo", "tipo_soggetto", "grado_parentela", "relazione_con_defunto", "cognome", "nome",
            "provincia_nascita", "luogo_nascita", "data_nascita", "sesso", "rappresentato_cf", "rappresentato_grado"],
-    "EB": ["tipo", "descrizione"] + _UBIC + ["sezione", "foglio", "particella", "subalterno", "natura", "tipologia_terreno",
+    "EB": ["tipo", "descrizione"] + _UBIC + _ESTERO_IMM + ["sezione", "foglio", "particella", "subalterno", "natura", "tipologia_terreno",
            "reddito_dominicale", "rendita"] + _DIRITTO_VALORE + ["data_visura", "provenienza", "discordanza_intestatario",
            "passaggi_senza_atti_legali"],
-    "EC": ["tipo", "descrizione"] + _UBIC + ["sezione", "foglio", "particella", "subalterno", "zona_censuaria", "categoria",
+    "EC": ["tipo", "descrizione"] + _UBIC + _ESTERO_IMM + ["sezione", "foglio", "particella", "subalterno", "zona_censuaria", "categoria",
            "classe", "consistenza", "rendita"] + _DIRITTO_VALORE + ["data_visura", "provenienza", "discordanza_intestatario",
            "passaggi_senza_atti_legali"],
     "ED": ["tipo", "descrizione", "estremi_documento", "data_documento", "bene_id", "possesso", "importo", "persona_id"],
@@ -156,14 +160,15 @@ ORDINE: dict[str, list[str]] = {
     "EM": ["tipo", "descrizione"] + _UBIC + _TAVOLARE[:2] + ["partita_tavolare", "corpo_tavolare", "porzione_materiale",
            "sezione", "foglio", "particella", "particella_denominatore", "subalterno", "zona_censuaria", "categoria", "classe", "consistenza", "rendita"]
           + _DIRITTO_VALORE + ["sistema_tavolare", "data_visura", "provenienza"],
-    "EN": ["tipo", "descrizione", "codice_fiscale_emittente", "inventario", "data_redazione_inventario"] + _DIRITTO_VALORE,
+    "EN": ["tipo", "descrizione", "codice_fiscale_emittente", "inventario", "data_redazione_inventario"] + _DIRITTO_VALORE
+          + ["bene_estero", "imposta_estera"],
     "EO": ["tipo", "tipo_titolo", "codice_fiscale_emittente", "quantita", "codice_titolo", "descrizione", "tipo_documento",
-           "data_documento"] + _DIRITTO_VALORE,
+           "data_documento"] + _DIRITTO_VALORE + ["bene_estero", "imposta_estera"],
     "EP": ["tipo", "marca_modello", "anno_costruzione", "nazionalita", "anno_immatricolazione", "numero_immatricolazione",
-           "descrizione"] + _DIRITTO_VALORE,
+           "descrizione"] + _DIRITTO_VALORE + ["bene_estero", "imposta_estera"],
     "EQ": ["tipo", "tipo_unita", "nazionalita", "sigla_ufficio_iscrizione", "anno_iscrizione", "numero_iscrizione",
-           "anno_costruzione", "lunghezza", "stazza", "descrizione"] + _DIRITTO_VALORE,
-    "ER": ["tipo", "tipo_cespite", "descrizione"] + _DIRITTO_VALORE + ["provenienza"],
+           "anno_costruzione", "lunghezza", "stazza", "descrizione"] + _DIRITTO_VALORE + ["bene_estero", "imposta_estera"],
+    "ER": ["tipo", "tipo_cespite", "descrizione"] + _DIRITTO_VALORE + ["bene_estero", "imposta_estera", "provenienza"],
     "DV": ["bene_id", "persona_id", "diritto", "quota"],
 }
 # Collezione dei campi elencati da ciascun quadro (per i controlli di coerenza e per l'interfaccia).

@@ -67,20 +67,22 @@ PER_ID = {q["id"]: q for q in QUADRI}
 _BASE = ["tipo", "descrizione", "valore", "diritto", "quota_defunto"]
 _IMM = ["comune", "foglio", "particella", "subalterno", "provincia", "codice_comune", "comune_amministrativo",
         "codice_comune_amministrativo", "data_visura", "provenienza"]
+_EST = ["codice_stato_estero", "stato_estero", "stato_federato", "localita_estero", "imposta_estera"]
+_BEST = ["bene_estero", "imposta_estera"]
 _TAV = ["comune_catastale", "codice_comune_catastale", "partita_tavolare", "corpo_tavolare", "sistema_tavolare"]
 CAMPI_BENI = {
-    "EB": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita", "discordanza_intestatario", "passaggi_senza_atti_legali"],
-    "EC": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
+    "EB": _BASE + _IMM + _EST + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita", "discordanza_intestatario", "passaggi_senza_atti_legali"],
+    "EC": _BASE + _IMM + _EST + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
                           "discordanza_intestatario", "passaggi_senza_atti_legali"],
     "EL": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"] + _TAV,
     "EM": _BASE + _IMM + ["sezione", "categoria", "rendita", "indirizzo", "classe", "zona_censuaria", "consistenza",
                           "porzione_materiale"] + _TAV,
-    "EN": _BASE + ["codice_fiscale_emittente", "inventario", "data_redazione_inventario"],
-    "EO": _BASE + ["tipo_titolo", "quantita", "codice_titolo", "codice_fiscale_emittente", "tipo_documento", "data_documento"],
-    "EP": _BASE + ["marca_modello", "anno_costruzione", "nazionalita", "anno_immatricolazione", "numero_immatricolazione"],
-    "EQ": _BASE + ["tipo_unita", "nazionalita", "sigla_ufficio_iscrizione", "anno_iscrizione", "numero_iscrizione",
+    "EN": _BASE + _BEST + ["codice_fiscale_emittente", "inventario", "data_redazione_inventario"],
+    "EO": _BASE + _BEST + ["tipo_titolo", "quantita", "codice_titolo", "codice_fiscale_emittente", "tipo_documento", "data_documento"],
+    "EP": _BASE + _BEST + ["marca_modello", "anno_costruzione", "nazionalita", "anno_immatricolazione", "numero_immatricolazione"],
+    "EQ": _BASE + _BEST + ["tipo_unita", "nazionalita", "sigla_ufficio_iscrizione", "anno_iscrizione", "numero_iscrizione",
                    "anno_costruzione", "lunghezza", "stazza"],
-    "ER": _BASE + ["tipo_cespite", "provenienza"],
+    "ER": _BASE + _BEST + ["tipo_cespite", "provenienza"],
 }
 for _q in QUADRI:
     if _q["id"] in CAMPI_BENI:
@@ -145,6 +147,8 @@ def rilievi_visure(dati: dict, giorni: int = 90, oggi=None) -> list[Errore]:
     for b in dati.get("beni", []):
         if b.get("tipo") not in ("fabbricato", "terreno") or quadro_di("beni", b) not in att:
             continue
+        if str(b.get("provincia") or "").strip().upper() == "EE":
+            continue   # immobile estero: nessuna visura catastale italiana
         perc = f"beni[{b['id']}].data_visura"
         d = b.get("data_visura")
         if not d or not isinstance(d, str):
