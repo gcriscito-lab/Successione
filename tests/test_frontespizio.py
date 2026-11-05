@@ -239,7 +239,7 @@ def test_xml_cariche():
     assert not x(es, f"{D}/suc:QuadroEH")                                         # annotazione: non presente con codice carica 7
 
 
-@pytest.mark.parametrize("carica", ["5", "6", "8", "9"])
+@pytest.mark.parametrize("carica", ["9"])      # 5, 6 e 8 sono ora supportate: tests/test_cariche_trust.py
 def test_cariche_non_supportate_restano_bloccate(carica):
     d = copy.deepcopy(caso_a10())
     dich(d)["presentatore"]["codice_carica"] = carica
