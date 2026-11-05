@@ -17,7 +17,7 @@ from .errori import DatiNonValidi, ErroreServizio
 from .servizio import VERSIONE_REGOLE, Servizio
 
 COPERTURA_NON_DISPONIBILE = [
-    "copertura completa di tutti i casi SUC13", "stampa del modello ministeriale", "collaudo operativo completo",
+    "copertura completa di tutti i casi SUC13", "verifica visiva della stampa del modello su tutti i quadri e gli allegati EG", "collaudo operativo completo",
     "acquisizione catastale Entratel", "invio automatico e download autenticato delle ricevute",
 ]
 
@@ -134,6 +134,11 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
     def controllo_ufficiale(pratica_id: str) -> dict:
         """Esegue in locale il controllo ufficiale SUC13 sul file esportato aggiornato (se Java e componenti sono configurati; altrimenti passaggio manuale tracciato, esito da_collaudare). È un controllo locale: non sostituisce la verifica con i servizi dell'Agenzia e non trasmette nulla."""
         return sv.controllo_ufficiale_pratica(pratica_id)
+
+    @tool(ann=LOCALE)
+    def stampa_modello(pratica_id: str) -> dict:
+        """Genera in locale il PDF del modello ministeriale compilato dallo stesso XML del file telematico completo e aggiornato, con il codice di stampa del componente ufficiale SUC13 (richiede Java e componente configurati). Restituisce pagine e impronta; il file si scarica dall'interfaccia. Prova locale: non e' una verifica con l'Agenzia ne' una firma; la fedelta' visiva va controllata per i quadri usati."""
+        return sv.stampa_modello(pratica_id)
 
     @tool(ann=LOCALE)
     def invio_prepara(pratica_id: str, chiave_richiesta: str) -> dict:

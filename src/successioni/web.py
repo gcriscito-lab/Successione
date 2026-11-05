@@ -170,6 +170,16 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                      sha256=r["xml_sha256"], completo=r["completo"]), headers={"Cache-Control": "no-store"})
 
     @api
+    async def stampa_modello_api(request):
+        return sv.stampa_modello(request.path_params["pid"])
+
+    @api
+    async def scarica_stampa_modello(request):
+        pdf, j = sv.file_stampa_modello(request.path_params["pid"])
+        return Response(pdf, media_type="application/pdf", headers={"Content-Disposition":
+                        f'inline; filename="modello_successione_{j["id"]}.pdf"', "Cache-Control": "no-store"})
+
+    @api
     async def scarica_copia(request):
         from .collegamenti.base import DepositoArtefatti
         ad = sv._adattatore_invio("manuale")
@@ -285,7 +295,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/revisioni", revisioni), Route(P + "/differenze", differenze),
         Route(P + "/ripristina", ripristina, methods=["POST"]),
         Route(P + "/esporta", esporta, methods=["POST"]), Route(P + "/elaborati", elaborati),
-        Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa),
+        Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa), Route(P + "/stampa-modello", stampa_modello_api, methods=["POST"]),
+        Route(P + "/stampa-modello.pdf", scarica_stampa_modello),
         Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),

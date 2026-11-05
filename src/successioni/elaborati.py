@@ -16,6 +16,7 @@ from .errori import DatiNonValidi, ErroreServizio, ora
 
 TIPO_EXPORT = "esporta_xml"
 TIPO_CONTROLLO = "controllo_pratica"
+TIPO_STAMPA = "stampa_modello"
 SCOPI = ("completo", "bozza_tecnica")
 
 
@@ -154,6 +155,47 @@ class ElaboratiMixin:
         jid = self._job_scrivi(TIPO_CONTROLLO, pratica_id, "completato", inp, ris)
         return {"pratica_id": pratica_id, "job_id": jid, **ris}
 
+    # ------------------------------------------------------------------ stampa del modello ministeriale
+    def stampa_modello(self, pratica_id: str) -> dict:
+        """PDF del modello ministeriale compilato dallo STESSO XML del file telematico completo e aggiornato (codice di stampa
+        del componente ufficiale, locale). Non e' una verifica con l'Agenzia ne' una firma."""
+        from .collegamenti import stampa as ST
+        exp = self.stato_elaborati(pratica_id)["export"]
+        if exp.get("stato") != "aggiornato" or not exp.get("generato") or not exp.get("completo"):
+            raise DatiNonValidi("la stampa del modello richiede un file XML completo e aggiornato: genera prima il file",
+                                stato_export=exp.get("stato"), completo=exp.get("completo"))
+        xml, _ = self.file_export(pratica_id, exp["job_id"])
+        r = ST.genera(xml)
+        sha = hashlib.sha256(r.pdf).hexdigest()
+        cart = self.arch.base / "elaborati" / pratica_id
+        cart.mkdir(parents=True, exist_ok=True)
+        p = cart / f"modello_{sha[:16]}.pdf"
+        if not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != sha:
+            tmp = p.with_name(p.name + ".tmp")
+            tmp.write_bytes(r.pdf)
+            os.replace(tmp, p)
+        ris = {"generato": True, "pdf_sha256": sha, "percorso": p.relative_to(self.arch.base).as_posix(), "pagine": r.pagine,
+               "fonte": ST.FONTE,
+               "ambito": "prova locale con il codice di stampa del componente ufficiale; non e' una verifica con l'Agenzia, "
+                         "la fedelta' visiva va controllata per i quadri usati; gli allegati EG compaiono come flag"}
+        inp = {"xml_sha256": exp["xml_sha256"], "impronta_dichiarativa": self.leggi(pratica_id)["impronta_dichiarativa"]}
+        jid = self._job_scrivi(TIPO_STAMPA, pratica_id, "completato", inp, ris)
+        return {"pratica_id": pratica_id, "job_id": jid, **ris}
+
+    def file_stampa_modello(self, pratica_id: str) -> tuple[bytes, dict]:
+        self.leggi(pratica_id)
+        j = self._job_ultimo(TIPO_STAMPA, pratica_id)
+        if not j or not j["risultato"].get("generato"):
+            raise DatiNonValidi("nessuna stampa del modello disponibile: generala prima")
+        r = j["risultato"]
+        p = (self.arch.base / r["percorso"]).resolve()
+        if not p.is_relative_to((self.arch.base / "elaborati").resolve()) or not p.is_file():
+            raise DatiNonValidi("file della stampa non disponibile")
+        pdf = p.read_bytes()
+        if hashlib.sha256(pdf).hexdigest() != r["pdf_sha256"]:
+            raise DatiNonValidi("file della stampa alterato: rigenera la stampa")
+        return pdf, j
+
     # ------------------------------------------------------------------ stato
     def stato_elaborati(self, pratica_id: str) -> dict:
         d = self.leggi(pratica_id)
@@ -182,6 +224,13 @@ class ElaboratiMixin:
                    "parola_esito": r.get("esito"), "versione_controllo": r.get("versione_controllo"),
                    "bozza_tecnica": r.get("bozza_tecnica"), "job_id": c["id"], "job_adattatore": r.get("job_adattatore"),
                    "azione_richiesta": r.get("azione_richiesta") if corrente else None}
+        s = self._job_ultimo(TIPO_STAMPA, pratica_id)
+        if not s:
+            stampa = {"stato": "non_eseguita"}
+        else:
+            corrente = export.get("stato") == "aggiornato" and s["input"].get("xml_sha256") == export.get("xml_sha256")
+            stampa = {"stato": "aggiornata" if corrente else "obsoleta", "job_id": s["id"], "pagine": s["risultato"].get("pagine"),
+                      "pdf_sha256": s["risultato"].get("pdf_sha256")}
         ver = self.verifica(pratica_id)
         invio = self.invio_stato(pratica_id)["copie"]
         trasmissione = {"stato": "non_preparata", "nota": "invio reale manuale con strumenti ufficiali"}
@@ -192,6 +241,6 @@ class ElaboratiMixin:
                 trasmissione["nota"] = "PROVA SIMULATA: nessun invio all'Agenzia"
         return {"pratica_id": pratica_id, "revisione": d["revisione"], "impronta_dichiarativa": imp,
                 "dati": {"stato": "senza_rilievi" if ver["esito"] == "ok" else "con_rilievi", "rilievi": len(ver["rilievi"])},
-                "export": export, "xsd": xsd, "controllo_ufficiale": ctl,
+                "export": export, "xsd": xsd, "controllo_ufficiale": ctl, "stampa_modello": stampa,
                 "trasmissione": trasmissione,
                 "ambito": "stati separati; il controllo ufficiale locale non sostituisce la verifica con i servizi dell'Agenzia"}
