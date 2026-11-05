@@ -692,10 +692,11 @@ def quadro_eg(x) -> dict | None:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "agevolazione H (immobili demoliti o "
                                  "inagibili): la documentazione va allegata nel quadro EG, rigo EG8 'Altro'",
                                  _fa(el + "/Altro") + "; " + FO.fonte_fasc1(50, "dichiarazione sostitutiva per l'agevolazione H")))
-    if x.codice_carica == "7" and "DichSost" not in per_sez:
-        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DichSost", "codice carica 7 (esecutore testamentario): "
-                                 "la dichiarazione sostitutiva di atto notorio sullo stato di famiglia e' obbligatoria (rigo EG1; "
-                                 "controllo ufficiale 3328)",
+    if x.codice_carica in ("5", "6", "7") and "DichSost" not in per_sez:
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DichSost", f"codice carica {x.codice_carica} "
+                                 "(curatore, amministratore o esecutore testamentario): la dichiarazione sostitutiva di atto notorio "
+                                 "sullo stato di famiglia e' obbligatoria (rigo EG1; annotazione XSD «obbligatorio se codice carica = 5 "
+                                 "o 6 o 7»; controllo ufficiale 3328)",
                                  _fa(el + "/DichSost") + "; " + FO.fonte_fasc1(49, "dichiarazione sostitutiva stato di famiglia")))
     if getattr(x, "fr_altro", False) and "Altro" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "eventi eccezionali (inagibilita' dell'immobile "
@@ -857,12 +858,17 @@ def _eh_testamento(x) -> dict:
     return {"PresenzaTestamento": pres}
 
 
+def _presentatore_in_ea(x, pres: dict) -> bool:
+    cf = pres.get("CodiceFiscale")
+    return any((x.soggetti_ea.get(p["id"]) or {}).get("CodiceFiscale") == cf for p in x.ea)
+
+
 def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     """Quadro EH, Sezione I (dichiarazioni sostitutive) nel caso di base."""
     el = "QuadroEH/PrimoModulo/SezioneI_DichSost"
     if x.codice_carica in ("5", "6", "7"):
         return None  # annotazione QuadroEH: non deve essere presente con codice carica 5, 6, 7
-    if x.codice_carica not in ("1", "2", "3", "4") or x.presentatore is None or x.defunto is None:
+    if x.codice_carica not in ("1", "2", "3", "4", "8") or x.presentatore is None or x.defunto is None:
         return None  # cariche non supportate gia' segnalate nel frontespizio
     pres_fr = fr.get("Presentatore") or {}
     ana_p = pres_fr.get("DatiAnagrafici") or {}
@@ -872,8 +878,13 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     if pres_fr.get("CodiceFiscaleRappresentato"):      # cariche 3 e 4: stesso dato del frontespizio (controllo ufficiale 3214)
         pres["CodiceFiscaleRappresentato"] = pres_fr["CodiceFiscaleRappresentato"]
     dft = x.defunto
-    comune = x.val("persone", dft, "comune_decesso", lambda v: F.an(v, 50), elemento=el + "/DatiDefunto/Decesso/Comune")
-    prov = x.val("persone", dft, "provincia_decesso", lambda v: _pn(v), elemento=el + "/DatiDefunto/Decesso/Provincia")
+    morte = x.codice_carica == "8"
+    comune = prov = None
+    if not morte:
+        comune = x.val("persone", dft, "comune_decesso", lambda v: F.an(v, 50), elemento=el + "/DatiDefunto/Decesso/Comune")
+        prov = x.val("persone", dft, "provincia_decesso", lambda v: _pn(v), elemento=el + "/DatiDefunto/Decesso/Provincia")
+    elif x.morte_presunta is None:
+        return None             # errori gia' segnalati da frontespizio.morte_presunta
     ana_d = (fr.get("DatiDefunto") or {}).get("DatiAnagrafici")
     data_dec = ((fr.get("DatiDefunto") or {}).get("UlterioriDati") or {}).get("DataDecesso")
     stato_civile = (fr.get("DatiDefunto") or {}).get("UlterioriDati", {}).get("StatoCivile")
@@ -893,10 +904,14 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
         eredi.append(voce)
     sez: dict = {
         "Presentatore": pres,
-        "DatiDefunto": {"DatiAnagrafici": ana_d, "Decesso": {"FlagDeceduto": "1", "DataDecesso": data_dec,
-                                                             "Comune": comune, "Provincia": prov}},
+        "DatiDefunto": {"DatiAnagrafici": ana_d,
+                        **({"MortePresunta": x.morte_presunta} if morte else
+                           {"Decesso": {"FlagDeceduto": "1", "DataDecesso": data_dec, "Comune": comune, "Provincia": prov}})},
         # cariche 1 e 2: il dichiarante e' nel quadro EA; cariche 3 e 4 (rappresentante): assenza del dichiarante (controllo 3008)
-        "Dichiarante": ({"PresenzaDichiarante": "1"} if x.codice_carica in ("1", "2") else {"FlagAssenzaDichiarante": "1"}),
+        # carica 8 (possesso temporaneo dei beni dell'assente): presenza se il dichiarante e' nel quadro EA, assenza altrimenti
+        # (controllo ufficiale 3213 con l'assenza di un dichiarante che e' nel quadro EA, 3214 con la presenza di uno che non c'e')
+        "Dichiarante": ({"PresenzaDichiarante": "1"} if (x.codice_carica in ("1", "2") or (morte and _presentatore_in_ea(x, pres)))
+                        else {"FlagAssenzaDichiarante": "1"}),
         "Testamento": _eh_testamento(x),
         "Interdetti": ({"PresenzaInterdetti": {"FlagInterdetti": "1", **interdetti[0]}} if interdetti
                        else {"FlagAssenzaInterdetti": "1"}),
@@ -964,7 +979,7 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
     _eh_rinunce_ulteriori(x, eh)
     _eh_moduli_ulteriori(eh, "PresenzaInterdetti", interdetti[1:])
     _eh_moduli_ulteriori(eh, "ReintegroDiritti", reintegri[1:])
-    if None in (comune, prov):
+    if not morte and None in (comune, prov):
         return None
     x.mappa["quadro:EH"] = {"coll": None, "quadro": "EH", "xpath": f"{x.XP_DICH}/suc:QuadroEH"}
     return eh

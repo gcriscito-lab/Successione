@@ -23,6 +23,7 @@ from datetime import date
 
 from . import formati as F
 from . import fonti as FO
+from . import sostitutiva as SO
 from . import supplemento as SUP
 
 PERC = "opzioni.telematico.dichiarazione."
@@ -143,12 +144,12 @@ def riduci_per_integrativa(x) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------- codici carica del presentatore
-CARICHE_SUPPORTATE = ("1", "2", "3", "4", "7")
+CARICHE_SUPPORTATE = ("1", "2", "3", "4", "5", "6", "7", "8")
 MOTIVO_CARICA = {
-    "5": "curatore dell'eredita' giacente: richiede un soggetto EA di tipo 'Altro' (6), la casella casi particolari e le agevolazioni ristrette",
-    "6": "amministratore dell'eredita': stessi requisiti del curatore (tipo 'Altro', casi particolari)",
-    "8": "persona immessa nel possesso temporaneo dei beni dell'assente: richiede la sezione MortePresunta del quadro EH",
-    "9": "trustee o suo rappresentante: richiede soggetti Trust (tipo 5), sezioni Trust e pagamento anticipato",
+    "9": "trustee o suo rappresentante: BLOCCATO. Richiede insieme soggetti Trust (tipo 5) nel quadro EA con le sezioni Trust e il "
+         "beneficiario finale, TrustDisab ed EF3-bis (imposta fissa), ImpostaCatastaleTrustDisab, l'atto istitutivo in EG «Altro», il "
+         "pagamento anticipato EF18ter e l'esclusione di agevolazioni e riduzioni; il calcolo dell'imposta (modulo calcolo) non "
+         "gestisce il trust e le fonti non ne danno una regola di importo completa da verificare col controllo ufficiale",
 }
 FONTE_CARICA = "fornituraSUC13_v1.xsd, annotazioni di Frontespizio/Presentatore/CodiceCarica e CodiceFiscaleRappresentato; " + FONTE_FASC
 
@@ -171,6 +172,18 @@ def regole_carica(x, carica: str | None, pres: dict, cfp, cfd, in_ea: list) -> N
         if not testamento and SUP.dich(x.d, "legge_estera") is not True:
             x.err("REGOLA_CARICA_LEGATARIO", PERC + "devoluzione_per_testamento", "con codice carica 2 (legatario) la devoluzione per "
                   "testamento e' obbligatoria in assenza di legge estera", FONTE_CARICA)
+    if carica in ("5", "6"):
+        # annotazione di CasiParticolari: obbligatorio con le cariche 5, 6, 9 (controllo ufficiale 3250: «campo volture catastali
+        # obbligatorio se codice carica 5 o 6 o 9»); Fascicolo I p. PDF 15: eredita' giacente/amministrata senza voltura automatica
+        if SUP.dich(x.d, "casi_particolari") is not True:
+            x.err("DATO_MANCANTE", PERC + "casi_particolari", f"con il codice carica {carica} la casella «non voler dar corso alle "
+                  "volture catastali» e' obbligatoria (eredita' giacente o amministrata: voltura non automatizzabile)", FONTE_CARICA)
+    if carica == "5" and not SO.e_sostitutiva(x.d):
+        tipi = [x.tipo_ea.get(p["id"]) for p in x.ea]
+        if len(x.ea) != 1 or tipi != ["6"]:
+            x.err("REGOLA_CARICA_CURATORE", "quadro[EA]", "con il codice carica 5 (curatore dell'eredita' giacente) nel quadro EA deve "
+                  "esserci un solo soggetto, la curatela, con tipo soggetto 6 (Altro) (annotazione XSD di CodiceCarica, prima "
+                  "dichiarazione)", FONTE_CARICA)
     if carica == "7" and not testamento:
         x.err("REGOLA_CARICA_ESECUTORE", PERC + "devoluzione_per_testamento", "il codice carica 7 (esecutore testamentario) e' ammesso "
               "solo con la devoluzione per testamento", FONTE_CARICA)
@@ -186,7 +199,7 @@ def rappresentato(x, carica: str | None, psup: dict, cfp, cfd) -> str | None:
             x.err("DATO_MANCANTE", perc, f"con codice carica {carica} il codice fiscale del soggetto rappresentato e' obbligatorio",
                   FONTE_CARICA)
         return None
-    if carica in ("1", "2", "5", "6", "7"):
+    if carica in ("1", "2", "5", "6", "7", "8"):
         x.err("DATI_INCOERENTI", perc, f"con codice carica {carica} il codice fiscale del rappresentato non va indicato", FONTE_CARICA)
         return None
     try:
@@ -211,3 +224,73 @@ def residente_estero(x, psup: dict) -> dict | None:
         return None
     pseudo = {"id": "presentatore", "residenza_estera": v}
     return x.residenza_estera(pseudo, "presentatore", "Frontespizio/Presentatore")
+
+
+# ------------------------------------------------------------------------------------------- soggetto «Altro» (tipo soggetto 6)
+FONTE_ALTRO = ("fornituraSUC13_v1.xsd, annotazioni di QuadroEA/Modulo/Soggetto/TipoSoggetto («se e' presente il valore 6 (Altro) non possono "
+               "essere presenti altri soggetti nel quadro»), GradoParentela e CodiceFiscale; Fascicolo I p. PDF 17")
+
+
+def regole_tipo_altro(x, base: str, p: dict) -> None:
+    """Tipo soggetto 6 (Altro: la curatela dell'eredita' giacente o amministrata). Unico soggetto del quadro EA, con denominazione
+    (soggetto diverso da persona fisica); grado 35 (Estraneo/a), unico caso provato col controllo ufficiale locale."""
+    if len(x.ea) != 1:
+        x.err("REGOLA_TIPO_ALTRO", base + ".tipo_soggetto", "con il tipo soggetto 6 (Altro) non possono esserci altri soggetti nel quadro "
+              "EA", FONTE_ALTRO)
+    den = SUP.attr(x.d, "persone", p, "denominazione")
+    if den in (None, ""):
+        x.err("DATO_MANCANTE", f"opzioni.telematico.persone[{p['id']}].denominazione", "con il tipo soggetto 6 (Altro) la denominazione "
+              "(della curatela) e' obbligatoria: il soggetto non e' una persona fisica", FONTE_ALTRO)
+    if SUP.attr(x.d, "persone", p, "rinuncia") not in (None, False):
+        x.err("REGOLA_TIPO_ALTRO", f"opzioni.telematico.persone[{p['id']}].rinuncia", "la rinuncia non e' prevista per il tipo soggetto 6",
+              FONTE_ALTRO)
+
+
+def grado_tipo_altro(x, base: str, grado) -> None:
+    if grado is not None and grado != "35":
+        x.err("REGOLA_TIPO_ALTRO", base + ".grado_parentela", f"con il tipo soggetto 6 (Altro) e la denominazione e' provato solo il grado 35 "
+              f"(Estraneo/a), non {grado}: gli altri gradi di soggetti non persone fisiche (36-39) hanno regole proprie", FONTE_ALTRO)
+
+
+# ------------------------------------------------------------------------------------- morte presunta (codice carica 8)
+FONTE_MORTE_PRESUNTA = ("fornituraSUC13_v1.xsd, annotazioni di QuadroEH/.../DatiDefunto/MortePresunta (obbligatoria se codice carica = 8) e "
+                        "DataDeposito (successiva alla data del decesso del frontespizio); Fascicolo I pp. PDF 15 e 52-53")
+
+
+def morte_presunta(x, ddec: date | None) -> dict | None:
+    """Sezione ``MortePresunta`` del quadro EH (``opzioni.telematico.dichiarazione.morte_presunta {tribunale, data_deposito, sentenza}``):
+    obbligatoria con il codice carica 8 (persona immessa nel possesso temporaneo dei beni dell'assente), non ammessa con gli altri."""
+    v = SUP.dich(x.d, "morte_presunta")
+    carica = x.codice_carica
+    if v in (None, "", {}):
+        if carica == "8":
+            x.err("DATO_MANCANTE", PERC + "morte_presunta", "con il codice carica 8 (possesso temporaneo dei beni dell'assente) servono "
+                  "tribunale, data di deposito e sentenza di morte presunta", FONTE_MORTE_PRESUNTA)
+        return None
+    if carica != "8":
+        x.err("DATI_INCOERENTI", PERC + "morte_presunta", "la morte presunta si indica solo con il codice carica 8", FONTE_MORTE_PRESUNTA)
+        return None
+    if not isinstance(v, dict) or set(v) - {"tribunale", "data_deposito", "sentenza"}:
+        x.err("VALORE_NON_VALIDO", PERC + "morte_presunta", "atteso {tribunale, data_deposito, sentenza}", FONTE_MORTE_PRESUNTA)
+        return None
+    out: dict = {"FlagAssenza": "1"}
+    for chiave, nome in (("tribunale", "Tribunale"), ("sentenza", "Sentenza")):
+        if v.get(chiave) in (None, ""):
+            x.err("DATO_MANCANTE", PERC + "morte_presunta." + chiave, f"{chiave} obbligatorio", FONTE_MORTE_PRESUNTA)
+            continue
+        try:
+            out[nome] = F.an(str(v[chiave]), 50)
+        except F.ValoreXml as e:
+            x.err("VALORE_NON_VALIDO", PERC + "morte_presunta." + chiave, str(e), FONTE_MORTE_PRESUNTA)
+    dd = v.get("data_deposito")
+    if dd in (None, ""):
+        x.err("DATO_MANCANTE", PERC + "morte_presunta.data_deposito", "data di deposito obbligatoria", FONTE_MORTE_PRESUNTA)
+    else:
+        d = _data(x, "morte_presunta.data_deposito", dd, FONTE_MORTE_PRESUNTA)
+        if d is not None:
+            if ddec is not None and d <= ddec:
+                x.err("REGOLA_MORTE_PRESUNTA", PERC + "morte_presunta.data_deposito", "la data di deposito deve essere successiva alla "
+                      "data del decesso", FONTE_MORTE_PRESUNTA)
+            else:
+                out["DataDeposito"] = F.data(str(dd))
+    return out if len(out) == 4 else None

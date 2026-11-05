@@ -808,6 +808,7 @@ const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore boo
   ["legge_estera", "successione regolata da legge straniera", "bool"], ["eventi_eccezionali", "eventi eccezionali (inagibilità dell'immobile prima casa)", "bool"],
   ["data_opzione", "data opzione art. 24-bis TUIR"], ["beneficio_inventario", "accettazione con beneficio d'inventario", "bool"],
   ["residenza_estera_defunto", "residenza estera del defunto"], ["casi_particolari", "non dar corso alle volture catastali (casi particolari)", "bool"],
+  ["morte_presunta.tribunale", "morte presunta: tribunale"], ["morte_presunta.data_deposito", "morte presunta: data di deposito"], ["morte_presunta.sentenza", "morte presunta: sentenza"],
   ["versamento.iban", "versamento: IBAN"], ["versamento.cf_titolare", "versamento: codice fiscale del titolare"],
   ["devoluzione_per_testamento", "devoluzione per testamento", "bool"],
   ["credito_ipotecaria", "credito d'imposta da utilizzare per l'imposta ipotecaria (EF7, euro)"],
@@ -1001,14 +1002,16 @@ function renderFront(main) {
   const chiaviSanzioni = CAMPI_DICH.filter(([k]) => /^(sanzione|interessi)_/.test(k)).map(([k]) => k);
   const valorizzata = k => k.split('.').reduce((o, c) => (o == null ? undefined : o[c]), dich) != null;
   const pagamenti = h('details', { class: 'gruppo-opzionale', open: chiaviCrediti.some(valorizzata) || chiaviSanzioni.some(valorizzata) },
-    h('summary', {}, 'Crediti d\'imposta, sanzioni e interessi · quadri EF ed EH'),
-    sezioneDatiDichiarazione(chiaviCrediti, 'Crediti d\'imposta (Legge 448/1998 art. 7 c. 2; DL 73/2021 art. 64 c. 7)'),
+    h('summary', {}, 'Crediti d'imposta, sanzioni e interessi · quadri EF ed EH'),
+    sezioneDatiDichiarazione(chiaviCrediti, 'Crediti d'imposta (Legge 448/1998 art. 7 c. 2; DL 73/2021 art. 64 c. 7)'),
     sezioneDatiDichiarazione(chiaviSanzioni, 'Sanzioni e interessi del ravvedimento (importi calcolati dal professionista)'));
+  const morte = h('details', { class: 'gruppo-opzionale', open: !!dich.morte_presunta }, h('summary', {}, 'Possesso temporaneo dei beni dell'assente (carica 8) · morte presunta'),
+    sezioneDatiDichiarazione(['morte_presunta.tribunale', 'morte_presunta.data_deposito', 'morte_presunta.sentenza'], 'Sentenza di morte presunta'));
   const primaCasa = h('details', { class: 'gruppo-opzionale', open: !!dich.prima_casa }, h('summary', {}, 'Agevolazione prima casa'), sezionePrimaCasa());
   const riduzioni = h('details', { class: 'gruppo-opzionale', open: !!dich.riduzioni_art25 }, h('summary', {}, 'Riduzioni art. 25 e codici L, Q'), sezioneRiduzioni());
   const aziende = h('details', { class: 'gruppo-opzionale', open: S.P.dati.beni.some(b => b.tipo === 'azienda') }, h('summary', {}, 'Dati delle aziende · se presenti'),
     sezioneDatiDichiarazione(['azienda_data_deposito', 'azienda_camera_commercio'], 'Deposito e camera di commercio'));
-  main.append(testamento, stato, pagamenti, primaCasa, riduzioni, aziende);
+  main.append(testamento, stato, pagamenti, morte, primaCasa, riduzioni, aziende);
   const att = new Set(S.P.dati.opzioni.quadri_attivi || S.schema.predefiniti);
   const box = h('details', { class: 'gruppo-opzionale' }, h('summary', {}, 'Quadri inclusi nella pratica · ' + att.size + ' selezionati'));
   for (const q of S.schema.quadri.filter(x => x.gruppo !== 'frontespizio' && x.id !== 'DV' && (!x.generato || att.has(x.id)))) {

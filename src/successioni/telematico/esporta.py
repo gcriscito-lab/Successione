@@ -518,10 +518,10 @@ class _Export:
                 if tipo == "5":
                     self.ns.append(f"{base}: tipo soggetto 5 (trust) non supportato: servono le sezioni Trust del quadro EA, TrustDisab ed "
                                    "EF3bis, il dichiarante con codice carica 9, l'atto istitutivo in EG e la verifica del perimetro "
-                                   "del modello telematico (Fascicolo I p. PDF 17), non ancora provate col controllo ufficiale")
+                                   "del modello telematico (Fascicolo I p. PDF 17); BLOCCATO: il calcolo non gestisce il trust e gli importi EF3-bis/EF18ter non sono "
+                                   "definiti in modo completo dalle fonti")
                 elif tipo == "6":
-                    self.ns.append(f"{base}: tipo soggetto 6 (altro) non supportato: con questo tipo non possono esserci altri soggetti nel "
-                                   "quadro EA (annotazione XSD di TipoSoggetto), caso non provato col controllo ufficiale")
+                    FR.regole_tipo_altro(self, base, p)
             grado = SUP.attr(self.d, "persone", p, "grado_parentela")
             self.usa(p, "grado_parentela", "relazione_con_defunto")
             rel = p.get("relazione_con_defunto")
@@ -565,6 +565,8 @@ class _Export:
             if p.get("data_decesso") not in (None, ""):
                 self.ns.append(f"{base}.data_decesso: soggetto EA deceduto (rappresentazione/trasmissione) non supportato")
                 self.usa(p, "data_decesso")
+            if tipo == "6":
+                FR.grado_tipo_altro(self, base, grado)
             den = self.denominazione(p, base, grado, el)
             ana = den if den else self.anagrafica(p, el + "/DatiAnagrafici")
             rinunciatario = self.rinuncia(p, base, tipo, grado, el)
@@ -2006,6 +2008,7 @@ class _Export:
         tipo_dich = SO.tipo_dichiarazione_xml(self.sost)
         tipo_dich["Devoluzione"] = self.devoluzione_fr()
         cas = FR.leggi(self, ddec)           # caselle del frontespizio: legge estera, eventi eccezionali, opzione, inventario...
+        self.morte_presunta = FR.morte_presunta(self, ddec)   # carica 8: sezione MortePresunta del quadro EH
         if cas["legge_estera"]:
             tipo_dich["Devoluzione"]["LeggeEstera"] = "1"
         if cas["eventi"]:
@@ -2164,6 +2167,7 @@ class _Export:
         self.fornitore_diverso_da_dichiarante = False
         self.totale_da_versare = 0
         self.sost = None   # dichiarazione sostitutiva (telematico/sostitutiva.py)
+        self.morte_presunta = None   # carica 8: {FlagAssenza, Tribunale, DataDeposito, Sentenza}
         self.estero_bene: dict[str, bool] = {}   # beni sedenti all'estero (immobili con provincia EE o casella «bene sito all'estero»)
         self.imposta_estera: dict[str, int] = {}  # imposta versata all'estero per bene (euro interi): richiede EG4
         self.rinunce: dict[str, dict | None] = {}   # rinunciatari EA -> estremi di registrazione (EH rigo 8)
