@@ -109,6 +109,8 @@ ETICHETTE_DICHIARAZIONE: dict[str, str] = {
     "presentatore.telefono": "Telefono",
     "presentatore.email": "Indirizzo di posta elettronica",
     "tempistica_pagamento": "Tempistica del pagamento",
+    "pagamento_rateale": "Numero di rate trimestrali (1-12)",
+    "acconto": "Acconto dell'imposta di successione (euro, almeno il 20%)",
     "versamento.iban": "IBAN del versamento",
     "versamento.cf_titolare": "Codice fiscale del titolare del conto",
     "firma_dichiarante": "Firma del dichiarante",

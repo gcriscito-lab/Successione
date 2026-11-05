@@ -159,7 +159,7 @@ Questa guida spiega, in modo sintetico, come compilare ogni quadro dell'interfac
 **Esempio:** Importo da versare 44.132 euro, IBAN `IT57A0123456789000000001234`.
 
 **Non supportato:**
-- agevolazioni, soli terreni, proporzionale < fissa, copia conforme, crediti, sostitutive con rimborso o tardive con imposta aggiuntiva, sanzioni, rateazione. Le sostitutive codici 1 e 2 sono coperte (vedi `docs/regole/sostitutiva.md`).
+- agevolazioni, soli terreni, proporzionale < fissa, copia conforme, crediti, sostitutive con rimborso o tardive con imposta aggiuntiva, sanzioni e interessi. La rateazione dell'imposta di successione e' coperta (numero di rate e acconto). Le sostitutive codici 1 e 2 sono coperte (vedi `docs/regole/sostitutiva.md`).
 
 ---
 

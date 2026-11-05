@@ -12,7 +12,7 @@ Struttura::
                          "presentatore": {"persona_id", "codice_carica", "telefono", "email"},
                          "versamento": {"iban", "cf_titolare"},          # Frontespizio/Versamento (EF19 > 0)
                          "tempistica_pagamento",                        # EF18ter col. 1 (1 | 2)
-                         "pagamento_rateale",                           # EF18ter col. 2-3 (non supportato)
+                         "pagamento_rateale", "acconto",                # EF18ter col. 2-3: numero di rate (1-12) e acconto in euro
                          "dichiara_copie_conformi"},                    # EH FlagPassivita (lettera l)
       "persone":   {<id>: {"sesso", "provincia_nascita", "tipo_soggetto", "grado_parentela", "portatore_handicap",
                            "comune_decesso", "provincia_decesso"}},    # luogo del decesso: EH DatiDefunto/Decesso
@@ -42,7 +42,7 @@ CHIAVI = {
     "devoluzioni": {"agevolazioni", "riduzioni"},
 }
 CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",
-                        "tempistica_pagamento", "pagamento_rateale", "dichiara_copie_conformi",
+                        "tempistica_pagamento", "pagamento_rateale", "acconto", "dichiara_copie_conformi",
                         "devoluzione_per_testamento", "testamento", "azienda_data_deposito", "azienda_camera_commercio",
                         "prima_casa", "riduzioni_art25",
                         "codice_sostitutiva", "prima_anno", "prima_volume", "prima_numero", "ipotecaria_versata",

@@ -35,7 +35,7 @@ Archivio, interfaccia locale, MCP, PDF/A e file XML funzionano e sono provati ne
 - Stati separati (dati, file XML, schema, controllo ufficiale, trasmissione), invalidati solo se cambia il dichiarato.
 
 ## Cosa NON c'è o è limitato
-- Quadri non coperti: EI, EL, EM, EN, EO, EP, EQ, agevolazioni e riduzioni, rinunce, legatari, testamento, rateazione. Selezionarli blocca la finalizzazione.
+- Quadri non coperti: EI, EL, EM, EN, EO, EP, EQ, agevolazioni e riduzioni, rinunce, legatari, testamento. Selezionarli blocca la finalizzazione.
 - Dichiarazione sostitutiva: codici 1 e 2 gestiti (controllo ufficiale locale positivo su dati sintetici, 2026-11-05); codice 3, rimborsi e tardive con imposta aggiuntiva non finalizzabili.
 - I dati richiesti dall'export (sesso, provincia, codici comune, stato civile…) si impostano solo da MCP o API, non dalla GUI (rilievo R20).
 - Con Java 11 o successivi il controllo ufficiale si ferma se la fornitura ha allegati EG (manca una libreria di sistema): serve Java 8 o una libreria aggiuntiva (proposta P9 in `docs/PROPOSTE_telematico.md`). L'adattatore di oggi fallisce con Java 21 in quel caso.

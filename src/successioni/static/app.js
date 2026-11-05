@@ -737,7 +737,7 @@ function schedaPersona(titolo, ruolo, vis) {
 /* Dati della dichiarazione: opzioni.telematico.dichiarazione. I codici ufficiali sono proposti come menu (server: codici.py, dagli XSD). */
 const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore booleano nel modello), altrimenti testo
   ["stato_civile", "stato civile"], ["devoluzione_per_legge", "devoluzione per legge", "bool"], ["firma_dichiarante", "firma del dichiarante", "bool"],
-  ["tempistica_pagamento", "tempistica del pagamento"],
+  ["tempistica_pagamento", "tempistica del pagamento"], ["pagamento_rateale", "numero di rate trimestrali (1-12)"], ["acconto", "acconto dell'imposta di successione (euro, almeno il 20%)"],
   ["codice_sostitutiva", "tipo di sostitutiva (codice)"], ["prima_anno", "prima dichiarazione: anno"], ["prima_volume", "prima dichiarazione: volume"],
   ["prima_numero", "prima dichiarazione: numero"], ["ipotecaria_versata", "imposta ipotecaria già versata (EF6)"],
   ["catastale_versata", "imposta catastale già versata (EF12)"], ["successione_versata", "imposta di successione già versata (EF18bis col. 3)"], ["circoscrizioni_nuove", "circoscrizioni delle nuove trascrizioni (solo codice 1)"],
@@ -872,7 +872,7 @@ function renderFront(main) {
   presentatore.classList.add('intera');
   presentatore.append(schedaPersona('Anagrafica del presentatore', 'presentatore', ['cognome', 'nome', 'codice_fiscale', 'sesso', 'data_nascita', 'luogo_nascita', 'provincia_nascita', 'relazione_con_defunto']));
   grid.append(presentatore,
-    sezioneDatiDichiarazione(['tempistica_pagamento', 'versamento.iban', 'versamento.cf_titolare'], '4. Pagamento'),
+    sezioneDatiDichiarazione(['tempistica_pagamento', 'pagamento_rateale', 'acconto', 'versamento.iban', 'versamento.cf_titolare'], '4. Pagamento'),
     sezioneDatiDichiarazione(['firma_dichiarante', 'dichiara_copie_conformi'], '5. Firme e documenti'));
   const dich = ((S.P.dati.opzioni.telematico || {}).dichiarazione || {});
   const testamento = h('details', { class: 'gruppo-opzionale', open: dich.devoluzione_per_testamento === true || !!dich.testamento }, h('summary', {}, 'Testamento · dati da compilare se presente'),

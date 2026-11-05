@@ -27,6 +27,7 @@ from pathlib import Path
 
 import re
 
+from .. import valori as V
 from ..schema import Errore
 from . import fonti as FO
 from . import formati as F
@@ -268,6 +269,7 @@ def _sezione_vbis(x, xml_pre):
         # annotazione ImpostaDaVersare: se il risultato e' minore o uguale a 10 euro deve essere uguale a zero
         x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
                                       "xpath": f"{x.XP_DICH}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione"}
+        _rateale_senza_importo(x)
         return {"ImpostaNonDovuta": "1"}, 0, []
     # Fascicolo I p.6 (dodici mesi) e p.48 (tempistica 1/2). Le decorrenze particolari,
     # sospensioni e il ravvedimento non sono implementati: non finalizzare una tardiva
@@ -285,6 +287,7 @@ def _sezione_vbis(x, xml_pre):
             ic["ImpostaVersata"] = str(versata)
         x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
                                       "xpath": f"{x.XP_DICH}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione"}
+        _rateale_senza_importo(x)
         return {"ImpostaCalcolata": ic}, 0, []
     try:
         termine_ordinario = x.data_decesso.replace(year=x.data_decesso.year + 1)
@@ -296,8 +299,6 @@ def _sezione_vbis(x, xml_pre):
                          "particolari, sanzioni/interessi e tempistica di pagamento non coperti; "
                          "non finalizzabile (Fascicolo I p.6 e p.48, EF18ter col.1)"]
     temp = SUP.dich(x.d, "tempistica_pagamento")
-    if SUP.dich(x.d, "pagamento_rateale") not in (None, False):
-        return None, 0, ["pagamento rateale dell'imposta di successione (EF18ter col. 2-3) non coperto"]
     if temp not in ("1", "2"):
         x.err("DATO_MANCANTE", "opzioni.telematico.dichiarazione.tempistica_pagamento", "imposta di successione "
               f"dovuta ({imposta}): indicare la tempistica di pagamento 1 (entro 90 giorni) o 2 (contestuale)",
@@ -307,10 +308,74 @@ def _sezione_vbis(x, xml_pre):
     if versata:
         ic["ImpostaVersata"] = str(versata)
     ic.update({"ImpostaDaVersare": str(da_versare_imp), "TempisticaPagamento": temp})
+    acconto = _rateazione(x, da_versare_imp, ic)
+    if acconto is None:
+        return None, 0, []
     x.mappa["calcolo:EF18bis"] = {"coll": None, "quadro": "EF", "imposta": imposta, "versione": r.versione,
                                   "xpath": f"{x.XP_DICH}/suc:QuadroEF/suc:SezioneVBis_ImpostaSuccessione"}
     # EF19: EF18bis col. 5 solo con pagamento contestuale (codice 2) (Fascicolo I p. 48)
-    return {"ImpostaCalcolata": ic}, (da_versare_imp if temp == "2" else 0), []
+    dovuto_ora = (acconto if "PagamentoRateale" in ic else da_versare_imp) if temp == "2" else 0
+    return {"ImpostaCalcolata": ic}, dovuto_ora, []
+
+
+def _rateazione(x, da_versare: int, ic: dict) -> int | None:
+    """Rigo EF18ter col. 2-3 (PagamentoRateale, Acconto). Restituisce l'acconto (0 senza rateazione) oppure ``None`` se i dati
+    non sono validi (errori registrati). Regole: annotazioni XSD ``ImpostaCalcolata/PagamentoRateale`` e ``Acconto``; Fascicolo I
+    p. PDF 48 (acconto non inferiore al 20% dell'imposta da versare; residuo non inferiore a 1.000 euro; fino a 8 rate
+    trimestrali se il residuo non supera 20.000 euro, fino a 12 oltre)."""
+    el = "QuadroEF/SezioneVBis_ImpostaSuccessione/ImpostaCalcolata"
+    perc = "opzioni.telematico.dichiarazione."
+    fonte = _fa(el + "/PagamentoRateale") + "; " + _fa(el + "/Acconto") + "; " + FO.fonte_fasc1(48, "rigo EF18ter col. 2-3")
+    rate_in, acc_in = SUP.dich(x.d, "pagamento_rateale"), SUP.dich(x.d, "acconto")
+    assente = lambda v: v is None or v is False or v == ""   # 0 non e' «assente»: e' un numero di rate non valido
+    if assente(rate_in) and assente(acc_in):
+        return 0
+    if assente(rate_in):
+        x.err("DATO_MANCANTE", perc + "pagamento_rateale", "indicato l'acconto senza il numero di rate: l'acconto "
+              "esiste solo con il pagamento rateale", fonte)
+        return None
+    try:
+        rate = int(str(rate_in))
+        if isinstance(rate_in, bool) or str(rate) != str(rate_in).strip() or not 1 <= rate <= 12:
+            raise ValueError
+    except ValueError:
+        x.err("VALORE_NON_VALIDO", perc + "pagamento_rateale", f"{rate_in!r}: indicare il numero di rate trimestrali (1-12)", fonte)
+        return None
+    if acc_in in (None, ""):
+        x.err("DATO_MANCANTE", perc + "acconto", "pagamento rateale: l'acconto (almeno il 20% dell'imposta da versare) "
+              "e' obbligatorio", fonte)
+        return None
+    try:
+        acc = V.parse_importo(acc_in)
+    except V.ValoreNonValido as e:
+        x.err("VALORE_NON_VALIDO", perc + "acconto", str(e), fonte)
+        return None
+    if acc != acc.to_integral_value():
+        x.err("VALORE_NON_VALIDO", perc + "acconto", f"{acc}: euro interi (DatoNP_Type)", fonte)
+        return None
+    acc = int(acc)
+    if acc * 5 < da_versare or acc > da_versare:
+        x.err("VALORE_NON_VALIDO", perc + "acconto", f"acconto {acc}: deve essere compreso fra il 20% ({da_versare / 5:g}) e "
+              f"l'intera imposta da versare ({da_versare})", fonte)
+        return None
+    residuo = da_versare - acc
+    if residuo < 1000:
+        x.err("VALORE_NON_VALIDO", perc + "pagamento_rateale", f"il residuo da rateizzare ({residuo}) e' inferiore a 1.000 euro: "
+              "rateazione non ammessa", fonte)
+        return None
+    if residuo <= 20000 and rate > 8:
+        x.err("VALORE_NON_VALIDO", perc + "pagamento_rateale", f"con un residuo di {residuo} euro (fino a 20.000) le rate sono al "
+              "massimo 8", fonte)
+        return None
+    ic["PagamentoRateale"], ic["Acconto"] = str(rate), str(acc)
+    return acc
+
+
+def _rateale_senza_importo(x) -> None:
+    r, a = SUP.dich(x.d, "pagamento_rateale"), SUP.dich(x.d, "acconto")
+    if not ((r is None or r is False or r == "") and a in (None, "")):
+        x.err("VALORE_NON_VALIDO", "opzioni.telematico.dichiarazione.pagamento_rateale", "pagamento rateale indicato ma "
+              "nessuna imposta di successione da versare", FO.fonte_fasc1(48, "rigo EF18ter"))
 
 
 # ============================================================================================== EG
