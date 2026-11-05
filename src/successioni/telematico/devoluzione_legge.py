@@ -20,8 +20,16 @@ COPERTI (tabelle di p. 69-70 dell'Allegato 5; codici GradoParentela dell'XSD: 01
 - coniuge + genitori: 2/3 e 1/3; coniuge + fratelli: 2/3 e 1/3; coniuge + genitori + fratelli: 8/12, 3/12, 1/12;
 - genitori + fratelli senza coniuge: tabella «Concorso del genitore/i con fratelli» (p. 70). Tutte le righe di quella tabella
   sono riprodotte dalla regola: genitore = 2 quote, germano = 2, unilaterale = 1, e ai genitori spetta almeno la meta'.
-Tutto il resto (altri ascendenti, rappresentazione, parenti oltre i fratelli, gradi diversi, concorso di categorie che in
-presenza di figli si escludono) -> ``None``: le quote NON vengono verificate e l'export lo segnala.
+- ALTRI ASCENDENTI (nonni 5A/5B, bisavi 7A/7B, trisavi 9A/9B, dove A = linea paterna e B = materna; codici dell'Allegato 1 p. 55 e
+  dell'XSD GradoParentela): «succedono per una meta' gli ascendenti della linea paterna e per l'altra meta' gli ascendenti della
+  linea materna; se gli ascendenti, pero', non sono di uguale grado, l'eredita' si devolve al piu' vicino senza distinzione di
+  linea» (p. 69, con i tre esempi numerici). Gli ascendenti si escludono con i genitori. Con coniuge e/o fratelli il gruppo degli
+  ascendenti vale come un solo «genitore» (tabelle di p. 69-70: «Coniuge + genitore (o entrambi o altri Ascendenti)»,
+  «Ascendente/i + ... fratelli»).
+Tutto il resto (rappresentazione di ascendenti, parenti oltre i fratelli come zii e cugini - l'Allegato 5 non ne da' le quote -,
+gradi diversi, concorso di categorie che in presenza di figli si escludono) -> ``None``: le quote NON vengono verificate e
+l'export lo segnala. L'accrescimento fra coeredi per rinuncia non e' descritto nelle fonti: i rinunciatari restano fuori dal
+calcolo (come fa l'esportazione) e le quote dei restanti beneficiari seguono l'Allegato 5 applicato ai soli beneficiari.
 """
 from __future__ import annotations
 
@@ -52,6 +60,24 @@ def _stirpi(ids: list[str], pesi: list[int], totale: Fraction) -> dict[str, Frac
     return out
 
 
+#: ascendenti oltre i genitori: codice GradoParentela -> (grado di parentela con il defunto, linea). Allegato 1 p. 55 e XSD.
+ASCENDENTI = {"5A": (2, "P"), "5B": (2, "M"), "7A": (3, "P"), "7B": (3, "M"), "9A": (4, "P"), "9B": (4, "M")}
+FONTE_ASCENDENTI = ("Succ_FASCICOLO_I_Nov_23.pdf p. 55 (Allegato 1, codici 05a/05b, 07a/07b, 09a/09b) e p. 69 (Allegato 5: ascendenti "
+                    "per meta' di linea paterna e materna, al piu' vicino se di grado diverso); XSD GradoParentela (5A, 5B, 7A, 7B, 9A, 9B)")
+
+
+def _ascendenti(ids: list[str], gradi: dict[str, str]) -> dict[str, Fraction]:
+    """Quote (somma 1) degli ascendenti oltre i genitori. Si considerano solo quelli del grado piu' vicino; se ci sono sia della
+    linea paterna sia della materna, meta' a ciascuna linea e dentro la linea in parti uguali; altrimenti parti uguali."""
+    vicino = min(ASCENDENTI[gradi[p].upper()][0] for p in ids)
+    cand = [p for p in ids if ASCENDENTI[gradi[p].upper()][0] == vicino]
+    linee = {"P": [p for p in cand if ASCENDENTI[gradi[p].upper()][1] == "P"],
+             "M": [p for p in cand if ASCENDENTI[gradi[p].upper()][1] == "M"]}
+    if linee["P"] and linee["M"]:
+        return {p: Fraction(1, 2 * len(v)) for v in linee.values() for p in v}
+    return {p: Fraction(1, len(cand)) for p in cand}
+
+
 def quote_di_legge(gradi: dict[str, str], tipi: dict[str, str],
                    rappresentati: dict[str, tuple[str, str]] | None = None) -> dict[str, Fraction] | None:
     """Quote di legge per persona (id -> frazione) oppure ``None`` se la configurazione non e' coperta.
@@ -68,7 +94,8 @@ def quote_di_legge(gradi: dict[str, str], tipi: dict[str, str],
     if set(rapp) - set(gradi):
         return None
     per = {g: [p for p, x in sorted(gradi.items()) if x == g and p not in rapp] for g in ("01", "02", "03", "10", "11")}
-    n_normali = sum(len(v) for v in per.values())
+    ascend = [p for p, x in sorted(gradi.items()) if str(x).upper() in ASCENDENTI and p not in rapp]
+    n_normali = sum(len(v) for v in per.values()) + len(ascend)
     gruppi: dict[tuple[str, str], list[str]] = {}
     for p, (cf, gr) in sorted(rapp.items()):
         if gradi[p] not in GRADI_RAPPRESENTANTE or gr not in ("02", "10", "11") or not cf:
@@ -79,8 +106,16 @@ def quote_di_legge(gradi: dict[str, str], tipi: dict[str, str],
     if n_normali + len(rapp) != len(gradi):
         return None                          # gradi non coperti (nonni, altri parenti, estranei...)
     coniuge, genitori = per["01"], per["03"]
-    if len(coniuge) > 1 or len(genitori) > 2:
-        return None
+    if len(coniuge) > 1 or len(genitori) > 2 or (genitori and ascend):
+        return None                          # i genitori escludono gli altri ascendenti
+    if ascend and len({ASCENDENTI[gradi[p].upper()][0] for p in ascend}) > 1:
+        return None                          # un ascendente di grado piu' lontano non eredita: non puo' stare nel quadro EA (XSD)
+    blocco = genitori or ascend              # ascendenti in linea retta ascendente (genitori o, in loro mancanza, nonni...)
+
+    def quote_blocco(totale: Fraction) -> dict[str, Fraction]:
+        if genitori:
+            return _stirpi(genitori, [1] * len(genitori), totale)
+        return {p: totale * f for p, f in _ascendenti(ascend, gradi).items()}
     # stirpi: ogni figlio/fratello presente e' una stirpe; i rappresentanti dello stesso rappresentato formano una stirpe
     figli = per["02"] + ["|".join(v) for (cf, gr), v in gruppi.items() if gr == "02"]
     fr_germ = per["10"] + ["|".join(v) for (cf, gr), v in gruppi.items() if gr == "10"]
@@ -88,28 +123,29 @@ def quote_di_legge(gradi: dict[str, str], tipi: dict[str, str],
     fratelli = fr_germ + fr_unil
     pesi_fr = [2] * len(fr_germ) + [1] * len(fr_unil)
     if figli:                            # i figli (e le loro stirpi) escludono ascendenti e collaterali
-        if genitori or fratelli:
+        if blocco or fratelli:
             return None
         if not coniuge:
             return _stirpi(figli, [1] * len(figli), Fraction(1))
         if len(figli) == 1:
             return {coniuge[0]: Fraction(1, 2), **_stirpi(figli, [1], Fraction(1, 2))}
         return {coniuge[0]: Fraction(1, 3), **_stirpi(figli, [1] * len(figli), Fraction(2, 3))}
-    if coniuge and not genitori and not fratelli:
+    if coniuge and not blocco and not fratelli:
         return {coniuge[0]: Fraction(1)}
-    if genitori and fratelli:
-        if coniuge:                      # tabella p. 69: coniuge 8/12, genitori 3/12, fratelli 1/12
-            return {coniuge[0]: Fraction(8, 12), **_stirpi(genitori, [1] * len(genitori), Fraction(3, 12)),
+    if blocco and fratelli:
+        if coniuge:                      # tabella p. 69: coniuge 8/12, ascendenti 3/12, fratelli 1/12
+            return {coniuge[0]: Fraction(8, 12), **quote_blocco(Fraction(3, 12)),
                     **_stirpi(fratelli, pesi_fr, Fraction(1, 12))}
-        g_unita, f_unita = 2 * len(genitori), sum(pesi_fr)
+        # genitori: 2 quote ciascuno; il gruppo di altri ascendenti conta come un solo genitore (righe «Ascendente/i» di p. 70)
+        g_unita, f_unita = (2 * len(genitori) if genitori else 2), sum(pesi_fr)
         quota_genitori = max(Fraction(1, 2), Fraction(g_unita, g_unita + f_unita))
-        return {**_stirpi(genitori, [1] * len(genitori), quota_genitori), **_stirpi(fratelli, pesi_fr, 1 - quota_genitori)}
+        return {**quote_blocco(quota_genitori), **_stirpi(fratelli, pesi_fr, 1 - quota_genitori)}
     resto = Fraction(1, 3) if coniuge else Fraction(1)
-    if not genitori and not fratelli:
+    if not blocco and not fratelli:
         return None
     out: dict[str, Fraction] = {coniuge[0]: Fraction(2, 3)} if coniuge else {}
-    if genitori:
-        out.update(_stirpi(genitori, [1] * len(genitori), resto))
+    if blocco:
+        out.update(quote_blocco(resto))
     else:
         out.update(_stirpi(fratelli, pesi_fr, resto))
     return out
