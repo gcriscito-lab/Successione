@@ -583,11 +583,45 @@ def _importa_xml(xml: bytes) -> dict:
     # ---- passivita' (ED)
     tel_pass: dict[str, dict] = {}
     k = 0
+    corrente: dict | None = None          # passivita' in costruzione: i righi di continuazione ne completano la ripartizione
+    continua = False                      # il rigo precedente aveva «Continuazione» (Fascicolo I p. PDF 38)
+
+    def ripartizione_di(ps, ctx):
+        rip_ = []
+        for rp in ps.xpath("suc:RipartizioneED/suc:Ripartizione", namespaces=NS):
+            rigo = _intero(_t(rp, "suc:IdentificazioneSoggetto/suc:Rigo"), ctx)
+            mm = _intero(_t(rp, "suc:IdentificazioneSoggetto/suc:Modulo"), ctx)
+            pers = persona_di_rigo.get((mm, rigo))
+            if pers is None:
+                raise XmlNonImportabile(f"{ctx}: la ripartizione rimanda a un erede inesistente (modulo {mm}, rigo {rigo})")
+            rip_.append({"persona_id": pers, "quota": _quota(rp, "suc:Quota/suc:QuotaElementi/suc:Quota", ctx)})
+        return rip_
+
+    def chiudi(c):
+        rip_ = c["rip"]
+        if len(rip_) == 1 and rip_[0]["quota"] == {"num": 1, "den": 1}:
+            c["campi"]["persona_id"] = rip_[0]["persona_id"]       # un solo erede per l'intero: forma semplice del modello
+        elif rip_:
+            c["tel"]["ripartizione"] = rip_
+        ops.append(_upsert("passivita", c["pid"], c["campi"]))
+        tel_pass[c["pid"]] = c["tel"]
+
     for m, mod in enumerate(d.xpath("suc:QuadroED/suc:Modulo", namespaces=NS), 1):
         for r, ps in enumerate(mod.xpath("suc:Passivita", namespaces=NS), 1):
+            ctx = f"QuadroED modulo {m} rigo {r}"
+            if continua:
+                # rigo di continuazione: solo gli ulteriori soggetti della ripartizione, senza i dati della passivita'
+                if corrente is None or any(etree.QName(e).localname != "RipartizioneED" for e in ps):
+                    raise XmlNonImportabile(f"{ctx}: rigo di continuazione con dati di una nuova passivita'")
+                if not ps.xpath("suc:RipartizioneED/suc:Ripartizione", namespaces=NS):
+                    raise XmlNonImportabile(f"{ctx}: continuazione senza soggetti")
+                corrente["rip"].extend(ripartizione_di(ps, ctx))
+                continua = _t(ps, "suc:RipartizioneED/suc:Continuazione") == "1"
+                continue
+            if corrente is not None:
+                chiudi(corrente)
             k += 1
             pid = f"ps_ed{k:03d}"
-            ctx = f"QuadroED modulo {m} rigo {r}"
             campi = {}
             ds = _t(ps, "suc:Descrizione")
             if ds:
@@ -614,20 +648,12 @@ def _importa_xml(xml: bytes) -> dict:
                     tel["bene_id"] = bid
                 else:
                     avvisi.append(f"{ctx}: il cespite collegato ({chiave[0]} modulo {chiave[1]} rigo {chiave[2]}) non e' stato importato")
-            rip = []
-            for rp in ps.xpath("suc:RipartizioneED/suc:Ripartizione", namespaces=NS):
-                rigo = _intero(_t(rp, "suc:IdentificazioneSoggetto/suc:Rigo"), ctx)
-                mm = _intero(_t(rp, "suc:IdentificazioneSoggetto/suc:Modulo"), ctx)
-                pers = persona_di_rigo.get((mm, rigo))
-                if pers is None:
-                    raise XmlNonImportabile(f"{ctx}: la ripartizione rimanda a un erede inesistente (modulo {mm}, rigo {rigo})")
-                rip.append({"persona_id": pers, "quota": _quota(rp, "suc:Quota/suc:QuotaElementi/suc:Quota", ctx)})
-            if len(rip) == 1 and rip[0]["quota"] == {"num": 1, "den": 1}:
-                campi["persona_id"] = rip[0]["persona_id"]       # un solo erede per l'intero: forma semplice del modello
-            elif rip:
-                tel["ripartizione"] = rip
-            ops.append(_upsert("passivita", pid, campi))
-            tel_pass[pid] = tel
+            corrente = {"pid": pid, "campi": campi, "tel": tel, "rip": ripartizione_di(ps, ctx)}
+            continua = _t(ps, "suc:RipartizioneED/suc:Continuazione") == "1"
+    if continua:
+        raise XmlNonImportabile("QuadroED: «Continuazione» barrata sull'ultimo rigo, senza il rigo che segue")
+    if corrente is not None:
+        chiudi(corrente)
     importato["passivita"] = k
 
     ops.extend(devoluzioni)

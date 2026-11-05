@@ -1488,18 +1488,34 @@ class _Export:
                 continue
             if prog:
                 riga["ProgressivoCespite"] = prog
-            if rip:
-                riga["RipartizioneED"] = rip
-            righe.append((p["id"], riga))
+            righe.append((p["id"], riga, rip["Ripartizione"] if rip else []))
             self.valore_passivita[p["id"]] = int(valore)
+        # Continuazione (annotazioni XSD di RipartizioneED e di Ripartizione_Type; Fascicolo I p. PDF 38): al massimo tre soggetti
+        # per rigo; se sono di piu' si barra «Continuazione» e gli altri vanno nella sezione ripartizione del rigo che segue,
+        # senza compilare i dati identificativi della passivita'.
+        piatte: list[tuple[str, dict, bool]] = []     # (id passivita', rigo, e' un rigo di continuazione)
+        for pid, riga, rip in righe:
+            blocchi = [rip[i:i + 3] for i in range(0, len(rip), 3)] or [[]]
+            for k, blocco in enumerate(blocchi):
+                r_ = dict(riga) if k == 0 else {}
+                if blocco:
+                    sez = {"Ripartizione": blocco}
+                    if k < len(blocchi) - 1:
+                        sez["Continuazione"] = "1"
+                    r_["RipartizioneED"] = sez
+                piatte.append((pid, r_, k > 0))
         moduli = []
-        for i, (pid, riga) in enumerate(righe):
+        for i, (pid, riga, cont) in enumerate(piatte):
             m, r = i // 3 + 1, i % 3 + 1
             if i % 3 == 0:
                 moduli.append({"Passivita": []})
             moduli[-1]["Passivita"].append(riga)
-            self.mappa[pid] = {"coll": "passivita", "quadro": "ED", "modulo": m, "rigo": r,
-                               "xpath": f"{_XP_DICH}/suc:QuadroED/suc:Modulo[{m}]/suc:Passivita[{r}]"}
+            xp = f"{_XP_DICH}/suc:QuadroED/suc:Modulo[{m}]/suc:Passivita[{r}]"
+            if not cont:
+                self.mappa[pid] = {"coll": "passivita", "quadro": "ED", "modulo": m, "rigo": r, "xpath": xp,
+                                   "righi_continuazione": []}
+            else:
+                self.mappa[pid]["righi_continuazione"].append({"modulo": m, "rigo": r, "xpath": xp})
         return {"Modulo": moduli} if moduli else None
 
     def devoluzione_fr(self) -> dict:
@@ -1616,9 +1632,6 @@ class _Export:
         somma = sum((Fraction(n, d) for _, n, d in voci), Fraction(0))
         if somma != 1:
             self.err("QUOTE_RIPARTIZIONE", base + ".ripartizione", f"somma delle quote {somma}: deve essere 1/1", fonte)
-            return None
-        if len(voci) > 3:
-            self.ns.append(f"{base}: ripartizione fra piu' di tre soggetti (continuazione del quadro ED) non supportata")
             return None
         if tipo not in DL.TIPI_PASSIVITA_LIBERE and tipo is not None:
             dich = {vp: Fraction(n, d) for vp, n, d in voci}
