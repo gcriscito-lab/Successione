@@ -106,7 +106,8 @@ def test_la_gui_ha_una_maschera_per_ogni_chiave_di_supplemento():
     js = (Path(__file__).parent.parent / "src" / "successioni" / "static" / "app.js").read_text(encoding="utf-8")
     # dati strutturati con maschera propria in app.js (renderStrutturati)
     gestiti_js = {"persone.portatore_handicap", "beni.superficie", "beni.estremi_trascrizione", "beni.estremi_registrazione",
-                  "passivita.ripartizione"}
+                  "passivita.ripartizione", "persone.rinuncia", "persone.denominazione", "persone.rinuncia_estremi",
+                  "persone.residenza_estera"}
     for k in gestiti_js:
         assert k.split(".")[1] in js, k
     assert set(senza_maschera) - gestiti_js == set(), senza_maschera

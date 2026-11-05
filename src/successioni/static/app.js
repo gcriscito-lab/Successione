@@ -526,6 +526,25 @@ function renderStrutturati(ins, q, r) {
     const cb = h('input', { type: 'checkbox', 'aria-label': 'portatore handicap', onchange: ev => scrivi('portatore_handicap', ev.target.checked) });
     cb.checked = valore('portatore_handicap') === true;
     ins.append(h('label', { class: 'chk' }, cb, 'Portatore di handicap (come documentato)'));
+    // rinunciatari, enti e residenza estera (docs/regole/soggetti_ea.md)
+    const rin = h('input', { type: 'checkbox', 'aria-label': 'rinunciatario', onchange: ev => scrivi('rinuncia', ev.target.checked ? true : null) });
+    rin.checked = valore('rinuncia') === true;
+    ins.append(h('label', { class: 'chk' }, rin, 'Rinunciatario (la rinuncia e\' registrata: indica gli estremi dell\'atto)'));
+    const den = h('input', { 'aria-label': 'denominazione', value: valore('denominazione') || '', oninput: ev => scrivi('denominazione', ev.target.value.trim() || null) });
+    ins.append(h('label', {}, 'Denominazione (solo enti: gradi 35, 37, 38, 39)', den));
+    const oggetto = (campo, titolo, campi) => {
+      ins.append(h('h3', {}, titolo));
+      for (const [c, et] of campi) {
+        const el = h('input', { 'aria-label': titolo + ': ' + et, value: (valore(campo) || {})[c] ?? '', oninput: ev => {
+          const o = { ...(valore(campo) || {}) }; const t = ev.target.value.trim(); if (!t) delete o[c]; else o[c] = t;
+          scrivi(campo, Object.keys(o).length ? o : null); } });
+        ins.append(h('label', {}, et, el));
+      }
+    };
+    oggetto('rinuncia_estremi', 'Estremi dell\'atto di rinuncia', [['ufficio_registrazione', 'ufficio di registrazione'], ['serie', 'serie'],
+      ['numero_registrazione', 'numero'], ['sottonumero_registrazione', 'sottonumero'], ['data_registrazione', 'data di registrazione (AAAA-MM-GG)']]);
+    oggetto('residenza_estera', 'Residenza estera', [['codice_stato', 'codice Stato (3 caratteri)'], ['stato', 'Stato'], ['stato_federato', 'Stato federato'],
+      ['localita', 'localita\''], ['indirizzo', 'indirizzo']]);
   }
   if (q.id === 'EB' || q.id === 'EL') {
     ins.append(h('h3', {}, 'Superficie'));

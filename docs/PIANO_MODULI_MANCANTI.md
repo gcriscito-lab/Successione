@@ -13,10 +13,10 @@ Creato il 2026-11-05. Il ramo stabile per la pratica reale di sabato e' il tag `
 ## Pacchetti
 | # | Pacchetto | Contenuto (dalla matrice) | Stato |
 |---|---|---|---|
-| 1 | Successioni 2014-2024 | quadro EF senza sezione V-bis, imposta fissa per periodo | onda 1 |
-| 2 | Agevolazioni | A, N, G, M, H, C, D, E (righe EF2, AgevolazioneM, esclusioni da EE) | onda 1 |
-| 3 | Soggetti | rinunciatari (tipo 4), trust (5), enti/Stato (gradi 36-39), residenza estera, soggetto su piu' righi | onda 1 |
-| 4 | Beni esteri | provincia EE, imposta versata all'estero e detrazione, certificazione in EG | onda 1 |
+| 1 | Successioni 2014-2024 | quadro EF senza sezione V-bis, imposta fissa per periodo | **integrato** (2006-2024) |
+| 2 | Agevolazioni | A, N, G, M, H, C, D, E (righe EF2, AgevolazioneM, esclusioni da EE) | **integrato** (G solo in EN; requisiti soggettivi a carico del professionista) |
+| 3 | Soggetti | rinunciatari (tipo 4), trust (5), enti/Stato (gradi 36-39), residenza estera, soggetto su piu' righi | **integrato** (restano trust, altro, Stato) |
+| 4 | Beni esteri | provincia EE, imposta versata all'estero e detrazione, certificazione in EG | **integrato** |
 | 5 | Immobili particolari | graffati, rendita proposta, immobili aziendali, diritto di abitazione, discordanza (EI), piu' di tre estremi EI | onda 2 |
 | 6 | Frontespizio | integrativa codice 3, cariche 2-9, legge estera, eventi eccezionali, beneficio d'inventario, residenza estera del defunto | onda 2 |
 | 7 | EG ed EH | inventario, sezioni III-IV di EH, separazione, unione civile, disabili/interdetti, morte presunta | onda 2 |
