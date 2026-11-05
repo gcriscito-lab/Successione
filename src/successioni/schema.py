@@ -36,6 +36,9 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         "categoria": "str", "rendita": "importo", "valore": "importo",
         "diritto": "str", "quota_defunto": "quota", "provenienza": "str",
         "data_visura": "data",   # data della visura catastale da cui derivano i dati (dato interno: non esportato)
+        # Beni esteri (provincia «EE» in EB/EC; casella «bene sito all'estero» in EN/EO/EP/EQ/ER) e imposta versata all'estero
+        "bene_estero": "str", "imposta_estera": "importo", "codice_stato_estero": "str", "stato_estero": "str",
+        "stato_federato": "str", "localita_estero": "str",
         "provincia": "str", "codice_comune": "str", "comune_amministrativo": "str", "codice_comune_amministrativo": "str",
         "indirizzo": "str", "natura": "str", "tipologia_terreno": "str", "reddito_dominicale": "importo", "classe": "str",
         "zona_censuaria": "str", "consistenza": "str", "tipo_cespite": "str",
@@ -66,6 +69,10 @@ AIUTI: dict[str, str] = {
     "devoluzioni.quota": "Quota dell'erede sul diritto del defunto (es. 1/3). È un dato diverso dalla quota del defunto sul bene.",
     "persone.sesso": "M o F, come richiesto dal file telematico.",
     "beni.data_visura": "Data della visura catastale da cui hai ricavato i dati dell'immobile. Il Fascicolo I chiede visure di non piu' di tre mesi prima della presentazione: il programma avvisa se e' piu' vecchia. Non entra nel file XML.",
+    "beni.bene_estero": "Solo per aziende, titoli, aeromobili, navi e altri beni (EN, EO, EP, EQ, ER): 1 se il bene e' sito all'estero. Per gli immobili esteri si indica invece la provincia EE.",
+    "beni.imposta_estera": "Imposta versata all'estero per il bene, in euro interi, per l'INTERO bene (il programma la ripartisce con la quota di devoluzione). Serve la certificazione nel rigo EG4.",
+    "beni.codice_stato_estero": "Immobile estero (provincia EE): codice a 3 cifre dello Stato estero (Appendice del Modello Unico Persone fisiche), es. 029 per la Francia.",
+    "beni.stato_estero": "Immobile estero: nome dello Stato (massimo 34 caratteri).",
     "persone.grado_parentela": "Codice del grado di parentela con il defunto, come nelle istruzioni del quadro EA (es. 02).",
     "persone.rappresentato_cf": "Solo per chi succede per rappresentazione (grado 04, 06, 08, 15, 20, 27): codice fiscale del rappresentato (figlio o fratello del defunto, premorto o rinunciatario).",
     "persone.rappresentato_grado": "Grado di parentela del rappresentato con il defunto: 02 (figlio/a) per i discendenti dei figli, 10 o 11 (fratello/sorella germano o unilaterale) per i discendenti dei fratelli.",
