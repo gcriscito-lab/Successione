@@ -6,7 +6,7 @@ istruzioni ``Succ_FASCICOLO_I_Nov_23.pdf`` (pagina PDF = pagina stampata). Nessu
 
 PERIMETRO (il resto e' ``non_supportato`` oppure ``quadri_mancanti`` con il motivo):
 
-- EF: successioni aperte dal 2025-01-01, prima dichiarazione o sostitutiva 1/2, immobili anche in piu' comuni (circoscrizioni da ``conservatorie.py``, col componente di controllo configurato), senza agevolazioni/riduzioni
+- EF: successioni aperte dal 2006-10-03 (misura fissa 168 fino al 2013, 200 dal 2014; sezione V-bis solo dal 2025-01-01, vedi docs/regole/ef_successioni_storiche.md), prima dichiarazione o sostitutiva 1/2, immobili anche in piu' comuni (circoscrizioni da ``conservatorie.py``, col componente di controllo configurato), senza agevolazioni/riduzioni
   salvo la prima casa (codici P, X, Z: rigo EF4 e Sezione II di EH, vedi ``prima_casa.py``); Sezioni I (ipotecaria 2%), II (catastale 1%), III (tassa ipotecaria 120 euro per circoscrizione), IV (bollo
   85 euro per circoscrizione), V-bis (imposta di successione da ``calcolo.calcola_da_xml`` sul file dichiarato),
   totale EF19. Non coperti: agevolazioni (G, M, Y, Z senza P, trust), regola dei valori fiscali dei soli terreni
@@ -39,8 +39,16 @@ from . import supplemento as SUP
 
 DEC_2025 = date(2025, 1, 1)
 DEC_2014 = date(2014, 1, 1)
+DEC_2006 = date(2006, 10, 3)
 #: imposta fissa ipotecaria/catastale per successioni aperte dal 2014-01-01 (Fascicolo I p. 39; annotazioni EF)
 IMPOSTA_FISSA = 200
+#: per le successioni aperte tra il 2006-10-03 e il 2013-12-31 (Fascicolo I p. 39; annotazioni XSD «168 ... 200 dal 01/01/2014»)
+IMPOSTA_FISSA_2006_2013 = 168
+
+
+def imposta_fissa(data_decesso: date) -> int:
+    """Misura fissa dell'imposta ipotecaria e catastale secondo la data di apertura della successione."""
+    return IMPOSTA_FISSA if data_decesso >= DEC_2014 else IMPOSTA_FISSA_2006_2013
 #: aliquote attuali (Fascicolo I p. 40 rigo EF1 col. 2: 2 per cento; p. 43 rigo EF9 col. 2: 1 per cento)
 ALIQUOTA_IPOTECARIA = Decimal("0.02")
 ALIQUOTA_CATASTALE = Decimal("0.01")
@@ -102,11 +110,21 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
     if not obbligatorio:
         return None
     motivi: list[str] = []
+    # Prima del 2025 il quadro EF resta (obbligatorio con EA e immobili) ma senza la sezione V-bis: l'imposta di successione e'
+    # liquidata dall'ufficio (Fascicolo I pp. PDF 9 e 39; annotazioni XSD di SezioneVBis_ImpostaSuccessione).
+    if dd < DEC_2006:
+        motivi.append("successione aperta prima del 2006-10-03: misura fissa e regole ipocatastali non indicate dalle fonti "
+                      "(Fascicolo I p. 39 distingue solo i periodi dal 2006-10-03 e dal 2014-01-01)")
+    fissa = imposta_fissa(dd) if dd >= DEC_2006 else IMPOSTA_FISSA_2006_2013
     if dd < DEC_2025:
-        motivi.append("successione aperta prima del 2025-01-01: quadro EF (imposte ipocatastali liquidate senza "
-                      "sezione V-bis) non coperto da questa versione")
-    if dd < DEC_2014:
-        motivi.append("imposta fissa di 168 euro (successioni 2006-2013, Fascicolo I p. 39) non coperta")
+        # tempistica di pagamento e rateazione sono campi di ImpostaCalcolata (V-bis), assente prima del 2025: se indicati non
+        # finiscono nel file, quindi lo si dice (nessuna perdita silenziosa)
+        ignorati = [k for k in ("tempistica_pagamento", "pagamento_rateale", "acconto") if SUP.dich(x.d, k) not in (None, "", False)]
+        if ignorati:
+            x.avv("DATO_NON_APPLICABILE_PRIMA_DEL_2025", "opzioni.telematico.dichiarazione",
+                  f"successione aperta prima del 2025-01-01: {', '.join(ignorati)} riguardano l'imposta di successione autoliquidata "
+                  "(sezione V-bis, assente per queste successioni) e non vengono esportati",
+                  _fa("QuadroEF/SezioneVBis_ImpostaSuccessione") + "; " + FO.fonte_fasc1(39, "quadro EF"))
     ef: dict = {}
     da_versare = Decimal(0)
     if immobili and not motivi:
@@ -173,7 +191,7 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             imp = str(int(imponibile))
             fa1 = _fa(el + "/SezioneI_ImpostaIpotecaria/ImpostaProporzionale/ImpostaProporzionale_Imposta")
             # rigo EF4 (Fascicolo I p. PDF 41, annotazione PrimaCasa_Imposta): numero immobili x 200; EF5/EF11 = proporzionale + EF4
-            fissa_pc = IMPOSTA_FISSA * n_pc
+            fissa_pc = fissa * n_pc
             ip = ip if immobili_prop else 0
             cat = cat if prop_cat else 0
             if vf is not None:
@@ -182,7 +200,7 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                     # il minore fra valori fiscali e imposte proporzionali: 2/3 all'ipotecaria, 1/3 alla catastale
                     ip, cat = arrotonda_euro(vf * 2 / 3), arrotonda_euro(vf / 3)
                 else:
-                    ip, cat = max(ip, IMPOSTA_FISSA), max(cat, IMPOSTA_FISSA)
+                    ip, cat = max(ip, fissa), max(cat, fissa)
             s1: dict = {}
             if immobili_prop:
                 s1["ImpostaProporzionale"] = {"ImpostaProporzionale_Imponibile": imp,
@@ -193,9 +211,9 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             sost = x.sost
             dovuta_ip, dovuta_cat = ip + fissa_pc, cat + fissa_pc
             if immobili_prop and vf is None:
-                dovuta_ip = max(dovuta_ip, IMPOSTA_FISSA)      # annotazione XSD ImpostaIpotecariaDovuta
+                dovuta_ip = max(dovuta_ip, fissa)      # annotazione XSD ImpostaIpotecariaDovuta
             if prop_cat and vf is None:
-                dovuta_cat = max(dovuta_cat, IMPOSTA_FISSA)    # annotazione XSD ImpostaCatastaleDovuta
+                dovuta_cat = max(dovuta_cat, fissa)    # annotazione XSD ImpostaCatastaleDovuta
             da_ip, da_cat = dovuta_ip, dovuta_cat
             s1["ImpostaIpotecariaDovuta"] = str(dovuta_ip)
             if sost:
@@ -203,7 +221,7 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                 # versare, se dovuto, non puo' essere inferiore alla misura fissa (200 euro)
                 da_ip, da_cat = int(SO.netto(dovuta_ip, sost.ipotecaria_versata)), int(SO.netto(dovuta_cat, sost.catastale_versata))
                 if sost.codice == "1":
-                    da_ip, da_cat = max(da_ip, IMPOSTA_FISSA), max(da_cat, IMPOSTA_FISSA)
+                    da_ip, da_cat = max(da_ip, fissa), max(da_cat, fissa)
                 if sost.ipotecaria_versata:
                     s1["ImpostaIpotecariaVersata"] = str(sost.ipotecaria_versata)
             if da_ip:
@@ -265,12 +283,30 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                                  "pratica ma non e' generato: " + "; ".join(motivi),
                                  _fa(el) + "; " + FO.fonte_fasc1(39, "quadro EF")))
         return None
+    if da_versare and dd < DEC_2025:
+        _avviso_tardiva(x, dd)
     if da_versare:
         ef["TotaleDaVersare"] = F.euro_centesimi(da_versare)
     x.totale_da_versare = da_versare
     x.mappa["quadro:EF"] = {"coll": None, "quadro": "EF", "xpath": f"{x.XP_DICH}/suc:QuadroEF",
                             "totale_da_versare": str(da_versare), "calcoli": dict(getattr(x, "calcoli_ef", {}))}
     return ef or None
+
+
+def _avviso_tardiva(x, dd) -> None:
+    """Dichiarazione oltre i dodici mesi dal decesso con imposte ipocatastali da versare: la Sezione VI (sanzioni e interessi del
+    ravvedimento) e' facoltativa («puo' essere utilizzata», Fascicolo I p. PDF 49) e non si calcola qui (il tasso legale per anno
+    non e' nelle fonti): l'XML non e' bloccato ma l'utente va avvisato."""
+    try:
+        termine = dd.replace(year=dd.year + 1)
+    except ValueError:
+        return
+    if x.oggi > termine:
+        x.avv("EF_TARDIVA_SANZIONI_NON_CALCOLATE", "quadro[EF]",
+              f"dichiarazione presentata oltre il termine di dodici mesi dal decesso ({termine.isoformat()}): per le imposte "
+              "ipotecarie, catastali e gli altri tributi autoliquidati versati in ritardo possono essere dovuti sanzioni e interessi "
+              "(Sezione VI, ravvedimento operoso) che questo programma non calcola: valutarli a parte",
+              FO.fonte_fasc1(49, "Sezione VI - sanzioni e interessi"))
 
 
 def _sezione_vbis(x, xml_pre):
