@@ -10,7 +10,7 @@ function h(tag, attrs, ...kids) {
   for (const c of kids.flat()) if (c !== null && c !== undefined && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
   return e;
 }
-const S = { schema: null, pratiche: [], P: null, Q: null, sel: "AN", riga: null, tab: "dati", dirty: new Map(), nuove: new Map(), salvata: null, writeBusy: false };
+const S = { schema: null, pratiche: [], P: null, Q: null, sel: "AN", riga: null, tab: "dati", dirty: new Map(), nuove: new Map(), salvata: null, writeBusy: false, gen: 0 };
 const STATI = { vuoto: "da compilare", compilato: "compilato", rilievi: "rilievi", non_supportato: "non supportato", inattivo: "non selezionato" };
 S.dichDirty = new Map();
 S.supDirty = new Map();
@@ -135,6 +135,7 @@ async function caricaPratiche() {
 async function apri(id, sel) {
   if (S.writeBusy) { msg("Salvataggio in corso: attendi prima di cambiare pratica.", "e"); return; }
   if (nMod() && !confirm("Ci sono modifiche non salvate: continuare senza salvarle?")) return;
+  S.gen++;   // invalida le risposte asincrone (es. codice fiscale) richieste per la pratica precedente
   S.dirty.clear(); S.nuove.clear(); S.dichDirty.clear(); S.supDirty.clear(); S.riga = null; S.tab = "dati"; S.salvata = null;
   S.fornitoreDirty = {};
   await ricarica(id);
@@ -450,7 +451,7 @@ function insDati(ins) {
       renderVista(); aggiornaBottoni(); renderSb();
       if ((q.coll === "beni" && campo === "tipo") || (q.coll === "devoluzioni" && campo === "bene_id")) renderIns();   // cambia l'elenco dei diritti
       if (q.coll === "persone" && campo === "codice_fiscale")
-        suggerisciDaCF(v, r.e ? r.e.ruolo : (r.nuova && r.nuova.campi.ruolo), c2 => valRiga(r, c2), scrivi).then(res => {
+        suggerisciDaCF(v, r.e ? r.e.ruolo : (r.nuova && r.nuova.campi.ruolo), c2 => valRiga(r, c2), scrivi, () => String(valRiga(r, "codice_fiscale") || "").trim().toUpperCase() === v.trim().toUpperCase()).then(res => {
           if (res.testo) msg(res.testo, res.riempiti.length ? "o" : "e");
           if (res.riempiti.length) { renderVista(); renderIns(); aggiornaBottoni(); renderSb(); }
         });
@@ -725,7 +726,7 @@ function schedaPersona(titolo, ruolo, vis) {
       const scrivi = (c2, x) => { const d = S.dirty.get(key) || { coll: "persone", id: e ? e.id : null, campi: e ? {} : { ruolo } }; d.campi[c2] = x; S.dirty.set(key, d); };
       scrivi(campo, v); aggiornaBottoni(); renderSb();
       if (campo === "codice_fiscale")
-        suggerisciDaCF(v, ruolo, c2 => { const dd = S.dirty.get(key); return dd && c2 in dd.campi ? dd.campi[c2] : (e ? e[c2] : undefined); }, scrivi).then(res => {
+        suggerisciDaCF(v, ruolo, c2 => { const dd = S.dirty.get(key); return dd && c2 in dd.campi ? dd.campi[c2] : (e ? e[c2] : undefined); }, scrivi, () => { const dd = S.dirty.get(key); return !!dd && String(dd.campi.codice_fiscale || "").trim().toUpperCase() === String(v || "").trim().toUpperCase(); }).then(res => {
           if (res.testo) msg(res.testo, res.riempiti.length ? "o" : "e");
           if (res.riempiti.length) { aggiornaBottoni(); renderSb(); render(); }
         });
@@ -1052,10 +1053,13 @@ function testoCF(r, riempiti) {
   if (r.avvisi.length) parti.push(r.avvisi.join(" "));
   return parti.join(" ");
 }
-async function suggerisciDaCF(cf, ruolo, leggiCampo, scriviCampo) {
+async function suggerisciDaCF(cf, ruolo, leggiCampo, scriviCampo, ancoraValida) {
   const v = String(cf || "").trim().toUpperCase();
   if (v.length !== 16) return { riempiti: [], testo: "" };
+  const gen = S.gen, pid = S.P && S.P.pratica_id;
   let r; try { r = await decodificaCF(v, ruolo); } catch (e) { return { riempiti: [], testo: "" }; }
+  // risposta tardiva: pratica cambiata/chiusa, procedura guidata riaperta o codice fiscale nel frattempo modificato
+  if (gen !== S.gen || pid !== (S.P && S.P.pratica_id) || (ancoraValida && !ancoraValida())) return { riempiti: [], testo: "" };
   const riempiti = [];
   for (const c of DA_CF) { const x = r.campi[c]; if (x && !String(leggiCampo(c) || "").trim()) { scriviCampo(c, x); riempiti.push(c); } }
   return { riempiti, testo: testoCF(r, riempiti) };
@@ -1092,10 +1096,10 @@ function wizRender() {
 }
 async function wizDaCF(valore) {
   const d = W.dati;
-  const { testo } = await suggerisciDaCF(valore, "defunto", c => d[c], (c, x) => { d[c] = x; const el = $("#w_" + c); if (el) el.value = x; });
+  const { testo } = await suggerisciDaCF(valore, "defunto", c => d[c], (c, x) => { d[c] = x; const el = $("#w_" + c); if (el) el.value = x; }, () => W.dati === d && String(d.codice_fiscale || "").trim().toUpperCase() === String(valore || "").trim().toUpperCase());
   const nota = $("#w_cf_nota"); if (nota) nota.textContent = testo;
 }
-function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; wizRender(); $("#wiz").showModal(); }
+function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; S.gen++; wizRender(); $("#wiz").showModal(); }
 async function wizAvanti() {
   const d = W.dati;
   if (W.passo === 0 && !(d.cognome || "").trim()) { $("#wizErr").textContent = "Indica almeno il cognome del defunto."; return; }
@@ -1233,7 +1237,7 @@ $('#homeNuova').onclick = wizApri;
 $('#homeImporta').onclick = () => $('#fImporta').click();
 $('#bHome').onclick = () => {
   if (S.writeBusy || (nMod() && !confirm('Ci sono modifiche non salvate. Tornare alla pagina iniziale senza salvarle?'))) return;
-  S.P = null; S.Q = null; S.dirty.clear(); S.nuove.clear(); S.dichDirty.clear(); S.supDirty.clear(); S.fornitoreDirty = {};
+  S.gen++; S.P = null; S.Q = null; S.dirty.clear(); S.nuove.clear(); S.dichDirty.clear(); S.supDirty.clear(); S.fornitoreDirty = {};
   S.sel = 'AN'; S.tab = 'dati'; $('#vista').scrollTop = 0; $('#titolo').textContent = 'Nessuna pratica aperta'; render(); caricaPratiche();
 };
 document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); salvaTutto(); } });

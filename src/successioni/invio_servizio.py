@@ -11,7 +11,7 @@ Credenziali e certificati non passano di qui.
 """
 from __future__ import annotations
 
-from .errori import DatiNonValidi
+from .errori import ConflittoRevisione, DatiNonValidi
 
 MODALITA = ("simulata", "manuale")
 
@@ -47,6 +47,8 @@ class InvioMixin:
         if c and c["input"].get("xml_sha256") == exp.get("xml_sha256"):
             controllo = c["risultato"].get("job_adattatore")
         d = self.leggi(pratica_id)
+        if d["impronta_dichiarativa"] != st["impronta_dichiarativa"]:
+            raise ConflittoRevisione("la pratica e' cambiata: rigenerare gli elaborati")
         forn = (d["dati"].get("opzioni", {}) or {}).get("fornitore", {}) or {}
         profilo = {k: forn[k] for k in ("cf", "tipo", "impegno_codice", "data_impegno") if forn.get(k)}
         from lxml import etree
@@ -57,7 +59,7 @@ class InvioMixin:
         profilo["cf"] = root.findtext(f'.//{{{NS_TM}}}CodiceFiscaleFornitore')
         r = self._adattatore_invio("manuale").prepara(
             pratica_id, elaborati=[{"percorso": str(self.arch.base / exp["percorso"]), "ruolo": "telematico"}],
-            importi=importi, profilo=profilo, controllo_job_id=controllo, revisione=exp.get("revisione"), chiave=chiave,
+            importi=importi, profilo=profilo, controllo_job_id=controllo, revisione=d["revisione"], chiave=chiave,
             aspettative={"addebito": bool(root.find(f'.//{{{NS_SUC}}}Versamento') is not None)})
         return self._copia_json(r)
 

@@ -1551,6 +1551,12 @@ class _Export:
         if ctx.tipo_fornitore not in ("1", "10"):
             self.err("VALORE_NON_VALIDO", "contesto.tipo_fornitore", "TipoFornitore ammette 1 o 10",
                      FO.fonte_spec(15, "§3.3.1"))
+        tipo_dich = (self.d.get("opzioni", {}) or {}).get("tipo_dichiarazione") or "originaria"
+        if tipo_dich != "originaria":
+            # il frontespizio e' sempre serializzato come prima dichiarazione: nessun file per tipi non gestiti
+            self.err("SOSTITUTIVA_NON_SUPPORTATA", "opzioni.tipo_dichiarazione",
+                     f"tipo di dichiarazione '{tipo_dich}' non gestito (dati della dichiarazione sostituita, casella nel "
+                     "frontespizio): XML non generato", "docs/MATRICE_COPERTURA.md")
         if not isinstance(ctx.identificativo, str) or not _ID_DICH.fullmatch(ctx.identificativo):
             self.err("VALORE_NON_VALIDO", "contesto.identificativo", "5 cifre, non tutte zero (Identificativo_Type)",
                      "fornitura_v2.xsd Identificativo_Type")

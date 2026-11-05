@@ -1,4 +1,14 @@
-# Stato dei lavori (aggiornato 2026-11-01)
+# Stato dei lavori (aggiornato 2026-11-05)
+
+## Sintesi corrente (2026-11-05, dopo la revisione esterna `docs/REVISIONE_ESTERNA_CODEX_20261105.md`)
+- Corretti R01 (risposte CF tardive tra pratiche: contatore `S.gen` e verifica di coerenza in `suggerisciDaCF`), R02 (tipo
+  dichiarazione non gestito: nessun XML, quindi nessuna preparazione), R03 (preparazione dopo modifica non dichiarativa) e
+  R04 (rigenerazione ripara l'XML alterato). Regressioni Python in `tests/test_correzioni_codex.py`; R01 verificato nel browser
+  integrato con risposta ritardata (riprodotto sul codice precedente), non ancora con Playwright: non installato qui.
+- R05: `gui_aspetto.js` usa `selectOption` per la provincia; matrice riallineata su Frontespizio/EG/EH. Restano da fare le
+  altre voci della revisione (sezione 4): sostitutive, devoluzione legittima, pluricomune, collegamenti reali, stampa ministeriale.
+- Le sezioni seguenti sono cronologia storica: possono descrivere come assenti funzioni poi realizzate.
+
 
 Nota per riprendere. Le decisioni sotto sono già prese; non vanno riaperte senza motivo.
 

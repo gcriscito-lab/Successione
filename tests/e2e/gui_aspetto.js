@@ -54,7 +54,7 @@ const { chromium } = require('playwright');
       await apri(p.pratica_id); return p.pratica_id;
     });
     assert.equal(await page.getByRole('heading', { name: '1. Defunto', exact: true }).count(), 1);
-    await page.locator('#vista [aria-label="provincia_nascita"]').first().fill('TO');
+    await page.locator('#vista [aria-label="provincia_nascita"]').first().selectOption('TO');
     await page.locator('#bSalva').click(); await page.waitForFunction(() => !S.writeBusy && nMod() === 0);
     assert.equal(await page.evaluate(() => S.P.dati.persone[0].provincia_nascita), 'TO');
     await page.screenshot({ path: 'build/aspetto_generali.png', fullPage: true });

@@ -277,3 +277,34 @@ def test_ce08_riprendi_non_duplica_un_controllo_ancora_attivo(tmp_path):
         finally:
             rilascia.set()
         f.result(timeout=10)
+
+
+# ---- revisione esterna 2026-11-05 (R02-R04) -------------------------------------------------
+def test_r02_sostitutiva_non_genera_xml_ne_preparazione(tmp_path):
+    s, pid = pratica_con_allegati(tmp_path)
+    rev = s.leggi(pid)['revisione']
+    s.aggiorna(pid, rev, [{'op': 'set', 'sezione': 'opzioni', 'campi': {'tipo_dichiarazione': 'sostitutiva'}}])
+    r = s.esporta(pid)
+    assert not r['generato'] and not r['completo']
+    assert any(e['codice'] == 'SOSTITUTIVA_NON_SUPPORTATA' for e in r['errori']), r['errori']
+    with pytest.raises(DatiNonValidi):
+        s.invio_prepara(pid)
+
+
+def test_r03_nota_interna_non_blocca_la_preparazione(tmp_path):
+    s, pid = pratica_con_allegati(tmp_path)
+    assert s.esporta(pid)['completo']
+    s.aggiorna(pid, s.leggi(pid)['revisione'], [{'op': 'set', 'sezione': 'note', 'campi': {'interna': 'solo promemoria'}}])
+    assert s.stato_elaborati(pid)['export']['stato'] == 'aggiornato'
+    assert s.invio_prepara(pid)['stato']
+
+
+def test_r04_rigenerazione_ripara_xml_alterato(tmp_path):
+    s, pid = pratica_con_allegati(tmp_path)
+    r = s.esporta(pid)
+    p = s.arch.base / r['percorso']
+    originale = p.read_bytes()
+    p.write_bytes(b'ALTERAZIONE SINTETICA')
+    s.esporta(pid)
+    assert p.read_bytes() == originale
+    assert s.file_export(pid)[0] == originale

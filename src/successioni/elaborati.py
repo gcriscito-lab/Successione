@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import uuid
 from pathlib import Path
 
@@ -88,8 +89,10 @@ class ElaboratiMixin:
             cart = self.arch.base / "elaborati" / pratica_id
             cart.mkdir(parents=True, exist_ok=True)
             p = cart / f"{sha[:16]}.xml"
-            if not p.exists():
-                p.write_bytes(es.xml)
+            if not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != sha:
+                tmp = p.with_name(p.name + ".tmp")   # assente o alterato: ripristina atomicamente i byte generati
+                tmp.write_bytes(es.xml)
+                os.replace(tmp, p)
             percorso = p.relative_to(self.arch.base).as_posix()
         ris = {"generato": es.xml is not None, "completo": es.completo, "scopo": scopo, "xml_sha256": sha, "percorso": percorso,
                "errori": [e.asdict() for e in es.errori], "non_supportato": list(es.non_supportato),
