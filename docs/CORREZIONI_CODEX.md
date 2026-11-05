@@ -33,7 +33,7 @@ ferma l'albero del processo creato dal test. Non e' una prova del pacchetto auto
 - CE01: `fornituraSUC13_v1.xsd`, elementi `QuadroEG/AlberoGenealogico` e
   `Frontespizio/ImpegnoATrasmettere`; istruzioni Fascicolo I, pp.49 e 51.
 - CE03: Fascicolo I, p.69, Allegato 5; annotazioni `Devoluzione/Quota` nei quadri EB/EC/ER.
-  La verifica automatica resta limitata a figli, coniuge, coniuge e figli.
+  La verifica automatica era limitata a figli, coniuge, coniuge e figli; dal 2026-11-05 comprende genitori e fratelli (tabelle di Allegato 5 pp. 69-70).
 - CE04: Fascicolo I p.6, termine ordinario di dodici mesi; p.48, EF18ter colonna 1 e inclusione in EF19.
   Il blocco e' prudenziale per le tardive **con imposta di successione dovuta**; non implementa sospensioni,
   decorrenze particolari, sanzioni o interessi. Non dichiara verificate le tardive con imposta non dovuta.

@@ -117,8 +117,8 @@ def test_quote_tipi_tutti_chiamati():
     assert result == {"C": Fraction(1, 2), "F": Fraction(1, 2)}
 
 
-# caratterizzazione: configurazione non coperta (ascendente) -> None
-def test_quote_ascendente_non_coperto():
-    gradi = {"A": "03"}  # grado 03 non gestito
-    tipi = {"A": "1"}
-    assert quote_di_legge(gradi, tipi) is None
+# genitore unico: senza discendenti ne' fratelli succede il genitore che sopravvive (Allegato 5, p. 69); un grado fuori
+# dalle tabelle (nonno del coniuge) resta non coperto
+def test_quote_genitore_unico_e_grado_non_coperto():
+    assert quote_di_legge({"A": "03"}, {"A": "1"}) == {"A": Fraction(1)}
+    assert quote_di_legge({"A": "14"}, {"A": "1"}) is None

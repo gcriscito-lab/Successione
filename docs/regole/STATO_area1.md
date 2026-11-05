@@ -98,7 +98,7 @@ implica EF16 col. 1 e EF18 (non coperti).
 - EG: testamento, inventario, imposta estera, agevolazioni/riduzioni -> `non_supportato`. Conformita' PDF/A non
   verificata dall'export (avviso).
 - EH: sezioni II-IV, separazione (stato civile 5), unione civile (7), interdetti/disabili, rinunce -> `non_supportato`.
-- Quote di legge: coperti solo figli / coniuge / coniuge+figli; altrimenti avviso `QUOTE_DI_LEGGE_NON_VERIFICATE`.
+- Quote di legge (aggiornato 2026-11-05): figli, coniuge, genitori, fratelli germani/unilaterali e le combinazioni delle tabelle di Allegato 5 pp. 69-70; altrimenti avviso `QUOTE_DI_LEGGE_NON_VERIFICATE`.
 - Servizio/GUI/MCP: passare `ContestoExport.allegati` (allegato_id -> file) dall'archivio (proposta P8).
 - Controllo con Java >= 11 dall'adattatore area 3: serve jaxb-api nel classpath o Java 8 (proposta P9).
 - Collaudo su Desktop Telematico (Windows) e con i servizi dell'Agenzia: da fare.

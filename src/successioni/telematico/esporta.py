@@ -1595,7 +1595,7 @@ class _Export:
                                                  {p["id"]: self.tipo_ea.get(p["id"]) for p in self.ea})
             if self.quote_legge is None:
                 self.avv("QUOTE_DI_LEGGE_NON_VERIFICATE", "quadro[EA]", "configurazione di eredi non coperta dal "
-                         "controllo delle quote di legge (coperti: solo figli, solo coniuge, coniuge e figli): le quote "
+                         "controllo delle quote di legge (coperti: figli, coniuge, genitori e fratelli nelle combinazioni delle tabelle di p. 69-70 dell'Allegato 5): le quote "
                          "di devoluzione non sono verificate dall'export", DL.FONTE)
                 self.mancanti.append(Errore("QUOTE_DI_LEGGE_NON_VERIFICATE", "quadro[EA]",
                     "configurazione di eredi non coperta dalla verifica delle quote di legge: "

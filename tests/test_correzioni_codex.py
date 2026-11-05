@@ -81,9 +81,10 @@ def test_ce01_rifiuta_allegato_di_altra_pratica_e_file_alterato(tmp_path):
 
 def test_ce03_quote_non_verificate_non_finalizzabili_ma_bozza_con_avviso():
     d = caso_tempestivo()
-    for p, g in [('p_anna0001', '10'), ('p_luca0001', '11')]:
+    for p, g in [('p_anna0001', '16'), ('p_luca0001', '16')]:   # zii: parenti oltre fratelli e ascendenti, fuori dalle tabelle
         next(x for x in d['persone'] if x['id'] == p)['relazione_con_defunto'] = g
         d['opzioni']['telematico']['persone'][p]['grado_parentela'] = g
+    d['opzioni']['telematico']['dichiarazione']['tempistica_pagamento'] = '2'   # zii: nessuna franchigia, imposta dovuta
     r = esporta_xml(d, contesto_caso_a10())
     assert r.xml is None and not r.completo
     assert any(m.codice == 'QUOTE_DI_LEGGE_NON_VERIFICATE' for m in r.quadri_mancanti)
@@ -308,3 +309,13 @@ def test_r04_rigenerazione_ripara_xml_alterato(tmp_path):
     s.esporta(pid)
     assert p.read_bytes() == originale
     assert s.file_export(pid)[0] == originale
+
+
+def test_germano_e_unilaterale_con_quote_uguali_sono_respinti():
+    """Allegato 5 p. 69: l'unilaterale ha la meta' della quota del germano (2/3 e 1/3): 1/2 e 1/2 non sono quote di legge."""
+    d = caso_tempestivo()
+    for p, g in [('p_anna0001', '10'), ('p_luca0001', '11')]:
+        next(x for x in d['persone'] if x['id'] == p)['relazione_con_defunto'] = g
+        d['opzioni']['telematico']['persone'][p]['grado_parentela'] = g
+    r = esporta_xml(d, contesto_caso_a10())
+    assert r.xml is None and any('allegato 5' in e.messaggio for e in r.errori)
