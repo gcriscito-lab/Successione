@@ -51,6 +51,8 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         "comune_catastale": "str", "codice_comune_catastale": "str", "partita_tavolare": "str", "corpo_tavolare": "str",
         "porzione_materiale": "str", "particella_denominatore": "str", "sistema_tavolare": "str",
         "discordanza_intestatario": "str", "passaggi_senza_atti_legali": "str",
+        # Immobili particolari (docs/regole/immobili_particolari.md): rendita proposta (DOCFA) e bene aziendale (casella EB/EC)
+        "rendita_proposta": "str", "bene_aziendale": "str",
     },
     "devoluzioni": {
         "bene_id": "ref:beni", "persona_id": "ref:persone", "quota": "quota", "diritto": "str",
@@ -66,6 +68,7 @@ AIUTI: dict[str, str] = {
                    "Esempio: immobile da 200.000 euro posseduto per 1/2: indicare 100.000. Indicare l'intero valore raddoppia attivo e imposta.",
     "beni.quota_defunto": "Frazione del bene posseduta dal defunto (es. 1/2). Non è la quota dell'erede.",
     "beni.rendita": "Rendita catastale in euro, con il punto decimale (es. 1240.50).",
+    "beni.graffati": "Immobili graffati al fabbricato (fino a 4 per rigo): sezione urbana, foglio, particella, subalterno. Nei dati principali si indica la sola prima particella.",
     "devoluzioni.quota": "Quota dell'erede sul diritto del defunto (es. 1/3). È un dato diverso dalla quota del defunto sul bene.",
     "persone.sesso": "M o F, come richiesto dal file telematico.",
     "beni.data_visura": "Data della visura catastale da cui hai ricavato i dati dell'immobile. Il Fascicolo I chiede visure di non piu' di tre mesi prima della presentazione: il programma avvisa se e' piu' vecchia. Non entra nel file XML.",
@@ -124,6 +127,17 @@ STRUTTURATI: dict[str, dict] = {
         "etichetta": "passaggi senza atti legali", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
         "aiuto": "Casella del quadro EB/EC: ci sono passaggi di proprieta' non risultanti da atti legali. Genera il quadro EI.",
         "opzioni": [_opz("si", "si'", "Casella spuntata."), _opz("no", "no", "Casella non spuntata.")]},
+    "beni.rendita_proposta": {
+        "etichetta": "rendita proposta (DOCFA)", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
+        "aiuto": "Si' se in catasto l'immobile ha solo la rendita proposta con DOCFA: nel campo «rendita» va il valore proposto e si "
+                 "chiede la determinazione (codice 1). La volonta' va manifestata con una dichiarazione sostitutiva allegata nel quadro EG "
+                 "(rigo «Altro»). Fascicolo I pp. 29-30.",
+        "opzioni": [_opz("si", "si'", "Rendita proposta: determinazione richiesta."), _opz("no", "no", "Rendita definitiva.")]},
+    "beni.bene_aziendale": {
+        "etichetta": "bene aziendale", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
+        "aiuto": "Si' se l'immobile e' un bene aziendale (ditta individuale): va compilato anche il quadro EN con l'azienda a cui appartiene "
+                 "e il collegamento dell'immobile. Fascicolo I pp. 21 e 29.",
+        "opzioni": [_opz("si", "si'", "Immobile aziendale."), _opz("no", "no", "Immobile non aziendale.")]},
     "beni.sistema_tavolare": {
         "etichetta": "sistema tavolare", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
         "aiuto": "Si' se l'immobile e' nel sistema tavolare (quadri EL/EM), anche fuori dalle province tavolari.",

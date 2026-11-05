@@ -587,6 +587,10 @@ def quadro_eg(x) -> dict | None:
             x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].DocumentiIdentita", "documento d'identita' "
                                      "di chi sottoscrive la richiesta di agevolazioni (rigo EG7)",
                                      FO.fonte_fasc1(50, "dichiarazioni sostitutive rese da soggetti diversi dal dichiarante")))
+    if getattr(x, "rp_altro", False) and "Altro" not in per_sez:
+        x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "rendita proposta (DOCFA): la volonta' di "
+                                 "avvalersene va manifestata con una dichiarazione sostitutiva allegata nel quadro EG, rigo 'Altro'",
+                                 _fa(el + "/Altro") + "; " + FO.fonte_fasc1(30, "Determinazione rendita")))
     if getattr(x, "ag_altro", False) and "Altro" not in per_sez:
         x.mancanti.append(Errore("ALLEGATO_OBBLIGATORIO_MANCANTE", "quadro[EG].Altro", "agevolazione H (immobili demoliti o "
                                  "inagibili): la documentazione va allegata nel quadro EG, rigo EG8 'Altro'",

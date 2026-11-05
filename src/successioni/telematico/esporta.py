@@ -908,6 +908,70 @@ class _Export:
         riga.update(self._flag_ei(b, "EB", luogo, cat, None, tavolare))
         return riga
 
+    def rendita_proposta_ec(self, b: dict, df: dict, rend, categoria_f: bool, eld: str, tavolare: bool) -> None:
+        """Rendita proposta (DOCFA): ``DeterminazioneRendita`` = 1 con la rendita proposta nel campo rendita (Fascicolo I pp. PDF 29-30);
+        la volonta' di avvalersene si manifesta con una dichiarazione sostitutiva nel quadro EG (rigo «Altro»)."""
+        from .quadri_efgh import _flag
+        self.usa(b, "rendita_proposta")
+        if not _flag(SUP.attr(self.d, "beni", b, "rendita_proposta")):
+            return
+        perc = f"beni[{b['id']}].rendita_proposta"
+        fonte = FO.fonte_annotazione(eld + "/DeterminazioneRendita") + "; " + FO.fonte_fasc1(29, "Rendita catastale") + "; " + FO.fonte_fasc1(30, "Determinazione rendita")
+        if tavolare:
+            self.ns.append(f"{perc}: rendita proposta non prevista per i fabbricati tavolari (EM)")
+        elif categoria_f or not rend:
+            self.err("REGOLA_RENDITA_PROPOSTA", perc, "la rendita proposta richiede una categoria non fittizia (F) e il valore della "
+                     "rendita proposta nel campo rendita", fonte)
+        else:
+            df["DeterminazioneRendita"] = "1"
+            self.rp_altro = True      # EG, rigo «Altro»: dichiarazione sostitutiva (Fascicolo I p. 30)
+
+    def graffati_ec(self, b: dict, sezione_principale, tavolare: bool) -> dict | None:
+        """Immobili graffati di un fabbricato (EC): fino a 4 per rigo (``ImmobiliGraffati``), con foglio, particella, subalterno e,
+        se l'immobile principale ha la sezione urbana, anche la sezione. Oltre 4: ContinuazioneGraffati con un rigo successivo senza
+        dati identificativi, non supportato. Annotazioni XSD di ``Graffati`` e di ``reg:DatiCatastali_Type``."""
+        self.usa(b, "graffati")
+        voci = SUP.attr(self.d, "beni", b, "graffati")
+        if voci in (None, "", []):
+            return None
+        perc = f"beni[{b['id']}].graffati"
+        el = "QuadroEC/Modulo/Fabbricati/Graffati"
+        fonte = FO.fonte_annotazione(el) + "; " + FO.fonte_fasc1(29, "Particella e subalterno (graffati)")
+        if tavolare:
+            self.ns.append(f"{perc}: immobili graffati dei fabbricati tavolari (EM) non supportati (GraffatiTavolareType)")
+            return None
+        if not isinstance(voci, list) or any(not isinstance(v, dict) or set(v) - {"sezione", "foglio", "particella", "subalterno"}
+                                              for v in voci):
+            self.err("VALORE_NON_VALIDO", perc, "attesa una lista di immobili con i soli campi sezione, foglio, particella, subalterno", fonte)
+            return None
+        if len(voci) > 4:
+            self.ns.append(f"{perc}: piu' di quattro immobili graffati (ContinuazioneGraffati, rigo successivo) non supportato")
+            return None
+        out, visti = [], set()
+        for i, v in enumerate(voci):
+            p = f"{perc}[{i}]"
+            try:
+                dc = {"Foglio": F.an(str(v.get("foglio") or ""), 4), "Particella": F.an(str(v.get("particella") or ""), 5, tipo="PART")}
+                if v.get("subalterno") not in (None, ""):
+                    dc["Subalterno"] = F.an(str(v["subalterno"]), 4)
+                if sezione_principale:
+                    if v.get("sezione") in (None, ""):
+                        raise F.ValoreXml("la sezione urbana e' obbligatoria se l'immobile principale ha la sezione urbana")
+                    dc["SezioneUrbana"] = F.an(str(v["sezione"]), 3)
+                elif v.get("sezione") not in (None, ""):
+                    raise F.ValoreXml("sezione urbana indicata ma l'immobile principale non ha la sezione urbana")
+            except F.ValoreXml as e:
+                self.err("DATO_MANCANTE" if not v.get("foglio") or not v.get("particella") else "VALORE_NON_VALIDO", p, str(e), fonte)
+                continue
+            chiave = (dc.get("SezioneUrbana"), dc["Foglio"], dc["Particella"], dc.get("Subalterno"))
+            if chiave in visti:
+                self.err("REGOLA_GRAFFATI", p, "lo stesso immobile graffato (sezione, foglio, particella, subalterno) non puo' comparire "
+                         "piu' volte nello stesso immobile", fonte)
+                continue
+            visti.add(chiave)
+            out.append({"DatiCatastali": dc})
+        return {"ImmobiliGraffati": out} if out else None
+
     def riga_ec(self, b: dict, tavolare: bool = False) -> dict | None:
         c, el = "beni", "QuadroEC/Modulo/Fabbricati"
         eld = el + "/DatiFabbricati/DatiFabbricati"
@@ -946,6 +1010,7 @@ class _Export:
                      FO.fonte_annotazione(eld + "/RenditaCatastale"))
         elif rend:
             df["RenditaCatastale"] = rend
+        self.rendita_proposta_ec(b, df, rend, categoria_f, eld, tavolare)
         poss, fposs = self.quota_possesso(b, el + "/Possesso")
         dir_p = self.diritto_defunto(b, "CodiciDirittoImmobili_Type", el + "/CodiceDiritto_P")
         valore = self.valore_bene(b, el + "/Valore")
@@ -960,6 +1025,9 @@ class _Export:
                 "CodiceDiritto_P": dir_p, "Valore": valore}
         self._niente_estero_in_italia(b)
         riga.update(self._flag_ei(b, "EC", luogo, cat, df.get("SezioneUrbana"), tavolare))
+        graffati = self.graffati_ec(b, df.get("SezioneUrbana"), tavolare)
+        if graffati:
+            riga["Graffati"] = graffati
         return riga
 
     def riga_er(self, b: dict) -> dict | None:
@@ -1966,6 +2034,7 @@ class _Export:
         self.estero_bene: dict[str, bool] = {}   # beni sedenti all'estero (immobili con provincia EE o casella «bene sito all'estero»)
         self.imposta_estera: dict[str, int] = {}  # imposta versata all'estero per bene (euro interi): richiede EG4
         self.rinunce: dict[str, dict | None] = {}   # rinunciatari EA -> estremi di registrazione (EH rigo 8)
+        self.rp_altro = False   # rendita proposta: serve la dichiarazione sostitutiva nel quadro EG (rigo «Altro»)
         self.terreni_vf: dict[str, dict] = {}   # reddito dominicale, quota del defunto e tipologia dei terreni EB (valori fiscali, EF1/EF9)
         self.defunto = self.presentatore = None
         self.testamento_x, self.test_reg = None, None

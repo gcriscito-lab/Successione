@@ -87,3 +87,104 @@ def test_ei_continuazione_senza_la_casella_e_respinta(tmp_path):
     assert xml != es.xml
     stato, dgn, _, _ = _esegui(xml, tmp_path)
     assert stato == "negativo", dgn["diagnostici"]
+
+
+# --------------------------------------------------------------------------------------------------------- rendita proposta
+def _altro(d, allegato="al_testam"):
+    d["documenti_ref"].append({"id": "dr_altro01", "_origine": {}, "allegato_id": allegato, "tipo_eg": "Altro", "finalita": "dichiarazione sostitutiva"})
+
+
+def rendita_proposta(valore="si", rendita="1500.00", categoria=None, con_eg=True):
+    d = caso_a10()
+    casa = next(b for b in d["beni"] if b["id"] == "b_casa0001")
+    casa["rendita_proposta"] = valore
+    if rendita is None:
+        casa.pop("rendita", None)
+    else:
+        casa["rendita"] = rendita
+    if categoria:
+        casa["categoria"] = categoria
+    if con_eg:
+        _altro(d)
+    return esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
+
+
+def test_rendita_proposta_scrive_determinazione_rendita():
+    es = completo(rendita_proposta())
+    ec = D + "/suc:QuadroEC"
+    assert x(es, ec + "//*[local-name()='RenditaCatastale']/text()") == ["1500,00"]
+    assert x(es, ec + "//*[local-name()='DeterminazioneRendita']/text()") == ["1"]
+
+
+def test_rendita_proposta_no_non_scrive_nulla():
+    es = completo(rendita_proposta("no", con_eg=False))
+    assert not x(es, D + "/suc:QuadroEC//*[local-name()='DeterminazioneRendita']")
+
+
+def test_rendita_proposta_richiede_la_dichiarazione_in_eg():
+    es = rendita_proposta(con_eg=False)
+    assert not es.completo and any(m.percorso == "quadro[EG].Altro" for m in es.quadri_mancanti)
+
+
+@pytest.mark.parametrize("rendita,categoria", [(None, None), ("1500.00", "F3")])
+def test_rendita_proposta_blocchi(rendita, categoria):
+    es = rendita_proposta(rendita=rendita, categoria=categoria)
+    assert es.xml is None and any(e.codice in ("REGOLA_RENDITA_PROPOSTA", "DATO_MANCANTE", "REGOLA_RENDITA") for e in es.errori)
+
+
+@pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.parametrize("rendita,categoria", [("1500.00", None), ("890.45", "A/3"), ("2210.10", "A/7")])
+def test_rendita_proposta_controllo_ufficiale(tmp_path, rendita, categoria):
+    positivo(completo(rendita_proposta(rendita=rendita, categoria=categoria)), tmp_path)
+
+
+# --------------------------------------------------------------------------------------------------------------- graffati (EC)
+def graffati(voci, sezione=None):
+    d = caso_a10()
+    d["opzioni"]["telematico"]["beni"]["b_casa0001"]["graffati"] = voci
+    if sezione:
+        next(b for b in d["beni"] if b["id"] == "b_casa0001")["sezione"] = sezione
+    return esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
+
+
+G1 = {"foglio": "100", "particella": "201", "subalterno": "1"}
+G2 = {"foglio": "100", "particella": "202"}
+G3 = {"foglio": "101", "particella": "55", "subalterno": "7"}
+G4 = {"foglio": "101", "particella": "56", "subalterno": "2"}
+
+
+@pytest.mark.parametrize("voci", [[G1], [G1, G2], [G1, G2, G3, G4]])
+def test_graffati_scrive_immobili_graffati(voci):
+    es = completo(graffati(voci))
+    g = x(es, D + "/suc:QuadroEC//*[local-name()='ImmobiliGraffati']")
+    assert len(g) == len(voci)
+    particelle = x(es, D + "/suc:QuadroEC//*[local-name()='Graffati']//*[local-name()='Particella']/text()")
+    assert particelle == [v["particella"] for v in voci]
+
+
+def test_graffati_con_sezione_urbana_obbligatoria():
+    sez = [{**G1, "sezione": "AB"}]
+    es = completo(graffati(sez, sezione="AB"))
+    assert x(es, D + "/suc:QuadroEC//*[local-name()='Graffati']//*[local-name()='SezioneUrbana']/text()") == ["AB"]
+    es = graffati([G1], sezione="AB")          # sezione dell'immobile principale ma non del graffato
+    assert es.xml is None and any(e.percorso.endswith("graffati[0]") for e in es.errori)
+    es = graffati(sez)                          # sezione indicata ma l'immobile principale non ha la sezione
+    assert es.xml is None and any(e.percorso.endswith("graffati[0]") for e in es.errori)
+
+
+def test_graffati_duplicati_e_oltre_quattro_bloccati():
+    es = graffati([G1, G1])
+    assert es.xml is None and any(e.codice == "REGOLA_GRAFFATI" for e in es.errori)
+    es = graffati([G1, G2, G3, G4, {"foglio": "9", "particella": "9"}])
+    assert es.xml is None and any("piu' di quattro immobili graffati" in s for s in es.non_supportato)
+
+
+def test_graffati_dati_mancanti():
+    es = graffati([{"foglio": "100"}])
+    assert es.xml is None and any(e.codice == "DATO_MANCANTE" for e in es.errori)
+
+
+@pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.parametrize("voci,sezione", [([G1], None), ([G1, G2, G3, G4], None), ([{**G1, "sezione": "AB"}, {**G3, "sezione": "AB"}], "AB")])
+def test_graffati_controllo_ufficiale(tmp_path, voci, sezione):
+    positivo(completo(graffati(voci, sezione)), tmp_path)
