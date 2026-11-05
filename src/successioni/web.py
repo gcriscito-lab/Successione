@@ -171,6 +171,11 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                      sha256=r["xml_sha256"], completo=r["completo"]), headers={"Cache-Control": "no-store"})
 
     @api
+    async def pulizia_api(request):
+        from . import pulizia
+        return pulizia.pulisci(sv.arch.base, forzata=True)
+
+    @api
     async def backup_crea(request):
         return sv.backup_archivio("manuale")
 
@@ -233,7 +238,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def impostazioni_salva(request):
         from . import impostazioni
         b = await request.json()
-        return impostazioni.salva(b.get("modifiche", {}), interfaccia=b.get("interfaccia"), profilo=b.get("profilo"))
+        return impostazioni.salva(b.get("modifiche", {}), interfaccia=b.get("interfaccia"), profilo=b.get("profilo"),
+                                   preferenze_nuove=b.get("preferenze"))
 
     async def corpo(request):
         return await request.json() if (await request.body()) else {}
@@ -293,9 +299,12 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                  "Cache-Control": "no-store"})
 
     P = "/api/pratiche/{pid}"
+    import threading
+    from .pulizia import pulisci_silenziosa
+    threading.Thread(target=pulisci_silenziosa, args=(sv.arch.base,), daemon=True, name="pulizia-avvio").start()
     return Starlette(routes=[
         Route("/api/codice-fiscale", cf_decodifica), Route("/api/importa", importa, methods=["POST"]),
-        Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
+        Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
         Route(P + "/ricevute/{tid}", ricevute, methods=["GET", "POST"]),

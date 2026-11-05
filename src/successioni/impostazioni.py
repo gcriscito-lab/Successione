@@ -163,6 +163,55 @@ def _dettaglio(chiave: str, valore: str | None) -> tuple[bool, str]:
     return True, ""
 
 
+# Preferenze di operativita' e sicurezza (sezione "preferenze" del file di configurazione).
+#   pulizia_automatica  bool    elimina i file temporanei e di lavoro (copie di XML, uscite del controllo) piu' vecchi di pulizia_ore
+#   pulizia_ore         int     eta' minima in ore dei file temporanei da eliminare (1-720)
+#   avviso_visura_giorni int    avvisa se la visura catastale di un bene e' piu' vecchia di tanti giorni (30-365; il Fascicolo chiede 90)
+#   visura_blocca       bool    se vero, una visura vecchia o senza data blocca la finalizzazione invece di essere solo un avviso
+#   mcp_sola_lettura    bool    Claude (MCP) puo' leggere ma non modificare pratiche, file e archivio
+PREFERENZE_DEFAULT = {"pulizia_automatica": True, "pulizia_ore": 24, "avviso_visura_giorni": 90, "visura_blocca": False,
+                      "mcp_sola_lettura": False}
+INTERVALLI_PREFERENZE = {"pulizia_ore": (1, 720), "avviso_visura_giorni": (30, 365)}
+
+
+def _valida_preferenze(p) -> dict:
+    if not isinstance(p, dict):
+        raise DatiNonValidi("preferenze: atteso un oggetto")
+    for k, v in p.items():
+        if k not in PREFERENZE_DEFAULT:
+            raise DatiNonValidi(f"preferenza sconosciuta: {k}", ammesse=list(PREFERENZE_DEFAULT))
+        if isinstance(PREFERENZE_DEFAULT[k], bool):
+            if not isinstance(v, bool):
+                raise DatiNonValidi(f"{k}: atteso vero o falso")
+        else:
+            minimo, massimo = INTERVALLI_PREFERENZE[k]
+            if isinstance(v, bool) or not isinstance(v, int) or not minimo <= v <= massimo:
+                raise DatiNonValidi(f"{k}: indicare un intero da {minimo} a {massimo}")
+    return dict(p)
+
+
+def preferenze(cartella_dati: Path | str | None = None) -> dict:
+    """Preferenze correnti con i predefiniti (valori non validi nel file sono ignorati). Si leggono ad ogni chiamata, cosi' una
+    modifica dal pannello vale subito anche per il server MCP. La variabile d'ambiente SUCCESSIONI_MCP_SOLA_LETTURA=1 prevale."""
+    env = os.environ.get("SUCCESSIONI_CONFIG")
+    f = Path(env) if env else (Path(cartella_dati) / "configurazione.json" if cartella_dati else file_configurazione())
+    valori = dict(PREFERENZE_DEFAULT)
+    try:
+        d = json.loads(f.read_text(encoding="utf-8-sig"))
+        grezzi = d.get("preferenze", {}) if isinstance(d, dict) else {}
+        for k, v in (grezzi if isinstance(grezzi, dict) else {}).items():
+            try:
+                _valida_preferenze({k: v})
+                valori[k] = v
+            except DatiNonValidi:
+                pass
+    except (OSError, ValueError):
+        pass
+    if os.environ.get("SUCCESSIONI_MCP_SOLA_LETTURA", "").strip().lower() in ("1", "true", "si", "yes"):
+        valori["mcp_sola_lettura"] = True
+    return valori
+
+
 # Profilo dello studio: dati del fornitore (chi presenta il file) applicati come predefiniti alle nuove pratiche.
 CHIAVI_PROFILO = ("cf", "tipo", "impegno_codice")
 
@@ -220,7 +269,7 @@ def stato() -> dict:
                      "origine": origine, "a_posto": ok, "dettaglio": descr,
                      "modificabile": tipo != "sola_lettura"})
     return {"file": str(file_configurazione()), "voci": voci, "interfaccia": preferenze_interfaccia(nel_file),
-            "profilo": profilo_studio()}
+            "profilo": profilo_studio(), "preferenze": preferenze()}
 
 
 def _valida(chiave: str, valore) -> str:
@@ -253,15 +302,20 @@ def _valida(chiave: str, valore) -> str:
     return v
 
 
-def salva(modifiche: dict, interfaccia: dict | None = None, profilo: dict | None = None) -> dict:
+def salva(modifiche: dict, interfaccia: dict | None = None, profilo: dict | None = None,
+          preferenze_nuove: dict | None = None) -> dict:
     """Applica e salva le modifiche (valore vuoto = rimuove l'impostazione). Tutto o niente: se un valore e' errato non si
     scrive nulla. Restituisce lo stato aggiornato piu' gli eventuali `avvisi`."""
-    if not isinstance(modifiche, dict) or (not modifiche and not interfaccia and profilo is None):
+    if not isinstance(modifiche, dict) or (not modifiche and not interfaccia and profilo is None and preferenze_nuove is None):
         raise DatiNonValidi("nessuna modifica indicata")
     nuove = {k: _valida(k, v) for k, v in modifiche.items()}
     aspetto = _valida_interfaccia(interfaccia) if interfaccia is not None else None
     nuovo_profilo = _valida_profilo(profilo) if profilo is not None else None
+    nuove_pref = _valida_preferenze(preferenze_nuove) if preferenze_nuove is not None else None
     contenuto = _leggi_file_stretto()
+    if nuove_pref is not None:
+        contenuto["preferenze"] = {k: v for k, v in {**(contenuto.get("preferenze") or {}), **nuove_pref}.items()
+                                   if k in PREFERENZE_DEFAULT}
     if nuovo_profilo is not None:
         if nuovo_profilo:
             contenuto["profilo"] = nuovo_profilo

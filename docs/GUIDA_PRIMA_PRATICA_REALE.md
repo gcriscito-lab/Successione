@@ -19,7 +19,7 @@ dichiarazione resta del professionista, e il programma e' un assistente di compi
 - **Dichiarante/presentatore**: dati anagrafici, **codice carica**, telefono **o** email, e la conferma della firma.
 - **Eredi**: per ciascuno codice fiscale, dati anagrafici, **grado di parentela** (es. 01 coniuge, 02 figlio), eventuali disabilita'. Se un figlio e'
   premorto o ha rinunciato: i suoi discendenti con `rappresentato_cf` e `rappresentato_grado`.
-- **Immobili** (dalle **visure aggiornate a non piu' di 3 mesi**): provincia, comune, **codice catastale**, indirizzo, foglio, particella,
+- **Immobili** (dalle **visure aggiornate a non piu' di 3 mesi**): **data della visura**, provincia, comune, **codice catastale**, indirizzo, foglio, particella,
   subalterno, categoria, classe, consistenza, **rendita**, **quota di possesso** e **diritto**, e il **valore venale alla data del decesso**
   (il Fascicolo chiede il valore di mercato, non un valore derivato dalla rendita). Terreni: reddito dominicale, superficie, natura,
   tipologia (edificabile o no). Per la **prima casa** servono i requisiti e il numero degli immobili agevolati.

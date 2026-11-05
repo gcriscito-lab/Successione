@@ -14,6 +14,14 @@ Il nome va messo **prima** delle opzioni `-e`/`--env`, che altrimenti lo assorbo
 Gli strumenti hanno prefisso `successioni_` (20): capacita, schema_dati, crea_pratica, elenca_pratiche, leggi_pratica, aggiorna_pratica, revisioni_pratica, differenze_pratica, verifica_pratica, stato_quadri, esporta_xml, stato_elaborati, controllo_ufficiale, file_in_ingresso, acquisisci_allegato, prepara_pdfa, suddividi_allegato, elenca_allegati, invio_prepara, invio_stato (l'MCP non conferma né trasmette: solo l'app).
 Si legge sempre la pratica prima di modificarla: `aggiorna_pratica` richiede `revisione_attesa` e una `chiave_richiesta` univoca. Gli id delle righe non si scelgono: li assegna il sistema.
 
+## Claude in sola lettura
+Impostazioni → Operatività e sicurezza → «Claude (MCP) in sola lettura» (oppure `SUCCESSIONI_MCP_SOLA_LETTURA=1` nell'ambiente del server). La preferenza si
+rilegge a ogni chiamata: vale subito, senza riavviare. In sola lettura Claude puo' leggere pratiche, revisioni, differenze, verifiche, stato dei quadri e dei file,
+allegati e codici fiscali, ma gli strumenti che modificano o producono qualcosa (`crea_pratica`, `aggiorna_pratica`, `acquisisci_allegato`, `prepara_pdfa`,
+`suddividi_allegato`, `importa_xml_telematico`, `esporta_xml`, `controllo_ufficiale`, `stampa_modello`, `backup_archivio`, `invio_prepara`) rispondono con l'errore
+`SOLA_LETTURA` senza eseguire nulla. `successioni_capacita` riporta `sola_lettura: true/false`. La classificazione e' in `STRUMENTI_LETTURA`/`STRUMENTI_SCRITTURA`
+(`mcp_server.py`): uno strumento non elencato come lettura e' trattato come scrittura (fail-closed) e un test impedisce strumenti non classificati.
+
 ## Se il client si chiude
 Lo stato è nella cartella dati: la stessa pratica si riapre da GUI o da MCP.
 

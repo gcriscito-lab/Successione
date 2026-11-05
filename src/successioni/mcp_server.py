@@ -22,6 +22,22 @@ COPERTURA_NON_DISPONIBILE = [
 ]
 
 
+# Classificazione degli strumenti, in UN solo posto. Con la preferenza «Claude in sola lettura» (Impostazioni -> Operativita' e
+# sicurezza; variabile SUCCESSIONI_MCP_SOLA_LETTURA=1) si eseguono solo gli strumenti di lettura. Fail-closed: uno strumento non
+# elencato in STRUMENTI_LETTURA e' trattato come scrittura; un test verifica che ogni strumento registrato sia classificato.
+STRUMENTI_LETTURA = frozenset({
+    "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
+    "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
+    "file_in_ingresso", "elenca_allegati",
+})
+STRUMENTI_SCRITTURA = frozenset({
+    "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "backup_archivio", "stampa_modello",
+    "invio_prepara", "importa_xml_telematico", "acquisisci_allegato", "prepara_pdfa", "suddividi_allegato",
+})
+MESSAGGIO_SOLA_LETTURA = ("Claude è in sola lettura: modifica disattivata nelle Impostazioni → Operatività e sicurezza. "
+                          "Lo strumento non è stato eseguito e nulla è stato modificato.")
+
+
 def _pagina(righe: list, limit: int, offset: int) -> dict:
     limit = max(1, min(int(limit), 200))
     offset = max(0, int(offset))
@@ -40,9 +56,17 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         "non_applicabile} quando il dato non e' noto. I risultati di verifica_pratica sono controlli interni, "
         "non il controllo ufficiale dell'Agenzia."))
 
+    def sola_lettura() -> bool:
+        from . import impostazioni
+        return bool(impostazioni.preferenze(sv.arch.base).get("mcp_sola_lettura"))
+
     def protetto(fn):
+        scrittura = fn.__name__ not in STRUMENTI_LETTURA          # fail-closed: non classificato = scrittura
+
         @functools.wraps(fn)
         def w(*a, **k):
+            if scrittura and sola_lettura():
+                raise ToolError("SOLA_LETTURA: " + MESSAGGIO_SOLA_LETTURA)
             try:
                 return fn(*a, **k)
             except ErroreServizio as e:
@@ -53,10 +77,12 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
     SCRITTURA = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
     LOCALE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 
-    def tool(fn=None, *, ann=LETTURA):
-        """Registra con prefisso di servizio (successioni_*) e annotazioni (suggerimenti, non garanzie di sicurezza)."""
+    def tool(fn=None, *, ann=None):
+        """Registra con prefisso di servizio (successioni_*) e annotazioni (suggerimenti, non garanzie di sicurezza).
+        Senza `ann` l'annotazione deriva dalla classificazione: lettura solo se lo strumento e' in STRUMENTI_LETTURA."""
         def reg(f):
-            return mcp.tool(name="successioni_" + f.__name__, annotations=ann)(protetto(f))
+            a = ann or (LETTURA if f.__name__ in STRUMENTI_LETTURA else LOCALE)
+            return mcp.tool(name="successioni_" + f.__name__, annotations=a)(protetto(f))
         return reg(fn) if fn else reg
 
     @tool
@@ -68,7 +94,7 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
                              "controllo ufficiale locale se configurato"],
                 "non_disponibile": COPERTURA_NON_DISPONIBILE,
                 "strumenti_pdfa": {"ghostscript": bool(pdfa.trova_gs()), "veraPDF": bool(pdfa.trova_verapdf())},
-                "cartella_ingresso": str(sv.cartella_ingresso)}
+                "cartella_ingresso": str(sv.cartella_ingresso), "sola_lettura": sola_lettura()}
 
     @tool
     def schema_dati() -> dict[str, Any]:

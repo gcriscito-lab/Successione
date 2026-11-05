@@ -66,7 +66,7 @@ PER_ID = {q["id"]: q for q in QUADRI}
 #: gia' valorizzato si mostra sempre)
 _BASE = ["tipo", "descrizione", "valore", "diritto", "quota_defunto"]
 _IMM = ["comune", "foglio", "particella", "subalterno", "provincia", "codice_comune", "comune_amministrativo",
-        "codice_comune_amministrativo", "provenienza"]
+        "codice_comune_amministrativo", "data_visura", "provenienza"]
 _TAV = ["comune_catastale", "codice_comune_catastale", "partita_tavolare", "corpo_tavolare", "sistema_tavolare"]
 CAMPI_BENI = {
     "EB": _BASE + _IMM + ["natura", "tipologia_terreno", "reddito_dominicale", "rendita", "discordanza_intestatario", "passaggi_senza_atti_legali"],
@@ -128,6 +128,37 @@ def _quadro_da_percorso(dati: dict, percorso: str) -> str | None:
         if e["id"] == eid:
             return quadro_di(coll, e)
     return quadro_di(coll, {}) if coll in ("passivita", "documenti_ref") else None
+
+
+FONTE_VISURA = ("Succ_FASCICOLO_I_Nov_23.pdf pp. PDF 20 e 28: i dati catastali si ricavano dalla visura catastale risalente a non "
+                "piu' di tre mesi prima della data di presentazione della dichiarazione")
+
+
+def rilievi_visure(dati: dict, giorni: int = 90, oggi=None) -> list[Errore]:
+    """Visure catastali mancanti di data o piu' vecchie di ``giorni`` (rispetto a ``oggi``) per i beni immobili dei quadri attivi.
+    Non e' un controllo ufficiale: il termine decorre dalla presentazione, qui si usa la data odierna. Chi chiama decide se
+    trattarli come avvisi o come rilievi bloccanti."""
+    from datetime import date
+    oggi = oggi or date.today()
+    att = attivi(dati)
+    out: list[Errore] = []
+    for b in dati.get("beni", []):
+        if b.get("tipo") not in ("fabbricato", "terreno") or quadro_di("beni", b) not in att:
+            continue
+        perc = f"beni[{b['id']}].data_visura"
+        d = b.get("data_visura")
+        if not d or not isinstance(d, str):
+            out.append(Errore("VISURA_SENZA_DATA", perc, "indicare la data della visura catastale da cui derivano i dati "
+                              f"dell'immobile (al massimo {giorni} giorni prima della presentazione)", FONTE_VISURA))
+            continue
+        try:
+            eta = (oggi - date.fromisoformat(d)).days
+        except ValueError:
+            continue    # il formato errato lo segnala gia' la validazione di forma
+        if eta > giorni:
+            out.append(Errore("VISURA_VECCHIA", perc, f"la visura catastale ha {eta} giorni (limite {giorni}): serve una visura piu' "
+                              "recente prima di presentare", FONTE_VISURA))
+    return out
 
 
 def quadro_per_percorso(dati: dict, percorso: str) -> str:

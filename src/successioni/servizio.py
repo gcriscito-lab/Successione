@@ -214,6 +214,14 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
     def verifica(self, pratica_id: str) -> dict:
         d = self.leggi(pratica_id)
         errori = S.valida_forma(d["dati"]) + S.controlli_coerenza(d["dati"]) + Q.rilievi_quadri(d["dati"])
+        from . import impostazioni
+        pref = impostazioni.preferenze(self.arch.base)
+        visure = Q.rilievi_visure(d["dati"], pref["avviso_visura_giorni"])
+        avvisi = []
+        if pref["visura_blocca"]:
+            errori = errori + visure          # visura vecchia o senza data: rilievo bloccante
+        else:
+            avvisi = [x.asdict() for x in visure]   # solo avviso: non impedisce la finalizzazione
         blocchi = []
         e = self._job_ultimo("esporta_xml", pratica_id)
         if not (e and e["input"].get("impronta_dichiarativa") == d["impronta_dichiarativa"] and e["risultato"].get("completo")):
@@ -225,7 +233,7 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
                 "versione_regole": VERSIONE_REGOLE,
                 "ambito": "controlli interni di forma e coerenza; NON e' il controllo ufficiale",
                 "esito": "ok" if not errori else "rilievi", "finalizzabile": not errori and not blocchi,
-                "blocchi_finalizzazione": blocchi, "rilievi": [x.asdict() for x in errori]}
+                "blocchi_finalizzazione": blocchi, "rilievi": [x.asdict() for x in errori], "avvisi": avvisi}
 
     def quadri(self, pratica_id: str) -> dict:
         """Stato di ciascun quadro (vuoto/compilato/rilievi/non supportato/inattivo) e rilievi per il pannello controlli."""
@@ -234,7 +242,7 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
         rilievi = [{**r, "quadro": Q.quadro_per_percorso(d["dati"], r["percorso"])} for r in v["rilievi"]]
         return {"pratica_id": pratica_id, "revisione": d["revisione"], "quadri": Q.stato_quadri(d["dati"], v["rilievi"]),
                 "esito": v["esito"], "finalizzabile": v["finalizzabile"], "blocchi_finalizzazione": v["blocchi_finalizzazione"],
-                "rilievi": rilievi,
+                "rilievi": rilievi, "avvisi": v["avvisi"],
                 "ambito": v["ambito"]}
 
     # ------------------------------------------------------------------ interni

@@ -170,6 +170,8 @@ class ElaboratiMixin:
                "bozza_tecnica": exp.get("scopo") == "bozza_tecnica", "modalita": reg.get("modalita")}
         inp = {"xml_sha256": exp["xml_sha256"], "impronta_dichiarativa": j["input"]["impronta_dichiarativa"]}
         jid = self._job_scrivi(TIPO_CONTROLLO, pratica_id, "completato", inp, ris)
+        from .pulizia import pulisci_silenziosa
+        pulisci_silenziosa(self.arch.base)           # temporanei vecchi: mai causa di fallimento del controllo
         return {"pratica_id": pratica_id, "job_id": jid, **ris}
 
     def file_controllato_dcm(self, pratica_id: str) -> tuple[bytes, dict]:
@@ -213,6 +215,8 @@ class ElaboratiMixin:
                          "la fedelta' visiva va controllata per i quadri usati; gli allegati EG compaiono come flag"}
         inp = {"xml_sha256": exp["xml_sha256"], "impronta_dichiarativa": self.leggi(pratica_id)["impronta_dichiarativa"]}
         jid = self._job_scrivi(TIPO_STAMPA, pratica_id, "completato", inp, ris)
+        from .pulizia import pulisci_silenziosa
+        pulisci_silenziosa(self.arch.base)
         return {"pratica_id": pratica_id, "job_id": jid, **ris}
 
     def file_stampa_modello(self, pratica_id: str) -> tuple[bytes, dict]:

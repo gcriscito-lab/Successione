@@ -36,6 +36,10 @@ Un file non si invia due volte: dopo un tentativo, anche incerto, si riconcilia 
 - **Dove:** `SUCCESSIONI_BACKUP` (Impostazioni → Strumenti e percorsi) oppure, se vuota, accanto alla cartella dei dati. Per proteggerti da un guasto del disco imposta
   una cartella su un'altra unita' o su un disco esterno. Se il backup automatico non riesce, il programma lo segnala ma non blocca il lavoro.
 - **Profilo dello studio:** Impostazioni → Profilo dello studio (codice fiscale, tipo di fornitore, impegno a trasmettere): proposto in ogni nuova pratica.
+- **Operatività e sicurezza (Impostazioni):** pulizia automatica dei file temporanei e di lavoro (copie di XML e uscite dei controlli; non tocca pratiche, allegati, file
+  generati ne' backup; pulsante «Pulisci ora»); avviso se la **visura catastale** di un immobile ha piu' di 90 giorni o manca la data (il Fascicolo chiede visure di non piu'
+  di tre mesi), con opzione per trasformarlo in blocco della finalizzazione; **Claude in sola lettura** (puo' leggere pratiche e controlli ma non modificare nulla; vale subito).
+  Per ogni immobile indica la «Data della visura catastale»: e' un dato interno, non va nell'XML.
 - **Barra di stato:** mostra sempre l'archivio in uso; la scheda File mostra le versioni (programma, regole, specifiche, controllo) con cui e' stato generato il file.
 - `successioni backup <cartella>` copia database e allegati.
 - `successioni ripristina <backup> --destinazione <cartella nuova>` ripristina solo in una cartella nuova: non sovrascrive mai dati esistenti.

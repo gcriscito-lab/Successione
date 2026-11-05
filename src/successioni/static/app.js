@@ -172,6 +172,7 @@ function renderSb() {
     S.salvata ? h("span", { class: "ok" }, "Salvata alle " + S.salvata) : null,
     nMod() ? h("span", { style: "color:var(--am)" }, nMod() + (nMod() === 1 ? " modifica non salvata" : " modifiche non salvate")) : null,
     n ? h("button", { onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, n + (n === 1 ? " rilievo" : " rilievi")) : h("span", {}, "Nessun rilievo"),
+    (S.Q.avvisi || []).length ? h("button", { style: "color:var(--am)", onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, S.Q.avvisi.length + (S.Q.avvisi.length === 1 ? " avviso" : " avvisi")) : null,
     h("span", {}, S.Q.finalizzabile ? "Finalizzabile" : "Non finalizzabile" + ((S.Q.blocchi_finalizzazione || []).length ? ": file XML completo non generato" : "")),
     h("span", {}, "Controllo ufficiale: vedi File e invio")].filter(Boolean));
 }
@@ -545,6 +546,8 @@ function insControlli(ins) {
   const q = S.Q;
   ins.append(h("p", { class: "mut" }, q.ambito + (q.finalizzabile ? ". Finalizzabile." : ". Non finalizzabile.")));
   for (const b of (q.blocchi_finalizzazione || [])) ins.append(h("div", { class: "nota", style: "margin:0 0 8px" }, b.messaggio));
+  // avvisi che non impediscono la finalizzazione (es. visure catastali vecchie o senza data)
+  for (const a of (q.avvisi || [])) ins.append(h("div", { class: "nota", style: "margin:0 0 8px", role: "status" }, h("b", {}, "Avviso: "), a.messaggio));
   if (!q.rilievi.length) { ins.append(h("p", { class: "ok", style: "color:var(--ok);font-weight:600" }, "Nessun rilievo sui dati inseriti.")); return; }
   const ul = h("ul", { class: "rl" });
   for (const r of q.rilievi) ul.append(h("li", {}, h("button", { onclick: () => vaiA(r) }, h("span", { class: "sigla", style: "background:var(--er-b)" }, r.quadro), h("span", {}, h("div", {}, r.messaggio), h("div", { class: "cod" }, r.codice + " · " + r.percorso)))));
@@ -1141,7 +1144,7 @@ async function wizAvanti() {
 }
 
 /* Impostazioni: percorsi degli strumenti esterni (server: /api/impostazioni), con stato di rilevamento. */
-const IMP = { voci: [], iniziali: {}, aspetto: null, profilo: {} };
+const IMP = { voci: [], iniziali: {}, aspetto: null, profilo: {}, preferenze: {} };
 function impAspettoRender(p) {
   IMP.aspetto = { ...preferenze, ...p };
   const grid = h('div', { class: 'aspetto-griglia' });
@@ -1188,8 +1191,33 @@ async function impBackupRender() {
       ev.target.disabled = false; impBackupRender();
     } }, 'Crea backup ora'));
 }
+function impPreferenzeRender(p) {
+  IMP.preferenze = { ...p };
+  const casella = (chiave, titolo, nota) => {
+    const el = h('input', { type: 'checkbox', id: 'pref_' + chiave, checked: !!p[chiave] });
+    el.addEventListener('change', () => { IMP.preferenze[chiave] = el.checked; });
+    return h('div', { class: 'campo' }, h('label', { class: 'chk', for: el.id }, el, h('span', {}, titolo)), h('div', { class: 'mut', style: 'font-size:0.9231rem' }, nota));
+  };
+  const numero = (chiave, titolo, minimo, massimo) => {
+    const el = h('input', { type: 'number', id: 'pref_' + chiave, min: String(minimo), max: String(massimo), value: String(p[chiave]) });
+    el.addEventListener('input', () => { const n = parseInt(el.value, 10); if (Number.isInteger(n)) IMP.preferenze[chiave] = n; });
+    return h('div', { class: 'campo' }, h('label', { for: el.id }, titolo + ' (' + minimo + '–' + massimo + ')'), el);
+  };
+  $('#impPreferenze').replaceChildren(h('h3', {}, 'Operatività e sicurezza'),
+    casella('pulizia_automatica', 'Elimina automaticamente i file temporanei e di lavoro', 'Copie di XML e uscite dei controlli lasciate nella cartella di lavoro. Non tocca pratiche, allegati, file generati né backup.'),
+    numero('pulizia_ore', 'Elimina i temporanei più vecchi di (ore)', 1, 720),
+    h('button', { type: 'button', class: 'gh', onclick: async ev => {
+      ev.target.disabled = true;
+      try { const r = await post('/api/pulizia', {}); msg('Pulizia eseguita: ' + r.eliminati + ' elementi, ' + r.byte_liberati + ' byte liberati.', 'o'); }
+      catch (e) { msg('Pulizia non riuscita: ' + e.message, 'e'); }
+      ev.target.disabled = false;
+    } }, 'Pulisci ora'),
+    numero('avviso_visura_giorni', 'Avvisa se la visura catastale ha più di (giorni)', 30, 365),
+    casella('visura_blocca', 'Una visura vecchia o senza data blocca la finalizzazione', 'Il Fascicolo chiede visure di non più di tre mesi prima della presentazione. Se non spunti, è solo un avviso.'),
+    casella('mcp_sola_lettura', 'Claude (MCP) in sola lettura', 'Claude può leggere pratiche e controlli ma non modificare pratiche, generare file, allegare o fare backup. Vale subito, senza riavvio.'));
+}
 function impRender(s) {
-  impProfiloRender(s.profilo || {}); impBackupRender();
+  impProfiloRender(s.profilo || {}); impBackupRender(); impPreferenzeRender(s.preferenze || {});
   IMP.voci = s.voci; IMP.iniziali = Object.fromEntries(s.voci.map(v => [v.chiave, v.valore || ""]));
   impAspettoRender(s.interfaccia);
   $("#impFile").textContent = "File di configurazione: " + s.file;
@@ -1209,7 +1237,7 @@ async function impSalva() {
   for (const v of IMP.voci) if (v.modificabile) { const x = $("#imp_" + v.chiave).value.trim(); if (x !== IMP.iniziali[v.chiave]) modifiche[v.chiave] = x; }
   try {
     const profilo = Object.fromEntries(Object.entries(IMP.profilo).filter(([, v]) => v));
-    const s = await post("/api/impostazioni", { modifiche, interfaccia: IMP.aspetto, profilo });
+    const s = await post("/api/impostazioni", { modifiche, interfaccia: IMP.aspetto, profilo, preferenze: IMP.preferenze });
     STUDIO.profilo = s.profilo || {};
     memorizzaAspetto(s.interfaccia);
     impRender(s); $("#impErr").textContent = "";

@@ -1650,7 +1650,7 @@ class _Export:
             q = Q.quadro_di("beni", b)
             per_q[q].append(b)
             self.quadro_bene[b["id"]] = q
-            for campo in ("provenienza",):
+            for campo in ("provenienza", "data_visura"):   # dati interni: non esportati
                 if b.get(campo) not in (None, ""):
                     self.usa(b, campo)
                     self.interno(b, campo)
