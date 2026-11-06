@@ -90,7 +90,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def schema_(request):
         from .collegamenti.invio import TIPI_RICEVUTA
         from . import codici, etichette as E
-        return {**E.per_api(), "collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": S.AIUTI,
+        return {**E.per_api(), "collezioni": S.COLLEZIONI, "quadri": Q.QUADRI, "predefiniti": list(Q.PREDEFINITI), "aiuti": {**S.AIUTI, **S.AIUTI_INTERFACCIA},
                 "strutturati": strutturati_completi(), "suggerimenti": codici.suggerimenti(), "tipi_ricevuta": TIPI_RICEVUTA,
                 "province_tavolari": list(Q.PROVINCE_TAVOLARI)}
 

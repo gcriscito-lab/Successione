@@ -87,6 +87,11 @@ AIUTI: dict[str, str] = {
     "persone.codice_fiscale": "16 caratteri. Il carattere di controllo viene verificato in esportazione.",
     "passivita.importo": "Importo in euro, con il punto decimale. Indicare la parte di debito che grava sul defunto.",
 }
+# Nell'interfaccia gli importi si scrivono all'italiana (la conversione al punto decimale la fa app.js): testi propri per la GUI.
+AIUTI_INTERFACCIA: dict[str, str] = {
+    "beni.rendita": "Rendita catastale in euro (es. 1.240,50).",
+    "passivita.importo": "Importo in euro (es. 12.500,00). Indicare la parte di debito che grava sul defunto.",
+}
 AIUTI["beni.tipo_titolo"] = ("Quadro EO: scegli il tipo di titolo. Con «esente» (3) il valore è esente e nel file va in "
                              "ValoreEsente, non in Valore. I titoli quotati richiedono il codice fiscale dell'emittente.")
 AIUTI["devoluzioni.agevolazioni"] = ("Codice di agevolazione della riga di devoluzione. Prima casa (P, X, Z): solo per i "

@@ -88,11 +88,20 @@ function dataIso(t) {
   m = t.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/);
   return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : t;
 }
-function mostra(kind, v) {
+/* Dato non noto: nella pratica {stato: ...}, all'utente in parole. Si possono scrivere le parole, «?» o la forma [stato]. */
+const STATI_DATO = { da_confermare: "da confermare", assente: "assente", zero: "zero", non_applicabile: "non applicabile" };
+/* Importi: nella pratica col punto decimale (1234.50), all'utente con la virgola; in tabella anche col punto delle migliaia. */
+function importoIt(v, migliaia) {
+  const m = String(v).match(/^(-?)(\d+)(?:\.(\d+))?$/);
+  if (!m) return String(v);
+  return m[1] + (migliaia ? m[2].replace(/\B(?=(\d{3})+(?!\d))/g, ".") : m[2]) + (m[3] !== undefined ? "," + m[3] : "");
+}
+function mostra(kind, v, inTabella) {
   if (v === undefined || v === null) return "";
-  if (typeof v === "object" && v.stato) return "[" + v.stato + "]";
+  if (typeof v === "object" && v.stato) return STATI_DATO[v.stato] || String(v.stato).replaceAll("_", " ");
   if (kind === "quota" && typeof v === "object") return v.num + "/" + v.den;
   if (kind === "data") return dataIt(String(v));
+  if (kind === "importo") return importoIt(v, inTabella);
   return String(v);
 }
 function leggi(kind, t) {
@@ -100,9 +109,15 @@ function leggi(kind, t) {
   if (t === "") return null;
   if (t === "?") return { stato: "da_confermare" };
   if (/^\[[a-z_]+\]$/.test(t)) return { stato: t.slice(1, -1) };
+  const st = Object.keys(STATI_DATO).find(k => STATI_DATO[k] === t.toLowerCase());
+  if (st) return { stato: st };
   if (kind === "quota") { const m = t.match(/^(\d+)\s*\/\s*(\d+)$/); return m ? { num: +m[1], den: +m[2] } : t; }
   if (kind === "data") return dataIso(t);
-  if (kind === "importo" && /^-?\d+,\d+$/.test(t)) return t.replace(",", ".");   // 12,5 -> 12.5
+  if (kind === "importo") {
+    if (/^-?\d{1,3}(\.\d{3})+,\d+$/.test(t)) return t.replaceAll(".", "").replace(",", ".");   // 1.234,50 -> 1234.50
+    if (/^-?\d{1,3}(\.\d{3}){2,}$/.test(t)) return t.replaceAll(".", "");                     // 1.234.567 -> 1234567
+    if (/^-?\d+,\d+$/.test(t)) return t.replace(",", ".");                                    // 12,5 -> 12.5
+  }
   return t;
 }
 /* Etichette e ordine dei campi: arrivano da /api/schema (server: etichette.py). Mai il nome interno con i trattini bassi. */
@@ -280,7 +295,8 @@ function campoStrutturato(sd, val, onMod, path) {
   const el = h("select", { "aria-label": sd.etichetta, style: "width:100%;min-width:0;max-width:100%;text-overflow:ellipsis" },
     h("option", { value: "" }, "(non indicato)"),
     sd.opzioni.map(o => h("option", { value: o.valore, title: testoVoce(sd, o) }, testoVoce(sd, o))),
-    attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale }, attuale + " (valore non previsto)") : null);
+    attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale },
+      /^\[[a-z_]+\]$/.test(attuale) ? mostra("str", { stato: attuale.slice(1, -1) }) : attuale + " (valore non previsto)") : null);
   el.value = attuale;
   if (path) el.dataset.path = path;
   if (err.length) el.classList.add("bad");
@@ -366,7 +382,7 @@ function renderTabella(main, q) {
       onkeydown: ev => tastiTabella(ev, tr, r.key) });
     q.colonne.forEach((c, j) => {
       const kind = campi[c]; const v = valRiga(r, c);
-      let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v);
+      let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v, true);
       if (c === "grado_parentela" && typeof v === "string" && v) {   // il grado si legge per nome (menu dei codici), non come codice
         const sdg = struttDi(q.coll, c, null), og = sdg && sdg.opzioni.find(x => x.valore === riconosciVoce(sdg, v));
         if (og) txt = og.etichetta;
@@ -381,7 +397,7 @@ function renderTabella(main, q) {
   if (!righe.length) tb.append(h("tr", {}, h("td", { colspan: q.colonne.length, class: "mut" }, "Nessuna riga. Usa «Aggiungi riga».")));
   main.append(h("div", { class: "tab" }, t));
   main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, "Aggiungi riga"),
-    h("span", { class: "mut" }, "Quote 1/2 · importi con il punto (1234.50) · dato non noto: ? oppure [assente], [zero], [non_applicabile]")));
+    h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
 }
 function aggiungiRiga(q) {
   const key = "n:" + crypto.randomUUID();
@@ -425,6 +441,7 @@ function renderIns() {
   if (S.tab === "dati" && S.riga) ins.append(h("button", { class: "lk solo-mobile", onclick: tornaTabella }, "↑ Torna alla tabella"));
   if (S.tab === "dati") insDati(ins); else if (S.tab === "controlli") insControlli(ins); else if (S.tab === "file") insFile(ins); else insCronologia(ins);
 }
+const ESTERO_IMM = new Set(["codice_stato_estero", "stato_estero", "stato_federato", "localita_estero", "imposta_estera"]);   // etichette.py: _ESTERO_IMM
 function rigaSelezionata() {
   const q = quadro(); if (!q || !q.coll || !S.riga) return null;
   return righeQuadro(q).find(r => r.key === S.riga) || null;
@@ -441,9 +458,14 @@ function insDati(ins) {
   for (const [comune, provincia] of [['comune', 'provincia'], ['luogo_nascita', 'provincia_nascita']]) {
     void comune; void provincia;   // provincia e comune seguono gia' l'ordine ufficiale (provincia prima del comune)
   }
+  // dati dell'immobile estero: solo con provincia EE (o se gia' compilati), come nelle istruzioni dei quadri EB ed EC
+  const esteroNascosto = q.coll === "beni" && ["EB", "EC"].includes(q.id) && String(valRiga(r, "provincia") || "").trim().toUpperCase() !== "EE";
+  let nascostiEstero = 0;
   for (const c of ordine) { const kind = campi[c];
     const vv = valRiga(r, c);
-    if (visibili && !visibili.has(c) && (vv === undefined || vv === null || vv === "")) continue;
+    const vuoto = vv === undefined || vv === null || vv === "";
+    if (visibili && !visibili.has(c) && vuoto) continue;
+    if (esteroNascosto && ESTERO_IMM.has(c) && vuoto) { nascostiEstero++; continue; }
     if (q.coll === "persone" && c === "relazione_con_defunto" && struttDi("persone", "grado_parentela")) {   // duplica il grado (menu): si nasconde se vuota o uguale
       const rel = String(vv || "").trim();
       if (!rel || rel === String(valRiga(r, "grado_parentela") || "").trim()) continue;
@@ -465,7 +487,7 @@ function insDati(ins) {
         if (!rel || rel === gradoPrima) scrivi("relazione_con_defunto", v || null);
       }
       renderVista(); aggiornaBottoni(); renderSb();
-      if ((q.coll === "beni" && campo === "tipo") || (q.coll === "devoluzioni" && campo === "bene_id")) renderIns();   // cambia l'elenco dei diritti
+      if ((q.coll === "beni" && (campo === "tipo" || campo === "provincia")) || (q.coll === "devoluzioni" && campo === "bene_id")) renderIns();   // cambiano i diritti o i campi esteri
       if (q.coll === "persone" && campo === "codice_fiscale")
         suggerisciDaCF(v, r.e ? r.e.ruolo : (r.nuova && r.nuova.campi.ruolo), c2 => valRiga(r, c2), scrivi, () => String(valRiga(r, "codice_fiscale") || "").trim().toUpperCase() === v.trim().toUpperCase()).then(res => {
           if (res.testo) msg(res.testo, res.riempiti.length ? "o" : "e");
@@ -478,6 +500,7 @@ function insDati(ins) {
     if (aiuto) w.append(h("div", { class: "mut", style: "font-size:0.8846rem;margin-top:2px" }, aiuto));
     ins.append(h("div", { class: "rg" }, h("label", {}, lbl(q.coll, c, q.id)), w));
   }
+  if (nascostiEstero) ins.append(h("p", { class: "mut nota-campi" }, "Per un immobile all'estero scegli la provincia EE: compaiono i campi dello Stato estero."));
   renderStrutturati(ins, q, r);
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
   const supKey = q.coll + ':' + (r.e ? r.e.id : r.nuova.id);
@@ -516,11 +539,17 @@ function renderStrutturati(ins, q, r) {
       ins.append(h('div', { class: 'nota', style: 'margin:6px 0' }, 'Indica anche il valore delle precedenti successioni nel pannello del bene collegato (' + etichetta('beni', bene) + ').'));
     return;
   }
+  // dati meno frequenti del bene (precedenti successioni, graffati, trascrizione, registrazione): ripiegati finche' sono vuoti
+  let altri = ins;
   if (q.coll === 'beni') {
+    const pieno = ['valore_prec_succ', 'graffati', 'estremi_trascrizione', 'estremi_registrazione', 'immobili_aziendali']
+      .some(c => { const v = valore(c); return v != null && v !== '' && !(Array.isArray(v) && !v.length); });
+    altri = h('details', { class: 'altri', open: pieno || S.altriAperti ? '' : null, ontoggle: ev => { S.altriAperti = ev.target.open; } },
+      h('summary', {}, 'Altri dati del bene'));
     const vp = (S.schema.strutturati || {})['beni.valore_prec_succ'];
-    const inp = h('input', { id: 'vps_' + id, class: 'num', autocomplete: 'off', 'aria-label': vp.etichetta, value: valore('valore_prec_succ') == null ? '' : String(valore('valore_prec_succ')),
+    const inp = h('input', { id: 'vps_' + id, class: 'num', autocomplete: 'off', 'aria-label': vp.etichetta, value: mostra('importo', valore('valore_prec_succ')),
       oninput: ev => scrivi('valore_prec_succ', leggi('importo', ev.target.value)) });
-    ins.append(h('h3', {}, 'Precedenti successioni o donazioni'), h('div', { class: 'rg' }, h('label', { for: 'vps_' + id }, vp.etichetta), h('div', {}, inp, h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:2px' }, vp.aiuto))));
+    altri.append(h('h3', {}, 'Precedenti successioni o donazioni'), h('div', { class: 'rg' }, h('label', { for: 'vps_' + id }, vp.etichetta), h('div', {}, inp, h('div', { class: 'mut aiuto-voce' }, vp.aiuto))));
   }
   if (q.coll === 'persone') {
     const cb = h('input', { type: 'checkbox', 'aria-label': 'portatore handicap', onchange: ev => scrivi('portatore_handicap', ev.target.checked) });
@@ -555,17 +584,18 @@ function renderStrutturati(ins, q, r) {
     }
   }
   const tabella = (campo, titolo, campi, predefinito) => {
-    ins.append(h('h3', {}, titolo));
+    const dest = q.coll === 'beni' ? altri : ins;
+    dest.append(h('h3', {}, titolo));
     const righe = valore(campo) || [];
     righe.forEach((voce, i) => {
       const box = h('div', { class: 'grp', style: 'padding:8px;margin:6px 0' });
       for (const [c, tipo] of campi) box.append(h('label', {}, lbl(q.coll, c), campoInput(q.coll, null, c, tipo, voce[c], (k, v) => {
         const nuove = structuredClone(valore(campo) || []); nuove[i][k] = v; scrivi(campo, nuove);
       })));
-      box.append(h('button', { onclick: () => { scrivi(campo, righe.filter((_, j) => j !== i)); renderIns(); } }, 'Rimuovi ' + titolo.toLowerCase()));
-      ins.append(box);
+      box.append(h('button', { class: 'gh', onclick: () => { scrivi(campo, righe.filter((_, j) => j !== i)); renderIns(); } }, 'Rimuovi ' + titolo.toLowerCase()));
+      dest.append(box);
     });
-    ins.append(h('button', { onclick: () => { scrivi(campo, [...righe, structuredClone(predefinito)]); renderIns(); } }, 'Aggiungi ' + titolo.toLowerCase()));
+    dest.append(h('button', { class: 'gh', onclick: () => { scrivi(campo, [...righe, structuredClone(predefinito)]); if (q.coll === 'beni') S.altriAperti = true; renderIns(); } }, 'Aggiungi ' + titolo.toLowerCase()));
   };
   if (q.coll === 'passivita') tabella('ripartizione', 'Ripartizione', [['persona_id', 'ref:persone'], ['quota', 'quota']], { persona_id: '', quota: '1/1' });
   if (q.id === 'EN') tabella('immobili_aziendali', 'Immobile aziendale', [['bene_id', 'ref:beni']], { bene_id: '' });
@@ -574,6 +604,7 @@ function renderStrutturati(ins, q, r) {
     tabella('estremi_trascrizione', 'Trascrizione', [['ufficio', 'str'], ['registro_particolare', 'str'], ['anno', 'str']], {});
     tabella('estremi_registrazione', 'Registrazione', [['ufficio', 'str'], ['anno', 'str'], ['volume', 'str'], ['numero', 'str']], {});
   }
+  if (altri !== ins) ins.append(altri);
 }
 function insControlli(ins) {
   const q = S.Q;
@@ -612,15 +643,21 @@ async function insFile(dest) {
   catch (e) { if (griglia.isConnected) griglia.append(h('p', { class: 'err' }, e.message)); return; }
   if (S.sel !== 'FILE' || S.P.pratica_id !== pid || !griglia.isConnected) return;
   const ex = st.export, ct = st.controllo_ufficiale;
-  const stato = h('section', { class: 'grp' }, h('h2', {}, 'Stato della dichiarazione'));
-  stato.append(riga_stato('Dati', st.dati.stato, st.dati.rilievi + ' rilievi'),
+  // I passi sono una sequenza reale: fornitore, file, controllo ufficiale, stampa, invio. Ogni passo dice se e' fatto.
+  const passo = (n, titolo, fatto, attrs) => h('section', { class: 'grp passo', ...(attrs || {}) },
+    h('h2', {}, h('span', { class: 'n' + (fatto ? ' fatto' : ''), 'aria-hidden': 'true' }, fatto ? '✓' : String(n)),
+      h('span', {}, h('span', { class: 'vh' }, 'Passo ' + n + ': '), titolo, fatto ? h('span', { class: 'vh' }, ' (fatto)') : null)));
+  const fileOk = ex.generato && ex.completo && ex.stato === 'aggiornato';
+  const stato = h('section', { class: 'grp riepilogo' }, h('h2', {}, 'Stato della dichiarazione'));
+  stato.append(riga_stato('Dati', st.dati.stato, st.dati.rilievi + (st.dati.rilievi === 1 ? ' rilievo' : ' rilievi')),
     riga_stato('File XML', ex.stato, ex.generato ? (ex.completo ? 'Completo nel perimetro supportato' : 'Bozza tecnica: non trasmissibile') : 'Nessun file generato'),
-    riga_stato('Schema XSD', st.xsd.stato), riga_stato('Controllo ufficiale', ct.stato, ct.versione_controllo),
+    riga_stato('Struttura del file', st.xsd.stato), riga_stato('Controllo ufficiale', ct.stato, ct.versione_controllo),
     riga_stato('Trasmissione', st.trasmissione.stato, st.trasmissione.nota));
-  if (ex.versioni) stato.append(h('p', { class: 'mut', style: 'font-size:0.9231rem' }, 'Versioni del file: programma ' + ex.versioni.applicazione + ' · regole ' + ex.versioni.regole +
-    ' · specifiche ' + ex.versioni.specifiche_suc + (ct.versione_controllo ? ' · controllo ' + ct.versione_controllo : '')));
-  if (ct.azione_richiesta) stato.append(h('p', { class: 'nota', style: 'white-space:pre-wrap' }, ct.azione_richiesta));
-  const fornitore = h('section', { class: 'grp', id: 'fornitore' }, h('h2', {}, 'Fornitore e impegno alla trasmissione'),
+  if (ex.versioni) stato.append(h('p', { class: 'mut piccolo' }, 'Versioni del file: programma ' + ex.versioni.applicazione + ', regole ' + ex.versioni.regole +
+    ', specifiche ' + ex.versioni.specifiche_suc + (ct.versione_controllo ? ', controllo ' + ct.versione_controllo : '') + '.'));
+  const profiloSalvato = (S.P.dati.opzioni.fornitore || {}).cf;
+  const fornitore = passo(1, 'Fornitore e impegno alla trasmissione', !!profiloSalvato, { id: 'fornitore' });
+  fornitore.append(
     h('p', { class: 'mut' }, 'Chi presenta il file: dichiarante o intermediario. Il profilo si compila una volta per questa pratica.'));
   const profilo = { ...(S.P.dati.opzioni.fornitore || {}), ...S.fornitoreDirty };
   const modifica = (k, valore) => { S.fornitoreDirty[k] = valore; aggiornaBottoni(); renderSb(); };
@@ -644,7 +681,7 @@ async function insFile(dest) {
         cfIn.value = STUDIO.profilo.cf || ''; tipoIn.value = STUDIO.profilo.tipo || tipoIn.value; impegnoIn.value = STUDIO.profilo.impegno_codice || '';
         dettagli.hidden = tipoIn.value !== '10'; msg('Profilo dello studio applicato: premi «Salva profilo» per confermarlo sulla pratica.', 'o');
       } }, 'Applica profilo dello studio') : null));
-  const elaborati = h('section', { class: 'grp' }, h('h2', {}, 'Generazione e controllo'));
+  const elaborati = passo(2, 'Genera il file telematico', fileOk);
   const esegui = async scopo => {
     if (S.writeBusy) return;
     try {
@@ -663,30 +700,33 @@ async function insFile(dest) {
     h('div', { class: 'az' }, h('button', { class: 'pil', onclick: () => esegui('completo') }, 'Genera file'),
       h('button', { class: 'gh', onclick: () => esegui('bozza_tecnica') }, 'Genera bozza tecnica')));
   if (ex.generato) elaborati.append(h('div', { class: 'az' },
-    h('a', { href: '/api/pratiche/' + pid + '/file.xml?job=' + ex.job_id, download: '' }, 'Scarica XML'),
-    h('a', { href: '/api/pratiche/' + pid + '/stampa?job=' + ex.job_id, target: '_blank', rel: 'noopener' }, 'Stampa prospetto')));
-  elaborati.append(h('div', { class: 'az' }, h('button', { class: 'gh', disabled: ex.stato !== 'aggiornato' || !ex.generato || !ex.completo, onclick: async () => {
-    if (nMod()) return msg('Salva le modifiche e rigenera il file prima della stampa.', 'e');
-    try { const r = await post('/api/pratiche/' + pid + '/stampa-modello', {}); msg('Modello ministeriale generato (' + r.pagine + ' pagine). Prova locale: controllane il contenuto prima di usarlo.', 'o'); window.open('/api/pratiche/' + pid + '/stampa-modello.pdf', '_blank', 'noopener'); }
-    catch (e) { msg(e.message, 'e'); }
-  } }, 'Stampa modello ministeriale')));
-  if (ct.stato === 'positivo' && ct.job_adattatore) elaborati.append(h('div', { class: 'az' },
-    h('a', { href: '/api/pratiche/' + pid + '/file.dcm', download: '' }, 'Scarica file controllato (.dcm)')));
-  elaborati.append(h('div', { class: 'az' }, h('button', { class: 'gh', disabled: ex.stato !== 'aggiornato' || !ex.generato, onclick: async () => {
+    h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/file.xml?job=' + ex.job_id, download: '' }, 'Scarica XML')));
+  const controllo = passo(3, 'Controllo ufficiale', ct.stato === 'positivo');
+  controllo.append(h('p', { class: 'mut' }, 'Esegue sul file il componente di controllo SUC dell\'Agenzia installato su questo computer.'));
+  if (ct.azione_richiesta) controllo.append(h('p', { class: 'nota', style: 'white-space:pre-wrap' }, ct.azione_richiesta));
+  controllo.append(h('div', { class: 'az' }, h('button', { class: 'pil', disabled: ex.stato !== 'aggiornato' || !ex.generato, onclick: async () => {
     if (nMod()) return msg('Salva le modifiche e rigenera il file prima del controllo.', 'e');
-    try { const r = await post('/api/pratiche/' + pid + '/controllo-ufficiale', {}); msg('Controllo ufficiale: ' + r.stato_controllo + ' (' + r.esito + ').', r.stato_controllo === 'positivo' ? 'o' : 'e'); }
+    try { const r = await post('/api/pratiche/' + pid + '/controllo-ufficiale', {}); msg('Controllo ufficiale: ' + String(r.stato_controllo).replaceAll('_', ' ') + ' (' + r.esito + ').', r.stato_controllo === 'positivo' ? 'o' : 'e'); }
     catch (e) { msg(e.message, 'e'); }
     if (S.P.pratica_id === pid && S.sel === 'FILE') renderVista();
-  } }, 'Esegui controllo ufficiale')));
-  const invio = h('section', { class: 'grp intera', id: 'invioPratica' }, h('h2', {}, 'Invio e ricevute'));
-  griglia.append(stato, fornitore, elaborati, invio);
+  } }, 'Esegui controllo ufficiale'),
+    ct.stato === 'positivo' && ct.job_adattatore ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/file.dcm', download: '' }, 'Scarica file controllato (.dcm)') : null));
+  const stampa = passo(4, 'Stampa e rileggi', (st.stampa_modello || {}).stato === 'aggiornata');
+  stampa.append(h('p', { class: 'mut' }, 'Rileggi il modello stampato prima di inviare: confronta immobili, eredi, quote e imposte con i documenti.'),
+    h('div', { class: 'az' }, h('button', { class: 'gh', disabled: !fileOk, onclick: async () => {
+      if (nMod()) return msg('Salva le modifiche e rigenera il file prima della stampa.', 'e');
+      try { const r = await post('/api/pratiche/' + pid + '/stampa-modello', {}); msg('Modello ministeriale generato (' + r.pagine + ' pagine). Prova locale: controllane il contenuto prima di usarlo.', 'o'); window.open('/api/pratiche/' + pid + '/stampa-modello.pdf', '_blank', 'noopener'); }
+      catch (e) { msg(e.message, 'e'); }
+    } }, 'Stampa modello ministeriale'),
+      ex.generato ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/stampa?job=' + ex.job_id, target: '_blank', rel: 'noopener' }, 'Stampa prospetto') : null));
+  const invio = passo(5, 'Invio e ricevute', st.trasmissione.stato === 'trasmessa' && st.trasmissione.modalita !== 'simulata', { id: 'invioPratica' });
+  griglia.append(stato, fornitore, elaborati, controllo, stampa, invio);
   await renderInvio(invio, ex);
 }
 /* Invio: copia congelata -> conferma -> trasmissione. La modalita' «prova» usa un servizio FITTIZIO locale: non invia nulla all'Agenzia. */
 async function renderInvio(ins, ex) {
   const pid = S.P.pratica_id; const base = "/api/pratiche/" + pid + "/invio";
-  ins.append(h("h3", { style: "margin-top:14px" }, "Invio"),
-    h("div", { class: "nota", style: "margin:4px 0" }, "PROVA SIMULATA: il programma non trasmette nulla all'Agenzia delle Entrate. L'invio reale si esegue con gli strumenti ufficiali (modalità manuale) e si registra qui."));
+  ins.append(h("div", { class: "nota", style: "margin:4px 0" }, "PROVA SIMULATA: il programma non trasmette nulla all'Agenzia delle Entrate. L'invio reale si esegue con gli strumenti ufficiali (modalità manuale) e si registra qui."));
   let copie = [];
   try { copie = (await api(base)).copie; } catch (e) { ins.append(h("p", { class: "err" }, e.message)); return; }
   const ricarica = () => { if (S.sel === "FILE") renderVista(); };
@@ -894,7 +934,8 @@ function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazi
       const sd = S.schema.strutturati["dichiarazione." + chiave], attuale = v == null ? "" : String(v);
       inp = h("select", { id, "aria-label": etichetta }, h("option", { value: "" }, "(non indicato)"),
         sd.opzioni.map(o => h("option", { value: o.valore }, o.valore + " — " + o.etichetta)),
-        attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale }, attuale + " (valore non previsto)") : null);
+        attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale },
+      /^\[[a-z_]+\]$/.test(attuale) ? mostra("str", { stato: attuale.slice(1, -1) }) : attuale + " (valore non previsto)") : null);
       inp.value = attuale;
     } else inp = h("input", { id, "aria-label": etichetta, autocomplete: "off", list: listaSuggerimenti("dichiarazione." + chiave),
       placeholder: chiave.includes("data_") ? "GG/MM/AAAA" : "", value: v == null ? "" : chiave.includes("data_") ? dataIt(String(v)) : String(v) });
