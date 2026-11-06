@@ -150,6 +150,7 @@ async function init() {
     S.schema = await api("/api/schema");
     try { const imp = await api('/api/impostazioni'); memorizzaAspetto(imp.interfaccia); STUDIO.profilo = imp.profilo || {}; } catch (_) { /* l'app resta utilizzabile */ }
     STUDIO.archivio = i.archivio || '';
+    if (i.archivio) { const a = $("#homeArchivio"); a.replaceChildren("Archivio aperto: ", h("code", {}, i.archivio)); a.hidden = false; }
     await caricaPratiche(); renderSb(); aggiornaBottoni();
     try { const ultima = localStorage.getItem('successioni.ultima'); if (preferenze.avvio === 'ultima' && ultima && S.pratiche.some(p => p.id === ultima)) await apri(ultima); } catch (_) { /* resta l'elenco */ }
   } catch (e) { msg("Avvio non riuscito: " + e.message, "e"); }
@@ -167,7 +168,12 @@ const dataBreve = d => String(d.getDate()).padStart(2, "0") + "/" + String(d.get
 function renderHome() {
   const ul = $("#recenti"); if (!ul) return;
   ul.replaceChildren();
-  if (!S.pratiche.length) { ul.append(h("li", { class: "mut vuota" }, "Nessuna pratica ancora. Inizia con «Nuova dichiarazione» o importa un file XML.")); $("#homeNota").hidden = true; return; }
+  const vuoto = !S.pratiche.length;
+  $("#homeTitolo").textContent = vuoto ? "Prima dichiarazione" : "Riprendi il lavoro";
+  $("#homeIntro").textContent = vuoto ? "L’archivio non contiene ancora pratiche. Crea la prima oppure importa un file telematico già preparato."
+    : "Apri una pratica recente oppure inizia una nuova dichiarazione di successione.";
+  ul.hidden = vuoto; $("#homeElencoT").textContent = vuoto ? "Come si arriva all’invio" : "Pratiche recenti"; $("#percorso").hidden = !vuoto;
+  if (vuoto) { $("#homeNota").hidden = true; return; }
   let conTermine = false;
   for (const p of S.pratiche.slice(0, 8)) {
     const t = terminePresentazione(p.data_decesso); conTermine = conTermine || !!t;
@@ -212,7 +218,7 @@ function render() {
 }
 function aggiornaBottoni() {
   const n = nMod();
-  $("#bSalva").className = n ? "pil" : "gh"; $("#bNuova").className = S.P ? "gh" : "pil";
+  $("#bSalva").className = n ? "pil" : "gh"; $("#bNuova").className = "gh";   // senza pratica aperta l'azione principale e' nella pagina iniziale
   $("#bSalva").disabled = !n || S.writeBusy; $("#bSalva").textContent = S.writeBusy ? "Salvataggio…" : n ? "Salva (" + n + ")" : "Salva";
   $("#bControlla").disabled = !S.P; $("#bGenera").disabled = !S.P; $("#bGenera").title = "Apri l'area unica File e invio della pratica";
   $('#bGenera').setAttribute('aria-pressed', String(S.sel === 'FILE'));

@@ -17,7 +17,7 @@
     <button id="bControlla" class="gh" disabled>Controlla</button>
     <button id="bGenera" class="gh" disabled>File e invio</button>
     <button id="bMenu" class="gh solo-mobile" aria-label="Altre azioni" aria-controls="azioni" aria-expanded="false">&#8943;</button>
-    <button id="bNuova" class="pil">Nuova dichiarazione</button>
+    <button id="bNuova" class="gh">Nuova dichiarazione</button>
     <button id="bImporta" class="gh" title="Riprendi una dichiarazione da un file telematico XML">Importa XML</button>
     <button id="bImpost" class="gh" title="Aspetto, caratteri e strumenti del programma">Impostazioni</button>
     <input type="file" id="fImporta" accept=".xml,.suc,text/xml,application/xml" hidden>
@@ -37,11 +37,35 @@
   <div id="ridimensionaNav" class="ridimensiona" role="separator" aria-label="Larghezza menu dei quadri" aria-orientation="vertical" aria-controls="lat" aria-valuemin="180" aria-valuemax="480" aria-valuenow="240" tabindex="0"></div>
   <main id="vista" tabindex="-1">
     <div class="vuoto" id="vuoto">
-      <h1>Riprendi il lavoro</h1>
-      <p class="intro">Apri una pratica recente oppure inizia una nuova dichiarazione di successione.</p>
-      <div class="home-actions"><button class="pil" id="homeNuova">Nuova dichiarazione</button><button class="gh" id="homeImporta">Importa da file XML</button></div>
-      <ul class="recenti" id="recenti" aria-label="Pratiche recenti"></ul>
-      <p class="home-nota" id="homeNota" hidden>Il termine indicato è quello ordinario: dodici mesi dalla data del decesso. Le istruzioni del modello prevedono casi in cui decorre da un’altra data, per esempio dopo una rinuncia o con il beneficio d’inventario.</p>
+      <div class="home-testa">
+        <h1 id="homeTitolo">Riprendi il lavoro</h1>
+        <p class="intro" id="homeIntro">Apri una pratica recente oppure inizia una nuova dichiarazione di successione.</p>
+        <div class="home-actions"><button class="pil" id="homeNuova">Nuova dichiarazione</button><button class="gh" id="homeImporta">Importa da file XML</button></div>
+      </div>
+      <div class="home-corpo">
+        <section class="home-main" aria-labelledby="homeElencoT">
+          <h2 id="homeElencoT" class="home-h2">Pratiche recenti</h2>
+          <ul class="recenti" id="recenti" aria-label="Pratiche recenti"></ul>
+          <ol class="percorso" id="percorso" hidden aria-label="Come si arriva all’invio">
+            <li><span class="n">1</span><div><b>Crea la pratica</b><span>La procedura guidata chiede i dati del defunto e i quadri da compilare.</span></div></li>
+            <li><span class="n">2</span><div><b>Compila i quadri</b><span>Eredi in EA, terreni in EB, fabbricati in EC, passività in ED, titoli e conti negli altri quadri. I rilievi mostrano cosa manca.</span></div></li>
+            <li><span class="n">3</span><div><b>Allega e genera il file</b><span>In «File e invio»: allegati in PDF/A, file telematico e controllo ufficiale sul tuo PC.</span></div></li>
+            <li><span class="n">4</span><div><b>Rileggi e invia</b><span>Stampa il modello, confrontalo con le visure, poi invia con Desktop Telematico.</span></div></li>
+          </ol>
+          <p class="home-nota" id="homeNota" hidden>Il termine indicato è quello ordinario: dodici mesi dalla data del decesso. Le istruzioni del modello prevedono casi in cui decorre da un’altra data, per esempio dopo una rinuncia o con il beneficio d’inventario.</p>
+        </section>
+        <aside class="home-lato" aria-labelledby="homeTavoloT">
+          <h2 id="homeTavoloT" class="home-h2">Da avere sul tavolo</h2>
+          <ul class="spunte">
+            <li>Codici fiscali e dati anagrafici di defunto ed eredi</li>
+            <li>Visure catastali aggiornate a non più di tre mesi</li>
+            <li>Saldi di conti e titoli alla data del decesso</li>
+            <li>Documenti delle passività, per esempio il mutuo</li>
+            <li>Albero genealogico in PDF</li>
+          </ul>
+          <p class="archivio-home" id="homeArchivio" hidden></p>
+        </aside>
+      </div>
     </div>
   </main>
   <div id="ridimensiona" class="ridimensiona" role="separator" aria-label="Larghezza pannello dati" aria-orientation="vertical" aria-controls="ins" aria-valuemin="280" aria-valuemax="760" aria-valuenow="360" tabindex="0" hidden></div>
