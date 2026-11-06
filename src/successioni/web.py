@@ -12,7 +12,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from . import __version__, pdfa, quadri as Q, schema as S
-from .errori import ErroreServizio, NonTrovato
+from .errori import DatiNonValidi, ErroreServizio, NonTrovato
 from .servizio import Servizio
 
 STATIC = Path(__file__).parent / "static"
@@ -171,6 +171,24 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                      sha256=r["xml_sha256"], completo=r["completo"]), headers={"Cache-Control": "no-store"})
 
     @api
+    async def prospetto_cliente_api(request):
+        """Riepilogo stampabile per gli eredi, letto dall'ultimo file generato (stessi importi della dichiarazione)."""
+        import json as _json
+        from . import impostazioni
+        from .prospetto_cliente import html as prospetto_html
+        pid = request.path_params["pid"]
+        xml, j = sv.file_export(pid)
+        stato = sv.stato_elaborati(pid)["export"]
+        try:
+            conf = _json.loads(impostazioni.file_configurazione().read_text(encoding="utf-8-sig"))
+            studio = impostazioni.preferenze_interfaccia(conf if isinstance(conf, dict) else {}).get("nome_studio", "")
+        except (OSError, ValueError, DatiNonValidi):
+            studio = ""
+        return HTMLResponse(prospetto_html(xml, titolo=sv.leggi(pid)["titolo"], studio=studio, revisione=j["input"]["revisione"],
+                                           completo=bool(j["risultato"].get("completo")), obsoleto=stato.get("stato") == "obsoleto"),
+                            headers={"Cache-Control": "no-store"})
+
+    @api
     async def diagnosi_api(request):
         from . import strumenti
         return strumenti.diagnosi(sv.arch)
@@ -325,7 +343,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/revisioni", revisioni), Route(P + "/differenze", differenze),
         Route(P + "/ripristina", ripristina, methods=["POST"]),
         Route(P + "/esporta", esporta, methods=["POST"]), Route(P + "/elaborati", elaborati),
-        Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa), Route(P + "/stampa-modello", stampa_modello_api, methods=["POST"]),
+        Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa), Route(P + "/prospetto-cliente", prospetto_cliente_api),Route(P + "/stampa-modello", stampa_modello_api, methods=["POST"]),
         Route(P + "/stampa-modello.pdf", scarica_stampa_modello), Route(P + "/file.dcm", scarica_dcm),
         Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),

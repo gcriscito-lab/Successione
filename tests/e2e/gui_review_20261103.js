@@ -73,9 +73,9 @@ const fixture = JSON.parse(require('node:fs').readFileSync('build/gui_review_fix
     assert.equal(Buffer.concat(chunks).toString(), 'ORIGINALE SINTETICO');
 
     await page.evaluate(async pid => { await apri(pid); S.tab = 'file'; renderIns(); }, fixture.export);
-    await page.getByRole('link', { name: 'Stampa prospetto', exact: true }).waitFor();
+    await page.getByRole('link', { name: 'Prospetto tecnico del file', exact: true }).waitFor();
     const popup = page.waitForEvent('popup');
-    await page.getByRole('link', { name: 'Stampa prospetto', exact: true }).click();
+    await page.getByRole('link', { name: 'Prospetto tecnico del file', exact: true }).click();
     const stampa = await popup; await stampa.waitForLoadState();
     assert.ok((await stampa.locator('body').innerText()).includes(fixture.sha256));
     assert.equal(await stampa.locator('section').count() > 5, true);

@@ -756,7 +756,9 @@ async function insFile(dest) {
       try { const r = await post('/api/pratiche/' + pid + '/stampa-modello', {}); msg('Modello ministeriale generato (' + r.pagine + ' pagine). Prova locale: controllane il contenuto prima di usarlo.', 'o'); window.open('/api/pratiche/' + pid + '/stampa-modello.pdf', '_blank', 'noopener'); }
       catch (e) { msg(e.message, 'e'); }
     } }, 'Stampa modello ministeriale'),
-      ex.generato ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/stampa?job=' + ex.job_id, target: '_blank', rel: 'noopener' }, 'Stampa prospetto') : null));
+      ex.generato ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/prospetto-cliente', target: '_blank', rel: 'noopener',
+        title: 'Riepilogo per gli eredi: beni, quote, passività e imposte, con gli stessi importi del file' }, 'Prospetto per il cliente') : null,
+      ex.generato ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/stampa?job=' + ex.job_id, target: '_blank', rel: 'noopener' }, 'Prospetto tecnico del file') : null));
   const invio = passo(5, 'Invio e ricevute', st.trasmissione.stato === 'trasmessa' && st.trasmissione.modalita !== 'simulata', { id: 'invioPratica' });
   griglia.append(stato, fornitore, elaborati, controllo, stampa, invio);
   await renderInvio(invio, ex);
