@@ -18,7 +18,7 @@
     <button id="bGenera" class="gh" disabled>File e invio</button>
     <button id="bMenu" class="gh solo-mobile" aria-label="Altre azioni" aria-controls="azioni" aria-expanded="false">&#8943;</button>
     <button id="bNuova" class="pil">Nuova dichiarazione</button>
-    <button id="bImporta" class="pil" title="Riprendi una dichiarazione da un file telematico XML">Importa XML</button>
+    <button id="bImporta" class="gh" title="Riprendi una dichiarazione da un file telematico XML">Importa XML</button>
     <button id="bImpost" class="gh" title="Aspetto, caratteri e strumenti del programma">Impostazioni</button>
     <input type="file" id="fImporta" accept=".xml,.suc,text/xml,application/xml" hidden>
   </div>
@@ -37,11 +37,11 @@
   <div id="ridimensionaNav" class="ridimensiona" role="separator" aria-label="Larghezza menu dei quadri" aria-orientation="vertical" aria-controls="lat" aria-valuemin="180" aria-valuemax="480" aria-valuenow="240" tabindex="0"></div>
   <main id="vista" tabindex="-1">
     <div class="vuoto" id="vuoto">
-      <img class="hero-logo" src="/static/logo.svg" alt="Logo Successioni" width="112" height="112">
-      <p class="eyebrow">Il tuo spazio di lavoro</p><h1>Successioni</h1>
-      <p>Pratiche, documenti e dichiarazioni.<br>Ogni passaggio, in un unico posto.</p>
-      <div class="home-actions"><button class="pil" id="homeNuova">Nuova dichiarazione</button><button class="gh" id="homeImporta">Importa XML</button></div>
-      <p class="mut">Scegli una pratica dall’elenco per riprendere il lavoro.</p>
+      <h1>Riprendi il lavoro</h1>
+      <p class="intro">Apri una pratica recente oppure inizia una nuova dichiarazione di successione.</p>
+      <div class="home-actions"><button class="pil" id="homeNuova">Nuova dichiarazione</button><button class="gh" id="homeImporta">Importa da file XML</button></div>
+      <ul class="recenti" id="recenti" aria-label="Pratiche recenti"></ul>
+      <p class="home-nota" id="homeNota" hidden>Il termine indicato è quello ordinario: dodici mesi dalla data del decesso. Le istruzioni del modello prevedono casi in cui decorre da un’altra data, per esempio dopo una rinuncia o con il beneficio d’inventario.</p>
     </div>
   </main>
   <div id="ridimensiona" class="ridimensiona" role="separator" aria-label="Larghezza pannello dati" aria-orientation="vertical" aria-controls="ins" aria-valuemin="280" aria-valuemax="760" aria-valuenow="360" tabindex="0" hidden></div>
@@ -65,16 +65,29 @@
 </dialog>
 <dialog id="imp" aria-labelledby="impT">
   <form method="dialog" id="impForm">
-    <h2 id="impT">Impostazioni</h2>
-    <p class="mut">Personalizza la lettura e lo spazio di lavoro.</p>
-    <div id="impProfilo"></div>
-    <div id="impBackup"></div>
-    <div id="impPreferenze"></div>
-    <div id="impDiagnosi"></div>
-    <div id="impAspetto"></div>
-    <details class="strumenti"><summary>Strumenti e percorsi</summary><p class="mut" id="impFile"></p><div id="impCorpo"></div></details>
-    <p class="mut">Le preferenze restano salvate su questo computer. Password e credenziali non si inseriscono qui.</p>
-    <p class="err" id="impErr" role="alert"></p>
+    <div class="imp-testa">
+      <h2 id="impT">Impostazioni</h2>
+      <p class="mut">Le preferenze restano salvate su questo computer. Password e credenziali non si inseriscono qui.</p>
+    </div>
+    <div class="imp-corpo">
+      <nav class="imp-indice" id="impIndice" aria-label="Sezioni delle impostazioni">
+        <a href="#impProfilo">Studio</a>
+        <a href="#impAspetto">Aspetto</a>
+        <a href="#impPreferenze">Operatività</a>
+        <a href="#impBackup">Backup</a>
+        <a href="#impDiagnosi">Diagnosi</a>
+        <a href="#impStrumenti">Strumenti e percorsi</a>
+      </nav>
+      <div class="imp-sezioni" id="impSezioni">
+        <section id="impProfilo"></section>
+        <section id="impAspetto"></section>
+        <section id="impPreferenze"></section>
+        <section id="impBackup"></section>
+        <section id="impDiagnosi"></section>
+        <section id="impStrumenti" class="strumenti"><h3>Strumenti e percorsi</h3><p class="mut" id="impFile"></p><div id="impCorpo"></div></section>
+      </div>
+    </div>
+    <p class="err imp-piede" id="impErr" role="alert"></p>
     <div class="wiz-az">
       <button type="button" id="iChiudi" class="gh">Chiudi</button>
       <span class="sp"></span>

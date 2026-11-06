@@ -23,7 +23,7 @@ const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 14, inte
   accento: 'predefinito', densita: 'normale', contrasto: 'normale', movimento: 'normale', avvio: 'elenco', nome_studio: '', quadri_predefiniti: [] };
 const ACCENTI = { blu: ['#0a74ff', '#6cb0ff'], verde: ['#1e7a37', '#6fd18a'], viola: ['#6e3fd1', '#b79cff'], arancio: ['#b25e00', '#ffb454'], rosso: ['#c4001a', '#ff8a92'], grafite: ['#3a3f4a', '#c4c9d4'] };
 const hexRgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
-const FONT_UI = { sistema: 'system-ui, "Segoe UI", sans-serif', segoe: '"Segoe UI", system-ui, sans-serif',
+const FONT_UI = { sistema: '"Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif', segoe: '"Segoe UI", system-ui, sans-serif',
   arial: 'Arial, sans-serif', verdana: 'Verdana, sans-serif', georgia: 'Georgia, serif', consolas: 'Consolas, monospace' };
 let preferenze = { ...ASPETTO_DEFAULT };
 const sistemaScuro = window.matchMedia('(prefers-color-scheme: dark)');
@@ -154,8 +154,35 @@ async function init() {
     try { const ultima = localStorage.getItem('successioni.ultima'); if (preferenze.avvio === 'ultima' && ultima && S.pratiche.some(p => p.id === ultima)) await apri(ultima); } catch (_) { /* resta l'elenco */ }
   } catch (e) { msg("Avvio non riuscito: " + e.message, "e"); }
 }
+/* Pagina iniziale: le pratiche piu' recenti con il termine ordinario di presentazione (dodici mesi dal decesso:
+   docs/regole/pagamenti_crediti.md e istruzioni del modello, che prevedono anche decorrenze diverse). */
+function terminePresentazione(decesso) {
+  const m = typeof decesso === "string" && decesso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const t = new Date(+m[1] + 1, +m[2] - 1, +m[3]);
+  const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
+  return { data: t, giorni: Math.round((t - oggi) / 86400000) };
+}
+const dataBreve = d => String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
+function renderHome() {
+  const ul = $("#recenti"); if (!ul) return;
+  ul.replaceChildren();
+  if (!S.pratiche.length) { ul.append(h("li", { class: "mut vuota" }, "Nessuna pratica ancora. Inizia con «Nuova dichiarazione» o importa un file XML.")); $("#homeNota").hidden = true; return; }
+  let conTermine = false;
+  for (const p of S.pratiche.slice(0, 8)) {
+    const t = terminePresentazione(p.data_decesso); conTermine = conTermine || !!t;
+    const term = !t ? h("span", { class: "term mut" }, "Data del decesso da indicare")
+      : t.giorni < 0 ? h("span", { class: "term scaduto" }, "Termine ordinario superato il " + dataBreve(t.data))
+      : h("span", { class: "term" + (t.giorni <= 60 ? " vicino" : "") }, "Termine ordinario " + dataBreve(t.data) + (t.giorni <= 60 ? ", tra " + t.giorni + (t.giorni === 1 ? " giorno" : " giorni") : ""));
+    ul.append(h("li", {}, h("button", { type: "button", onclick: () => apri(p.id) },
+      h("span", { class: "tit" }, p.titolo),
+      h("span", { class: "dett" }, "Aggiornata il " + dataIt(String(p.aggiornata || "").slice(0, 10)) + ", revisione " + p.revisione), term)));
+  }
+  $("#homeNota").hidden = !conTermine;
+}
 async function caricaPratiche() {
   S.pratiche = await api("/api/pratiche");
+  renderHome();
   const ul = $("#lista"); ul.replaceChildren();
   if (!S.pratiche.length) ul.append(h("li", { class: "mut" }, "Nessuna pratica."));
   for (const p of S.pratiche) ul.append(h("li", {}, h("button", { title: p.titolo + " (rev. " + p.revisione + ")", "aria-current": S.P && S.P.pratica_id === p.id ? "true" : "false", onclick: () => apri(p.id) }, h("span", {}, p.titolo), h("span", { class: "mut" }, "rev. " + p.revisione))));
@@ -185,6 +212,7 @@ function render() {
 }
 function aggiornaBottoni() {
   const n = nMod();
+  $("#bSalva").className = n ? "pil" : "gh"; $("#bNuova").className = S.P ? "gh" : "pil";
   $("#bSalva").disabled = !n || S.writeBusy; $("#bSalva").textContent = S.writeBusy ? "Salvataggio…" : n ? "Salva (" + n + ")" : "Salva";
   $("#bControlla").disabled = !S.P; $("#bGenera").disabled = !S.P; $("#bGenera").title = "Apri l'area unica File e invio della pratica";
   $('#bGenera').setAttribute('aria-pressed', String(S.sel === 'FILE'));
@@ -192,14 +220,14 @@ function aggiornaBottoni() {
 }
 function renderSb() {
   const sb = $("#sb"); sb.replaceChildren();
-  const arch = STUDIO.archivio ? h("span", { class: "arch", title: STUDIO.archivio, style: "font-weight:600" }, "Archivio: " + STUDIO.archivio.split(/[\\/]/).filter(Boolean).pop()) : null;
+  const arch = STUDIO.archivio ? h("span", { class: "arch", title: STUDIO.archivio }, "Archivio: " + STUDIO.archivio.split(/[\\/]/).filter(Boolean).pop()) : null;
   if (!S.P) { sb.append(...[arch, h("span", {}, "Nessuna pratica aperta")].filter(Boolean)); return; }
   const n = S.Q.rilievi.length;
   sb.append(...[arch, h("span", {}, "Revisione " + S.P.revisione),
     S.salvata ? h("span", { class: "ok" }, "Salvata alle " + S.salvata) : null,
-    nMod() ? h("span", { style: "color:var(--am)" }, nMod() + (nMod() === 1 ? " modifica non salvata" : " modifiche non salvate")) : null,
+    nMod() ? h("span", { class: "am" }, nMod() + (nMod() === 1 ? " modifica non salvata" : " modifiche non salvate")) : null,
     n ? h("button", { onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, n + (n === 1 ? " rilievo" : " rilievi")) : h("span", {}, "Nessun rilievo"),
-    (S.Q.avvisi || []).length ? h("button", { style: "color:var(--am)", onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, S.Q.avvisi.length + (S.Q.avvisi.length === 1 ? " avviso" : " avvisi")) : null,
+    (S.Q.avvisi || []).length ? h("button", { class: "am", onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, S.Q.avvisi.length + (S.Q.avvisi.length === 1 ? " avviso" : " avvisi")) : null,
     h("span", {}, S.Q.finalizzabile ? "Finalizzabile" : "Non finalizzabile" + ((S.Q.blocchi_finalizzazione || []).length ? ": file XML completo non generato" : "")),
     h("span", {}, "Controllo ufficiale: vedi File e invio")].filter(Boolean));
 }
@@ -259,7 +287,7 @@ function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
     el.value = val || "";
   } else {
     const lista = listaSuggerimenti(coll + "." + campo);
-    el = h("input", { "aria-label": campo, autocomplete: "off", list: lista, maxlength: MAX_LUNGHEZZA[coll + "." + campo], class: kind === "cf" ? "mono" : (kind === "importo" || kind === "quota" ? "num" : ""), placeholder: kind === "quota" ? "1/2" : kind === "data" ? "GG/MM/AAAA" : "" });
+    el = h("input", { "aria-label": campo, autocomplete: "off", list: lista, maxlength: MAX_LUNGHEZZA[coll + "." + campo], class: kind === "cf" ? "mono cf" : (kind === "importo" || kind === "quota" ? "num" : ""), placeholder: kind === "quota" ? "1/2" : kind === "data" ? "GG/MM/AAAA" : "" });
     el.value = mostra(kind, val);
   }
   if (path) el.dataset.path = path;
@@ -292,7 +320,7 @@ function campoStrutturato(sd, val, onMod, path) {
   const err = path ? rilievi().filter(r => r.percorso === path) : [];
   const grezzo = val === undefined || val === null ? "" : (typeof val === "object" && val.stato ? "[" + val.stato + "]" : String(val));
   const attuale = riconosciVoce(sd, grezzo);
-  const el = h("select", { "aria-label": sd.etichetta, style: "width:100%;min-width:0;max-width:100%;text-overflow:ellipsis" },
+  const el = h("select", { "aria-label": sd.etichetta },
     h("option", { value: "" }, "(non indicato)"),
     sd.opzioni.map(o => h("option", { value: o.valore, title: testoVoce(sd, o) }, testoVoce(sd, o))),
     attuale && !sd.opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale },
@@ -300,7 +328,7 @@ function campoStrutturato(sd, val, onMod, path) {
   el.value = attuale;
   if (path) el.dataset.path = path;
   if (err.length) el.classList.add("bad");
-  const dett = h("div", { class: "mut aiuto-voce", style: "font-size:0.8846rem;margin-top:2px" });
+  const dett = h("div", { class: "mut aiuto-voce" });
   const mostraAiuto = () => {
     const o = sd.opzioni.find(x => x.valore === el.value);
     dett.textContent = o ? o.aiuto : "";
@@ -345,7 +373,7 @@ function renderVista() {
   main.append(h("h1", {}, (q.id === "AN" || q.id === "DV" ? "" : q.id + " — ") + q.titolo));
   main.append(h("div", { class: "sottotitolo" }, q.nota || (q.vista === "tabella" || q.vista === "documenti" ? (q.righe + (q.righe === 1 ? " riga" : " righe")) : "")));
   if (!q.attivo && q.supportato) main.append(h("div", { class: "nota" }, "Questo quadro non è selezionato per la dichiarazione. ", h("button", { class: "lk", onclick: () => impostaQuadro(q.id, true) }, "Seleziona il quadro")));
-  if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { style: "flex:1" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
+  if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { class: "cresce" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
   if (q.vista === "frontespizio") renderFront(main);
   else if (q.vista === "derivato") main.append(h("div", { class: "nota" }, q.nota || "Quadro generato automaticamente dal programma."));
   else if (q.vista === "non_supportato") renderNonSupp(main, q);
@@ -389,7 +417,7 @@ function renderTabella(main, q) {
       }
       if (kind.startsWith("ref:") && v) { const e = (S.P.dati[kind.slice(4)] || []).find(x => x.id === v); if (e) txt = etichetta(kind.slice(4), e); }
       const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
-      const td = h("td", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : "", title: txt }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
+      const td = h("td", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : (kind === "cf" ? "cf" : ""), title: txt }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
       tr.append(td);
     });
     tb.append(tr);
@@ -452,7 +480,7 @@ function insDati(ins) {
   if (!r) { ins.append(h("p", { class: "mut" }, "Seleziona una riga della tabella oppure aggiungine una.")); return; }
   const campi = S.schema.collezioni[q.coll]; const id = r.e ? r.e.id : r.nuova.id;   // anche le righe nuove hanno data-path (per evidenziare l'errore al salvataggio)
   ins.append(h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)));
-  for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e", style: "color:var(--er);margin:0 0 6px" }, x.messaggio));
+  for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e e-riga" }, x.messaggio));
   const visibili = q.campi ? new Set(q.campi) : (((S.schema.ordine || {})[q.id]) ? new Set(S.schema.ordine[q.id]) : null);   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
   const ordine = ordinati(q.id, Object.keys(campi));
   for (const [comune, provincia] of [['comune', 'provincia'], ['luogo_nascita', 'provincia_nascita']]) {
@@ -497,7 +525,7 @@ function insDati(ins) {
     const w = sd && sd.opzioni ? campoStrutturato(sd, valRiga(r, c), v => modificaCampo(c, v), id ? q.coll + "[" + id + "]." + c : null)
       : campoInput(q.coll, id, c, kind, valRiga(r, c), modificaCampo);
     const aiuto = (S.schema.aiuti || {})[q.coll + "." + c];
-    if (aiuto) w.append(h("div", { class: "mut", style: "font-size:0.8846rem;margin-top:2px" }, aiuto));
+    if (aiuto) w.append(h("div", { class: "mut aiuto-voce" }, aiuto));
     ins.append(h("div", { class: "rg" }, h("label", {}, lbl(q.coll, c, q.id)), w));
   }
   if (nascostiEstero) ins.append(h("p", { class: "mut nota-campi" }, "Per un immobile all'estero scegli la provincia EE: compaiono i campi dello Stato estero."));
@@ -505,13 +533,13 @@ function insDati(ins) {
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
   const supKey = q.coll + ':' + (r.e ? r.e.id : r.nuova.id);
   if (r.nuova || S.dirty.has(r.key) || S.supDirty.has(supKey)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); S.supDirty.delete(supKey); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));
-  if (r.e) az.append(h("button", { class: "lk", style: "color:var(--er)", onclick: async () => {
+  if (r.e) az.append(h("button", { class: "lk pericolo", onclick: async () => {
     if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di eliminare la riga.", "e");
     if (confirm("Eliminare la riga?")) await salvaOps([{ op: "remove", coll: q.coll, id }], () => {
       S.dirty.delete(r.key); S.supDirty.delete(supKey); S.riga = null;
     });
   } }, "Elimina riga"));
-  ins.append(az, h("p", { class: "mut mono", style: "margin-top:10px" }, r.e ? r.e.id : ""));
+  ins.append(az, h("p", { class: "mut mono id-riga" }, r.e ? r.e.id : ""));
 }
 function renderStrutturati(ins, q, r) {
   if (!['beni', 'passivita', 'persone', 'devoluzioni'].includes(q.coll)) return;
@@ -528,15 +556,15 @@ function renderStrutturati(ins, q, r) {
     const attuale = String(valore('agevolazioni') || '').toUpperCase();
     ins.append(h('h3', {}, 'Agevolazione (prima casa, riduzioni)'));
     ins.append(campoStrutturato(sd, valore('agevolazioni'), v => { scrivi('agevolazioni', v); renderIns(); }, null));
-    ins.append(h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:4px' }, sd.aiuto));
+    ins.append(h('div', { class: 'mut aiuto-voce' }, sd.aiuto));
     if (bene && ['P', 'X', 'Z'].includes(attuale) && quadroBene(bene) !== 'EC')
-      ins.append(h('div', { class: 'nota', style: 'margin:6px 0' }, 'Il bene collegato non è un fabbricato del quadro EC: i codici P, X, Z sono ammessi solo lì e l\'esportazione segnalerà un errore.'));
+      ins.append(h('div', { class: 'nota stretta' }, 'Il bene collegato non è un fabbricato del quadro EC: i codici P, X, Z sono ammessi solo lì e l\'esportazione segnalerà un errore.'));
     const rd = (S.schema.strutturati || {})['devoluzioni.riduzioni'];
     ins.append(h('h3', {}, 'Riduzione art. 25 comma 1'));
     ins.append(campoStrutturato(rd, valore('riduzioni'), v => scrivi('riduzioni', v), null));
-    ins.append(h('div', { class: 'mut', style: 'font-size:0.8846rem;margin-top:4px' }, rd.aiuto));
+    ins.append(h('div', { class: 'mut aiuto-voce' }, rd.aiuto));
     if (valore('riduzioni') && bene)
-      ins.append(h('div', { class: 'nota', style: 'margin:6px 0' }, 'Indica anche il valore delle precedenti successioni nel pannello del bene collegato (' + etichetta('beni', bene) + ').'));
+      ins.append(h('div', { class: 'nota stretta' }, 'Indica anche il valore delle precedenti successioni nel pannello del bene collegato (' + etichetta('beni', bene) + ').'));
     return;
   }
   // dati meno frequenti del bene (precedenti successioni, graffati, trascrizione, registrazione): ripiegati finche' sono vuoti
@@ -555,19 +583,23 @@ function renderStrutturati(ins, q, r) {
     const cb = h('input', { type: 'checkbox', 'aria-label': 'portatore handicap', onchange: ev => scrivi('portatore_handicap', ev.target.checked) });
     cb.checked = valore('portatore_handicap') === true;
     ins.append(h('label', { class: 'chk' }, cb, 'Portatore di handicap (come documentato)'));
+    // dati meno frequenti del soggetto: ripiegati finche' sono vuoti
+    const pienoP = ['rinuncia', 'denominazione', 'rinuncia_estremi', 'residenza_estera'].some(c => { const v = valore(c); return v != null && v !== '' && v !== false; });
+    altri = h('details', { class: 'altri', open: pienoP || S.altriAperti ? '' : null, ontoggle: ev => { S.altriAperti = ev.target.open; } },
+      h('summary', {}, 'Rinuncia, enti e residenza estera'));
     // rinunciatari, enti e residenza estera (docs/regole/soggetti_ea.md)
     const rin = h('input', { type: 'checkbox', 'aria-label': 'rinunciatario', onchange: ev => scrivi('rinuncia', ev.target.checked ? true : null) });
     rin.checked = valore('rinuncia') === true;
-    ins.append(h('label', { class: 'chk' }, rin, 'Rinunciatario (la rinuncia e\' registrata: indica gli estremi dell\'atto)'));
+    altri.append(h('label', { class: 'chk' }, rin, 'Rinunciatario (la rinuncia e\' registrata: indica gli estremi dell\'atto)'));
     const den = h('input', { 'aria-label': 'denominazione', value: valore('denominazione') || '', oninput: ev => scrivi('denominazione', ev.target.value.trim() || null) });
-    ins.append(h('label', {}, 'Denominazione (solo enti: gradi 35, 37, 38, 39)', den));
+    altri.append(h('label', {}, 'Denominazione (solo enti: gradi 35, 37, 38, 39)', den));
     const oggetto = (campo, titolo, campi) => {
-      ins.append(h('h3', {}, titolo));
+      altri.append(h('h3', {}, titolo));
       for (const [c, et] of campi) {
         const el = h('input', { 'aria-label': titolo + ': ' + et, value: (valore(campo) || {})[c] ?? '', oninput: ev => {
           const o = { ...(valore(campo) || {}) }; const t = ev.target.value.trim(); if (!t) delete o[c]; else o[c] = t;
           scrivi(campo, Object.keys(o).length ? o : null); } });
-        ins.append(h('label', {}, et, el));
+        altri.append(h('label', {}, et, el));
       }
     };
     oggetto('rinuncia_estremi', 'Estremi dell\'atto di rinuncia', [['ufficio_registrazione', 'ufficio di registrazione'], ['serie', 'serie'],
@@ -588,7 +620,7 @@ function renderStrutturati(ins, q, r) {
     dest.append(h('h3', {}, titolo));
     const righe = valore(campo) || [];
     righe.forEach((voce, i) => {
-      const box = h('div', { class: 'grp', style: 'padding:8px;margin:6px 0' });
+      const box = h('div', { class: 'grp sotto' });
       for (const [c, tipo] of campi) box.append(h('label', {}, lbl(q.coll, c), campoInput(q.coll, null, c, tipo, voce[c], (k, v) => {
         const nuove = structuredClone(valore(campo) || []); nuove[i][k] = v; scrivi(campo, nuove);
       })));
@@ -609,12 +641,12 @@ function renderStrutturati(ins, q, r) {
 function insControlli(ins) {
   const q = S.Q;
   ins.append(h("p", { class: "mut" }, q.ambito + (q.finalizzabile ? ". Finalizzabile." : ". Non finalizzabile.")));
-  for (const b of (q.blocchi_finalizzazione || [])) ins.append(h("div", { class: "nota", style: "margin:0 0 8px" }, b.messaggio));
+  for (const b of (q.blocchi_finalizzazione || [])) ins.append(h("div", { class: "nota stretta" }, b.messaggio));
   // avvisi che non impediscono la finalizzazione (es. visure catastali vecchie o senza data)
-  for (const a of (q.avvisi || [])) ins.append(h("div", { class: "nota", style: "margin:0 0 8px", role: "status" }, h("b", {}, "Avviso: "), a.messaggio));
-  if (!q.rilievi.length) { ins.append(h("p", { class: "ok", style: "color:var(--ok);font-weight:600" }, "Nessun rilievo sui dati inseriti.")); return; }
+  for (const a of (q.avvisi || [])) ins.append(h("div", { class: "nota stretta", role: "status" }, h("b", {}, "Avviso: "), a.messaggio));
+  if (!q.rilievi.length) { ins.append(h("p", { class: "ok esito-ok" }, "Nessun rilievo sui dati inseriti.")); return; }
   const ul = h("ul", { class: "rl" });
-  for (const r of q.rilievi) ul.append(h("li", {}, h("button", { onclick: () => vaiA(r) }, h("span", { class: "sigla", style: "background:var(--er-b)" }, r.quadro), h("span", {}, h("div", {}, r.messaggio), h("div", { class: "cod" }, r.codice + " · " + r.percorso)))));
+  for (const r of q.rilievi) ul.append(h("li", {}, h("button", { onclick: () => vaiA(r) }, h("span", { class: "sigla" }, r.quadro), h("span", {}, h("div", {}, r.messaggio), h("div", { class: "cod" }, r.codice + " · " + r.percorso)))));
   ins.append(ul);
 }
 async function insCronologia(ins) {
@@ -622,7 +654,7 @@ async function insCronologia(ins) {
   const lista = await api("/api/pratiche/" + S.P.pratica_id + "/revisioni");
   if (S.tab !== "cronologia") return;
   for (const x of lista.slice().reverse()) {
-    const b = x.n !== S.P.revisione ? h("button", { class: "gh", style: "margin-top:4px", onclick: async () => {
+    const b = x.n !== S.P.revisione ? h("button", { class: "gh spazio-su", onclick: async () => {
       if (S.writeBusy || nMod()) return msg("Completa il salvataggio delle modifiche prima di ripristinare una revisione.", "e");
       if (!confirm("Creare una nuova revisione con i dati della n. " + x.n + "?")) return;
       S.writeBusy = true; aggiornaBottoni();
@@ -633,7 +665,7 @@ async function insCronologia(ins) {
 }
 const PILLOLE = { aggiornato: "ok", valido: "ok", positivo: "ok", senza_rilievi: "ok", negativo: "er", non_valido: "er", con_rilievi: "am", obsoleto: "am", non_eseguito: "", non_preparata: "" };
 function riga_stato(nome, stato, extra) {
-  return h("div", { class: "rg", style: "grid-template-columns:120px 1fr" }, h("span", { class: "etichetta" }, nome), h("div", {}, h("span", { class: "pz " + (PILLOLE[stato] || "") , style: PILLOLE[stato] ? "" : "background:var(--grigio)" }, String(stato).replaceAll("_", " ")), extra ? h("div", { class: "mut", style: "font-size:0.9231rem;margin-top:3px" }, extra) : null));
+  return h("div", { class: "rg rg-stato" }, h("span", { class: "etichetta" }, nome), h("div", {}, h("span", { class: "pz " + (PILLOLE[stato] || "") }, String(stato).replaceAll("_", " ")), extra ? h("div", { class: "mut stato-extra" }, extra) : null));
 }
 async function insFile(dest) {
   const pid = S.P.pratica_id;
@@ -661,7 +693,7 @@ async function insFile(dest) {
     h('p', { class: 'mut' }, 'Chi presenta il file: dichiarante o intermediario. Il profilo si compila una volta per questa pratica.'));
   const profilo = { ...(S.P.dati.opzioni.fornitore || {}), ...S.fornitoreDirty };
   const modifica = (k, valore) => { S.fornitoreDirty[k] = valore; aggiornaBottoni(); renderSb(); };
-  const cfIn = h('input', { 'aria-label': 'Codice fiscale del fornitore', class: 'mono', value: profilo.cf || '',
+  const cfIn = h('input', { 'aria-label': 'Codice fiscale del fornitore', class: 'mono cf', value: profilo.cf || '',
     oninput: e => modifica('cf', e.target.value.trim().toUpperCase()) });
   const tipoIn = h('select', { 'aria-label': 'Tipo fornitore' }, h('option', { value: '1' }, 'Dichiarante (1)'), h('option', { value: '10' }, 'Intermediario (10)'));
   tipoIn.value = profilo.tipo || '1';
@@ -703,7 +735,7 @@ async function insFile(dest) {
     h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/file.xml?job=' + ex.job_id, download: '' }, 'Scarica XML')));
   const controllo = passo(3, 'Controllo ufficiale', ct.stato === 'positivo');
   controllo.append(h('p', { class: 'mut' }, 'Esegue sul file il componente di controllo SUC dell\'Agenzia installato su questo computer.'));
-  if (ct.azione_richiesta) controllo.append(h('p', { class: 'nota', style: 'white-space:pre-wrap' }, ct.azione_richiesta));
+  if (ct.azione_richiesta) controllo.append(h('p', { class: 'nota pre' }, ct.azione_richiesta));
   controllo.append(h('div', { class: 'az' }, h('button', { class: 'pil', disabled: ex.stato !== 'aggiornato' || !ex.generato, onclick: async () => {
     if (nMod()) return msg('Salva le modifiche e rigenera il file prima del controllo.', 'e');
     try { const r = await post('/api/pratiche/' + pid + '/controllo-ufficiale', {}); msg('Controllo ufficiale: ' + String(r.stato_controllo).replaceAll('_', ' ') + ' (' + r.esito + ').', r.stato_controllo === 'positivo' ? 'o' : 'e'); }
@@ -726,7 +758,7 @@ async function insFile(dest) {
 /* Invio: copia congelata -> conferma -> trasmissione. La modalita' «prova» usa un servizio FITTIZIO locale: non invia nulla all'Agenzia. */
 async function renderInvio(ins, ex) {
   const pid = S.P.pratica_id; const base = "/api/pratiche/" + pid + "/invio";
-  ins.append(h("div", { class: "nota", style: "margin:4px 0" }, "PROVA SIMULATA: il programma non trasmette nulla all'Agenzia delle Entrate. L'invio reale si esegue con gli strumenti ufficiali (modalità manuale) e si registra qui."));
+  ins.append(h("div", { class: "nota stretta" }, "PROVA SIMULATA: il programma non trasmette nulla all'Agenzia delle Entrate. L'invio reale si esegue con gli strumenti ufficiali (modalità manuale) e si registra qui."));
   let copie = [];
   try { copie = (await api(base)).copie; } catch (e) { ins.append(h("p", { class: "err" }, e.message)); return; }
   const ricarica = () => { if (S.sel === "FILE") renderVista(); };
@@ -734,17 +766,17 @@ async function renderInvio(ins, ex) {
   ins.append(h("div", { class: "az" }, h("button", { class: "pil", disabled: ex.stato !== "aggiornato" || !ex.completo, title: "Congela il file XML completo con il controllo ufficiale associato",
     onclick: () => chiama(base + "/prepara", { chiave_richiesta: "prep-" + crypto.randomUUID() }, r => "Copia preparata. " + (r.azione_richiesta || "")) }, "Prepara invio")));
   const c = copie[0];
-  if (!c) { ins.append(h("p", { class: "mut", style: "font-size:0.9231rem" }, "Nessuna copia preparata. Serve un file completo e un controllo ufficiale positivo.")); return; }
+  if (!c) { ins.append(h("p", { class: "mut testo-m" }, "Nessuna copia preparata. Serve un file completo e un controllo ufficiale positivo.")); return; }
   const d = c.dettaglio || {};
   ins.append(h("a", { href: "/api/invio/" + c.job_id + "/file", download: "" }, "Scarica la copia congelata"));
   ins.append(h("p", { class: "mut" }, "Fornitore: " + JSON.stringify(d.profilo || {}) + " · Importi: " + JSON.stringify(d.importi || {})));
   const tentativo = (c.tentativi || []).find(t => t.dettaglio.job_id === d.tentativo_corrente);
   if (tentativo) {
     ins.append(riga_stato("Tentativo", tentativo.dettaglio.stato, tentativo.dettaglio.modalita + (tentativo.dettaglio.protocollo ? " · " + tentativo.dettaglio.protocollo : "")));
-    if (tentativo.azione_richiesta) ins.append(h("div", { class: "nota", style: "white-space:pre-wrap" }, tentativo.azione_richiesta));
+    if (tentativo.azione_richiesta) ins.append(h("div", { class: "nota pre" }, tentativo.azione_richiesta));
   }
   ins.append(riga_stato("Copia", c.stato, (d.manifest || []).map(m => m.nome + " · " + m.sha256.slice(0, 12)).join(", ")));
-  if (c.azione_richiesta) ins.append(h("div", { class: "nota", style: "margin:6px 0;white-space:pre-wrap" }, c.azione_richiesta));
+  if (c.azione_richiesta) ins.append(h("div", { class: "nota stretta pre" }, c.azione_richiesta));
   if (c.stato === "preparata") {
     const sp = h("input", { type: "checkbox", id: "inv_ok" });
     const bt = h("button", { class: "pil", disabled: true, onclick: () => chiama("/api/invio/" + c.job_id + "/conferma", { impronta: d.impronta_conferma, utente: "professionista" }, () => "Copia confermata.") }, "Conferma questa copia");
@@ -774,7 +806,7 @@ async function renderInvio(ins, ex) {
     }
   }
   if (tentativo && tentativo.dettaglio.protocollo) await renderRicevute(ins, pid, tentativo.dettaglio.job_id);
-  for (const tid of d.tentativi || []) ins.append(h("div", { class: "mut", style: "font-size:0.9231rem" }, "Tentativo " + tid + (tid === d.tentativo_corrente ? " (corrente)" : "")));
+  for (const tid of d.tentativi || []) ins.append(h("div", { class: "mut testo-m" }, "Tentativo " + tid + (tid === d.tentativo_corrente ? " (corrente)" : "")));
 }
 async function renderRicevute(ins, pid, tid) {
   const url = '/api/pratiche/' + pid + '/ricevute/' + tid;
@@ -924,7 +956,7 @@ function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazi
     const v = S.dichDirty.has(chiave) ? S.dichDirty.get(chiave) : leggi(chiave); const id = "dd_" + chiave.replaceAll(".", "_");
     let inp;
     if (tipo === "bool") {
-      inp = h("select", { id, "aria-label": etichetta }, h("option", { value: "" }, "(non indicato)"), h("option", { value: "si" }, "si'"), h("option", { value: "no" }, "no"));
+      inp = h("select", { id, "aria-label": etichetta }, h("option", { value: "" }, "(non indicato)"), h("option", { value: "si" }, "sì"), h("option", { value: "no" }, "no"));
       inp.value = v === true ? "si" : v === false ? "no" : "";
     } else if (chiave === 'presentatore.persona_id') {
       inp = h('select', { id, 'aria-label': etichetta }, h('option', { value: '' }, 'Presentatore distinto / non selezionato'),
@@ -949,7 +981,7 @@ function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazi
     inputs[chiave] = inp;
     sez.append(h("div", { class: "rg" }, h("label", { for: id }, etichetta), inp));
   }
-  if (!chiavi) sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "dd_salva", onclick: async () => {
+  if (!chiavi) sez.append(h("div", { class: "barra dentro" }, h("button", { class: "pil", id: "dd_salva", onclick: async () => {
     // legge l'oggetto corrente e modifica solo le chiavi toccate: persone, beni e passivita' dell'oggetto restano intatti
     await salvaTutto();
   } }, "Salva dati della dichiarazione")));
@@ -961,7 +993,7 @@ function sezionePrimaCasa() {
   const dich = ((S.P.dati.opzioni || {}).telematico || {}).dichiarazione || {};
   const defs = Object.entries(S.schema.strutturati || {}).filter(([k]) => k.startsWith("dichiarazione.prima_casa."));
   const sez = h("section", { class: "grp", id: "sezPrimaCasa" }, h("h2", {}, "Agevolazione prima casa (Sezione II del quadro EH)"),
-    h("div", { class: "nota", style: "margin:8px 14px" }, "Servono solo se il dichiarante chiede il codice P: il codice si imposta sulla riga di devoluzione (scheda DV, riquadro «Agevolazione prima casa»). Il dichiarante è il presentatore con carica 1 presente nel quadro EA. Fonti: docs/regole/prima_casa.md."));
+    h("div", { class: "nota dentro" }, "Servono solo se il dichiarante chiede il codice P: il codice si imposta sulla riga di devoluzione (scheda DV, riquadro «Agevolazione prima casa»). Il dichiarante è il presentatore con carica 1 presente nel quadro EA. Fonti: docs/regole/prima_casa.md."));
   for (const [percorso, sd] of defs) {
     const chiave = percorso.slice("dichiarazione.".length);   // es. prima_casa.requisito_comune
     const corrente = S.dichDirty.has(chiave) ? S.dichDirty.get(chiave) : chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
@@ -972,7 +1004,7 @@ function sezionePrimaCasa() {
       opzioni.map(o => h("option", { value: o.valore }, sd.tipo === "bool" ? o.etichetta : o.valore + " — " + o.etichetta)),
       attuale && !opzioni.some(o => o.valore === attuale) ? h("option", { value: attuale }, attuale + " (valore non previsto)") : null);
     inp.value = attuale;
-    const dett = h("div", { class: "mut", style: "font-size:0.8846rem;margin-top:2px" });
+    const dett = h("div", { class: "mut aiuto-voce" });
     const mostraAiuto = () => { const o = sd.tipo === "enum" ? sd.opzioni.find(x => x.valore === inp.value) : null; dett.textContent = o ? o.aiuto : ""; };
     const modifica = () => {
       const t = inp.value;
@@ -980,9 +1012,9 @@ function sezionePrimaCasa() {
       mostraAiuto(); aggiornaBottoni(); renderSb();
     };
     inp.addEventListener("change", modifica); mostraAiuto();
-    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut", style: "font-size:0.8846rem;margin-top:2px" }, sd.aiuto), dett)));
+    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto), dett)));
   }
-  sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "pc_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
+  sez.append(h("div", { class: "barra dentro" }, h("button", { class: "pil", id: "pc_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
   return sez;
 }
 /* Sezione IV del quadro EH per le riduzioni dell'art. 25 e i codici L, Q chiesti dal dichiarante:
@@ -991,7 +1023,7 @@ function sezioneRiduzioni() {
   const dich = ((S.P.dati.opzioni || {}).telematico || {}).dichiarazione || {};
   const defs = Object.entries(S.schema.strutturati || {}).filter(([k]) => k.startsWith("dichiarazione.riduzioni_art25."));
   const sez = h("section", { class: "grp", id: "sezRiduzioni" }, h("h2", {}, "Riduzioni dell'art. 25 e codici L, Q (Sezione IV del quadro EH)"),
-    h("div", { class: "nota", style: "margin:8px 14px" }, "Servono solo se il dichiarante chiede una riduzione 1-5 oppure L o Q: i codici si impostano sulle righe di devoluzione (scheda DV) e il valore delle precedenti successioni sul bene. Indica la successione precedente OPPURE la donazione precedente. Fonti: docs/regole/riduzioni_art25.md."));
+    h("div", { class: "nota dentro" }, "Servono solo se il dichiarante chiede una riduzione 1-5 oppure L o Q: i codici si impostano sulle righe di devoluzione (scheda DV) e il valore delle precedenti successioni sul bene. Indica la successione precedente OPPURE la donazione precedente. Fonti: docs/regole/riduzioni_art25.md."));
   for (const [percorso, sd] of defs) {
     const chiave = percorso.slice("dichiarazione.".length);   // es. riduzioni_art25.l.data
     const corrente = S.dichDirty.has(chiave) ? S.dichDirty.get(chiave) : chiave.split(".").reduce((o, k) => (o == null ? undefined : o[k]), dich);
@@ -1008,9 +1040,9 @@ function sezioneRiduzioni() {
       aggiornaBottoni(); renderSb();
     };
     inp.addEventListener("input", modifica); inp.addEventListener("change", modifica);
-    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut", style: "font-size:0.8846rem;margin-top:2px" }, sd.aiuto))));
+    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto))));
   }
-  sez.append(h("div", { class: "barra", style: "padding:6px 14px" }, h("button", { class: "pil", id: "ra_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
+  sez.append(h("div", { class: "barra dentro" }, h("button", { class: "pil", id: "ra_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
   return sez;
 }
 function renderFront(main) {
@@ -1067,10 +1099,10 @@ function renderFront(main) {
 async function renderAllegati(main) {
   const a = await api("/api/pratiche/" + S.P.pratica_id + "/allegati");
   if (quadro() && quadro().id !== "EG") return;
-  const sez = h("section", { class: "grp", style: "padding-bottom:10px" }, h("h2", {}, "Allegati e conversione in PDF/A"));
-  sez.append(h("div", { class: "barra", style: "padding:6px 14px 0" }, h("input", { type: "file", id: "file", "aria-label": "File da caricare", style: "max-width:250px" }),
-    h("input", { id: "teg", placeholder: "Tipo documento EG", "aria-label": "Tipo documento EG", style: "max-width:190px" }),
-    h("input", { id: "fin", placeholder: "Finalità o beneficiario", "aria-label": "Finalità", style: "max-width:230px" }),
+  const sez = h("section", { class: "grp allegati" }, h("h2", {}, "Allegati e conversione in PDF/A"));
+  sez.append(h("div", { class: "barra dentro" }, h("input", { type: "file", id: "file", "aria-label": "File da caricare" }),
+    h("input", { id: "teg", placeholder: "Tipo documento EG", "aria-label": "Tipo documento EG" }),
+    h("input", { id: "fin", placeholder: "Finalità o beneficiario", "aria-label": "Finalità" }),
     h("button", { class: "pil", onclick: async () => {
       const file = $("#file").files[0]; if (!file) return msg("Scegli un file.", "e");
       const fd = new FormData(); fd.append("file", file); fd.append("tipo_eg", $("#teg").value); fd.append("finalita", $("#fin").value);
@@ -1081,12 +1113,12 @@ async function renderAllegati(main) {
   for (const x of a) {
     const an = x.analisi || {}; const rap = x.rapporto; const val = rap && rap.validazione;
     const pdfa = rap ? (val ? val.esito : "") + (val && val.verifica_indicativa ? " (indicativo: " + (val.verifica_indicativa.esito || "") + ")" : "") + ((rap.avvisi || []).length ? " — " + rap.avvisi.join("; ") : "") : (an.dichiara_pdfa ? "dichiara " + an.dichiara_pdfa + " (non verificato)" : "");
-    tb.append(h("tr", { style: "cursor:default" }, h("td", {}, x.nome), h("td", {}, x.ruolo), h("td", { class: "n" }, x.bytes), h("td", {}, (an.esito || "") + ((an.avvisi || []).length ? " — " + an.avvisi.join("; ") : "")), h("td", {}, pdfa),
-      h("td", {}, x.bytes > 5000000 && ["leggibile", "firmato"].includes(an.esito) ? h("button", { class: "gh", style: "margin-right:6px", title: "Il file supera il limite di 5 MB per allegato", onclick: async () => { try { const r = await api("/api/allegati/" + x.id + "/suddividi", { method: "POST" }); msg("Allegato ridotto o suddiviso: " + ((r.parti || []).length || 1) + " file collegati all'originale, che resta invariato.", "o"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Suddividi") : null, x.ruolo === "originale" && ["leggibile", "firmato"].includes(an.esito) ? h("button", { class: "gh", onclick: async () => { try { const r = await api("/api/allegati/" + x.id + "/pdfa", { method: "POST" }); msg("Conversione eseguita. Esito validazione: " + r.esito + (r.esito === "non_verificato" ? " (serve veraPDF per attestare la conformità)." : "."), r.esito === "conforme" ? "o" : "e"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Converti in PDF/A") : null)));
+    tb.append(h("tr", { class: "fisso" }, h("td", {}, x.nome), h("td", {}, x.ruolo), h("td", { class: "n" }, x.bytes), h("td", {}, (an.esito || "") + ((an.avvisi || []).length ? " — " + an.avvisi.join("; ") : "")), h("td", {}, pdfa),
+      h("td", {}, x.bytes > 5000000 && ["leggibile", "firmato"].includes(an.esito) ? h("button", { class: "gh spazio-dx", title: "Il file supera il limite di 5 MB per allegato", onclick: async () => { try { const r = await api("/api/allegati/" + x.id + "/suddividi", { method: "POST" }); msg("Allegato ridotto o suddiviso: " + ((r.parti || []).length || 1) + " file collegati all'originale, che resta invariato.", "o"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Suddividi") : null, x.ruolo === "originale" && ["leggibile", "firmato"].includes(an.esito) ? h("button", { class: "gh", onclick: async () => { try { const r = await api("/api/allegati/" + x.id + "/pdfa", { method: "POST" }); msg("Conversione eseguita. Esito validazione: " + r.esito + (r.esito === "non_verificato" ? " (serve veraPDF per attestare la conformità)." : "."), r.esito === "conforme" ? "o" : "e"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Converti in PDF/A") : null)));
   }
-  if (!a.length) tb.append(h("tr", { style: "cursor:default" }, h("td", { colspan: 6, class: "mut" }, "Nessun allegato.")));
-  sez.append(h("div", { class: "tab", style: "box-shadow:none;border-radius:0;max-height:none" }, t));
-  sez.append(h("p", { class: "mut", style: "margin:8px 14px 0" }, "Un PDF convertito non prova che il documento sia firmato o sufficiente. La conformità PDF/A è attestata solo da un validatore indipendente."));
+  if (!a.length) tb.append(h("tr", { class: "fisso" }, h("td", { colspan: 6, class: "mut" }, "Nessun allegato.")));
+  sez.append(h("div", { class: "tab piatta" }, t));
+  sez.append(h("p", { class: "mut dentro-testo" }, "Un PDF convertito non prova che il documento sia firmato o sufficiente. La conformità PDF/A è attestata solo da un validatore indipendente."));
   main.append(sez);
 }
 
@@ -1249,8 +1281,8 @@ function wizRender() {
   const c = $("#wizCorpo"); c.replaceChildren(); $("#wizErr").textContent = "";
   $("#wIndietro").hidden = W.passo === 0; $("#wAvanti").textContent = W.passo === PASSI.length - 1 ? "Crea dichiarazione" : "Avanti";
   const d = W.dati;
-  const f = (k, label, ph) => h("div", { class: "campo" }, h("label", { for: "w_" + k }, label), h("input", { id: "w_" + k, value: d[k] || "", placeholder: ph || "", class: k === "codice_fiscale" ? "mono" : "", oninput: ev => { d[k] = ev.target.value; if (k === "codice_fiscale") wizDaCF(ev.target.value); } }));
-  if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nei dati generali."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "GG/MM/AAAA"), f("luogo_nascita", "Comune di nascita"), f("provincia_nascita", "Provincia di nascita", "RM"), f("data_decesso", "Data del decesso", "GG/MM/AAAA"), f("comune_decesso", "Comune del decesso"), f("provincia_decesso", "Provincia del decesso", "RM")), h("div", { id: "w_cf_nota", class: "mut", style: "font-size:0.9231rem;margin-top:8px", "aria-live": "polite" }));
+  const f = (k, label, ph) => h("div", { class: "campo" }, h("label", { for: "w_" + k }, label), h("input", { id: "w_" + k, value: d[k] || "", placeholder: ph || "", class: k === "codice_fiscale" ? "mono cf" : "", oninput: ev => { d[k] = ev.target.value; if (k === "codice_fiscale") wizDaCF(ev.target.value); } }));
+  if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nei dati generali."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "GG/MM/AAAA"), f("luogo_nascita", "Comune di nascita"), f("provincia_nascita", "Provincia di nascita", "RM"), f("data_decesso", "Data del decesso", "GG/MM/AAAA"), f("comune_decesso", "Comune del decesso"), f("provincia_decesso", "Provincia del decesso", "RM")), h("div", { id: "w_cf_nota", class: "mut", class: "testo-m spazio-su", "aria-live": "polite" }));
   if (W.passo === 1) {
     d.tipo = d.tipo || "originaria";
     for (const [v, t, s] of [["originaria", "Dichiarazione originaria", "Prima dichiarazione per questa successione."], ["sostitutiva", "Dichiarazione sostitutiva", "Sostituisce una dichiarazione già presentata. La gestione dei dati della precedente non è ancora disponibile."]]) {
@@ -1305,10 +1337,10 @@ function impAspettoRender(p) {
     grid.append(h('div', { class: 'campo' }, h('label', { for: id }, titolo), el));
   };
   scelte('tema', 'Tema', [['sistema', 'Come il sistema'], ['chiaro', 'Chiaro'], ['scuro', 'Scuro'], ['seppia', 'Seppia']]);
-  scelte('font', 'Carattere', [['sistema', 'Carattere del sistema'], ['segoe', 'Segoe UI'], ['arial', 'Arial'], ['verdana', 'Verdana'], ['georgia', 'Georgia'], ['consolas', 'Consolas']]);
+  scelte('font', 'Carattere', [['sistema', 'Atkinson Hyperlegible (predefinito)'], ['segoe', 'Segoe UI'], ['arial', 'Arial'], ['verdana', 'Verdana'], ['georgia', 'Georgia'], ['consolas', 'Consolas']]);
   scelte('dimensione', 'Dimensione del testo', Array.from({ length: 11 }, (_, i) => [String(i + 12), (i + 12) + ' px']));
   scelte('interlinea', 'Spaziatura delle righe', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
-  scelte('accento', 'Colore di accento', [['predefinito', 'Predefinito del tema'], ['blu', 'Blu'], ['verde', 'Verde'], ['viola', 'Viola'], ['arancio', 'Arancio'], ['rosso', 'Rosso'], ['grafite', 'Grafite']]);
+  scelte('accento', 'Colore di accento', [['predefinito', 'Verde modello (predefinito)'], ['blu', 'Blu'], ['verde', 'Verde'], ['viola', 'Viola'], ['arancio', 'Arancio'], ['rosso', 'Rosso'], ['grafite', 'Grafite']]);
   scelte('densita', 'Densità delle tabelle', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
   scelte('contrasto', 'Contrasto', [['normale', 'Normale'], ['alto', 'Alto (bordi e testi più marcati)']]);
   scelte('movimento', 'Animazioni', [['normale', 'Normali'], ['ridotto', 'Ridotte']]);
@@ -1322,16 +1354,16 @@ function impAspettoRender(p) {
       el.addEventListener('change', () => { const s = new Set(IMP.aspetto.quadri_predefiniti || []); el.checked ? s.add(q) : s.delete(q); IMP.aspetto.quadri_predefiniti = [...s]; });
       return h('label', { class: 'chk', for: 'qp_' + q }, el, h('span', {}, q));
     }));
-  grid.append(h('div', { class: 'campo', style: 'grid-column:1/-1' }, h('label', {}, 'Quadri proposti nelle nuove pratiche (vuoto = quelli standard)'), quadriGrid));
+  grid.append(h('div', { class: 'campo intera' }, h('label', {}, 'Quadri proposti nelle nuove pratiche (vuoto = quelli standard)'), quadriGrid));
   $('#impAspetto').replaceChildren(h('h3', {}, 'Aspetto e leggibilità'), grid,
-    h('div', { class: 'aspetto-anteprima' }, h('strong', {}, 'Anteprima del carattere'), h('p', {}, 'Dichiarazione di successione · Roma (RM) · € 1.234,56')),
+    h('div', { class: 'aspetto-anteprima' }, h('strong', {}, 'Anteprima del carattere'), h('p', {}, 'Dichiarazione di successione, Roma (RM), € 1.234,56'), h('p', { class: 'mono' }, 'RSSMRA50A01H501U  0 O 1 l I')),
     h('p', { class: 'mut' }, 'Trascina il separatore accanto ai dati per allargare o restringere il pannello. La larghezza viene ricordata.'),
     h('button', { type: 'button', class: 'gh', onclick: () => { impAspettoRender(ASPETTO_DEFAULT); applicaAspetto(IMP.aspetto); } }, 'Ripristina aspetto predefinito'));
 }
 function impProfiloRender(p) {
   IMP.profilo = { ...p };
   const campo = (chiave, titolo, el) => { el.id = 'prof_' + chiave; el.setAttribute('aria-label', titolo); return h('div', { class: 'campo' }, h('label', { for: el.id }, titolo), el); };
-  const cf = h('input', { class: 'mono', value: p.cf || '', placeholder: 'codice fiscale', oninput: e => { IMP.profilo.cf = e.target.value.trim().toUpperCase(); } });
+  const cf = h('input', { class: 'mono cf', value: p.cf || '', placeholder: 'codice fiscale', oninput: e => { IMP.profilo.cf = e.target.value.trim().toUpperCase(); } });
   const tipo = h('select', {}, h('option', { value: '' }, 'Non indicato'), h('option', { value: '1' }, 'Dichiarante (1)'), h('option', { value: '10' }, 'Intermediario (10)'));
   tipo.value = p.tipo || ''; tipo.addEventListener('change', () => { IMP.profilo.tipo = tipo.value; });
   const imp = h('select', {}, h('option', { value: '' }, 'Non indicato'), h('option', { value: '1' }, 'Predisposta dal dichiarante (1)'), h('option', { value: '2' }, 'Predisposta dall’intermediario (2)'));
@@ -1360,7 +1392,7 @@ function impPreferenzeRender(p) {
   const casella = (chiave, titolo, nota) => {
     const el = h('input', { type: 'checkbox', id: 'pref_' + chiave, checked: !!p[chiave] });
     el.addEventListener('change', () => { IMP.preferenze[chiave] = el.checked; });
-    return h('div', { class: 'campo' }, h('label', { class: 'chk', for: el.id }, el, h('span', {}, titolo)), h('div', { class: 'mut', style: 'font-size:0.9231rem' }, nota));
+    return h('div', { class: 'campo' }, h('label', { class: 'chk', for: el.id }, el, h('span', {}, titolo)), h('div', { class: 'mut testo-m' }, nota));
   };
   const numero = (chiave, titolo, minimo, massimo) => {
     const el = h('input', { type: 'number', id: 'pref_' + chiave, min: String(minimo), max: String(massimo), value: String(p[chiave]) });
@@ -1392,9 +1424,9 @@ function impDiagnosiRender(componente) {
       try {
         const r = await post('/api/diagnosi', {});
         const icona = { ok: '✓', avviso: '⚠', errore: '✗', info: 'ℹ' };
-        risultato.replaceChildren(h('p', { style: 'font-weight:600' }, r.riepilogo),
-          ...r.voci.map(v => h('div', { class: 'campo', style: 'margin-bottom:6px' }, h('div', {}, (icona[v.stato] || '·') + ' ' + v.nome + ' — ' + v.dettaglio),
-            v.rimedio && v.stato !== 'ok' ? h('div', { class: 'mut', style: 'font-size:0.9231rem' }, v.rimedio) : null)));
+        risultato.replaceChildren(h('p', { class: 'forte' }, r.riepilogo),
+          ...r.voci.map(v => h('div', { class: 'campo diagnosi-voce' }, h('div', {}, (icona[v.stato] || '·') + ' ' + v.nome + ' — ' + v.dettaglio),
+            v.rimedio && v.stato !== 'ok' ? h('div', { class: 'mut testo-m' }, v.rimedio) : null)));
       } catch (e) { risultato.replaceChildren(h('p', { class: 'err' }, 'Diagnosi non riuscita: ' + e.message)); }
       ev.target.disabled = false;
     } }, 'Esegui diagnosi'), risultato);
@@ -1405,11 +1437,11 @@ function impRender(s) {
   IMP.voci = s.voci; IMP.iniziali = Object.fromEntries(s.voci.map(v => [v.chiave, v.valore || ""]));
   impAspettoRender(s.interfaccia);
   $("#impFile").textContent = "File di configurazione: " + s.file;
-  $("#impCorpo").replaceChildren(...s.voci.map(v => h("div", { class: "campo", style: "margin-bottom:12px" },
+  $("#impCorpo").replaceChildren(...s.voci.map(v => h("div", { class: "campo voce-imp" },
     h("label", { for: "imp_" + v.chiave }, v.etichetta),
     h("input", { id: "imp_" + v.chiave, class: "mono", value: v.valore || "", disabled: !v.modificabile, placeholder: v.modificabile ? "non impostato" : "" }),
-    h("div", { class: "mut", style: "font-size:0.9231rem" }, (v.a_posto ? "✓ " : "✗ ") + v.dettaglio + (v.valore ? " · origine: " + v.origine : "")),
-    h("div", { class: "mut", style: "font-size:0.9231rem" }, v.nota))));
+    h("div", { class: "mut testo-m" }, (v.a_posto ? "✓ " : "✗ ") + v.dettaglio + (v.valore ? " · origine: " + v.origine : "")),
+    h("div", { class: "mut testo-m" }, v.nota))));
 }
 async function impApri() {
   $("#impErr").textContent = "";
@@ -1430,6 +1462,13 @@ async function impSalva() {
   } catch (e) { $("#impErr").textContent = e.message; }
 }
 $("#bImpost").onclick = impApri;
+/* Indice delle Impostazioni: porta alla sezione senza cambiare l'indirizzo della pagina. */
+$("#impIndice").addEventListener("click", ev => {
+  const a = ev.target.closest("a"); if (!a) return;
+  ev.preventDefault();
+  const dest = $(a.getAttribute("href")); if (dest) dest.scrollIntoView({ block: "start" });
+  for (const x of $("#impIndice").querySelectorAll("a")) x.setAttribute("aria-current", String(x === a));
+});
 $("#iChiudi").onclick = () => $("#imp").close();
 $("#iSalva").onclick = impSalva;
 $('#imp').addEventListener('close', () => applicaAspetto(preferenze));

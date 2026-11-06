@@ -121,7 +121,9 @@ def test_gli_alias_arrivano_nei_menu_senza_cambiare_le_voci():
 
 def test_la_gui_riconosce_gli_alias_e_non_taglia_i_menu():
     assert "riconosciVoce" in JS and "sd.alias" in JS
-    assert "text-overflow:ellipsis" in JS and "title: testoVoce" in JS
+    # il troncamento con «...» sta nel foglio di stile (regola su select), il testo intero nel title di ogni voce
+    css = (Path(__file__).parent.parent / "src" / "successioni" / "static" / "app.css").read_text(encoding="utf-8")
+    assert re.search(r"(?m)^select\s*\{[^}]*text-overflow:ellipsis", css) and "title: testoVoce" in JS
 
 
 # --------------------------------------------------------------- n.6 menu e suggerimenti

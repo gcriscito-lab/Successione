@@ -119,9 +119,17 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
         return {**r, "importato": letto["importato"], "non_importato": letto["non_importato"], "avvisi": letto["avvisi"]}
 
     def elenca(self) -> list[dict]:
+        # data del decesso del defunto (se indicata): serve all'interfaccia per mostrare il termine di presentazione
+        def decesso(dati: str):
+            try:
+                p = next((x for x in json.loads(dati).get("persone", []) if x.get("ruolo") == "defunto"), {})
+            except (ValueError, AttributeError):
+                return None
+            v = p.get("data_decesso")
+            return v if isinstance(v, str) else None
         with self.arch.lettura() as c:
-            return [dict(r) for r in c.execute(
-                "SELECT id, titolo, creata, aggiornata, revisione FROM pratiche ORDER BY aggiornata DESC")]
+            return [{**{k: r[k] for k in ("id", "titolo", "creata", "aggiornata", "revisione")}, "data_decesso": decesso(r["dati"])}
+                    for r in c.execute("SELECT id, titolo, creata, aggiornata, revisione, dati FROM pratiche ORDER BY aggiornata DESC")]
 
     def leggi(self, pratica_id: str, revisione: int | None = None) -> dict:
         with self.arch.lettura() as c:

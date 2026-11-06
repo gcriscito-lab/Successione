@@ -64,3 +64,19 @@ Lo spunto viene dal modello SUC verde dell'Agenzia: le caselle, le sigle dei qua
 4. Rifare le schermate a schermo largo, portatile e telefono, in chiaro e in scuro, e provare la navigazione da tastiera.
 
 Prima della pratica reale non conviene cambiare l'aspetto: nessun punto blocca la compilazione.
+
+## Stato dell'applicazione (6 novembre 2026)
+
+Applicato tutto quanto sopra:
+- **Correzioni 1–4:** commit `a0466ac`.
+- **Direzione visiva e punti 5–13:**
+  - palette e tema scuro con i ruoli indicati, contrasti verificati a WCAG AA;
+  - caratteri Atkinson Hyperlegible inclusi nel programma (licenza OFL in `static/OFL-*.txt`);
+  - scala tipografica e due soli raggi;
+  - regola unica per il fuoco da tastiera;
+  - codice fiscale in 16 caselle e sigle dei quadri in casella;
+  - una sola azione piena per contesto nella barra in alto;
+  - pagina iniziale con le pratiche recenti e il termine ordinario;
+  - Impostazioni divise in sezioni con un indice;
+  - Dati generali con etichette uniformi;
+  - stili spostati da `app.js` in classi di `app.css`.

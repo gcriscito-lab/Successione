@@ -149,7 +149,8 @@ def test_composizione_alfa_e_lettura_colori():
 
 def test_cascata_dei_token_ultimo_valore_vince(css):
     t = temi(css)
-    assert t["chiaro"]["--blu"] == "#176a67" and t["scuro"]["--blu"] == "#7bd3c7"   # le ridefinizioni in coda a app.css prevalgono
+    # accento: «Verde modello» nel chiaro (tramite il token --verde), variante chiara nello scuro (docs/REVIEW_DESIGN_20261106.md)
+    assert colore(t["chiaro"]["--blu"], t["chiaro"])[:3] == (0x2F, 0x6B, 0x57) and t["scuro"]["--blu"].lower() == "#7fb79f"
     assert t["seppia"]["--t2"] != t["chiaro"]["--t2"]
     assert "--t2" in t["scuro"]
 
@@ -166,23 +167,26 @@ def test_testo_secondario_e_principale_sopra_la_soglia(css, tema):
 
 @pytest.mark.parametrize("tema", ["chiaro", "scuro", "seppia"])
 def test_sigle_dei_quadri_leggibili(css, tema):
-    """Le sigle (EA, EC...) hanno testo --sg-t su sfondo per stato; l'inattivo e' trasparente con testo secondario."""
+    """Sigle in casella: bordate (accento su superficie) da compilare, piene (--su-acc su accento) compilate,
+    rosse (--su-er su --er-b) con rilievi, ocra su superficie se non supportate; inattive con testo secondario."""
     t = temi(css)[tema]
-    testo = colore(t["--sg-t"], t)
-    for nome in ("--sg-n", "--sg-ok", "--sg-er", "--sg-am", "--blu"):
-        assert rapporto(testo, colore(t[nome], t)) >= SOGLIA, f"{tema}: {nome}"
+    solido = colore(t["--solido"], t)
+    for nome, testo, sf in (("bordata", colore(t["--blu"], t), solido), ("piena", colore(t["--su-acc"], t), colore(t["--blu"], t)),
+                            ("rilievi", colore(t["--su-er"], t), colore(t["--er-b"], t)), ("non supportata", colore(t["--am"], t), solido)):
+        assert rapporto(testo, sf) >= SOGLIA, f"{tema}: sigla {nome} = {rapporto(testo, sf):.2f}"
     lat = sopra(colore(t["--lat"], t), sfondi_pagina(css, t, tema)[0])
     assert rapporto(colore(t["--t2"], t), lat) >= SOGLIA
 
 
 def test_sigle_usano_i_token_e_non_colori_fissi(css):
-    """Regressione: sfondi fissi (#8e8e93, #a8a8ae con opacita') non devono tornare nelle regole delle sigle."""
+    """Regressione: niente colori fissi ne' opacita' nelle regole delle sigle; tutto passa dai token."""
     regole = [c for s, c in _blocchi(css) if ".sigla" in s]
     assert len(regole) >= 6
     for corpo in regole:
         assert "opacity" not in corpo
-        assert not re.search(r"background\s*:\s*#", corpo), corpo
-    assert "color:var(--sg-t)" in next(c for s, c in _blocchi(css) if s.strip() == ".sigla").replace(" ", "")
+        assert not re.search(r"(background|color)\s*:\s*#", corpo), corpo
+    base = next(c for s, c in _blocchi(css) if s.strip() == ".sigla").replace(" ", "")
+    assert "color:var(--blu)" in base and "background:var(--solido)" in base
 
 
 # ---------------------------------------------------------------- problema 4: barra laterale ridimensionabile
