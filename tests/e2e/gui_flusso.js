@@ -14,7 +14,7 @@ const { ok } = require('./verifiche');
   await pg.waitForSelector('.voce'); ok((await pg.textContent('#titolo')) === 'Successione Rossi Mario', 'pratica creata dalla procedura guidata');
   ok(!(await pg.locator('#ins').isVisible()), 'dati generali nel pannello centrale');
   await pg.click('.voce[data-q=EC]'); await pg.getByRole('button', { name: 'Aggiungi riga' }).click();
-  await pg.locator('#ins [aria-label=comune]').fill('Roma'); await pg.locator('#ins [aria-label=diritto]').fill('1');
+  await pg.locator('#ins [aria-label=comune]').fill('Roma'); await pg.locator('#ins [aria-label="diritto del defunto"]').selectOption('1');
   ok((await pg.locator('#vista tbody tr').first().innerText()).includes('Roma'), 'la tabella mostra subito il valore digitato');
   ok((await pg.textContent('#bSalva')).includes('(1)'), 'contatore modifiche non salvate');
   await pg.click('#bSalva'); await pg.waitForFunction(() => document.querySelector('#msg').textContent.includes('Salvato (revisione 2)')); ok((await pg.textContent('#sb')).includes('Revisione 2'), 'salvato: revisione 2 nella barra di stato');
