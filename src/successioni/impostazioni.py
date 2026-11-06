@@ -35,6 +35,11 @@ VOCI: tuple[tuple[str, str, str, str], ...] = (
     ("SUCCESSIONI_VERAPDF", "veraPDF", "file", "Verifica indipendente della conformita' PDF/A."),
     ("SUCCESSIONI_QPDF", "qpdf", "file", "Controlli strutturali e suddivisione dei PDF."),
     ("SUCCESSIONI_ICC", "Profilo colore sRGB (.icc)", "file", "Di solito rilevato da Ghostscript; serve alla conversione PDF/A."),
+    ("SUCCESSIONI_DESKTOP_TELEMATICO", "Cartella di Desktop Telematico", "cartella",
+     "Serve per dare istruzioni di invio con i percorsi giusti (Autentica e Invio si fanno nello strumento ufficiale). Se vuota, il programma "
+     "la cerca nelle posizioni consuete (es. C:\\DesktopTelematico\\DesktopTelematico)."),
+    ("SUCCESSIONI_ENTRATEL_MULTIFILE", "Cartella di Entratel-Multifile", "cartella",
+     "Facoltativa: alternativa a Desktop Telematico per autenticare e inviare. Deve contenere la sottocartella prog."),
     ("SUCCESSIONI_BACKUP", "Cartella dei backup", "cartella",
      "Dove si salvano le copie di sicurezza. Per proteggersi da un guasto del disco scegli un'altra unita' o un disco esterno; "
      "se vuota, accanto alla cartella dei dati."),
@@ -148,6 +153,11 @@ def _dettaglio(chiave: str, valore: str | None) -> tuple[bool, str]:
     if chiave == "SUCCESSIONI_DATA":
         from .archivio import cartella_dati
         return True, str(cartella_dati())
+    if chiave in ("SUCCESSIONI_DESKTOP_TELEMATICO", "SUCCESSIONI_ENTRATEL_MULTIFILE"):
+        from . import strumenti
+        if not valore:
+            return False, "non trovato nelle posizioni consuete (facoltativo: serve per le istruzioni di invio)"
+        return strumenti.controllo_cartella(chiave, valore)
     if chiave == "SUCCESSIONI_JAVA":
         from .collegamenti.controllo import ConfigControllo
         j = ConfigControllo.da_ambiente().java
@@ -265,13 +275,27 @@ def profilo_studio(cartella_dati: Path | str | None = None) -> dict:
         return {}
 
 
+def _componente_controllo() -> dict:
+    from . import strumenti
+    inst = strumenti.versione_controllo_installata(os.environ.get("SUCCESSIONI_CONTROLLI_SUC13"))
+    return {"installata": inst, "provata": {"versione": strumenti.VERSIONE_CONTROLLO_PROVATA[0], "data": strumenti.VERSIONE_CONTROLLO_PROVATA[1]},
+            **strumenti.confronta_versione(inst)}
+
+
 def stato() -> dict:
     """Impostazioni correnti, con origine del valore e stato di rilevamento di ciascuno strumento."""
     nel_file = _leggi_file()
     voci = []
     for chiave, etichetta, tipo, nota in VOCI:
         valore = os.environ.get(chiave) or None
-        if valore is None:
+        rilevato = False
+        if valore is None and chiave in ("SUCCESSIONI_DESKTOP_TELEMATICO", "SUCCESSIONI_ENTRATEL_MULTIFILE"):
+            from . import strumenti
+            valore = strumenti.rilevamento(chiave)
+            rilevato = valore is not None
+        if rilevato:
+            origine = "rilevato nelle posizioni consuete"
+        elif valore is None:
             origine = "non impostato"
         elif chiave in nel_file and nel_file[chiave] == valore:
             origine = "file di configurazione"
@@ -283,7 +307,8 @@ def stato() -> dict:
                      "origine": origine, "a_posto": ok, "dettaglio": descr,
                      "modificabile": tipo != "sola_lettura"})
     return {"file": str(file_configurazione()), "voci": voci, "interfaccia": preferenze_interfaccia(nel_file),
-            "profilo": profilo_studio(), "preferenze": preferenze()}
+            "profilo": profilo_studio(), "preferenze": preferenze(),
+            "componente_controllo": _componente_controllo()}
 
 
 def _valida(chiave: str, valore) -> str:
@@ -309,6 +334,11 @@ def _valida(chiave: str, valore) -> str:
         return str(n)
     if not _esiste(voce[2], v):
         raise DatiNonValidi(f"{voce[1]}: {'cartella' if voce[2] == 'cartella' else 'file'} non trovato: {v}", chiave=chiave)
+    if chiave in ("SUCCESSIONI_DESKTOP_TELEMATICO", "SUCCESSIONI_ENTRATEL_MULTIFILE"):
+        from . import strumenti
+        ok, descr = strumenti.controllo_cartella(chiave, v)
+        if not ok:
+            raise DatiNonValidi(f"{voce[1]}: {descr}", chiave=chiave)
     nome = NOMI_AMMESSI.get(chiave)
     if nome is not None and not nome.fullmatch(Path(v).name):
         raise DatiNonValidi(f"{voce[1]}: il file deve avere il nome dello strumento (es. {_ESEMPIO[chiave]}), non {Path(v).name!r}",
