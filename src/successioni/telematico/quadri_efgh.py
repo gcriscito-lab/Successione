@@ -60,6 +60,11 @@ TASSA_CIRCOSCRIZIONE = 120
 TASSA_CIRCOSCRIZIONE_SENZA_VOLTURE = 65   # Fascicolo I p. PDF 45, rigo EF15 col. 2 (casi particolari, cariche 5, 6, 9)
 #: imposta di bollo per circoscrizione (Fascicolo I p. 45-46 rigo EF16; annotazione SezioneIV/Circoscrizioni_Imposta)
 BOLLO_CIRCOSCRIZIONE = 85
+#: attestazione di avvenuta presentazione (copia conforme) chiesta in dichiarazione: rigo EF16 col. 1, «32€ (16€ per la richiesta e
+#: 16€ per una attestazione)», sommati anche in col. 3 (Fascicolo I pp. PDF 45-46; annotazioni ImpostaBollo_CopiaConforme e
+#: Circoscrizioni_Imposta); rigo EF18, tributi speciali, «un importo di 16 euro» (p. PDF 46; annotazione CopiaConforme_Importo)
+BOLLO_ATTESTAZIONE = 32
+TRIBUTI_SPECIALI_ATTESTAZIONE = 16
 
 #: righi del quadro EG nell'ordine dello schema; il numero di rigo e' quello del modello (fonti/Modello, quadro EG:
 #: EG1 ... EG11) e coincide con l'ordine degli elementi in QuadroEG
@@ -115,7 +120,10 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         # «non deve essere indicato il valore delle quote relative agli immobili devoluti a uno dei soggetti 36-39» (EF1, EF9):
         # le righe degli enti non entrano nelle basi proporzionali; la regola e' provata solo per i casi coperti dai test
         immobili = [r for r in immobili if x.grado_ea.get(r["persona_id"]) not in ("36", "37", "38", "39")]
-    obbligatorio = dd >= DEC_2025 or (bool(x.ea) and bool(immobili))
+    attestazione = bool(getattr(x, "richiesta_attestazione", None))
+    # con la copia conforme le sezioni IV e V del quadro EF sono obbligatorie (annotazioni XSD di SezioneIV_ImpostaBollo e
+    # SezioneV_TributiSpeciali: «obbligatorio in presenza del campo Copia conforme»)
+    obbligatorio = dd >= DEC_2025 or (bool(x.ea) and bool(immobili)) or attestazione
     if not obbligatorio:
         return None
     motivi: list[str] = []
@@ -337,6 +345,8 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                                                                        "da_versare": da_ip},
                     "catastale": {"dovuta": dovuta_cat, "versata": sost.catastale_versata, "da_versare": da_cat},
                     "fonte": SO.FONTE_VERSATE}
+    if attestazione and not motivi:
+        da_versare += _attestazione(x, ef, motivi)
     cred = PG.crediti(x)
     if cred and not motivi and not ef:
         if cred.ipotecaria or cred.catastale:
@@ -376,6 +386,40 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
     x.mappa["quadro:EF"] = {"coll": None, "quadro": "EF", "xpath": f"{x.XP_DICH}/suc:QuadroEF",
                             "totale_da_versare": str(da_versare), "calcoli": dict(getattr(x, "calcoli_ef", {}))}
     return ef or None
+
+
+def _attestazione(x, ef: dict, motivi: list[str]) -> int:
+    """Righi EF16 col. 1 e 3 ed EF18 per l'attestazione chiesta in dichiarazione; restituisce l'importo da aggiungere al totale EF19.
+
+    Col. 1 vale zero con devoluzioni a soggetti con grado di parentela 36 (Stato) e nei casi di trust per persone con disabilita'
+    grave (annotazione di ImpostaBollo_CopiaConforme; Fascicolo I p. PDF 45): il trust (codice carica 9) non e' coperto e blocca il
+    quadro, invece di indicare un importo non verificato."""
+    if getattr(x, "codice_carica", None) == "9":
+        motivi.append("attestazione di avvenuta presentazione con trust (codice carica 9): l'esenzione dal bollo del rigo EF16 col. 1 "
+                      "per i trust a favore di persone con disabilita' grave non e' coperta")
+        return 0
+    immobili = [r for r in x.righe_dev.values() if r["quadro"] in ("EB", "EC", "EL", "EM")]
+    bollo = 0 if any(x.grado_ea.get(r["persona_id"]) == "36" for r in immobili) else BOLLO_ATTESTAZIONE
+    s4 = ef.get("SezioneIV_ImpostaBollo") or {}
+    circ = int(s4.get("Circoscrizioni_Imposta") or 0)
+    nuovo = {"ImpostaBollo_CopiaConforme": str(bollo)}
+    if s4.get("Circoscrizioni_Numero"):
+        nuovo["Circoscrizioni_Numero"] = s4["Circoscrizioni_Numero"]
+    nuovo["Circoscrizioni_Imposta"] = str(circ + bollo)          # col. 3 = 85 x circoscrizioni + col. 1
+    ef["SezioneIV_ImpostaBollo"] = nuovo
+    # CopiaConforme_Importo e' cm:DatoVP_Type (importo con centesimi, «16,00»), a differenza dei righi interi del quadro
+    ef["SezioneV_TributiSpeciali"] = {"CopiaConforme": {"CopiaConforme_Importo": F.euro_centesimi(Decimal(TRIBUTI_SPECIALI_ATTESTAZIONE))}}
+    if hasattr(x, "_tributi_presenti"):
+        x._tributi_presenti["bollo"] = True
+    else:
+        x._tributi_presenti = {"ipotecaria": False, "catastale": False, "tassa_ipotecaria": False, "bollo": True}
+    calc = getattr(x, "calcoli_ef", None)
+    if calc is None:
+        x.calcoli_ef = calc = {}
+    calc["EF16 col. 1 / EF18 (attestazione)"] = {
+        "bollo": bollo, "tributi_speciali": TRIBUTI_SPECIALI_ATTESTAZIONE,
+        "fonte": FO.fonte_fasc1(45, "rigo EF16 col. 1: 32 euro") + "; " + FO.fonte_fasc1(46, "col. 3 e rigo EF18: 16 euro")}
+    return bollo + TRIBUTI_SPECIALI_ATTESTAZIONE
 
 
 def _avviso_tardiva(x, dd) -> None:

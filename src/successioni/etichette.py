@@ -127,6 +127,7 @@ ETICHETTE_DICHIARAZIONE: dict[str, str] = {
     "beneficio_inventario": "Accettazione con beneficio d'inventario",
     "residenza_estera_defunto": "Residenza estera del defunto",
     "casi_particolari": "Non dar corso alle volture catastali (casi particolari)",
+    "richiesta_attestazione": "Richiesta attestazione di avvenuta presentazione (copia conforme, 32 euro di bollo e 16 di tributi speciali)",
     "morte_presunta.tribunale": "Morte presunta: tribunale",
     "morte_presunta.data_deposito": "Morte presunta: data di deposito (dopo il decesso)",
     "morte_presunta.sentenza": "Morte presunta: sentenza",

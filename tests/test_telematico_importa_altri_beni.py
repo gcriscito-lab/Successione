@@ -328,12 +328,15 @@ def test_provincia_tavolare_non_ricreabile():
         importa_xml(t.replace("<reg:Provincia>BZ</reg:Provincia>", "<reg:Provincia>BL</reg:Provincia>").encode())
 
 
-def test_casi_particolari_solo_con_i_quadri_tavolari():
-    t = _testo(caso_voltura)         # con EB/EC la casella non c'e': aggiunta a mano, la riesportazione non la riprodurrebbe
-    falso = "<suc:CasiParticolari><suc:CasiParticolari>1</suc:CasiParticolari><suc:FirmaDichiarante>1</suc:FirmaDichiarante></suc:CasiParticolari>"
-    t = t.replace("<suc:FirmaModello>", falso + "<suc:FirmaModello>", 1)
+def test_casi_particolari_volture_e_valori_non_previsti():
+    # con EB/EC la casella «non dar corso alle volture» e' una scelta del dichiarante: importata come casi_particolari, che
+    # l'esportazione riscrive (2026-11-06: prima veniva rifiutata)
+    t = _testo(caso_voltura)
+    casella = "<suc:CasiParticolari><suc:CasiParticolari>1</suc:CasiParticolari><suc:FirmaDichiarante>1</suc:FirmaDichiarante></suc:CasiParticolari>"
+    assert "'casi_particolari': True" in repr(importa_xml(t.replace("<suc:FirmaModello>", casella + "<suc:FirmaModello>", 1).encode()))
+    senza_firma = "<suc:CasiParticolari><suc:CasiParticolari>1</suc:CasiParticolari><suc:FirmaDichiarante>0</suc:FirmaDichiarante></suc:CasiParticolari>"
     with pytest.raises(XmlNonImportabile, match="CasiParticolari"):
-        importa_xml(t.encode())
+        importa_xml(t.replace("<suc:FirmaModello>", senza_firma + "<suc:FirmaModello>", 1).encode())
     t = _testo(caso_tavolare)
     assert "<suc:CasiParticolari>" in t
     importa_xml(t.encode())

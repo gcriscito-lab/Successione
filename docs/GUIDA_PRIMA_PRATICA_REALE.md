@@ -36,7 +36,7 @@ dichiarazione resta del professionista, e il programma e' un assistente di compi
 3. Allega i PDF nella scheda **File** (conversione e verifica PDF/A: l'esito «conforme» appare solo se veraPDF l'ha verificato).
 4. Apri **Controlli**: devono essere **0 rilievi**. Ogni rilievo indica il campo e la fonte.
 5. Nella scheda **File**: compila il profilo del fornitore e premi **Genera file** (scopo «completo»: se manca qualcosa non produce nulla).
-6. **Esegui controllo ufficiale**: deve dare *positivo (passato)*. Un solo avviso e' normale: «non e' stata richiesta l'attestazione di avvenuta presentazione».
+6. **Esegui controllo ufficiale**: deve dare *positivo (passato)*. Se non hai chiesto l'attestazione, un solo avviso e' normale: «non e' stata richiesta l'attestazione di avvenuta presentazione». Per chiederla (serve per sbloccare i conti): Dati generali, sezione 5, «Richiesta attestazione di avvenuta presentazione» = sì; il programma aggiunge 32 euro di bollo (EF16) e 16 di tributi speciali (EF18).
 7. **Stampa modello ministeriale**: controlla a vista **tutte le pagine** contro i documenti (nomi, codici fiscali, particelle, quote, valori, totali EF, IBAN).
    Gli allegati EG compaiono solo come flag. La stampa e' una prova locale, non una certificazione.
 8. **Confronto dei totali** con un calcolo indipendente (a mano o con il compilatore ufficiale): ipotecaria 2%, catastale 1%, tassa ipotecaria 120 e bollo 85 per

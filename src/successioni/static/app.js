@@ -888,6 +888,7 @@ const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore boo
   ["legge_estera", "successione regolata da legge straniera", "bool"], ["eventi_eccezionali", "eventi eccezionali (inagibilità dell'immobile prima casa)", "bool"],
   ["data_opzione", "data opzione art. 24-bis TUIR"], ["beneficio_inventario", "accettazione con beneficio d'inventario", "bool"],
   ["residenza_estera_defunto", "residenza estera del defunto"], ["casi_particolari", "non dar corso alle volture catastali (casi particolari)", "bool"],
+  ["richiesta_attestazione", "richiesta attestazione di avvenuta presentazione (copia conforme)", "bool"],
   ["morte_presunta.tribunale", "morte presunta: tribunale"], ["morte_presunta.data_deposito", "morte presunta: data di deposito"], ["morte_presunta.sentenza", "morte presunta: sentenza"],
   ["versamento.iban", "versamento: IBAN"], ["versamento.cf_titolare", "versamento: codice fiscale del titolare"],
   ["devoluzione_per_testamento", "devoluzione per testamento", "bool"],
@@ -1071,7 +1072,7 @@ function renderFront(main) {
   presentatore.append(schedaPersona('Anagrafica del presentatore', 'presentatore', ['cognome', 'nome', 'codice_fiscale', 'sesso', 'data_nascita', 'luogo_nascita', 'provincia_nascita', 'relazione_con_defunto']));
   grid.append(presentatore,
     sezioneDatiDichiarazione(['tempistica_pagamento', 'pagamento_rateale', 'acconto', 'versamento.iban', 'versamento.cf_titolare'], '4. Pagamento'),
-    sezioneDatiDichiarazione(['firma_dichiarante', 'dichiara_copie_conformi'], '5. Firme e documenti'));
+    sezioneDatiDichiarazione(['firma_dichiarante', 'dichiara_copie_conformi', 'richiesta_attestazione', 'casi_particolari'], '5. Firme, attestazione e volture'));
   const dich = ((S.P.dati.opzioni.telematico || {}).dichiarazione || {});
   const testamento = h('details', { class: 'gruppo-opzionale', open: dich.devoluzione_per_testamento === true || !!dich.testamento }, h('summary', {}, 'Testamento · dati da compilare se presente'),
     sezioneDatiDichiarazione(CAMPI_DICH.filter(([k]) => k.startsWith('testamento.')).map(([k]) => k), 'Estremi del testamento'));

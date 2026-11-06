@@ -757,6 +757,13 @@ class _Export:
                        fonte=FO.fonte_annotazione(f"Quadro{quadro}/Modulo/Fabbricati/Luogo") if indirizzo_obbl else None)
         if ind:
             it["Indirizzo"] = ind
+        elif quadro == "EC" and not indirizzo_obbl and SUP.attr(self.d, c, b, "indirizzo") in (None, "") and not b.get("indirizzo"):
+            # l'annotazione di Fabbricati/Luogo dice «obbligatorio se provincia diverso da EE», ma l'XSD lo dichiara facoltativo e il
+            # controllo ufficiale SUC13 2.3.1 (locale, 2026-11-06) da' esito positivo senza segnalazioni su una dichiarazione reale
+            # prodotta dal compilatore ufficiale con un fabbricato senza indirizzo: avviso invece di blocco
+            self.avv("INDIRIZZO_FABBRICATO_ASSENTE", f"beni[{b['id']}].indirizzo", "fabbricato senza indirizzo: l'XSD lo ammette e il "
+                     "controllo ufficiale non lo segnala, ma va indicato se risulta dalla visura",
+                     FO.fonte_annotazione(f"Quadro{quadro}/Modulo/Fabbricati/Luogo"))
         it["CodiceComuneAmministrativo"] = self.val(c, b, "codice_comune_amministrativo", lambda v: F.an(v, 5),
                                                     elemento=el + "/Italia/CodiceComuneAmministrativo")
         self.usa(b, "comune")  # letto come ComuneAmministrativo se comune_amministrativo manca
@@ -1035,7 +1042,7 @@ class _Export:
     def riga_ec(self, b: dict, tavolare: bool = False) -> dict | None:
         c, el = "beni", "QuadroEC/Modulo/Fabbricati"
         eld = el + "/DatiFabbricati/DatiFabbricati"
-        luogo = self.luogo(b, "EC", indirizzo_obbl=True, tavolare=tavolare)
+        luogo = self.luogo(b, "EC", indirizzo_obbl=tavolare, tavolare=tavolare)
         if not tavolare and self._provincia_ee(b):
             return self._riga_immobile_estero(b, "EC", luogo)
         cat = self.catastali(b, "EC")
@@ -2018,6 +2025,11 @@ class _Export:
         if cas["beneficio"]:
             ben["AccettazioneConBeneficioInventario"] = "1"
         self.casi_particolari = cas["casi"]
+        self.richiesta_attestazione = cas["attestazione"]
+        if cas["attestazione"] and self.integrativa:
+            # annotazione XSD di CasiParticolari: «Non può essere presente se dichiarazione sostitutiva = 3»
+            self.err("REGOLA_ATTESTAZIONE", "opzioni.telematico.dichiarazione.richiesta_attestazione", "l'attestazione non si "
+                     "puo' chiedere nella dichiarazione integrativa (codice 3)", FO.fonte_annotazione("Frontespizio/CasiParticolari"))
         fr = {"CodiceFiscaleDefunto": cfd, "TipoDichiarazione": tipo_dich}
         if ben:
             fr["Beneficiari"] = ben
@@ -2255,11 +2267,17 @@ class _Export:
         corpo = {"QuadroEA": qea, "QuadroEB": qeb, "QuadroEC": qec, "QuadroED": qed, "QuadroEE": qee, "QuadroEL": qel, "QuadroEM": qem, "QuadroEN": qen, "QuadroEO": qeo, "QuadroEP": qep, "QuadroEQ": qeq, "QuadroER": qer}
         presenti = [k[6:] for k, v in corpo.items() if v]
         fr = self.frontespizio(presenti)
-        if fr is not None and (("EL" in presenti or "EM" in presenti) and not ("EB" in presenti or "EC" in presenti)
-                               or getattr(self, "casi_particolari", None)):
-            # annotazione CasiParticolari: obbligatorio in assenza dei quadri EB, EC ed in presenza di EL o EM (volture non richieste);
-            # facoltativo negli altri casi su richiesta del dichiarante (Fascicolo I p. PDF 15, «non voler dar corso alle volture»)
-            fr["CasiParticolari"] = {"CasiParticolari": "1", "FirmaDichiarante": "1"}
+        if fr is not None:
+            casi: dict = {}
+            if (("EL" in presenti or "EM" in presenti) and not ("EB" in presenti or "EC" in presenti)
+                    or getattr(self, "casi_particolari", None)):
+                # annotazione CasiParticolari: obbligatorio in assenza dei quadri EB, EC ed in presenza di EL o EM (volture non
+                # richieste); facoltativo negli altri casi su richiesta del dichiarante (Fascicolo I p. PDF 15)
+                casi["CasiParticolari"] = "1"
+            if getattr(self, "richiesta_attestazione", None):
+                casi["CopiaConforme"] = "1"     # Fascicolo I p. PDF 16; FirmaDichiarante obbligatoria con uno dei due campi
+            if casi:
+                fr["CasiParticolari"] = {**casi, "FirmaDichiarante": "1"}
         intest = {"TipoFornitore": ctx.tipo_fornitore}
         if ctx.spazio_utente:
             try:

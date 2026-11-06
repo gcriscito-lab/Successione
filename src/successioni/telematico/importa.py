@@ -238,7 +238,9 @@ def _importa_xml(xml: bytes) -> dict:
         p = pres[0]
         cf = _t(p, "suc:CodiceFiscale")
         anagrafica_pres = _anagrafica(p, "suc:DatiAnagrafici")
-        dichiarazione["presentatore"] = {"codice_carica": _t(p, "suc:CodiceCarica"), "telefono": _t(p, "suc:Telefono")}
+        dichiarazione["presentatore"] = {"codice_carica": _t(p, "suc:CodiceCarica"), "telefono": _t(p, "suc:Telefono"),
+                                         "email": _t(p, "suc:Email"),
+                                         "data_decorrenza": _data(_t(p, "suc:DecorrenzaTerminePresentazione"))}
         if cf in persona_di_cf:
             dichiarazione["presentatore"]["persona_id"] = persona_di_cf[cf]
             erede = next(o["campi"] for o in ops if o.get("id") == persona_di_cf[cf])
@@ -381,6 +383,22 @@ def _importa_xml(xml: bytes) -> dict:
                     v = _dec(_t(b, f"{dati}/reg:{tag}"))
                     if v:
                         campi[campo] = v
+                if not tavolare:
+                    # immobili graffati (fino a 4 per rigo; l'esportazione non scrive ContinuazioneGraffati)
+                    if b.xpath("suc:Graffati/suc:ContinuazioneGraffati", namespaces=NS):
+                        raise XmlNonImportabile(f"{ctx}: piu' di quattro immobili graffati (ContinuazioneGraffati) non supportato")
+                    voci = []
+                    for g in b.xpath("suc:Graffati/suc:ImmobiliGraffati", namespaces=NS):
+                        v = {}
+                        for campo, tag in (("sezione", "SezioneUrbana"), ("foglio", "Foglio"), ("particella", "Particella"),
+                                           ("subalterno", "Subalterno")):
+                            t = g.xpath(f"*[local-name()='DatiCatastali']/*[local-name()='{tag}']")
+                            if t and (t[0].text or "").strip():
+                                v[campo] = t[0].text.strip()
+                                _segna(t[0])
+                        voci.append(v)
+                    if voci:
+                        tel["graffati"] = voci
             if tavolare:
                 voci = [("partita_tavolare", "PartitaTavolare"), ("corpo_tavolare", "CorpoTavolare")]
                 if not terreno:
@@ -669,22 +687,28 @@ def _importa_xml(xml: bytes) -> dict:
         opzioni["quadri_attivi"] = _ATTIVI_BASE + quadri_extra
     ops.append({"op": "set", "sezione": "opzioni", "campi": opzioni})
 
-    # Casella dei casi particolari (volture non richieste): derivata, presente solo con EL/EM e senza EB/EC
+    # Casi particolari: «non dar corso alle volture» (derivata con soli EL/EM, altrimenti scelta del dichiarante) e richiesta
+    # dell'attestazione di avvenuta presentazione (copia conforme, Fascicolo I p. PDF 16)
     casi = fr.xpath("suc:CasiParticolari", namespaces=NS)
     if casi:
         solo_tavolari = (importato.get("terreni_tavolari") or importato.get("fabbricati_tavolari")) and not (
             importato["terreni"] or importato["fabbricati"])
         figli = {etree.QName(e).localname: (e.text or "").strip() for e in casi[0]}
-        if not solo_tavolari or figli != {"CasiParticolari": "1", "FirmaDichiarante": "1"}:
-            raise XmlNonImportabile("frontespizio: CasiParticolari non corrisponde ai soli quadri tavolari EL/EM: "
-                                    "la riesportazione non lo riprodurrebbe")
+        if figli.get("FirmaDichiarante") != "1" or set(figli) - {"CasiParticolari", "CopiaConforme", "FirmaDichiarante"} or \
+                any(v != "1" for v in figli.values()):
+            raise XmlNonImportabile("frontespizio: CasiParticolari con valori non previsti: la riesportazione non lo riprodurrebbe")
+        if "CasiParticolari" in figli and not solo_tavolari:
+            dichiarazione["casi_particolari"] = True
+        if "CopiaConforme" in figli:
+            dichiarazione["richiesta_attestazione"] = True
         _segna(casi[0])
 
     # Nessun campo significativo dei quadri dichiarati importabili puo' sparire.
     # I totali e le caselle derivate sono ricostruiti dall'export; gli altri campi
     # non letti rendono esplicito il limite PRIMA di creare la pratica.
     derivati = {"NumeroBeneficiari", "NumeroImmobili", "NumeroEredi", "NumeroLegatari", "NumeroChiamati",
-                "ImportoDaVersare", "QuotaValore"}
+                "ImportoDaVersare", "QuotaValore",
+                "IdentificativoProdSoftware"}     # identificativo del software che ha prodotto il file: non e' un dato dichiarato
     ignora = {"FirmaModello", "ImpegnoATrasmettere"}
     mancanti = []
     _t(fr, "suc:TipoDichiarazione/suc:PrimaDichiarazione")

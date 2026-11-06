@@ -51,7 +51,7 @@ CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiara
                         "catastale_versata", "successione_versata", "circoscrizioni_nuove",
                         "separazione_con_colpa", "no_scioglimento_unione_civile", "reintegro_1", "reintegro_2", "reintegro_3",
                         "legge_estera", "eventi_eccezionali", "data_opzione", "beneficio_inventario", "residenza_estera_defunto",
-                        "casi_particolari", "morte_presunta",
+                        "casi_particolari", "richiesta_attestazione", "morte_presunta",
                         "credito_ipotecaria", "credito_catastale", "credito_successione", "credito_tipologia", "credito_imposta",
                         "credito_acquisto", "credito_vendita", "credito_tipologia_2", "credito_imposta_2", "credito_acquisto_2", "credito_vendita_2",
                         "sanzione_ipotecaria", "interessi_ipotecaria", "sanzione_catastale", "interessi_catastale",

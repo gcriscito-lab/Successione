@@ -13,6 +13,8 @@ Dati in ``opzioni.telematico.dichiarazione``::
     beneficio_inventario    bool    accettazione con beneficio d'inventario (Beneficiari)
     residenza_estera_defunto "1"|"2" 1 = mai residente in Italia o residenza ignota; 2 = in parte in Italia e in parte all'estero
     casi_particolari        bool    «non voler dar corso alle volture catastali» (CasiParticolari)
+    richiesta_attestazione  bool    richiesta dell'attestazione di avvenuta presentazione, copia conforme (CasiParticolari/CopiaConforme;
+                                    Fascicolo I p. PDF 16; effetti sul quadro EF: righi EF16 col. 1 e 3, EF18, pp. PDF 45-46)
     presentatore.data_decorrenza     data    decorrenza del termine di presentazione (non inferiore al decesso)
     presentatore.rappresentato_cf    CF      soggetto rappresentato (cariche 3 e 4 obbligatorio)
     presentatore.residente_estero    {codice_stato, stato, stato_federato, localita, indirizzo}
@@ -29,7 +31,7 @@ from . import supplemento as SUP
 PERC = "opzioni.telematico.dichiarazione."
 FONTE_FASC = "Succ_FASCICOLO_I_Nov_23.pdf pp. PDF 13-15"
 CHIAVI_NUOVE = ("legge_estera", "eventi_eccezionali", "data_opzione", "beneficio_inventario", "residenza_estera_defunto",
-                "casi_particolari")
+                "casi_particolari", "richiesta_attestazione")
 PRIMO_2017 = date(2017, 1, 1)
 
 
@@ -55,7 +57,8 @@ def leggi(x, ddec: date | None) -> dict:
     """Legge e valida le caselle. Restituisce i frammenti da inserire nel frontespizio (chiavi: ``legge_estera``, ``eventi``,
     ``data_opzione``, ``beneficio``, ``res_defunto``, ``casi``). Ogni valore e' ``None`` se la casella non e' indicata."""
     el = "Frontespizio"
-    out: dict = {"legge_estera": None, "eventi": None, "data_opzione": None, "beneficio": None, "res_defunto": None, "casi": None}
+    out: dict = {"legge_estera": None, "eventi": None, "data_opzione": None, "beneficio": None, "res_defunto": None, "casi": None,
+                 "attestazione": None}
     if _bool(x, "legge_estera"):
         out["legge_estera"] = "1"
     ev = SUP.dich(x.d, "eventi_eccezionali")
@@ -87,6 +90,10 @@ def leggi(x, ddec: date | None) -> dict:
             out["res_defunto"] = str(rd)
     if _bool(x, "casi_particolari"):
         out["casi"] = "1"
+    if _bool(x, "richiesta_attestazione"):
+        # «Richiesta attestazione di avvenuta presentazione della dichiarazione di successione (copia conforme della dichiarazione
+        # telematica)»: casella del frontespizio, una sola attestazione (Fascicolo I pp. PDF 5 e 16)
+        out["attestazione"] = "1"
     return out
 
 

@@ -38,6 +38,29 @@ Alla data del confronto la dichiarazione risulta tardiva: sono passati più di d
 
 Per gli importi il confronto è stato rifatto con data di riferimento 15/01/2026, entro i termini.
 
+## Seconda prova: una dichiarazione reale già presentata
+
+Senza dati personali in questo documento.
+
+- **File di partenza:** il file telematico di una dichiarazione reale dello studio, prodotto dal compilatore ufficiale e già inviato (decesso 2026, erede unico, un terreno, due fabbricati, disponibilità finanziarie, attestazione richiesta).
+- **Controllo ufficiale sul file originale:** positivo, senza segnalazioni (eseguito in locale).
+- **Importazione e rigenerazione:** il file è stato importato nel nostro programma, nell'archivio reale (pratica «Ricopia da compilatore ufficiale»), e rigenerato.
+- **Risultato:** 0 differenze sui 21 valori dei quadri EE ed EF e sull'importo da versare del frontespizio.
+- **Non rigenerati:** gli allegati del quadro EG non vengono importati e vanno riacquisiti.
+
+Lacune emerse e corrette, con test in `tests/test_attestazione.py` e `tests/test_pratiche_reali_20261106.py`:
+
+1. **Attestazione di avvenuta presentazione (copia conforme):** mancava. La chiedono 9 dichiarazioni reali su 10.
+   - Casella `richiesta_attestazione` nel frontespizio (CasiParticolari/CopiaConforme).
+   - EF16: colonna 1 a 32 euro, colonna 3 a 85 per circoscrizione più 32.
+   - EF18: 16 euro.
+   - Fonte: Fascicolo I pp. PDF 16, 45-46.
+   - Controllo ufficiale locale: positivo senza segnalazioni. Togliendo i 32 euro il file viene respinto.
+2. **Fabbricato senza indirizzo:** era bloccato per l'annotazione XSD. Il controllo ufficiale accetta il file reale, quindi ora è un avviso.
+3. **Importazione:** ora vengono letti anche email e decorrenza del presentatore, immobili graffati e identificativo del software produttore.
+
+Lacune di importazione ancora aperte sulle altre dichiarazioni reali: sostitutive, quadro EO (decimali e ordine dei righi), agevolazioni nella devoluzione EC, diritto di abitazione. Riguardano solo l'importazione: la compilazione manuale non è toccata.
+
 ## Limiti
 
 - **Un solo caso:** fratelli e un immobile. Restano non confrontati coniuge e figli, passività, agevolazione prima casa, più moduli, riduzioni e sostitutiva.

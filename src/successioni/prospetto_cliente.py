@@ -214,7 +214,9 @@ def leggi(xml: bytes) -> dict:
         for etich, perc in (("Imposta ipotecaria", ("SezioneI_ImpostaIpotecaria", "ImpostaIpotecariaDaVersare")),
                             ("Imposta catastale", ("SezioneII_ImpostaCatastale", "ImpostaCatastaleDaVersare")),
                             ("Tassa ipotecaria", ("SezioneIII_TassaIpotecaria", "Circoscrizioni_Imposta")),
-                            ("Imposta di bollo", ("SezioneIV_ImpostaBollo", "Circoscrizioni_Imposta"))):
+                            ("Imposta di bollo", ("SezioneIV_ImpostaBollo", "Circoscrizioni_Imposta")),
+                            ("Tributi speciali per l'attestazione di avvenuta presentazione",
+                             ("SezioneV_TributiSpeciali", "CopiaConforme", "CopiaConforme_Importo"))):
             v = _num(_t(ef, *perc))
             if v is not None:
                 imposte.append((etich, v))
