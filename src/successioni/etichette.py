@@ -138,6 +138,7 @@ ETICHETTE_DICHIARAZIONE: dict[str, str] = {
     "versamento.cf_titolare": "Codice fiscale del titolare del conto",
     "firma_dichiarante": "Firma del dichiarante",
     "dichiara_copie_conformi": "Dichiarazione di conformità delle copie allegate",
+    "flag_inventari": "Inventari allegati tra gli altri documenti (EG8) come copie degli originali (EH, lettera l)",
     "credito_ipotecaria": "Credito d'imposta da utilizzare per l'imposta ipotecaria (EF7, euro)",
     "credito_catastale": "Credito d'imposta da utilizzare per l'imposta catastale (EF13, euro)",
     "credito_successione": "Credito d'imposta da utilizzare per l'imposta di successione (EF18bis col. 4, euro)",

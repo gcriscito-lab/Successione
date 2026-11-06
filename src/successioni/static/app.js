@@ -198,7 +198,7 @@ async function apri(id, sel) {
   if (S.writeBusy) { msg("Salvataggio in corso: attendi prima di cambiare pratica.", "e"); return; }
   if (nMod() && !confirm("Ci sono modifiche non salvate: continuare senza salvarle?")) return;
   S.gen++;   // invalida le risposte asincrone (es. codice fiscale) richieste per la pratica precedente
-  S.dirty.clear(); S.nuove.clear(); S.dichDirty.clear(); S.supDirty.clear(); S.riga = null; S.tab = "dati"; S.salvata = null;
+  S.dirty.clear(); S.nuove.clear(); S.dichDirty.clear(); S.supDirty.clear(); S.riga = null; S.tab = "dati"; S.salvata = null; S.allegati = null;
   S.fornitoreDirty = {};
   await ricarica(id);
   S.sel = sel || "AN"; $('#vista').scrollTop = 0; render(); await caricaPratiche();
@@ -382,9 +382,56 @@ function renderVista() {
   if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { class: "cresce" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
   if (q.vista === "frontespizio") renderFront(main);
   else if (q.vista === "derivato") main.append(h("div", { class: "nota" }, q.nota || "Quadro generato automaticamente dal programma."));
+  else if (q.generato && ["EE", "EF", "EH"].includes(q.id)) renderAnteprima(main, q);
   else if (q.vista === "non_supportato") renderNonSupp(main, q);
   else { renderTabella(main, q); if (q.vista === "documenti") renderAllegati(main); }
   main.scrollTop = y;
+}
+/* Quadri EE, EF, EH: calcolati dal programma come nel file (server: elaborati.anteprima_quadri), mostrati a video; nel quadro EH le
+   caselle che dipendono da una scelta del dichiarante si modificano qui. */
+const VOCI_EE = { TotaleValoreTerreni: "Terreni", TotaleValoreFabbricati: "Fabbricati", TotaleValoreImmobili: "Immobili (terreni e fabbricati)",
+  TotaleValoreAziende: "Aziende", TotaleValoreTitoli: "Azioni, obbligazioni e altri titoli", TotaleValoreAeromobili: "Aeromobili",
+  TotaleValoreNavi: "Navi e imbarcazioni", TotaleValoreAltriBeni: "Rendite, crediti e altri beni", TotaleAttivo: "Totale attivo",
+  TotalePassivo: "Totale passività", TotaleValoreAsseEreditarioNetto: "Asse ereditario netto" };
+const VOCI_EH = { FlagDeceduto: "Il defunto è deceduto (data e luogo del decesso)", PresenzaDichiarante: "Il dichiarante è tra gli eredi o legatari",
+  FlagAssenzaDichiarante: "Il dichiarante non è tra gli eredi o legatari", FlagTestamento: "Presenza di testamento (estremi)",
+  FlagAssenzaTestamento: "Assenza di testamento", FlagInterdetti: "Presenza di interdetti o inabilitati", FlagAssenzaInterdetti: "Assenza di interdetti o inabilitati",
+  FlagRinuncia: "Presenza di rinunce all'eredità", FlagAssenzaRinuncia: "Assenza di rinunce all'eredità", FlagSeparazione: "Separazione con addebito al coniuge",
+  FlagAssenzaSeparazione: "Assenza di separazione con addebito", FlagNoScioglimentoUnioneCivile: "Nessuna domanda di scioglimento dell'unione civile",
+  FlagReintegro: "Accordi di reintegro dei diritti di legittima", FlagAzienda: "Bilanci di aziende o società (deposito)", FlagNavi: "Navi o imbarcazioni (estremi)",
+  FlagAeromobili: "Aeromobili (estremi)", FlagPassivita: "Documenti delle passività: copie degli originali (lettera l)",
+  FlagProspetto: "Inventari/prospetti delle attività e passività: copie degli originali (lettera l)", FlagInventari: "Inventari allegati tra gli altri documenti: copie degli originali (lettera l)",
+  FlagAttiLegali: "Passaggi senza atti legali (quadro EI)" };
+const euroIt = v => { const n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString("it-IT", { minimumFractionDigits: String(v).includes(".") ? 2 : 0, maximumFractionDigits: 2 }) + " €"; };
+async function renderAnteprima(main, q) {
+  const pid = S.P.pratica_id;
+  main.append(h("div", { class: "nota" }, "Il quadro " + q.id + " è calcolato dal programma con i dati salvati della pratica, come nel file della dichiarazione. " +
+    (nMod() ? "Ci sono modifiche non salvate: salva per aggiornare questa vista." : "")));
+  const box = h("div", {}, h("p", { class: "mut" }, "Calcolo in corso…")); main.append(box);
+  let r;
+  try { r = await api("/api/pratiche/" + pid + "/anteprima-quadri"); } catch (e) { box.replaceChildren(h("div", { class: "avv" }, e.message)); return; }
+  if (!S.P || S.P.pratica_id !== pid || !quadro() || quadro().id !== q.id) return;
+  box.replaceChildren();
+  if (q.id === "EE") {
+    if (!r.ee.length) box.append(h("p", { class: "mut" }, "Nessun totale calcolabile: vedi i motivi qui sotto."));
+    else box.append(h("div", { class: "tab piatta" }, h("table", {}, h("tbody", {}, r.ee.map(x => h("tr", { class: ["TotaleAttivo", "TotaleValoreAsseEreditarioNetto"].includes(x.campo) ? "fisso forte" : "fisso" },
+      h("td", {}, VOCI_EE[x.campo] || x.campo), h("td", { class: "n" }, euroIt(x.valore))))))));
+  } else if (q.id === "EF") {
+    if (!r.ef) box.append(h("p", { class: "mut" }, "Imposte non calcolabili finché non si risolvono i punti qui sotto."));
+    else box.append(h("div", { class: "tab piatta" }, h("table", {}, h("tbody", {},
+      r.ef.imposte.map(([k, v]) => h("tr", { class: "fisso" }, h("td", {}, k), h("td", { class: "n" }, isNaN(Number(v)) ? v : euroIt(v)))),
+      h("tr", { class: "fisso forte" }, h("td", {}, "Totale da versare (EF19)"), h("td", { class: "n" }, r.ef.totale ? euroIt(r.ef.totale) : "—")),
+      r.ef.importo_da_versare && r.ef.importo_da_versare !== r.ef.totale ? h("tr", { class: "fisso" }, h("td", {}, "Importo da versare (frontespizio, con sanzioni e interessi)"), h("td", { class: "n" }, euroIt(r.ef.importo_da_versare))) : null))));
+  } else if (q.id === "EH") {
+    const sez1 = r.eh.filter(x => x.sezione === "SezioneI_DichSost"), altre = r.eh.filter(x => x.sezione !== "SezioneI_DichSost");
+    box.append(h("section", { class: "grp" }, h("h2", {}, "Sezione I - Dichiarazioni sostitutive: cosa risulta dai dati"),
+      sez1.length ? h("ul", { class: "spunte-eh" }, sez1.map(x => h("li", {}, "☑ " + (VOCI_EH[x.campo] || x.campo)))) : h("p", { class: "mut" }, r.solo_ee || r.errori.length ? "Non calcolabile finché non si risolvono i punti qui sotto." : "Nessuna casella."),
+      altre.length ? h("p", { class: "mut" }, "Altre sezioni: " + [...new Set(altre.map(x => x.sezione.replace(/_/g, " ")))].join(", ")) : null,
+      h("p", { class: "mut dentro-testo" }, "Testamento, interdetti, rinunce, eredi e aziende derivano dai dati degli altri quadri. Qui sotto le caselle che dipendono da una dichiarazione esplicita.")));
+    box.append(sezioneDatiDichiarazione(['dichiara_copie_conformi', 'flag_inventari', 'separazione_con_colpa', 'no_scioglimento_unione_civile'], 'Caselle del dichiarante (quadro EH, lettere h ed l)'));
+  }
+  const punti = [...r.errori.map(t => ["er", t]), ...r.mancanti.map(t => ["av", t])];
+  if (punti.length) box.append(h("section", { class: "grp" }, h("h2", {}, "Da sistemare prima di generare il file"), h("ul", { class: "elenco-azioni" }, punti.map(([k, t]) => h("li", { class: k }, t)))));
 }
 function renderNonSupp(main, q) {
   if (q.generato) {   // EE, EF, EH, EI: li produce il programma alla generazione del file; non c'e' nulla da compilare ne' da selezionare
@@ -422,8 +469,10 @@ function renderTabella(main, q) {
         if (og) txt = og.etichetta;
       }
       if (kind.startsWith("ref:") && v) { const e = (S.P.dati[kind.slice(4)] || []).find(x => x.id === v); if (e) txt = etichetta(kind.slice(4), e); }
+      if (q.coll === "documenti_ref" && c === "tipo_eg" && v) { const sd = struttDi(q.coll, c, null), o = sd && sd.opzioni.find(x => x.valore === v); if (o) txt = o.etichetta; }
+      if (q.coll === "documenti_ref" && c === "allegato_id" && v) txt = descriviFileEG(v);
       const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
-      const td = h("td", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : (kind === "cf" ? "cf" : ""), title: txt }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
+      const td = h("td", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : (kind === "cf" ? "cf" : ""), title: txt, "data-allegato": q.coll === "documenti_ref" && c === "allegato_id" ? (v || "") : null }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
       tr.append(td);
     });
     tb.append(tr);
@@ -877,6 +926,7 @@ const CAMPI_DICH = [   // [chiave, etichetta, tipo]: "bool" = si'/no (valore boo
   ["prima_numero", "prima dichiarazione: numero"], ["ipotecaria_versata", "imposta ipotecaria già versata (EF6)"],
   ["catastale_versata", "imposta catastale già versata (EF12)"], ["successione_versata", "imposta di successione già versata (EF18bis col. 3)"], ["circoscrizioni_nuove", "circoscrizioni delle nuove trascrizioni (solo codice 1)"],
   ["dichiara_copie_conformi", "dichiarazione di conformità delle copie allegate", "bool"],
+  ["flag_inventari", "inventari allegati tra gli altri documenti (EG8) come copie degli originali", "bool"],
   ["azienda_data_deposito", "azienda: data di deposito"],
   ["azienda_camera_commercio", "azienda: camera di commercio"],
   ["presentatore.persona_id", "Presentatore tra i soggetti della pratica"], ["presentatore.codice_carica", "presentatore: codice carica"],
@@ -1105,30 +1155,77 @@ function renderFront(main) {
 }
 
 /* ---------- documenti ---------- */
+/* Quadro EG: un rigo per documento. Il file caricato diventa subito un rigo EG e, se e' un PDF leggibile, viene convertito in PDF/A;
+   a conversione riuscita senza avvisi di rischio il rigo passa al PDF/A e l'originale viene tolto (server: allegati.prepara_pdfa). */
+function statoFile(x) {
+  if (!x) return { testo: "file non trovato", tipo: "er" };
+  const an = x.analisi || {}, rap = x.rapporto || {}, val = rap.validazione || {};
+  if (x.ruolo === "derivato") return { testo: "PDF/A" + (val.esito === "conforme" ? " conforme" : val.esito === "non_conforme" ? " NON conforme" : " (da validare con veraPDF)"), tipo: val.esito === "non_conforme" ? "er" : "ok" };
+  if (rap.conservato_senza_riscrittura) return { testo: "PDF/A conforme (originale)", tipo: "ok" };
+  if (["leggibile", "firmato"].includes(an.esito)) return { testo: "da convertire in PDF/A", tipo: "av", convertibile: true };
+  return { testo: "non convertibile: " + (an.esito || "formato non riconosciuto"), tipo: "er" };
+}
+function descriviFileEG(aid) {
+  const x = (S.allegati || []).find(a => a.id === aid);
+  if (!S.allegati) return "…";
+  return x ? x.nome + " — " + statoFile(x).testo : "file non trovato (" + aid + ")";
+}
+async function convertiAllegato(id) {
+  const r = await api("/api/allegati/" + id + "/pdfa", { method: "POST" });
+  if (!r.derivato && r.esito !== "conforme") throw new Error("Conversione non riuscita: " + (r.dettaglio || r.motivo || r.esito));
+  return r;
+}
 async function renderAllegati(main) {
-  const a = await api("/api/pratiche/" + S.P.pratica_id + "/allegati");
-  if (quadro() && quadro().id !== "EG") return;
-  const sez = h("section", { class: "grp allegati" }, h("h2", {}, "Allegati e conversione in PDF/A"));
-  sez.append(h("div", { class: "barra dentro" }, h("input", { type: "file", id: "file", "aria-label": "File da caricare" }),
-    h("input", { id: "teg", placeholder: "Tipo documento EG", "aria-label": "Tipo documento EG" }),
-    h("input", { id: "fin", placeholder: "Finalità o beneficiario", "aria-label": "Finalità" }),
-    h("button", { class: "pil", onclick: async () => {
+  const pid = S.P.pratica_id;
+  const a = await api("/api/pratiche/" + pid + "/allegati");
+  if (!S.P || S.P.pratica_id !== pid || (quadro() && quadro().id !== "EG")) return;
+  S.allegati = a;
+  for (const td of document.querySelectorAll("#vista td[data-allegato]")) { const v = td.dataset.allegato; if (v) { td.textContent = descriviFileEG(v); td.title = td.textContent; } }
+  const refs = S.P.dati.documenti_ref || [];
+  const usati = new Set(refs.map(r => r.allegato_id));
+  const sd = struttDi("documenti_ref", "tipo_eg", null);
+  const sez = h("section", { class: "grp allegati" }, h("h2", {}, "Aggiungi un documento"));
+  const selTipo = h("select", { id: "teg", "aria-label": "Rigo del quadro EG" }, h("option", { value: "" }, "Rigo del quadro EG…"), sd.opzioni.map(o => h("option", { value: o.valore, title: o.aiuto }, o.etichetta)));
+  sez.append(h("div", { class: "barra dentro" }, h("input", { type: "file", id: "file", "aria-label": "File da caricare" }), selTipo,
+    h("input", { id: "fin", placeholder: "Descrizione (es. carta d'identità di …)", "aria-label": "Descrizione del documento" }),
+    h("button", { class: "pil", onclick: async ev => {
       const file = $("#file").files[0]; if (!file) return msg("Scegli un file.", "e");
-      const fd = new FormData(); fd.append("file", file); fd.append("tipo_eg", $("#teg").value); fd.append("finalita", $("#fin").value);
-      try { await api("/api/pratiche/" + S.P.pratica_id + "/allegati", { method: "POST", body: fd }); msg("Allegato acquisito: l'originale è conservato.", "o"); renderVista(); } catch (e) { msg(e.message, "e"); }
-    } }, "Carica")));
-  const t = h("table", {}, h("thead", {}, h("tr", {}, ["nome", "ruolo", "byte", "analisi", "PDF/A", ""].map(x => h("th", {}, x)))));
-  const tb = h("tbody"); t.append(tb);
-  for (const x of a) {
-    const an = x.analisi || {}; const rap = x.rapporto; const val = rap && rap.validazione;
-    const pdfa = rap ? (val ? val.esito : "") + (val && val.verifica_indicativa ? " (indicativo: " + (val.verifica_indicativa.esito || "") + ")" : "") + ((rap.avvisi || []).length ? " — " + rap.avvisi.join("; ") : "") : (an.dichiara_pdfa ? "dichiara " + an.dichiara_pdfa + " (non verificato)" : "");
-    tb.append(h("tr", { class: "fisso" }, h("td", {}, x.nome), h("td", {}, x.ruolo), h("td", { class: "n" }, x.bytes), h("td", {}, (an.esito || "") + ((an.avvisi || []).length ? " — " + an.avvisi.join("; ") : "")), h("td", {}, pdfa),
-      h("td", {}, x.bytes > 5000000 && ["leggibile", "firmato"].includes(an.esito) ? h("button", { class: "gh spazio-dx", title: "Il file supera il limite di 5 MB per allegato", onclick: async () => { try { const r = await api("/api/allegati/" + x.id + "/suddividi", { method: "POST" }); msg("Allegato ridotto o suddiviso: " + ((r.parti || []).length || 1) + " file collegati all'originale, che resta invariato.", "o"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Suddividi") : null, x.ruolo === "originale" && ["leggibile", "firmato"].includes(an.esito) ? h("button", { class: "gh", onclick: async () => { try { const r = await api("/api/allegati/" + x.id + "/pdfa", { method: "POST" }); msg("Conversione eseguita. Esito validazione: " + r.esito + (r.esito === "non_verificato" ? " (serve veraPDF per attestare la conformità)." : "."), r.esito === "conforme" ? "o" : "e"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Converti in PDF/A") : null)));
+      if (!selTipo.value) return msg("Scegli il rigo del quadro EG.", "e");
+      if (nMod()) return msg("Salva prima le altre modifiche in corso.", "e");
+      ev.target.disabled = true;
+      try {
+        const fd = new FormData(); fd.append("file", file); fd.append("tipo_eg", selTipo.value); fd.append("finalita", $("#fin").value);
+        const al = await api("/api/pratiche/" + pid + "/allegati", { method: "POST", body: fd });
+        const ok = await salvaOps([{ op: "upsert", coll: "documenti_ref", id: nuovoId("documenti_ref"), campi: { allegato_id: al.allegato_id, tipo_eg: selTipo.value, finalita: $("#fin").value || null } }]);
+        if (!ok) return;
+        if (["leggibile", "firmato"].includes((al.analisi || {}).esito)) {
+          const r = await convertiAllegato(al.allegato_id); await ricarica(); render();
+          msg("Documento aggiunto e convertito in PDF/A" + (r.originale_rimosso ? ": resta solo il PDF/A." : ". " + (r.motivo_originale_conservato || "")), r.originale_rimosso ? "o" : "e");
+        } else msg("Documento aggiunto. Non è un PDF convertibile: " + ((al.analisi || {}).esito || "") + ".", "e");
+      } catch (e) { msg(e.message, "e"); } finally { ev.target.disabled = false; }
+    } }, "Aggiungi al quadro EG")));
+  sez.append(h("p", { class: "mut dentro-testo" }, "Il file viene convertito in PDF/A e nel quadro EG resta una sola versione. Se la conversione cambia il testo o l'aspetto, o il PDF era firmato, l'originale resta finché non lo controlli. La conformità PDF/A è attestata solo da un validatore indipendente (veraPDF)."));
+  // azioni sui documenti del quadro: da convertire, oltre 5 MB
+  const daFare = [];
+  for (const r of refs) {
+    const x = a.find(y => y.id === r.allegato_id), st = statoFile(x);
+    if (st.convertibile) daFare.push(h("li", {}, (x.nome) + " — da convertire ", h("button", { class: "gh", onclick: async () => { try { const z = await convertiAllegato(x.id); await ricarica(); render(); msg("Convertito in PDF/A" + (z.originale_rimosso ? ": resta solo il PDF/A." : ". " + (z.motivo_originale_conservato || "")), z.originale_rimosso ? "o" : "e"); } catch (e) { msg(e.message, "e"); } } }, "Converti in PDF/A")));
+    if (x && x.bytes > 5000000) daFare.push(h("li", {}, x.nome + " supera 5 MB ", h("button", { class: "gh", onclick: async () => { try { const z = await api("/api/allegati/" + x.id + "/suddividi", { method: "POST" }); msg("Ridotto o suddiviso in " + ((z.parti || []).length || 1) + " file: collega le parti ai righi EG.", "o"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Riduci o suddividi")));
   }
-  if (!a.length) tb.append(h("tr", { class: "fisso" }, h("td", { colspan: 6, class: "mut" }, "Nessun allegato.")));
-  sez.append(h("div", { class: "tab piatta" }, t));
-  sez.append(h("p", { class: "mut dentro-testo" }, "Un PDF convertito non prova che il documento sia firmato o sufficiente. La conformità PDF/A è attestata solo da un validatore indipendente."));
+  if (daFare.length) main.append(h("section", { class: "grp" }, h("h2", {}, "Da completare"), h("ul", { class: "elenco-azioni" }, daFare)));
   main.append(sez);
+  // file caricati non collegati a un rigo EG (vecchie conversioni, doppioni, originali gia' convertiti)
+  const liberi = a.filter(x => !usati.has(x.id));
+  if (liberi.length) {
+    const doppi = liberi.some(x => x.ruolo === "derivato" || a.some(y => y.origine_id === x.id));
+    const ul = h("ul", { class: "elenco-azioni" }, liberi.map(x => h("li", {}, x.nome + " — " + (x.ruolo === "originale" ? (a.some(y => y.origine_id === x.id) ? "originale già convertito" : "originale non usato") : "copia PDF/A non usata") + " ",
+      h("button", { class: "gh", onclick: async () => { if (!confirm("Eliminare il file «" + x.nome + "» dall'archivio della pratica?")) return; try { await api("/api/allegati/" + x.id + "/elimina", { method: "POST" }); msg("File eliminato.", "o"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Elimina"))));
+    main.append(h("section", { class: "grp" }, h("h2", {}, "File non usati nel quadro EG (" + liberi.length + ")"),
+      doppi ? h("div", { class: "barra dentro" }, h("button", { class: "pil", onclick: async () => {
+        if (!confirm("Tenere una sola versione PDF/A per documento ed eliminare doppioni e originali già convertiti?")) return;
+        try { const r = await post("/api/pratiche/" + pid + "/allegati/riordina", {}); await ricarica(); render(); msg("Eliminati " + r.rimossi.length + " file doppi o già convertiti.", "o"); } catch (e) { msg(e.message, "e"); } } }, "Rimuovi doppioni")) : null,
+      ul));
+  }
 }
 
 /* ---------- salvataggio ---------- */

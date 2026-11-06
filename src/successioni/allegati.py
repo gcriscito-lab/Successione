@@ -81,16 +81,99 @@ class AllegatiMixin:
             raise NonTrovato("allegato inesistente", allegato_id=allegato_id)
         return r
 
-    def prepara_pdfa(self, allegato_id: str, livello: str = "1b") -> dict:
+    def _derivato_esistente(self, allegato_id: str):
+        """Ultimo derivato di conversione (non di suddivisione) gia' registrato per l'originale."""
+        with self.arch.lettura() as c:
+            righe = c.execute("SELECT * FROM allegati WHERE origine_id=? AND ruolo='derivato' ORDER BY ts DESC",
+                              (allegato_id,)).fetchall()
+        for d in righe:
+            rap = json.loads(d["rapporto"]) if d["rapporto"] else {}
+            if "conversione" in rap:
+                return d, rap
+        return None, None
+
+    def _riferimenti(self, pratica_id: str, allegato_id: str) -> list[dict]:
+        return [r for r in self.leggi(pratica_id)["dati"].get("documenti_ref", []) if r.get("allegato_id") == allegato_id]
+
+    def _sposta_riferimenti(self, pratica_id: str, da: str, a: str, canale: str) -> int:
+        """I righi del quadro EG che puntano a ``da`` passano ad ``a`` (nuova revisione della pratica)."""
+        refs = self._riferimenti(pratica_id, da)
+        if not refs:
+            return 0
+        rev = self.leggi(pratica_id)["revisione"]
+        self.aggiorna(pratica_id, rev, [{"op": "upsert", "coll": "documenti_ref", "id": r["id"], "campi": {"allegato_id": a}}
+                                        for r in refs], autore="programma", canale=canale)
+        return len(refs)
+
+    def _cancella_riga(self, r) -> None:
+        with self.arch.transazione() as c:
+            c.execute("DELETE FROM allegati WHERE id=?", (r["id"],))
+            altri = c.execute("SELECT COUNT(*) FROM allegati WHERE sha256=?", (r["sha256"],)).fetchone()[0]
+        if not altri:          # lo stesso contenuto puo' servire ad altri allegati (deposito per impronta)
+            p = self.arch.base / r["percorso"]
+            if p.is_file():
+                p.unlink()
+
+    def elimina_allegato(self, allegato_id: str, *, canale: str = "gui") -> dict:
+        """Elimina un allegato della pratica. Rifiutato se un rigo del quadro EG lo usa ancora."""
+        r = self._riga_allegato(allegato_id)
+        refs = self._riferimenti(r["pratica_id"], allegato_id)
+        if refs:
+            raise DatiNonValidi("l'allegato e' usato nel quadro EG: togli prima il rigo o sostituisci il file",
+                                righi=[x["id"] for x in refs])
+        self._cancella_riga(r)
+        return {"allegato_id": allegato_id, "eliminato": True}
+
+    def riordina_allegati(self, pratica_id: str, *, canale: str = "gui") -> dict:
+        """Toglie i doppioni: per ogni originale convertito resta una sola versione PDF/A (quella usata nel quadro EG, o la
+        piu' recente); i righi EG che puntano all'originale passano al PDF/A e l'originale convertito viene rimosso."""
+        tutti = [dict(x) for x in self._righe_pratica(pratica_id)]
+        usati = {r.get("allegato_id") for r in self.leggi(pratica_id)["dati"].get("documenti_ref", [])}
+        rimossi, spostati = [], 0
+        for o in [x for x in tutti if x["ruolo"] == "originale"]:
+            conv = [x for x in tutti if x["origine_id"] == o["id"] and x["ruolo"] == "derivato"
+                    and "conversione" in (json.loads(x["rapporto"]) if x["rapporto"] else {})]
+            if not conv:
+                continue
+            tenere = next((x for x in conv if x["id"] in usati), None) or max(conv, key=lambda x: x["ts"])
+            for x in conv:
+                if x["id"] != tenere["id"] and x["id"] not in usati:
+                    self._cancella_riga(x)
+                    rimossi.append(x["id"])
+            spostati += self._sposta_riferimenti(pratica_id, o["id"], tenere["id"], canale)
+            if not self._riferimenti(pratica_id, o["id"]):
+                self._cancella_riga(o)
+                rimossi.append(o["id"])
+        return {"pratica_id": pratica_id, "rimossi": rimossi, "righi_eg_aggiornati": spostati}
+
+    def _righe_pratica(self, pratica_id: str):
+        with self.arch.lettura() as c:
+            return c.execute("SELECT * FROM allegati WHERE pratica_id=? ORDER BY ts", (pratica_id,)).fetchall()
+
+    def prepara_pdfa(self, allegato_id: str, livello: str = "1b", *, sostituisci_originale: bool = False,
+                     canale: str = "gui") -> dict:
         """Crea il derivato PDF/A di un originale, lo analizza e lo valida; conserva tutto collegato.
 
         Se l'originale dichiara gia' PDF/A-1 e veraPDF lo giudica conforme, l'originale e' conservato senza riscrittura
         (la firma digitale, se presente, resta integra). Senza veraPDF si crea sempre il derivato (esito
-        'non_verificato'). Un derivato con un numero di pagine diverso NON viene registrato."""
+        'non_verificato'). Un derivato con un numero di pagine diverso NON viene registrato.
+
+        Una seconda richiesta sullo stesso originale restituisce il derivato gia' creato (nessun doppione).
+        Con ``sostituisci_originale`` (interfaccia e MCP) una conversione senza avvisi di rischio sposta i righi EG sul PDF/A e
+        rimuove l'originale; con firma digitale, testo o aspetto divergenti l'originale resta e lo si dice."""
         from .documenti.dimensioni import confronta_testo, testo_pagine
         r = self._riga_allegato(allegato_id)
         if r["ruolo"] != "originale":
             raise DatiNonValidi("la conversione parte da un originale")
+        gia, rap_gia = self._derivato_esistente(allegato_id)
+        if gia is not None:
+            val = rap_gia.get("validazione") or {}
+            esito = {"allegato_id": allegato_id, "esito": val.get("esito"), "gia_convertito": True,
+                     "derivato": {"allegato_id": gia["id"], "nome": gia["nome"], "sha256": gia["sha256"], "bytes": gia["bytes"]},
+                     "avvisi": list(rap_gia.get("avvisi") or [])}
+            if sostituisci_originale:
+                esito.update(self._dopo_conversione(r, gia["id"], esito["avvisi"], canale))
+            return esito
         src = self.arch.base / r["percorso"]
         an = json.loads(r["analisi"])
         if an.get("esito") not in ("leggibile", "firmato"):
@@ -149,9 +232,24 @@ class AllegatiMixin:
                 d = self._registra(c, r["pratica_id"], Path(r["nome"]).stem + "_pdfa.pdf", out, "derivato", allegato_id,
                                    r["tipo_eg"], r["finalita"], r["persona_id"], an_d, rapporto)
         esito = val["esito"]  # conforme / non_conforme / non_verificato
-        return {"allegato_id": allegato_id, "derivato": d, "esito": esito, "avvisi": avvisi,
-                "verifica_indicativa": (val.get("verifica_indicativa") or {}).get("esito"),
-                "azione_richiesta": azione_richiesta}
+        out = {"allegato_id": allegato_id, "derivato": d, "esito": esito, "avvisi": avvisi,
+               "verifica_indicativa": (val.get("verifica_indicativa") or {}).get("esito"),
+               "azione_richiesta": azione_richiesta}
+        if sostituisci_originale and esito != "non_conforme":
+            out.update(self._dopo_conversione(r, d["allegato_id"], avvisi, canale))
+        return out
+
+    #: avvisi della conversione per cui l'originale resta (da confrontare a vista o perche' perde la firma)
+    _RISCHI = ("firmato", "testo divergente", "differenze visive")
+
+    def _dopo_conversione(self, originale, derivato_id: str, avvisi: list[str], canale: str) -> dict:
+        rischi = [a for a in avvisi if any(k in a for k in self._RISCHI)]
+        spostati = self._sposta_riferimenti(originale["pratica_id"], originale["id"], derivato_id, canale)
+        if rischi:
+            return {"originale_rimosso": False, "righi_eg_aggiornati": spostati,
+                    "motivo_originale_conservato": "controllare il PDF/A prima di eliminare l'originale: " + "; ".join(rischi)}
+        self._cancella_riga(originale)
+        return {"originale_rimosso": True, "righi_eg_aggiornati": spostati}
 
     def suddividi_allegato(self, allegato_id: str, limite_byte: int | None = None, livello: str = "1b",
                            **opzioni) -> dict:

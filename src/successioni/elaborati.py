@@ -111,6 +111,76 @@ class ElaboratiMixin:
                                "Il file NON è una dichiarazione completa e non è trasmissibile: serve solo ai controlli tecnici.")
                 if es.xml is not None else None}
 
+    def anteprima_quadri(self, pratica_id: str) -> dict:
+        """Quadri EE, EF ed EH come li scriverebbe la generazione del file, per vederli a video (nessun file salvato, nessun job).
+        Fornitore: quello del profilo; se manca, il presentatore (tipo 1). Con l'intermediario senza impegno si usa un impegno
+        provvisorio solo per l'anteprima."""
+        from datetime import date
+        from lxml import etree
+        from . import prospetto_cliente as PC
+        from .telematico.esporta import ContestoExport, esporta_xml
+        d = self.leggi(pratica_id)
+        dati = d["dati"]
+        forn = (dati.get("opzioni", {}) or {}).get("fornitore", {}) or {}
+        pres_id = (((dati.get("opzioni") or {}).get("telematico") or {}).get("dichiarazione") or {}).get("presentatore", {}).get("persona_id")
+        persone = {p.get("id"): p for p in dati.get("persone", [])}
+        cf_pres = (persone.get(pres_id) or next((p for p in dati.get("persone", []) if p.get("ruolo") == "presentatore"), {})).get("codice_fiscale")
+        cf = (forn.get("cf") or cf_pres or next((p.get("codice_fiscale") for p in dati.get("persone", []) if p.get("ruolo") == "defunto"), "")
+              or "").strip().upper()
+        tipo = str(forn.get("tipo") or "1") if forn.get("cf") else "1"
+        imp, dimp = forn.get("impegno_codice"), forn.get("data_impegno")
+        if tipo == "10" and not (imp and dimp):
+            imp, dimp = "1", date.today().isoformat()
+        out: dict = {"pratica_id": pratica_id, "revisione": d["revisione"], "ee": [], "ef": None, "eh": [], "eg": [],
+                     "errori": [], "mancanti": [], "avvisi": []}
+        if not cf:
+            out["errori"].append("manca un codice fiscale (fornitore, presentatore o defunto) per calcolare l'anteprima")
+            return out
+        try:
+            es = esporta_xml(dati, ContestoExport(cf_fornitore=cf, tipo_fornitore=tipo, scopo="bozza_tecnica",
+                                                  allegati=self._allegati_export(pratica_id, dati),
+                                                  impegno_codice=imp if tipo == "10" else None,
+                                                  data_impegno=dimp if tipo == "10" else None))
+        except Exception as e:          # l'anteprima non deve mai impedire il lavoro: si mostra il motivo
+            out["errori"].append(f"anteprima non calcolabile: {e}")
+            return out
+        out["errori"] = [e.messaggio for e in es.errori] + list(es.non_supportato)
+        out["mancanti"] = [m.messaggio for m in es.quadri_mancanti]
+        out["avvisi"] = [a.messaggio for a in es.avvisi]
+        if es.xml is None:
+            # i quadri EF/EG/EH bloccati (es. IBAN mancante) non devono nascondere il riepilogo EE: secondo calcolo senza di essi
+            try:
+                es = esporta_xml(dati, ContestoExport(cf_fornitore=cf, tipo_fornitore=tipo, scopo="bozza_tecnica",
+                                                      quadri_liquidazione=False,
+                                                      impegno_codice=imp if tipo == "10" else None,
+                                                      data_impegno=dimp if tipo == "10" else None))
+            except Exception:
+                return out
+            if es.xml is None:
+                return out
+            out["solo_ee"] = True
+        root = etree.fromstring(es.xml, etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=True))
+        loc = lambda e: etree.QName(e).localname if isinstance(e.tag, str) else ""    # noqa: E731
+        for q in root.iter():
+            if loc(q) == "QuadroEE":
+                out["ee"] = [{"campo": loc(e), "valore": e.text.strip()} for e in q.iter() if len(e) == 0 and (e.text or "").strip()]
+            elif loc(q) == "QuadroEH":
+                for e in q.iter():
+                    if len(e) == 0 and (e.text or "").strip() and loc(e).startswith(("Flag", "Presenza")):
+                        sez = next((loc(a) for a in e.iterancestors() if loc(a).startswith("Sezione")), "")
+                        out["eh"].append({"sezione": sez, "campo": loc(e), "gruppo": loc(e.getparent())})
+            elif loc(q) == "QuadroEG":
+                for g in q:
+                    nomi = [c.text.strip() for a in g if loc(a).endswith("All") for c in a
+                            if loc(c) == "FileName" and (c.text or "").strip()]
+                    out["eg"].append({"rigo": loc(g), "file": nomi})
+        if out.get("solo_ee"):
+            return out
+        lettura = PC.leggi(es.xml)
+        out["ef"] = {"imposte": [[k, str(v)] for k, v in lettura["imposte"]], "totale": str(lettura["totale_ef"] or ""),
+                     "importo_da_versare": str(lettura["importo_da_versare"] or "")}
+        return out
+
     def _allegati_export(self, pratica_id: str, dati: dict) -> dict:
         """Solo documenti della pratica e byte integri del deposito, mai percorsi forniti dal client."""
         richiesti = {r.get("allegato_id") for r in dati.get("documenti_ref", [])}

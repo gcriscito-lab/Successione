@@ -44,7 +44,7 @@ CHIAVI = {
     "devoluzioni": {"agevolazioni", "riduzioni"},
 }
 CHIAVI_DICHIARAZIONE = {"stato_civile", "devoluzione_per_legge", "firma_dichiarante", "presentatore", "versamento",
-                        "tempistica_pagamento", "pagamento_rateale", "acconto", "dichiara_copie_conformi",
+                        "tempistica_pagamento", "pagamento_rateale", "acconto", "dichiara_copie_conformi", "flag_inventari",
                         "devoluzione_per_testamento", "testamento", "azienda_data_deposito", "azienda_camera_commercio",
                         "prima_casa", "riduzioni_art25",
                         "codice_sostitutiva", "prima_anno", "prima_volume", "prima_numero", "ipotecaria_versata",

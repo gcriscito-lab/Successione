@@ -110,6 +110,27 @@ def _opz(valore: str, etichetta: str, aiuto: str) -> dict:
 #: verificata da tests/test_maschere_strutturati.py.
 ALIAS_SINO = {"1": "si", "true": "si", "0": "no", "false": "no"}
 STRUTTURATI: dict[str, dict] = {
+    # righi del quadro EG (modello, quadro EG: EG1 ... EG11; XSD QuadroEG, nello stesso ordine). Il valore e' il nome dell'elemento XSD.
+    "documenti_ref.tipo_eg": {
+        "etichetta": "rigo del quadro EG", "tipo": "enum", "senza_codice": True,
+        "aiuto": "Rigo del quadro EG in cui va il documento. Il file allegato deve essere PDF/A (si converte qui sotto).",
+        "opzioni": [
+            _opz("DichSost", "EG1 - Dichiarazioni sostitutive e certificati", "Dichiarazioni sostitutive di atto notorio o di certificazione."),
+            _opz("Testamento", "EG2 - Testamento", "Solo con devoluzione per testamento."),
+            _opz("Inventario", "EG3 - Inventario / prospetto delle attivita' e passivita'",
+                 "Con questo rigo il quadro EH riporta la casella del prospetto (lettera l): serve la dichiarazione di conformita' delle copie."),
+            _opz("CertificazioneImpostaVersataEstero", "EG4 - Certificazione dell'imposta versata all'estero", "Certificato dell'imposta di successione pagata all'estero, per la detrazione."),
+            _opz("DocumentiPassivita", "EG5 - Documenti delle passivita'",
+                 "Con questo rigo il quadro EH riporta la casella delle passivita' (lettera l)."),
+            _opz("AlberoGenealogico", "EG6 - Albero genealogico", "Obbligatorio in presenza del quadro EA."),
+            _opz("DocumentiIdentita", "EG7 - Documenti d'identita'",
+                 "Documento del dichiarante, obbligatorio se il modello non e' trasmesso direttamente da lui."),
+            _opz("Altro", "EG8 - Altro", "Altri documenti (es. attestazioni bancarie, inventari: vedi la casella degli inventari nel quadro EH)."),
+            _opz("PrimaCasa", "EG9 - Prima casa (richiesta di un altro beneficiario)", "Richiesta dell'agevolazione prima casa fatta da un beneficiario diverso dal dichiarante (Fascicolo I, quadro EH, Sezione II)."),
+            _opz("AgevolazioniImposteIpocatastali", "EG10 - Agevolazioni sulle imposte ipotecarie e catastali", "Richieste di agevolazione ipocatastale di un beneficiario diverso dal dichiarante."),
+            _opz("RiduzioniImposteSuccessione", "EG11 - Riduzioni dell'imposta di successione", "Richieste di riduzione dell'imposta di successione di un beneficiario diverso dal dichiarante."),
+        ],
+    },
     "beni.tipo_titolo": {
         "etichetta": "tipo di titolo", "tipo": "enum", "aiuto": AIUTI["beni.tipo_titolo"],
         "opzioni": [

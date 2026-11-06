@@ -51,6 +51,7 @@ def argomenti_scrittura(pid, aid):
         "acquisisci_allegato": {"pratica_id": pid, "nome_file": "inesistente.pdf"},
         "prepara_pdfa": {"allegato_id": aid},
         "suddividi_allegato": {"allegato_id": aid},
+        "riordina_allegati": {"pratica_id": pid},
     }
 
 

@@ -998,6 +998,15 @@ def quadro_eh(x, fr: dict, eg: dict | None) -> dict | None:
             sez["FlagPassivita"] = "1"
         if "Inventario" in eg:
             sez["FlagProspetto"] = "1"             # annotazione: obbligatorio in presenza del rigo EG3
+    if SUP.dich(x.d, "flag_inventari") is True:
+        # lettera l (Fascicolo I p. PDF 52): inventari allegati come copie degli originali; annotazione XSD di FlagInventari:
+        # «non deve essere barrata in assenza del rigo EG8» (Altro). Casella del dichiarante, non derivata.
+        if eg and "Altro" in eg:
+            sez["FlagInventari"] = "1"
+        else:
+            x.err("DATI_INCOERENTI", "opzioni.telematico.dichiarazione.flag_inventari", "la casella degli inventari (quadro EH) "
+                  "richiede almeno un documento nel rigo EG8 «Altro»", _fa(el + "/FlagInventari") + "; " +
+                  FO.fonte_fasc1(52, "lettera l"))
     eh: dict = {"PrimoModulo": {"SezioneI_DichSost": sez}}
     sez2 = PC.sezione_eh(x)
     if sez2:

@@ -241,7 +241,19 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def converti(request):
-        return sv.prepara_pdfa(request.path_params["aid"])
+        return sv.prepara_pdfa(request.path_params["aid"], sostituisci_originale=True)
+
+    @api
+    async def elimina_allegato_api(request):
+        return sv.elimina_allegato(request.path_params["aid"])
+
+    @api
+    async def riordina_allegati_api(request):
+        return sv.riordina_allegati(request.path_params["pid"])
+
+    @api
+    async def anteprima_quadri_api(request):
+        return sv.anteprima_quadri(request.path_params["pid"])
 
     @api
     async def importa(request):
@@ -348,6 +360,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),
+        Route("/api/allegati/{aid}/elimina", elimina_allegato_api, methods=["POST"]),
+        Route(P + "/allegati/riordina", riordina_allegati_api, methods=["POST"]),
+        Route(P + "/anteprima-quadri", anteprima_quadri_api),
         Route("/api/allegati/{aid}/suddividi", suddividi, methods=["POST"]),
     ])
 

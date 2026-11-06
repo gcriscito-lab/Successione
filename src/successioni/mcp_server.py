@@ -33,6 +33,7 @@ STRUMENTI_LETTURA = frozenset({
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "backup_archivio", "stampa_modello",
     "invio_prepara", "importa_xml_telematico", "acquisisci_allegato", "prepara_pdfa", "suddividi_allegato",
+    "riordina_allegati",
 })
 MESSAGGIO_SOLA_LETTURA = ("Claude è in sola lettura: modifica disattivata nelle Impostazioni → Operatività e sicurezza. "
                           "Lo strumento non è stato eseguito e nulla è stato modificato.")
@@ -215,8 +216,16 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
 
     @tool(ann=LOCALE)
     def prepara_pdfa(allegato_id: str) -> dict:
-        """Crea il derivato PDF/A-1b dell'originale e lo valida. 'conforme' solo con veraPDF; altrimenti 'non_verificato'."""
-        return sv.prepara_pdfa(allegato_id)
+        """Crea il derivato PDF/A-1b dell'originale e lo valida. 'conforme' solo con veraPDF; altrimenti 'non_verificato'.
+        Una seconda chiamata sullo stesso originale restituisce il PDF/A gia' creato (nessun doppione). Senza avvisi di rischio i
+        righi del quadro EG passano al PDF/A e l'originale viene rimosso; con firma o testo/aspetto divergenti l'originale resta."""
+        return sv.prepara_pdfa(allegato_id, sostituisci_originale=True, canale="mcp")
+
+    @tool(ann=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False))
+    def riordina_allegati(pratica_id: str) -> dict:
+        """Toglie i doppioni degli allegati: una sola versione PDF/A per documento, righi EG spostati sul PDF/A, originali
+        gia' convertiti rimossi."""
+        return sv.riordina_allegati(pratica_id, canale="mcp")
 
     @tool(ann=LOCALE)
     def suddividi_allegato(allegato_id: str, limite_byte: int | None = None) -> dict:
