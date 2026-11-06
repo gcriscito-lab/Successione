@@ -7,8 +7,8 @@ allegati e PDF/A, export XML SUC13 con controllo ufficiale locale, stampa del mo
 Non trasmette nulla all'Agenzia: le prove sono locali, su dati sintetici. Collegamenti autenticati (Entratel, catasto, ricevute) e parte della copertura
 fiscale non sono completi. **Indice della documentazione: `docs/README.md`.** Per una pratica reale: `docs/GUIDA_PRIMA_PRATICA_REALE.md`.
 
-Avvio rapido: `Avvia-pratica-reale.cmd` (archivio dedicato alle pratiche reali) oppure `Avvia-programma-aggiornato.cmd` (archivio predefinito).
-Queste scorciatoie usano i sorgenti dell'ambiente `.venv` e non aggiornano un'eventuale installazione autonoma precedente.
+Avvio: `Avvia-pratica-reale.cmd`, l'unico lanciatore, con lo stesso archivio usato da Claude (`%USERPROFILE%\Successioni-reale`).
+Usa i sorgenti dell'ambiente `.venv` e non aggiornano un'eventuale installazione autonoma precedente.
 
 ## Inizia qui
 

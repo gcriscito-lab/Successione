@@ -30,7 +30,7 @@ dichiarazione resta del professionista, e il programma e' un assistente di compi
 - **Pagamento**: IBAN e codice fiscale del titolare per l'addebito se paghi contestualmente (tempistica 2); altrimenti l'F24 e' da fare a parte (il programma non lo genera).
 
 ## 2. Procedura
-1. Avvia il programma (`Avvia-programma-aggiornato.cmd`, collegamento «Successioni» o `successioni gui`). Si apre l'interfaccia locale.
+1. Avvia il programma con `Avvia-pratica-reale.cmd`. Si apre l'interfaccia locale.
 2. Crea la pratica con la **procedura guidata**, poi compila i quadri. In alternativa detta i dati a Claude, che li inserisce con gli strumenti MCP:
    **leggi sempre tu il risultato**, campo per campo, contro le visure e i documenti.
 3. Allega i PDF nella scheda **File** (conversione e verifica PDF/A: l'esito «conforme» appare solo se veraPDF l'ha verificato).
