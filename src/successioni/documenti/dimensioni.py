@@ -490,3 +490,59 @@ def verifica_fornitura(manifest: dict, limite_compresso: int = L.LIMITE_FORNITUR
                           f"{m['punto_misura']} ({m['descrizione']}). Oltre il limite la dichiarazione va presentata "
                           "presso un ufficio territoriale", L.FONTE_FORNITURA))
     return err
+
+
+# ------------------------------------------------------------------------------------------ conformita' allegati EG
+
+def valuta_conformita_eg(percorso: Path | str, rapporto: dict | str | None = None,
+                         esito_validazione: str | None = None) -> dict:
+    """Esito della conformita' di un allegato del quadro EG ai formati ammessi (PDF/A-1a, PDF/A-1b, TIFF: Specifiche_SUC13
+    p. 7 par. 2.3; Fascicolo I p. PDF 49), per l'esportazione.
+
+    Restituisce ``{"esito": "conforme" | "non_conforme" | "non_verificato", "motivo": str, "fonte": str}``:
+
+    * ``conforme`` solo se un validatore indipendente lo ha accertato (``esito_validazione`` o ``rapporto.validazione.esito``
+      = 'conforme', come scritto da ``allegati.prepara_pdfa`` con veraPDF);
+    * ``non_conforme`` se il rapporto dice 'non_conforme', se un TIFF non supera la verifica dei requisiti (``tiff.verifica_tiff``:
+      B/N 1 bit, CCITT Group IV, max 300 DPI), se un PDF non dichiara PDF/A-1a/1b nei metadati (nessuna conversione) o se la
+      verifica strutturale interna trova violazioni (``pdfa_strutturale``: indicativa, ma ogni motivo e' una violazione del
+      profilo). Allegati non conformi causano lo scarto della dichiarazione (stessa regola di ``verifica_fornitura``);
+    * ``non_verificato`` negli altri casi (PDF che dichiara PDF/A-1 senza esito di veraPDF, TIFF con verifica indicativa ok)."""
+    p = Path(percorso)
+    if isinstance(rapporto, str):
+        try:
+            rapporto = json.loads(rapporto)
+        except ValueError:
+            rapporto = None
+    val = (rapporto or {}).get("validazione") if isinstance(rapporto, dict) else None
+    dichiarato = esito_validazione or (val.get("esito") if isinstance(val, dict) else None)
+    fonte = L.FONTE_FORMATI
+    if dichiarato == "non_conforme":
+        return {"esito": "non_conforme", "motivo": "il rapporto di validazione dell'allegato e' 'non_conforme'", "fonte": fonte}
+    tipo = tipo_file_eg(p)
+    if tipo == "image/tiff":
+        from .tiff import verifica_tiff
+        vt = verifica_tiff(p)
+        if vt["esito"] != "indicativo_ok":
+            motivi = "; ".join(m["messaggio"] for m in vt.get("motivi", [])[:5])
+            return {"esito": "non_conforme", "motivo": f"TIFF fuori specifica: {motivi}", "fonte": L.FONTE_TIFF}
+        return {"esito": "conforme" if dichiarato == "conforme" else "non_verificato",
+                "motivo": "TIFF: requisiti verificati in modo indicativo (nessun validatore indipendente)", "fonte": L.FONTE_TIFF}
+    if tipo != "application/pdf":
+        return {"esito": "non_conforme", "motivo": "contenuto non PDF ne' TIFF", "fonte": fonte}
+    if dichiarato == "conforme":
+        return {"esito": "conforme", "motivo": "validazione indipendente: conforme", "fonte": fonte}
+    from .. import pdfa
+    an = pdfa.analizza_pdf(p)
+    livello = an.get("dichiara_pdfa")
+    if livello not in ("1a", "1b"):
+        return {"esito": "non_conforme", "motivo": "PDF senza conversione PDF/A dimostrata: i metadati non dichiarano PDF/A-1a o "
+                f"PDF/A-1b (rilevato: {livello or 'nessuna dichiarazione PDF/A'}); convertirlo con 'Prepara PDF/A'", "fonte": fonte}
+    from .pdfa_strutturale import verifica_strutturale_pdfa
+    ind = verifica_strutturale_pdfa(p, livello)
+    if ind["esito"] != "indicativo_ok":
+        codici = ", ".join(sorted({m["codice"] for m in ind.get("motivi", [])})[:8])
+        return {"esito": "non_conforme", "motivo": f"dichiara PDF/A-{livello} ma la verifica strutturale trova violazioni ({codici})",
+                "fonte": fonte}
+    return {"esito": "non_verificato", "motivo": f"dichiara PDF/A-{livello} e supera la verifica strutturale interna, ma la "
+            "conformita' non e' accertata da un validatore indipendente (veraPDF)", "fonte": fonte}

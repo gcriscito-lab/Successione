@@ -43,7 +43,10 @@ DEC_2025 = date(2025, 1, 1)
 DEC_2014 = date(2014, 1, 1)
 DEC_2006 = date(2006, 10, 3)
 #: imposta fissa ipotecaria/catastale per successioni aperte dal 2014-01-01 (Fascicolo I p. 39; annotazioni EF)
-IMPOSTA_FISSA = 200
+IMPOSTA_FISSA = AG.IMPOSTA_FISSA
+#: gradi di parentela degli enti esclusi dalle basi EF1/EF9 e dai righi EF2/EF3 (annotazioni EF: «'Grado di parentela' uguale a
+#: '36', '37', '38' o '39'»); 36 = Stato, 37 = regioni, province, comuni (Fascicolo I pp. 44-45)
+GRADI_ENTI = ("36", "37", "38", "39")
 #: per le successioni aperte tra il 2006-10-03 e il 2013-12-31 (Fascicolo I p. 39; annotazioni XSD «168 ... 200 dal 01/01/2014»)
 IMPOSTA_FISSA_2006_2013 = 168
 
@@ -115,15 +118,20 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
     if dd is None:
         return None
     # gli immobili esteri (provincia EE) non entrano nelle basi EF1/EF9 ne' nelle circoscrizioni (annotazioni XSD di QuadroEF)
-    immobili = [r for r in x.righe_dev.values() if r["quadro"] in ("EB", "EC", "EL", "EM") and not r.get("estero")]
-    if any(x.grado_ea.get(r["persona_id"]) in ("36", "37", "38", "39") for r in immobili):
-        # «non deve essere indicato il valore delle quote relative agli immobili devoluti a uno dei soggetti 36-39» (EF1, EF9):
-        # le righe degli enti non entrano nelle basi proporzionali; la regola e' provata solo per i casi coperti dai test
-        immobili = [r for r in immobili if x.grado_ea.get(r["persona_id"]) not in ("36", "37", "38", "39")]
+    tutti = [r for r in x.righe_dev.values() if r["quadro"] in ("EB", "EC", "EL", "EM") and not r.get("estero")]
+    # «non deve essere indicato il valore delle quote relative agli immobili devoluti a uno dei soggetti 36-39» (EF1, EF9):
+    # le righe degli enti non entrano nelle basi proporzionali. Le circoscrizioni hanno invece esclusioni proprie (EF15: solo
+    # grado 36; EF16: gradi 36 e 37), calcolate sotto da ``tutti`` (annotazioni Circoscrizioni_Numero; Fascicolo I pp. 44-45)
+    immobili = [r for r in tutti if x.grado_ea.get(r["persona_id"]) not in GRADI_ENTI]
     attestazione = bool(getattr(x, "richiesta_attestazione", None))
-    # con la copia conforme le sezioni IV e V del quadro EF sono obbligatorie (annotazioni XSD di SezioneIV_ImpostaBollo e
+    # annotazione XSD di QuadroEF: obbligatorio con EA e almeno un rigo EB, EC, EL, EM, senza considerare i righi esteri, quelli
+    # a soggetti con grado 36, quelli a soggetti 37, 38, 39 con sostitutiva = 2 e quelli con agevolazione C, D, E o H con
+    # sostitutiva = 2. Con la copia conforme le sezioni IV e V sono obbligatorie (annotazioni di SezioneIV_ImpostaBollo e
     # SezioneV_TributiSpeciali: «obbligatorio in presenza del campo Copia conforme»)
-    obbligatorio = dd >= DEC_2025 or (bool(x.ea) and bool(immobili)) or attestazione
+    sost2 = bool(getattr(x, "sost", None)) and x.sost.codice == "2"
+    rilevanti = [r for r in tutti if x.grado_ea.get(r["persona_id"]) != "36" and not (
+        sost2 and (x.grado_ea.get(r["persona_id"]) in ("37", "38", "39") or r.get("agevolazione") in ("C", "D", "E", "H")))]
+    obbligatorio = dd >= DEC_2025 or (bool(x.ea) and bool(rilevanti)) or attestazione
     if not obbligatorio:
         return None
     motivi: list[str] = []
@@ -144,7 +152,20 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                   _fa("QuadroEF/SezioneVBis_ImpostaSuccessione") + "; " + FO.fonte_fasc1(39, "quadro EF"))
     ef: dict = {}
     da_versare = Decimal(0)
-    if immobili and not motivi:
+    # circoscrizioni (EF15, EF16): solo immobili del catasto ordinario (quadri EB, EC), senza oneri reali (codice diritto 10,
+    # che qui blocca comunque il quadro) e senza i beni con agevolazione H (annotazioni Circoscrizioni_Numero: «i beni in cui e'
+    # presente l'agevolazione H»; Fascicolo I pp. 44-46); per i tavolari il controllo ufficiale SUC13 2.3.1 (locale, 2026-11-03)
+    # individua 0 circoscrizioni.
+    beni_h = {r["bene_id"] for r in tutti if r.get("agevolazione") == "H"}
+    base_circ = [r for r in tutti if r["quadro"] in ("EB", "EC") and r["diritto"] != "10" and r["bene_id"] not in beni_h]
+    # EF15 (Sezione III): righi con grado di parentela diverso da 36 (annotazione SezioneIII/Circoscrizioni_Numero; Fascicolo I
+    # p. 44: «circoscrizioni in cui sono compresi solo ... immobili devoluti allo Stato, codice 36»)
+    righe_ef15 = [r for r in base_circ if x.grado_ea.get(r["persona_id"]) != "36"]
+    # EF16 (Sezione IV): grado diverso da 36 e 37 e agevolazioni diverse da C, M, G, E (annotazione SezioneIV/Circoscrizioni_Numero;
+    # Fascicolo I pp. 45-46). Esclusione per rigo come nell'annotazione XSD.
+    righe_ef16 = [r for r in base_circ if x.grado_ea.get(r["persona_id"]) not in ("36", "37")
+                  and r.get("agevolazione") not in AG.FUORI_CIRCOSCRIZIONI_BOLLO]
+    if (immobili or righe_ef15) and not motivi:
         # prima casa (docs/regole/prima_casa.md): i beni con P/X/Z escono dai righi EF1 ed EF9 (annotazioni
         # QuadroEF/SezioneI_ImpostaIpotecaria/ImpostaProporzionale e SezioneII_ImpostaCatastale/ImpostaProporzionale:
         # «l'agevolazione prima casa si estende a tutti i beneficiari ... in relazione a quel bene») ed entrano nel rigo EF4
@@ -172,12 +193,13 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         if valore_pc != valore_pc.to_integral_value():
             motivi.append(f"somma dei 'Valore quota' degli immobili prima casa {valore_pc} non intera: l'arrotondamento "
                           "del rigo EF4 colonna 2 non e' indicato dalle fonti")
-        if any(r["diritto"] == "10" for r in immobili):
+        if any(r["diritto"] == "10" for r in tutti):
             motivi.append("immobili gravati da oneri reali (codice diritto 10): esclusi dalle circoscrizioni "
                           "(Fascicolo I p. 44), caso non coperto")
         # soli terreni non edificabili, senza agevolazioni ne' riduzioni, senza fabbricati: regola dei valori fiscali
         # (annotazioni XSD ImpostaProporzionale_Imposta di EF1 ed EF9; Fascicolo I pp. PDF 40 e 43)
-        solo_terreni = (not any(r["quadro"] in ("EC", "EM") for r in immobili) and all(r["quadro"] == "EB" for r in immobili))
+        solo_terreni = (bool(immobili) and not any(r["quadro"] in ("EC", "EM") for r in immobili)
+                        and all(r["quadro"] == "EB" for r in immobili))
         vf = None
         if solo_terreni:
             beni_ids = sorted({r["bene_id"] for r in immobili})          # una riga di devoluzione per beneficiario: ogni bene una volta
@@ -207,17 +229,9 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         # ufficiale SUC13 2.3.1 (prova locale 2026-11-05) respinge 200 nella colonna 2 («valore corretto» = imposta calcolata) e
         # accetta l'annotazione XSD di ImpostaIpotecariaDovuta/ImpostaCatastaleDovuta: colonna 2 = imposta calcolata, minimo di
         # 200 euro solo nel totale dovuto in presenza dei righi EF1/EF9 (vedi sotto)
-        # circoscrizioni (EF15, EF16): solo immobili del catasto ordinario; per i tavolari il controllo ufficiale SUC13 2.3.1
-        # (locale, 2026-11-03) individua 0 circoscrizioni
-        # H (immobili demoliti o inagibili): esclusi dalle circoscrizioni (annotazione Circoscrizioni_Numero)
-        comuni = sorted({r["codice_comune"] for r in immobili if r["quadro"] in ("EB", "EC") and r.get("agevolazione") != "H"})
-        circoscrizioni = None
-        if len(comuni) == 1:
-            circoscrizioni = {comuni[0]}          # stesso comune -> una circoscrizione (Fascicolo I p. 44)
-        elif len(comuni) > 1:
-            circoscrizioni, perche = CO.circoscrizioni(comuni)
-            if circoscrizioni is None:
-                motivi.append(f"immobili in piu' comuni {comuni}: {perche} (Fascicolo I p. 44)")
+        # circoscrizioni: EF15 e EF16 con le rispettive esclusioni (righe_ef15, righe_ef16 sopra)
+        circoscrizioni = _circoscrizioni(righe_ef15, motivi)
+        circoscrizioni_bollo = _circoscrizioni(righe_ef16, motivi)
         if not motivi:
             imp = str(int(imponibile))
             fa1 = _fa(el + "/SezioneI_ImpostaIpotecaria/ImpostaProporzionale/ImpostaProporzionale_Imposta")
@@ -236,8 +250,10 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             if immobili_prop:
                 s1["ImpostaProporzionale"] = {"ImpostaProporzionale_Imponibile": imp,
                                               "ImpostaProporzionale_Imposta": str(ip)}
-            fissa_g = IMPOSTA_FISSA if riga_g else 0
-            fissa_m = IMPOSTA_FISSA if righe_m else 0
+            # EF2/EF3: «168 (se la data di decesso e' ... dal 01/01/2014 ... 200)» (annotazioni AgevolazioneG_Imposta e
+            # AgevolazioneM_Imposta; Fascicolo I p. 39): misura fissa per data di apertura
+            fissa_g = fissa if riga_g else 0
+            fissa_m = fissa if righe_m else 0
             if riga_g:
                 s1["AgevolazioneG"] = {"AgevolazioneG_Valore": str(int(riga_g["valore"])), "AgevolazioneG_Imposta": str(fissa_g)}
             if righe_m:
@@ -311,19 +327,22 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
             # codice 2: «il campo non deve essere compilato» (Fascicolo I pp. PDF 45-46); codice 1: solo le circoscrizioni
             # delle nuove trascrizioni (qui un unico comune, quindi al piu' una)
             n = len(circoscrizioni) if circoscrizioni and (not sost or sost.codice == "1") else 0
-            if n and sost and sost.circoscrizioni_nuove:
+            nb = len(circoscrizioni_bollo) if circoscrizioni_bollo and (not sost or sost.codice == "1") else 0
+            if sost and sost.circoscrizioni_nuove:
                 # codice 1: solo le circoscrizioni delle nuove trascrizioni (Fascicolo I pp. PDF 45-46)
-                n = min(n, sost.circoscrizioni_nuove)
+                n, nb = min(n, sost.circoscrizioni_nuove), min(nb, sost.circoscrizioni_nuove)
             # «non voler dar corso alle volture» (casi particolari): 65 euro per circoscrizione invece di 120 (Fascicolo I p. PDF 45;
             # controllo ufficiale locale, diagnostico 3076 con 120)
             tassa = TASSA_CIRCOSCRIZIONE_SENZA_VOLTURE if getattr(x, "casi_particolari", None) else TASSA_CIRCOSCRIZIONE
             if n:
                 ef["SezioneIII_TassaIpotecaria"] = {"Circoscrizioni_Numero": str(n),
                                                     "Circoscrizioni_Imposta": str(tassa * n)}
-                ef["SezioneIV_ImpostaBollo"] = {"Circoscrizioni_Numero": str(n),
-                                               "Circoscrizioni_Imposta": str(BOLLO_CIRCOSCRIZIONE * n)}
-            da_versare += da_ip + da_cat + tassa * n + BOLLO_CIRCOSCRIZIONE * n
-            x._tributi_presenti = {"ipotecaria": bool(da_ip), "catastale": bool(da_cat), "tassa_ipotecaria": bool(n), "bollo": bool(n)}
+            if nb:
+                ef["SezioneIV_ImpostaBollo"] = {"Circoscrizioni_Numero": str(nb),
+                                               "Circoscrizioni_Imposta": str(BOLLO_CIRCOSCRIZIONE * nb)}
+            da_versare += da_ip + da_cat + tassa * n + BOLLO_CIRCOSCRIZIONE * nb
+            x._tributi_presenti = {"ipotecaria": bool(da_ip), "catastale": bool(da_cat), "tassa_ipotecaria": bool(n),
+                                   "bollo": bool(nb)}
             x.calcoli_ef = {
                 "EF1": {"imponibile": imp, "imposta": ip, "fonte": fa1 + "; " + FO.fonte_fasc1(40, "rigo EF1")},
                 "EF4": {"numero": n_pc, "valore": str(int(valore_pc)), "imposta": fissa_pc,
@@ -333,9 +352,12 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                 "EF9": {"imponibile": str(int(imponibile_cat)), "imposta": cat, "fonte": FO.fonte_fasc1(43, "rigo EF9")},
                 "EF11/EF14": {"importo": cat + fissa_pc, "fonte": FO.fonte_fasc1(44, "righi EF11, EF14")},
                 "EF15": {"circoscrizioni": n, "imposta": tassa * n,
-                         "fonte": FO.fonte_fasc1(44, "rigo EF15: stesso codice comune -> 1 circoscrizione; 120 euro")},
-                "EF16": {"circoscrizioni": n, "imposta": BOLLO_CIRCOSCRIZIONE * n,
-                         "fonte": FO.fonte_fasc1(45, "rigo EF16: 85 euro") + "; " + FO.fonte_fasc1(46, "col. 3")},
+                         "fonte": FO.fonte_fasc1(44, "rigo EF15: stesso codice comune -> 1 circoscrizione; 120 euro; escluso "
+                                                 "solo il grado 36") + "; " +
+                                  _fa(el + "/SezioneIII_TassaIpotecaria/Circoscrizioni_Numero")},
+                "EF16": {"circoscrizioni": nb, "imposta": BOLLO_CIRCOSCRIZIONE * nb,
+                         "fonte": FO.fonte_fasc1(45, "rigo EF16: 85 euro; esclusi gradi 36, 37 e agevolazioni C, E, M, G")
+                         + "; " + FO.fonte_fasc1(46, "col. 3") + "; " + _fa(el + "/SezioneIV_ImpostaBollo/Circoscrizioni_Numero")},
             }
             if not agevolati:
                 x.calcoli_ef.pop("EF4")
@@ -386,6 +408,20 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
     x.mappa["quadro:EF"] = {"coll": None, "quadro": "EF", "xpath": f"{x.XP_DICH}/suc:QuadroEF",
                             "totale_da_versare": str(da_versare), "calcoli": dict(getattr(x, "calcoli_ef", {}))}
     return ef or None
+
+
+def _circoscrizioni(righe: list[dict], motivi: list[str]) -> set | None:
+    """Circoscrizioni di pubblicita' immobiliare dei righi indicati, individuate dal codice del comune (Fascicolo I p. 44: stesso
+    comune -> una circoscrizione; piu' comuni: elenco delle conservatorie, ``conservatorie.py``)."""
+    comuni = sorted({r["codice_comune"] for r in righe})
+    if len(comuni) <= 1:
+        return set(comuni) or None
+    circ, perche = CO.circoscrizioni(comuni)
+    if circ is None:
+        m = f"immobili in piu' comuni {comuni}: {perche} (Fascicolo I p. 44)"
+        if m not in motivi:
+            motivi.append(m)
+    return circ
 
 
 def _attestazione(x, ef: dict, motivi: list[str]) -> int:
@@ -612,6 +648,24 @@ def _rateale_senza_importo(x) -> None:
 
 
 # ============================================================================================== EG
+def _conformita_allegato(x, perc: str, percorso, sorgente: dict) -> None:
+    """Formati ammessi per gli allegati EG: PDF/A-1a, PDF/A-1b, TIF/TIFF (Specifiche_SUC13_20250702 p. 7 par. 2.3; Fascicolo I
+    p. PDF 49). Un allegato non conforme (rapporto 'non_conforme', PDF senza PDF/A-1, TIFF fuori specifica) rende il file non
+    completo: resta generabile solo come bozza tecnica. Conformita' non accertata da un validatore indipendente: avviso.
+    ``sorgente`` puo' portare il rapporto dell'archivio (``rapporto`` con ``validazione.esito``) o ``esito_validazione``."""
+    from ..documenti.dimensioni import valuta_conformita_eg
+    try:
+        c = valuta_conformita_eg(Path(percorso), sorgente.get("rapporto"), sorgente.get("esito_validazione"))
+    except Exception as e:          # file illeggibile per la verifica: conformita' non dimostrata, non un falso positivo
+        c = {"esito": "non_conforme", "motivo": f"verifica di conformita' non eseguibile: {str(e)[:150]}", "fonte": ""}
+    fonte = (c.get("fonte") or "") + "; " + FO.fonte_fasc1(49, "formati PDF/A-1a, PDF/A-1b, TIF/TIFF")
+    if c["esito"] == "non_conforme":
+        x.mancanti.append(Errore("ALLEGATO_NON_CONFORME", perc, f"allegato non conforme ai formati ammessi: {c['motivo']}. "
+                                 "Allegati non conformi causano lo scarto della dichiarazione: file non completo", fonte))
+    elif c["esito"] != "conforme":
+        x.avv("ALLEGATO_CONFORMITA_NON_DIMOSTRATA", perc, c["motivo"], fonte)
+
+
 def quadro_eg(x) -> dict | None:
     """Quadro EG dai ``documenti_ref`` e dai file indicati in ``contesto.allegati`` (allegato_id -> file)."""
     from ..documenti.base64 import dati_file_attachment
@@ -659,6 +713,7 @@ def quadro_eg(x) -> dict | None:
             x.err("ALLEGATO_NON_VALIDO", perc, str(e), FO.fonte_xsd(el + "/" + sez + "/" + sez + "All") + "; " +
                   FO.fonte_fasc1(49, "formati PDF/A-1a, PDF/A-1b, TIF/TIFF"))
             continue
+        _conformita_allegato(x, perc, percorso, sorgente if isinstance(sorgente, dict) else {})
         per_sez.setdefault(sez, []).append((dr["id"], fa))
     # obbligatorieta' (annotazioni dei righi EG)
     if x.ea and "AlberoGenealogico" not in per_sez:

@@ -214,7 +214,8 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         return sv.acquisisci_da_ingresso(pratica_id, nome_file, tipo_eg=tipo_eg, finalita=finalita,
                                          persona_id=persona_id)
 
-    @tool(ann=LOCALE)
+    # puo' rimuovere l'originale (sostituisci_originale=True): distruttivo; una seconda chiamata riusa il PDF/A gia' creato
+    @tool(ann=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False))
     def prepara_pdfa(allegato_id: str) -> dict:
         """Crea il derivato PDF/A-1b dell'originale e lo valida. 'conforme' solo con veraPDF; altrimenti 'non_verificato'.
         Una seconda chiamata sullo stesso originale restituisce il PDF/A gia' creato (nessun doppione). Senza avvisi di rischio i

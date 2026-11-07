@@ -25,7 +25,12 @@ CODICI = ("A", "C", "D", "E", "G", "H", "M", "N")
 ESENTI_SUCCESSIONE = ("A", "C", "D", "E", "G", "H", "N")
 #: righi esclusi dalla base proporzionale EF1/EF9 (annotazione ImpostaProporzionale_Imponibile: restano solo spazio, A, L, R, F, N, Q)
 FUORI_BASE_PROPORZIONALE = ("C", "D", "E", "G", "H", "M")
+#: misura fissa per le successioni aperte dal 2014-01-01 (Fascicolo I p. 39); dal 2006-10-03 al 2013-12-31 e' 168: la misura per data
+#: e' ``quadri_efgh.imposta_fissa`` (annotazioni AgevolazioneG_Imposta e AgevolazioneM_Imposta: «168 ... 200 dal 01/01/2014»)
 IMPOSTA_FISSA = 200
+#: righi esclusi dal numero di circoscrizioni del rigo EF16 (bollo): annotazione SezioneIV_ImpostaBollo/Circoscrizioni_Numero
+#: «agevolazioni diverse da 'C', 'M' o 'G' o 'E'» (H e' escluso per bene anche da EF15); Fascicolo I pp. PDF 45-46
+FUORI_CIRCOSCRIZIONI_BOLLO = ("C", "E", "G", "M")
 
 EL_AGEV = "QuadroEC/Modulo/Fabbricati/DevoluzioneEC/Devoluzione/Agevolazioni"
 #: quadri in cui l'XSD ammette il codice (annotazione di Devoluzione/Agevolazioni: «H ... EC, EM»; «G ... EB, EC, EL, EM, EN»;
@@ -156,11 +161,12 @@ def _controlla_eta_g(x, r: dict) -> None:
 
 
 def sezione_g(x, righe_dev: list[dict]) -> dict | None:
-    """EF2 (AgevolazioneG): valore delle quote con G nei quadri EB, EC, EL, EM e imposta ipotecaria fissa."""
+    """EF2 (AgevolazioneG): valore delle quote con G nei quadri EB, EC, EL, EM. L'imposta fissa dipende dalla data di apertura
+    (168 o 200) ed e' applicata da ``quadri_efgh.quadro_ef``."""
     sel = [r for r in righe_dev if r.get("agevolazione") == "G" and r["quadro"] in ("EB", "EC", "EL", "EM")]
     if not sel:
         return None
-    return {"valore": sum((r["quota_valore"] for r in sel), 0), "imposta": IMPOSTA_FISSA}
+    return {"valore": sum((r["quota_valore"] for r in sel), 0)}
 
 
 def beni_con_m(x) -> set[str]:

@@ -37,7 +37,7 @@ COMPLETATO, PARZIALE, ERRORE, ANNULLATO = "completato", "parziale", "errore", "a
 APERTI = (AVVIATO, ATTESA_UTENTE, SESSIONE_SCADUTA)
 TERMINALI = (COMPLETATO, PARZIALE, ERRORE, ANNULLATO)
 
-CAMPI_IDENTIFICATIVI = ("tipo", "comune", "sezione", "foglio", "particella", "subalterno")
+CAMPI_IDENTIFICATIVI = ("tipo", "comune", "codice_comune", "sezione", "foglio", "particella", "subalterno")
 CAMPI_NOTI = {"catasto", "comune", "codice_comune", "sezione", "foglio", "particella", "subalterno", "graffati",
               "porzione", "categoria", "classe", "consistenza", "superficie", "rendita", "reddito_dominicale",
               "reddito_agrario", "qualita", "indirizzo", "titolarita", "partita", "data_situazione"}
@@ -143,14 +143,52 @@ def chiave_immobile(tipo: str | None, comune, sezione, foglio, particella, subal
                      _norm_id(subalterno)])
 
 
+_RE_CODICE_COMUNE = re.compile(r"^[A-Z]\d{3}$")  # codice catastale (Belfiore), es. H501
+
+
+def comune_parti(d: dict) -> tuple[str, str]:
+    """(codice catastale, nome) normalizzati di un bene o di un immobile. Nello schema della pratica `comune` e' il
+    nome e `codice_comune` il codice; un codice scritto in `comune` (dati di versioni precedenti o visure che lo
+    restituiscono li') e' riconosciuto dalla forma e trattato come codice."""
+    codice, nome = _norm_id(d.get("codice_comune")), _norm_id(d.get("comune"))
+    if not codice and _RE_CODICE_COMUNE.match(nome):
+        codice, nome = nome, ""
+    return codice, nome
+
+
+def stesso_comune(a: dict, b: dict) -> bool:
+    """Confronto del comune: per codice quando entrambi lo hanno, altrimenti per nome; senza termini omogenei da
+    confrontare (solo codice da una parte, solo nome dall'altra) non c'e' corrispondenza."""
+    ca, na = comune_parti(a)
+    cb, nb = comune_parti(b)
+    if ca and cb:
+        return ca == cb
+    return bool(na and nb and na == nb)
+
+
+def _chiave_senza_comune(tipo, d: dict) -> str:
+    return chiave_immobile(tipo, "", d.get("sezione"), d.get("foglio"), d.get("particella"), d.get("subalterno"))
+
+
 def chiave_da_bene(b: dict) -> str:
-    return chiave_immobile(b.get("tipo"), b.get("comune"), b.get("sezione"), b.get("foglio"), b.get("particella"),
+    codice, nome = comune_parti(b)
+    return chiave_immobile(b.get("tipo"), codice or nome, b.get("sezione"), b.get("foglio"), b.get("particella"),
                            b.get("subalterno"))
 
 
 def chiave_da_immobile(im: dict) -> str:
-    return chiave_immobile(im.get("catasto"), im.get("codice_comune") or im.get("comune"), im.get("sezione"),
+    codice, nome = comune_parti(im)
+    return chiave_immobile(im.get("catasto"), codice or nome, im.get("sezione"),
                            im.get("foglio"), im.get("particella"), im.get("subalterno"))
+
+
+def bene_corrispondente(im: dict, beni: list[dict]) -> dict | None:
+    """Bene della pratica che corrisponde all'immobile: stessi catasto, sezione, foglio, particella, subalterno e
+    stesso comune secondo `stesso_comune`. A parita', preferito il bene con lo stesso codice catastale."""
+    resto = _chiave_senza_comune(im.get("catasto"), im)
+    cand = [b for b in beni if _chiave_senza_comune(b.get("tipo"), b) == resto and stesso_comune(b, im)]
+    cod = comune_parti(im)[0]
+    return next((b for b in cand if cod and comune_parti(b)[0] == cod), cand[0] if cand else None)
 
 
 def id_bene(chiave: str) -> str:
@@ -221,7 +259,7 @@ def proponi_importazione(immobili: list[dict], dati_pratica: dict, *, cf_defunto
     """Confronta gli immobili acquisiti con i beni della pratica e propone operazioni per `Servizio.aggiorna`
     (`{op, coll, id, campi}`, da applicare con origine='acquisito'). Non sovrascrive campi inseriti o confermati
     dall'utente: li elenca come conflitti. `selezione` = chiavi da importare (None = tutte)."""
-    beni = {chiave_da_bene(b): b for b in dati_pratica.get("beni", [])}
+    beni = list(dati_pratica.get("beni", []))
     if cf_defunto is None:
         cf_defunto = next((p.get("codice_fiscale") for p in dati_pratica.get("persone", [])
                            if p.get("ruolo") == "defunto"), None)
@@ -230,8 +268,10 @@ def proponi_importazione(immobili: list[dict], dati_pratica: dict, *, cf_defunto
         k = im["chiave"]
         if selezione is not None and k not in selezione:
             continue
+        codice, nome = comune_parti(im)  # nome normalizzato solo per decidere; nel bene va il testo della visura
         campi = {"tipo": "terreno" if im["catasto"] == "T" else "fabbricato",
-                 "comune": im.get("codice_comune") or im.get("comune"), "sezione": im.get("sezione"),
+                 "codice_comune": codice, "comune": str(im.get("comune")).strip() if nome else None,
+                 "sezione": im.get("sezione"),
                  "foglio": im.get("foglio"), "particella": im.get("particella"), "subalterno": im.get("subalterno"),
                  "categoria": im.get("categoria") if im["catasto"] == "F" else None,
                  "rendita": im.get("rendita") if im["catasto"] == "F" else None}
@@ -254,7 +294,7 @@ def proponi_importazione(immobili: list[dict], dati_pratica: dict, *, cf_defunto
             segnalazioni.append({"codice": "CAMPI_SENZA_DESTINAZIONE", "chiave": k, "campi": non_mappati,
                                  "messaggio": "dati restituiti senza campo corrispondente nel modello: conservati "
                                               "nell'acquisizione (vedi docs/PROPOSTE_collegamenti.md)"})
-        esistente = beni.get(k)
+        esistente = bene_corrispondente(im, beni)
         if esistente is None:
             operazioni.append({"op": "upsert", "coll": "beni", "id": id_bene(k), "campi": campi})
             nuovi.append(k)

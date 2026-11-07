@@ -198,7 +198,8 @@ class ElaboratiMixin:
             if p.stat().st_size != r["bytes"] or hashlib.sha256(p.read_bytes()).hexdigest() != r["sha256"]:
                 raise DatiNonValidi("allegato alterato: impronta o dimensione diversa dal file acquisito",
                                     allegato_id=r["id"])
-            out[r["id"]] = {"percorso": p, "nome": r["nome"]}
+            # il rapporto salvato (esito veraPDF) arriva all'export: un PDF/A non conforme blocca il file completo
+            out[r["id"]] = {"percorso": p, "nome": r["nome"], "rapporto": r["rapporto"]}
         return out
 
     # ------------------------------------------------------------------ backup

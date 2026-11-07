@@ -5,7 +5,10 @@ che la prova di andata e ritorno (tests/test_telematico_importa.py, tests/test_t
 frontespizio, eredi (EA), terreni (EB), fabbricati (EC), passivita' (ED), disponibilita' finanziarie (ER), terreni e
 fabbricati tavolari (EL, EM), aziende (EN), titoli (EO), aeromobili (EP), navi (EQ) e voltura (EI, ricostruita dai flag
 dei beni e dagli estremi di trascrizione/registrazione). Tutto il resto e' elencato in ``non_importato`` e va reinserito a
-mano; i quadri di calcolo (EE, EF) si ricalcolano. L'XML non e' validato qui: la validita' e' quella del controllo
+mano; i quadri di calcolo (EE, EF) si ricalcolano, tranne i dati di EF/EH dichiarati dal professionista (sanzioni e interessi
+della Sezione VI, tempistica, rateazione e acconto, crediti d'imposta EF7/EF13/EF18bis ed EH Sezione III), che si importano. Dopo
+l'importazione la pratica viene riesportata in prova: se il quadro EF o l'ImportoDaVersare ricalcolati differiscono dall'originale
+c'e' un avviso con i due valori; i dati di EF non ricalcolati e non importati sono negli avvisi. L'XML non e' validato qui: la validita' e' quella del controllo
 ufficiale sul file ri-esportato.
 
 Regola generale: un elemento con testo che l'importazione non legge (e non e' un totale derivato) rende il file non
@@ -127,12 +130,202 @@ def _upsert(coll: str, eid: str, campi: dict) -> dict:
     return {"op": "upsert", "coll": coll, "id": eid, "campi": campi}
 
 
-def importa_xml(xml: bytes) -> dict:
+# ---- quadri EF ed EH: dati DICHIARATI dal professionista (non ricalcolati), letti nelle chiavi che l'esportazione usa
+# (quadri_efgh.py, pagamenti.py; supplemento.CHIAVI_DICHIARAZIONE). Tutto il resto del quadro EF e' ricalcolato e confrontato
+# con l'originale dopo l'importazione (_confronta_ef).
+_SEZ_VI = {"ImpostaIpotecaria": "ipotecaria", "ImpostaCatastale": "catastale", "TassaIpotecaria": "tassa_ipotecaria",
+           "ImpostaBollo": "bollo", "ImpostaSuccessione": "successione"}        # pagamenti.TRIBUTI
+_CREDITI_EF = (("suc:SezioneI_ImpostaIpotecaria/suc:CreditoImposta", "credito_ipotecaria"),             # EF7
+               ("suc:SezioneII_ImpostaCatastale/suc:CreditoImposta", "credito_catastale"),              # EF13
+               ("suc:SezioneVBis_ImpostaSuccessione/suc:ImpostaCalcolata/suc:CreditoImposta", "credito_successione"))  # EF18bis c. 4
+#: foglie del quadro EF che l'esportazione ricalcola dagli altri dati della pratica (quadri_efgh.quadro_ef, pagamenti.sezione_vi)
+_EF_RICALCOLATI = {"ImpostaProporzionale_Imponibile", "ImpostaProporzionale_Imposta", "AgevolazioneG_Valore", "AgevolazioneG_Imposta",
+                   "AgevolazioneM_Valore", "AgevolazioneM_Imposta", "PrimaCasa_Numero", "AgevolazionePX_Valore", "PrimaCasa_Imposta",
+                   "ImpostaIpotecariaDovuta", "ImpostaIpotecariaDaVersare", "ImpostaCatastaleFissa", "ImpostaCatastaleDovuta",
+                   "ImpostaCatastaleDaVersare", "Circoscrizioni_Numero", "Circoscrizioni_Imposta", "ImpostaBollo_CopiaConforme",
+                   "CopiaConforme_Importo", "Imposta", "ImpostaDaVersare", "ImpostaNonDovuta", "TotaleDaVersare",
+                   "TotaleDaVersare_Sanzioni", "TotaleDaVersare_Interessi"}
+_EH_SEZIONI_NOTE = {"SezioneI_DichSost"}        # coperta dalla voce generale «dichiarazioni e testamento: da reinserire»
+
+
+def _estremi_reg(el, base: str) -> dict | None:
+    """reg:EstremiRegistrazione_Type -> chiavi di ``esporta.estremi_registrazione`` (come per il testamento)."""
+    if not el.xpath(base, namespaces=NS):
+        return None
+    out = {}
+    for campo, tag in (("ufficio_registrazione", "UfficioDiRegistrazione"), ("serie", "Serie"),
+                       ("numero_registrazione", "NumeroRegistrazione"), ("sottonumero_registrazione", "SottonumeroRegistrazione"),
+                       ("data_registrazione", "DataRegistrazione")):
+        v = _t(el, f"{base}/reg:{tag}")
+        if v:
+            out[campo] = _data(v) if campo == "data_registrazione" else v
+    return out
+
+
+def _percorso_relativo(e, sopra) -> str:
+    parti = []
+    while e is not None and e is not sopra:
+        parti.append(etree.QName(e).localname)
+        e = e.getparent()
+    return "/".join(reversed(parti))
+
+
+def _ef_eh_dichiarati(d, dichiarazione: dict, avvisi: list[str], non_importato: list[str]) -> None:
+    """Sanzioni e interessi (EF Sezione VI), tempistica, rateazione e acconto (EF18ter), crediti d'imposta (EF7, EF13, EF18bis
+    col. 4 ed EH Sezione III). Le foglie di EF non lette e non ricalcolate finiscono negli avvisi; le sezioni di EH diverse dalla
+    I e dalla III (lette qui) in ``non_importato``."""
+    ef = d.xpath("suc:QuadroEF", namespaces=NS)
+    if ef:
+        ef = ef[0]
+        for elem, trib in _SEZ_VI.items():
+            for tipo, suff in (("sanzione", "Sanzioni"), ("interessi", "Interessi")):
+                v = _dec(_t(ef, f"suc:SezioneVI_SanzioniInteressi/suc:{elem}/suc:{elem}_{suff}"))
+                if v is not None:
+                    dichiarazione[f"{tipo}_{trib}"] = v
+        ic = "suc:SezioneVBis_ImpostaSuccessione/suc:ImpostaCalcolata/suc:"
+        tp = _t(ef, ic + "TempisticaPagamento")
+        if tp:
+            dichiarazione["tempistica_pagamento"] = tp
+        pr = _t(ef, ic + "PagamentoRateale")
+        if pr:
+            dichiarazione["pagamento_rateale"] = _intero(pr, "QuadroEF PagamentoRateale")
+        ac = _dec(_t(ef, ic + "Acconto"))
+        if ac is not None:
+            dichiarazione["acconto"] = ac
+        for percorso, chiave in _CREDITI_EF:
+            v = _dec(_t(ef, percorso))
+            if v is not None:
+                dichiarazione[chiave] = v
+        letti = _letti.get() or set()
+        for e in ef.iter():
+            if not isinstance(e.tag, str) or len(e) or not (e.text or "").strip() or e in letti:
+                continue
+            if etree.QName(e).localname not in _EF_RICALCOLATI:
+                avvisi.append(f"QuadroEF: {_percorso_relativo(e, ef)} = {(e.text or '').strip()} non importato (dato non "
+                              "ricalcolato dal programma): da reinserire, la riesportazione non lo riproduce")
+    eh = d.xpath("suc:QuadroEH", namespaces=NS)
+    if not eh:
+        return
+    eh = eh[0]
+    righe = [("", s) for s in eh.xpath("suc:PrimoModulo/suc:SezioneIII_CreditoImposta", namespaces=NS)]
+    righe += [("_2", s) for s in eh.xpath("suc:Modulo[1]/suc:SezioneIII_CreditoImposta", namespaces=NS)]
+    for suff, s in righe:
+        for campo, tag in (("credito_tipologia", "TipologiaImposta"), ("credito_imposta", "Imposta")):
+            v = _t(s, "suc:" + tag)
+            if v:
+                dichiarazione[campo + suff] = _dec(v) if campo == "credito_imposta" else v
+        for campo, tag in (("credito_acquisto", "RegistrazioneAcquisto"), ("credito_vendita", "RegistrazioneVendita")):
+            reg = _estremi_reg(s, "suc:" + tag)
+            if reg is not None:
+                dichiarazione[campo + suff] = reg
+        _t(s, "suc:FirmaDichiarante")          # firma del primo rigo: riscritta dall'esportazione
+    letti = _letti.get() or set()
+    for suff, s in righe:
+        resto = [_percorso_relativo(e, eh) for e in s.iter() if isinstance(e.tag, str) and not len(e)
+                 and (e.text or "").strip() and e not in letti]
+        if resto:
+            non_importato.append("QuadroEH sezione III (credito d'imposta): campi non importati, da reinserire: " + "; ".join(resto))
+    altri_moduli = eh.xpath("suc:Modulo[position() > 1]/suc:SezioneIII_CreditoImposta", namespaces=NS)
+    if altri_moduli:
+        non_importato.append(f"QuadroEH sezione III: {len(altri_moduli)} righi di credito oltre il secondo non importati: da reinserire")
+    sezioni = sorted({etree.QName(sz).localname for m in eh for sz in m if isinstance(sz.tag, str)}
+                     - _EH_SEZIONI_NOTE - {"SezioneIII_CreditoImposta"})
+    for nome in sezioni:
+        non_importato.append(f"QuadroEH {nome}: non importata, da reinserire")
+
+
+def _foglie(el) -> dict[str, str]:
+    """percorso (relativo, con indici) -> testo delle foglie valorizzate."""
+    out = {}
+    if el is None:
+        return out
+
+    def visita(nodo, percorso):
+        figli = [f for f in nodo if isinstance(f.tag, str)]
+        if not figli:
+            if (nodo.text or "").strip():
+                out[percorso] = (nodo.text or "").strip()
+            return
+        visti: dict[str, int] = {}
+        for f in figli:
+            nome = etree.QName(f).localname       # nomi locali: il prefisso dei namespace dipende dal software produttore
+            visti[nome] = visti.get(nome, 0) + 1
+            n = sum(1 for g in figli if etree.QName(g).localname == nome)
+            visita(f, f"{percorso}/{nome}" + (f"[{visti[nome]}]" if n > 1 else "") if percorso else
+                   nome + (f"[{visti[nome]}]" if n > 1 else ""))
+    visita(el, "")
+    return out
+
+
+def _importo(s: str | None) -> Decimal | None:
+    return Decimal(s.replace(",", ".")) if s else None
+
+
+def _confronta_ef(radice, ops: list[dict], data_riferimento: date | None) -> list[str]:
+    """Riesporta la pratica che si sta per creare e confronta il quadro EF e l'ImportoDaVersare con l'originale: ogni differenza
+    e' un avviso esplicito con i due valori (mai una variazione silenziosa degli importi da versare)."""
+    from ..servizio import Servizio, nuovi_dati
+    from .esporta import ContestoExport, esporta_xml
+    orig_d = radice.xpath("//suc:Fornitura/suc:Dichiarazione", namespaces=NS)[0]
+    orig_ef = orig_d.find(f"{{{NS['suc']}}}QuadroEF")
+    orig_imp = orig_d.xpath("suc:Frontespizio/suc:ImportoDaVersare/text()", namespaces=NS)
+    orig_imp = orig_imp[0].strip() if orig_imp else None
+    if orig_ef is None and orig_imp is None:
+        return []
+    dati = nuovi_dati()
+    try:
+        for i, op in enumerate(ops):
+            Servizio._applica(dati, op, "inserito", "gui", i)
+        cf_forn = radice.xpath("//tm:Intestazione/tm:CodiceFiscaleFornitore/text()", namespaces=NS)
+        es = esporta_xml(dati, ContestoExport(cf_fornitore=cf_forn[0].strip() if cf_forn else "", data_riferimento=data_riferimento,
+                                              scopo="bozza_tecnica"))
+    except Exception as e:  # noqa: BLE001 - il confronto non deve impedire l'importazione, ma l'esito va detto
+        return [f"QuadroEF: confronto con l'originale non eseguito ({type(e).__name__}): verificare a mano ImportoDaVersare "
+                f"({orig_imp or 'assente'}) e totali del quadro EF dopo la riesportazione"]
+    if es.xml is None:
+        tot_orig = orig_ef.findtext(f"{{{NS['suc']}}}TotaleDaVersare") if orig_ef is not None else None
+        ef_map = es.mappa.get("quadro:EF") or {}
+        tot_nuovo = ef_map.get("totale_da_versare")
+        motivo = "; ".join(sorted({f"{e.codice} {e.percorso}" for e in es.errori})[:5]) or "file non generato"
+        msg = (f"QuadroEF: riesportazione non completa senza i dati da reinserire ({motivo}); ImportoDaVersare originale "
+               f"{orig_imp or 'assente'} non confrontabile")
+        if (_importo(tot_orig) or Decimal(0)) != (_importo(tot_nuovo) or Decimal(0)):
+            msg += f"; TotaleDaVersare (EF19) originale {tot_orig or 'assente'}, ricalcolato {tot_nuovo or 'non determinato'}"
+        return [msg]
+    nuovo = etree.fromstring(es.xml)
+    nuovo_d = nuovo.xpath("//suc:Fornitura/suc:Dichiarazione", namespaces=NS)[0]
+    nuovo_imp = nuovo_d.xpath("suc:Frontespizio/suc:ImportoDaVersare/text()", namespaces=NS)
+    nuovo_imp = nuovo_imp[0].strip() if nuovo_imp else None
+    nuovo_ef = nuovo_d.find(f"{{{NS['suc']}}}QuadroEF")
+    if orig_ef is not None and nuovo_ef is None:
+        motivi = "; ".join(m.messaggio for m in es.quadri_mancanti if m.percorso == "quadro[EF]") or "non generato"
+        tot_orig = orig_ef.findtext(f"{{{NS['suc']}}}TotaleDaVersare") or "assente"
+        return [f"QuadroEF non ricalcolabile con i dati importati ({motivi}): originale ImportoDaVersare {orig_imp or 'assente'}, "
+                f"TotaleDaVersare {tot_orig}; ricalcolato ImportoDaVersare {nuovo_imp or 'assente'}"]
+    a, b = _foglie(orig_ef), _foglie(nuovo_ef)
+    diff =[f"{k}: originale {a.get(k, 'assente')}, ricalcolato {b.get(k, 'assente')}" for k in sorted(a.keys() | b.keys())
+            if a.get(k) != b.get(k)]
+    if orig_imp == nuovo_imp and not diff:
+        return []
+    out = []
+    if orig_imp != nuovo_imp:
+        out.append(f"ImportoDaVersare ricalcolato diverso dall'originale: originale {orig_imp or 'assente'}, ricalcolato "
+                   f"{nuovo_imp or 'assente'}: verificare i dati prima di riesportare")
+    if diff:
+        out.append("QuadroEF ricalcolato diverso dall'originale: " + "; ".join(diff))
+    return out
+
+
+def importa_xml(xml: bytes, *, data_riferimento: date | None = None) -> dict:
+    """``data_riferimento``: data della riesportazione di confronto del quadro EF (None = oggi, come la riesportazione reale)."""
     token = _letti.set(set())
     try:
-        return _importa_xml(xml)
+        r = _importa_xml(xml)
     finally:
         _letti.reset(token)
+    radice = etree.fromstring(xml, parser=etree.XMLParser(resolve_entities=False, no_network=True))
+    r["avvisi"] += _confronta_ef(radice, r["operazioni"], data_riferimento)
+    return r
 
 
 def _importa_xml(xml: bytes) -> dict:
@@ -674,6 +867,10 @@ def _importa_xml(xml: bytes) -> dict:
         chiudi(corrente)
     importato["passivita"] = k
 
+    # ---- quadri EF ed EH: scelte del professionista che l'esportazione riproduce (sanzioni, tempistica, rateazione, crediti)
+    non_importato_eh: list[str] = []
+    _ef_eh_dichiarati(d, dichiarazione, avvisi, non_importato_eh)
+
     ops.extend(devoluzioni)
     telematico: dict = {"dichiarazione": dichiarazione}
     if tel_persone:
@@ -734,6 +931,7 @@ def _importa_xml(xml: bytes) -> dict:
             non_importato.append(f"{q}: {QUADRI_NON_IMPORTATI[q]}")
         elif q.startswith("Quadro") and q not in QUADRI_IMPORTATI:
             non_importato.append(f"{q}: non gestito dall'importazione")
+    non_importato += non_importato_eh
     cognome = defunto.get("cognome", "")
     titolo = f"Importata: {cognome} {defunto.get('nome', '')}".strip()
     return {"operazioni": ops, "titolo": titolo, "importato": importato, "non_importato": non_importato, "avvisi": avvisi}

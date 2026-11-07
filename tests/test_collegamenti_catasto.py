@@ -76,7 +76,8 @@ def _pratica(sv):
         {"op": "upsert", "coll": "persone", "campi": {"cognome": "ROSSI", "nome": "MARIO", "ruolo": "defunto",
                                                       "codice_fiscale": CF}},
         {"op": "upsert", "coll": "beni", "id": "b_manuale01", "campi": {
-            "tipo": "fabbricato", "comune": "H501", "foglio": "12", "particella": "345", "subalterno": "7",
+            "tipo": "fabbricato", "comune": "ROMA", "codice_comune": "H501", "foglio": "12", "particella": "345",
+            "subalterno": "7",
             "rendita": "800.00"}}])
     return p["pratica_id"]
 
@@ -123,6 +124,57 @@ def test_a14_importazione_selettiva_ripetuta_senza_doppioni(arch):
         K.chiave_immobile("F", "H501", "", "12", "345", "8")), "campi": {"rendita": "99.00"}}]
     sv.aggiorna(pid, sv.leggi(pid)["revisione"], prop3["operazioni"], origine="acquisito")
     assert len(sv.leggi(pid)["dati"]["beni"]) == n_beni
+
+
+def _im(**kw):
+    base = {"catasto": "F", "foglio": "12", "particella": "345", "subalterno": "7", "categoria": "A/2",
+            "titolarita": [{"cf": CF, "diritto": "proprieta", "quota": {"num": 1, "den": 1}}]}
+    imm, _ = K.normalizza([{**base, **kw}])
+    return imm
+
+
+def _bene(**kw):
+    return {"id": "b_x", "tipo": "fabbricato", "foglio": "12", "particella": "345", "subalterno": "7",
+            "categoria": "A/2", "quota_defunto": {"num": 1, "den": 1}, "diritto": "proprieta", **kw}
+
+
+def test_bene_con_nome_e_codice_riconosciuto_per_codice():
+    dati = {"beni": [_bene(comune="ROMA", codice_comune="h501")], "persone": []}
+    prop = K.proponi_importazione(_im(codice_comune="H501"), dati, cf_defunto=CF)
+    assert prop["nuovi"] == [] and prop["invariati"] and prop["operazioni"] == []
+    # codici diversi: nessuna corrispondenza anche se il nome coincidesse
+    prop = K.proponi_importazione(_im(codice_comune="F205", comune="ROMA"), dati, cf_defunto=CF)
+    assert len(prop["nuovi"]) == 1
+
+
+def test_bene_solo_nome_riconosciuto_da_visura_con_nome():
+    dati = {"beni": [_bene(comune="Roma")], "persone": []}
+    prop = K.proponi_importazione(_im(comune="ROMA"), dati, cf_defunto=CF)
+    assert prop["nuovi"] == [] and prop["invariati"]
+    # visura con codice e nome: riconosciuto per nome, il codice mancante viene proposto sul bene esistente
+    prop = K.proponi_importazione(_im(comune="ROMA", codice_comune="H501"), dati, cf_defunto=CF)
+    assert prop["nuovi"] == [] and prop["operazioni"] == [
+        {"op": "upsert", "coll": "beni", "id": "b_x", "campi": {"codice_comune": "H501"}}]
+    # nome diverso: nessuna corrispondenza
+    assert len(K.proponi_importazione(_im(comune="MILANO"), dati, cf_defunto=CF)["nuovi"]) == 1
+
+
+def test_bene_con_codice_nel_campo_comune_dati_precedenti():
+    dati = {"beni": [_bene(comune="H501")], "persone": []}
+    prop = K.proponi_importazione(_im(codice_comune="H501"), dati, cf_defunto=CF)
+    assert prop["nuovi"] == []
+
+
+def test_proposta_codice_in_codice_comune_e_nome_in_comune():
+    prop = K.proponi_importazione(_im(codice_comune="H501", comune="San Giovanni Rotondo"), {"beni": []},
+                                  cf_defunto=CF)
+    campi = prop["operazioni"][0]["campi"]
+    assert campi["codice_comune"] == "H501" and campi["comune"] == "San Giovanni Rotondo"
+    campi = K.proponi_importazione(_im(codice_comune="H501"), {"beni": []}, cf_defunto=CF)["operazioni"][0]["campi"]
+    assert campi["codice_comune"] == "H501" and "comune" not in campi
+    # codice restituito nel campo comune: riconosciuto dalla forma e messo in codice_comune
+    campi = K.proponi_importazione(_im(comune="h501"), {"beni": []}, cf_defunto=CF)["operazioni"][0]["campi"]
+    assert campi["codice_comune"] == "H501" and "comune" not in campi
 
 
 def test_selezione_parziale(arch):

@@ -87,7 +87,9 @@ class ContestoExport:
     data_impegno: str | None = None        # AAAA-MM-GG
     spazio_utente: str | None = None
     scopo: str = "completo"                # 'completo' | 'bozza_tecnica'
-    #: file degli allegati per il quadro EG: allegato_id -> percorso, oppure {"percorso", "nome"} (dall'archivio)
+    #: file degli allegati per il quadro EG: allegato_id -> percorso, oppure {"percorso", "nome"} (dall'archivio), con facoltativi
+    #: "rapporto" (rapporto dell'archivio, dict o JSON, con validazione.esito) o "esito_validazione": un allegato non conforme
+    #: (quadri_efgh._conformita_allegato) rende il file non completo, resta generabile come bozza tecnica
     allegati: dict | None = None
     #: False: non genera EF, EG, EH (uso interno del calcolo, che legge solo i quadri dei beni e delle passivita')
     quadri_liquidazione: bool = True
@@ -2334,6 +2336,8 @@ class _Export:
             esito.errori = self.errori + _riferisci(err_xsd, self.mappa)
             return esito
         from ..documenti.dimensioni import verifica_fornitura
+        # la conformita' dei singoli allegati (formato, PDF/A, TIFF) e' controllata nel quadro EG (quadri_efgh._conformita_allegato):
+        # un allegato non conforme rende il file non completo ma lascia la bozza tecnica; qui solo la misura della fornitura
         dimensioni = verifica_fornitura({"xml": xml}, richiedi_xml=True)
         if dimensioni:
             esito.errori.extend(dimensioni)

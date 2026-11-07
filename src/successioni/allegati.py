@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 import uuid
@@ -28,8 +29,7 @@ class AllegatiMixin:
                   analisi, rapporto=None) -> dict:
         h = hashlib.sha256(percorso_tmp.read_bytes()).hexdigest()
         dest = self.arch.percorso_allegato(h)
-        if not dest.exists():
-            shutil.copyfile(percorso_tmp, dest)
+        self._scrivi_nel_deposito(percorso_tmp, dest, h)
         aid = "al_" + uuid.uuid4().hex[:12]
         c.execute("INSERT INTO allegati VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                   (aid, pratica_id, nome, h, dest.stat().st_size, dest.relative_to(self.arch.base).as_posix(), ruolo,
@@ -37,6 +37,29 @@ class AllegatiMixin:
                    json.dumps(rapporto) if rapporto else None, ora()))
         return {"allegato_id": aid, "nome": nome, "sha256": h, "bytes": dest.stat().st_size, "ruolo": ruolo,
                 "analisi": analisi, "rapporto": rapporto}
+
+    @staticmethod
+    def _sha_file(p: Path) -> str:
+        h = hashlib.sha256()
+        with open(p, "rb") as f:
+            for blocco in iter(lambda: f.read(1 << 20), b""):
+                h.update(blocco)
+        return h.hexdigest()
+
+    def _scrivi_nel_deposito(self, sorgente: Path, dest: Path, h: str) -> None:
+        """Copia atomica nel deposito per impronta (.tmp + os.replace). Un file gia' presente viene ricontrollato: se
+        l'impronta non coincide (troncato, alterato) viene riscritto dalla sorgente."""
+        if dest.is_file() and self._sha_file(dest) == h:
+            return
+        tmp = dest.with_name(f"{dest.name}.{uuid.uuid4().hex[:8]}.tmp")
+        try:
+            shutil.copyfile(sorgente, tmp)
+            if self._sha_file(tmp) != h:
+                raise DatiNonValidi("il file e' cambiato durante l'acquisizione: riprovare", percorso=str(sorgente))
+            os.replace(tmp, dest)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
 
     def acquisisci_file(self, pratica_id: str, percorso: Path | str, *, tipo_eg: str | None = None,
                         finalita: str | None = None, persona_id: str | None = None, nome: str | None = None) -> dict:
@@ -106,13 +129,32 @@ class AllegatiMixin:
         return len(refs)
 
     def _cancella_riga(self, r) -> None:
+        """Toglie la riga; il file del deposito si cancella solo se l'impronta non serve piu' a nessuno.
+
+        Il deposito per impronta e' condiviso con ``DepositoArtefatti`` (ricevute, copie congelate, diagnostici), i cui
+        descrittori stanno nel JSON di ``job.input``/``job.risultato``: se l'impronta compare li' (o in caso di dubbio)
+        il file resta. Controllo e cancellazione avvengono sotto lo stesso lock di scrittura (BEGIN IMMEDIATE): un
+        allegato con lo stesso contenuto, che scrive il file dentro la propria transazione, non puo' restare senza file."""
         with self.arch.transazione() as c:
             c.execute("DELETE FROM allegati WHERE id=?", (r["id"],))
-            altri = c.execute("SELECT COUNT(*) FROM allegati WHERE sha256=?", (r["sha256"],)).fetchone()[0]
-        if not altri:          # lo stesso contenuto puo' servire ad altri allegati (deposito per impronta)
+            if self._impronta_in_uso(c, r["sha256"]):
+                return
             p = self.arch.base / r["percorso"]
-            if p.is_file():
+            if p.is_file() and p.name == r["sha256"]:
                 p.unlink()
+
+    @staticmethod
+    def _impronta_in_uso(c, h: str) -> bool:
+        if not h or len(h) != 64:
+            return True                                  # in dubbio non si cancella
+        try:
+            if c.execute("SELECT 1 FROM allegati WHERE sha256=? LIMIT 1", (h,)).fetchone():
+                return True
+            like = f"%{h}%"
+            return c.execute("SELECT 1 FROM job WHERE input LIKE ? OR risultato LIKE ? OR errore LIKE ? LIMIT 1",
+                             (like, like, like)).fetchone() is not None
+        except Exception:
+            return True
 
     def elimina_allegato(self, allegato_id: str, *, canale: str = "gui") -> dict:
         """Elimina un allegato della pratica. Rifiutato se un rigo del quadro EG lo usa ancora."""
@@ -126,10 +168,12 @@ class AllegatiMixin:
 
     def riordina_allegati(self, pratica_id: str, *, canale: str = "gui") -> dict:
         """Toglie i doppioni: per ogni originale convertito resta una sola versione PDF/A (quella usata nel quadro EG, o la
-        piu' recente); i righi EG che puntano all'originale passano al PDF/A e l'originale convertito viene rimosso."""
+        piu' recente). Se il PDF/A puo' sostituire l'originale (stessa regola di ``prepara_pdfa``: ``originale_sostituibile``)
+        i righi EG passano al PDF/A e l'originale viene rimosso; altrimenti originale e righi restano e il motivo e'
+        riportato in ``originali_conservati``."""
         tutti = [dict(x) for x in self._righe_pratica(pratica_id)]
         usati = {r.get("allegato_id") for r in self.leggi(pratica_id)["dati"].get("documenti_ref", [])}
-        rimossi, spostati = [], 0
+        rimossi, spostati, conservati = [], 0, []
         for o in [x for x in tutti if x["ruolo"] == "originale"]:
             conv = [x for x in tutti if x["origine_id"] == o["id"] and x["ruolo"] == "derivato"
                     and "conversione" in (json.loads(x["rapporto"]) if x["rapporto"] else {})]
@@ -140,11 +184,19 @@ class AllegatiMixin:
                 if x["id"] != tenere["id"] and x["id"] not in usati:
                     self._cancella_riga(x)
                     rimossi.append(x["id"])
+            ok, motivo = self.originale_sostituibile(json.loads(tenere["rapporto"]) if tenere["rapporto"] else None)
+            if not ok:
+                conservati.append({"allegato_id": o["id"], "nome": o["nome"], "derivato_id": tenere["id"],
+                                   "motivo": motivo})
+                if self.derivato_utilizzabile(json.loads(tenere["rapporto"]) if tenere["rapporto"] else None):
+                    spostati += self._sposta_riferimenti(pratica_id, o["id"], tenere["id"], canale)
+                continue
             spostati += self._sposta_riferimenti(pratica_id, o["id"], tenere["id"], canale)
             if not self._riferimenti(pratica_id, o["id"]):
                 self._cancella_riga(o)
                 rimossi.append(o["id"])
-        return {"pratica_id": pratica_id, "rimossi": rimossi, "righi_eg_aggiornati": spostati}
+        return {"pratica_id": pratica_id, "rimossi": rimossi, "righi_eg_aggiornati": spostati,
+                "originali_conservati": conservati}
 
     def _righe_pratica(self, pratica_id: str):
         with self.arch.lettura() as c:
@@ -172,7 +224,7 @@ class AllegatiMixin:
                      "derivato": {"allegato_id": gia["id"], "nome": gia["nome"], "sha256": gia["sha256"], "bytes": gia["bytes"]},
                      "avvisi": list(rap_gia.get("avvisi") or [])}
             if sostituisci_originale:
-                esito.update(self._dopo_conversione(r, gia["id"], esito["avvisi"], canale))
+                esito.update(self._dopo_conversione(r, gia["id"], rap_gia, canale))
             return esito
         src = self.arch.base / r["percorso"]
         an = json.loads(r["analisi"])
@@ -235,19 +287,46 @@ class AllegatiMixin:
         out = {"allegato_id": allegato_id, "derivato": d, "esito": esito, "avvisi": avvisi,
                "verifica_indicativa": (val.get("verifica_indicativa") or {}).get("esito"),
                "azione_richiesta": azione_richiesta}
-        if sostituisci_originale and esito != "non_conforme":
-            out.update(self._dopo_conversione(r, d["allegato_id"], avvisi, canale))
+        if sostituisci_originale:
+            out.update(self._dopo_conversione(r, d["allegato_id"], rapporto, canale))
         return out
 
     #: avvisi della conversione per cui l'originale resta (da confrontare a vista o perche' perde la firma)
     _RISCHI = ("firmato", "testo divergente", "differenze visive")
 
-    def _dopo_conversione(self, originale, derivato_id: str, avvisi: list[str], canale: str) -> dict:
-        rischi = [a for a in avvisi if any(k in a for k in self._RISCHI)]
-        spostati = self._sposta_riferimenti(originale["pratica_id"], originale["id"], derivato_id, canale)
+    @classmethod
+    def originale_sostituibile(cls, rapporto_derivato: dict | None) -> tuple[bool, str | None]:
+        """Regola unica (prepara_pdfa, anche col derivato gia' esistente, e riordina_allegati): il PDF/A prende il posto
+        dell'originale solo se la validazione non e' 'non_conforme' e non ci sono avvisi di rischio (_RISCHI)."""
+        if not rapporto_derivato:
+            return False, "rapporto di conversione assente: l'originale resta"
+        val = rapporto_derivato.get("validazione")
+        esito = val.get("esito") if isinstance(val, dict) else None
+        if esito == "non_conforme":
+            return False, "il PDF/A non e' conforme secondo il validatore: l'originale resta"
+        rischi = [str(a) for a in (rapporto_derivato.get("avvisi") or []) if any(k in str(a) for k in cls._RISCHI)]
         if rischi:
-            return {"originale_rimosso": False, "righi_eg_aggiornati": spostati,
-                    "motivo_originale_conservato": "controllare il PDF/A prima di eliminare l'originale: " + "; ".join(rischi)}
+            return False, "controllare il PDF/A prima di eliminare l'originale: " + "; ".join(rischi)
+        return True, None
+
+    @staticmethod
+    def derivato_utilizzabile(rapporto_derivato: dict | None) -> bool:
+        """Il PDF/A puo' prendere il posto dell'originale nel quadro EG (anche se l'originale resta per un confronto):
+        serve un rapporto di conversione e un esito diverso da 'non_conforme'."""
+        if not rapporto_derivato:
+            return False
+        val = rapporto_derivato.get("validazione")
+        return (val.get("esito") if isinstance(val, dict) else None) != "non_conforme"
+
+    def _dopo_conversione(self, originale, derivato_id: str, rapporto_derivato: dict | None, canale: str) -> dict:
+        ok, motivo = self.originale_sostituibile(rapporto_derivato)
+        if not ok:
+            # l'originale resta sempre; i righi EG passano comunque al PDF/A se e' utilizzabile (e' quello da inviare),
+            # cosi' l'originale compare fra i file non usati e il professionista decide se eliminarlo dopo il confronto
+            spostati = (self._sposta_riferimenti(originale["pratica_id"], originale["id"], derivato_id, canale)
+                        if self.derivato_utilizzabile(rapporto_derivato) else 0)
+            return {"originale_rimosso": False, "righi_eg_aggiornati": spostati, "motivo_originale_conservato": motivo}
+        spostati = self._sposta_riferimenti(originale["pratica_id"], originale["id"], derivato_id, canale)
         self._cancella_riga(originale)
         return {"originale_rimosso": True, "righi_eg_aggiornati": spostati}
 

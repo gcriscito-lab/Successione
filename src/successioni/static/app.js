@@ -115,7 +115,9 @@ function leggi(kind, t) {
   if (kind === "data") return dataIso(t);
   if (kind === "importo") {
     if (/^-?\d{1,3}(\.\d{3})+,\d+$/.test(t)) return t.replaceAll(".", "").replace(",", ".");   // 1.234,50 -> 1234.50
-    if (/^-?\d{1,3}(\.\d{3}){2,}$/.test(t)) return t.replaceAll(".", "");                     // 1.234.567 -> 1234567
+    // 150.000 / 1.234.567 -> 150000 / 1234567: nella maschera il punto seguito da gruppi di tre cifre e' il separatore
+    // delle migliaia (come suggerisce «1.234,50»); prima un solo gruppo restava "150.000" = 150 euro
+    if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) return t.replaceAll(".", "");
     if (/^-?\d+,\d+$/.test(t)) return t.replace(",", ".");                                    // 12,5 -> 12.5
   }
   return t;
