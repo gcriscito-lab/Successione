@@ -10,7 +10,6 @@ import hashlib
 import json
 import os
 import uuid
-from pathlib import Path
 
 from .errori import DatiNonValidi, ErroreServizio, ora
 

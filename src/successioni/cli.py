@@ -5,7 +5,6 @@ import argparse
 import sys
 
 from .archivio import Archivio
-from .servizio import Servizio
 
 
 def main(argv=None):
