@@ -345,6 +345,7 @@ select { text-overflow:ellipsis; }
 .allegati { padding-bottom:10px; } .allegati input[type=file] { max-width:250px; } #teg { max-width:300px; } #fin { min-width:260px; flex:1; }
 .elenco-azioni { margin:6px 0 4px; padding-left:20px; } .elenco-azioni li { margin:5px 0; } .elenco-azioni li.er { color:var(--er); }
 .elenco-azioni button { margin-left:8px; }
+.anteprima-albero { width:100%; height:520px; border:1px solid var(--sep-f); border-radius:var(--r1); margin-top:6px; background:var(--solido); }
 .spunte-eh { list-style:none; padding:0; margin:6px 0; } .spunte-eh li { margin:4px 0; }
 tr.forte td { font-weight:600; border-top:1px solid var(--sep); }
 tbody tr.fisso { cursor:default; } tbody tr.fisso:hover td { background:none; }

@@ -1409,6 +1409,46 @@ async function convertiAllegato(id) {
   if (!r.derivato && r.esito !== "conforme") throw new Error("Conversione non riuscita: " + (r.dettaglio || r.motivo || r.esito));
   return r;
 }
+/* Albero genealogico generato dai dati (server: albero_genealogico.py; Fascicolo I p. PDF 6). Un albero caricato a mano non si
+   sostituisce senza conferma e non si cancella. */
+async function sezioneAlbero(pid) {
+  const sez = h("section", { class: "grp albero-gen", id: "albero_gen" }, h("h2", {}, "Albero genealogico (rigo EG6)"));
+  let st;
+  try { st = await api("/api/pratiche/" + pid + "/albero-genealogico"); }
+  catch (e) { sez.append(h("p", { class: "mut dentro-testo" }, "Albero non generabile: " + e.message)); return sez; }
+  const r6 = st.righi_eg6 || [];
+  const stato = !r6.length ? "Nessun albero genealogico nel quadro EG."
+    : st.manuale ? "Nel rigo EG6 c'è un albero caricato a mano (" + (r6.find(x => !x.generato) || {}).nome + ")."
+    : st.aggiornato ? "Albero generato dai dati attuali della pratica."
+    : "I dati sono cambiati dopo l'ultima generazione: rigenera l'albero.";
+  sez.append(h("p", { class: "dentro-testo", id: "albero_stato" }, stato));
+  const genera = h("button", { class: "pil", id: "albero_genera", onclick: async ev => {
+    if (nMod()) return msg("Salva prima le altre modifiche in corso.", "e");
+    ev.target.disabled = true;
+    try {
+      let r = await post("/api/pratiche/" + pid + "/albero-genealogico", {});
+      if (r.esito === "conferma_richiesta") {
+        if (!confirm("Il rigo EG6 contiene un albero caricato a mano (" + r.manuali.map(x => x.nome).join(", ") + "). Sostituirlo con l'albero generato dai dati? Il file caricato resta fra i documenti della pratica.")) return;
+        r = await post("/api/pratiche/" + pid + "/albero-genealogico", { sostituisci_manuale: true });
+      }
+      await ricarica(); render();
+      const manc = (r.mancanti || []).length;
+      msg(r.esito === "gia_aggiornato" ? "L'albero genealogico è già aggiornato ai dati della pratica."
+        : "Albero genealogico generato" + (r.pdfa ? " e convertito in PDF/A" : " (PDF/A non creato: convertilo prima dell'invio)") + (manc ? ". Dati da completare per " + manc + " soggetti." : "."), manc || !r.pdfa ? "e" : "o");
+    } catch (e) { msg(e.message, "e"); } finally { ev.target.disabled = false; }
+  } }, r6.length && !st.manuale ? "Rigenera albero genealogico dai dati" : "Genera albero genealogico dai dati");
+  sez.append(h("div", { class: "barra dentro" }, genera));
+  const manc = (st.modello || {}).mancanti || [];
+  if (manc.length) sez.append(h("p", { class: "mut dentro-testo" }, "Dati da completare: "), h("ul", { class: "elenco-azioni", id: "albero_mancanti" }, manc.map(m => h("li", { class: "er" }, m.soggetto + ": " + m.dati.join(", ")))));
+  const att = r6.find(x => x.file_presente);
+  if (att) {
+    const url = "/api/allegati/" + att.allegato_id + "/file";
+    sez.append(h("p", { class: "dentro-testo" }, h("a", { href: url, target: "_blank", rel: "noopener", id: "albero_apri" }, "Apri l'anteprima di " + att.nome)),
+      h("iframe", { src: url, title: "Anteprima dell'albero genealogico", id: "albero_anteprima", class: "anteprima-albero" }));
+  }
+  sez.append(h("p", { class: "mut dentro-testo piccolo" }, "L'albero riporta solo i dati inseriti (Fascicolo I, «Quali documenti occorrono»: nome, cognome, luogo e data di nascita del coniuge e dei beneficiari parenti). Puoi sostituirlo caricando un file sul rigo EG6."));
+  return sez;
+}
 async function renderAllegati(main) {
   const pid = S.P.pratica_id;
   let a;
@@ -1428,12 +1468,17 @@ async function renderAllegati(main) {
       const file = $("#file").files[0]; if (!file) return msg("Scegli un file.", "e");
       if (!selTipo.value) return msg("Scegli il rigo del quadro EG.", "e");
       if (nMod()) return msg("Salva prima le altre modifiche in corso.", "e");
+      // rigo EG6: un solo albero. Il file caricato prende il posto di quello presente (generato: senza chiedere; caricato a mano: con conferma)
+      const eg6 = selTipo.value === "AlberoGenealogico" ? refs.find(r => r.tipo_eg === "AlberoGenealogico") : null;
+      const prec = eg6 ? a.find(y => y.id === eg6.allegato_id) : null, precGenerato = !!(prec && (prec.analisi || {}).generato);
+      if (eg6 && !precGenerato && !confirm("Il rigo EG6 contiene già un albero caricato a mano. Sostituirlo con il nuovo file? Il file precedente resta fra i documenti della pratica.")) return;
       ev.target.disabled = true;
       try {
         const fd = new FormData(); fd.append("file", file); fd.append("tipo_eg", selTipo.value); fd.append("finalita", $("#fin").value);
         const al = await api("/api/pratiche/" + pid + "/allegati", { method: "POST", body: fd });
-        const ok = await salvaOps([{ op: "upsert", coll: "documenti_ref", id: nuovoId("documenti_ref"), campi: { allegato_id: al.allegato_id, tipo_eg: selTipo.value, finalita: $("#fin").value || null } }]);
+        const ok = await salvaOps([{ op: "upsert", coll: "documenti_ref", id: eg6 ? eg6.id : nuovoId("documenti_ref"), campi: { allegato_id: al.allegato_id, tipo_eg: selTipo.value, finalita: $("#fin").value || null } }]);
         if (!ok) return;
+        if (precGenerato) { try { await api("/api/allegati/" + prec.id + "/elimina", { method: "POST" }); } catch (e) { /* resta fra i file non usati */ } }
         if (["leggibile", "firmato"].includes((al.analisi || {}).esito)) {
           const r = await convertiAllegato(al.allegato_id); await ricarica(); render();
           msg("Documento aggiunto e convertito in PDF/A" + (r.originale_rimosso ? ": resta solo il PDF/A." : ". " + (r.motivo_originale_conservato || "")), r.originale_rimosso ? "o" : "e");
@@ -1450,6 +1495,9 @@ async function renderAllegati(main) {
   }
   if (daFare.length) main.append(h("section", { class: "grp" }, h("h2", {}, "Da completare"), h("ul", { class: "elenco-azioni" }, daFare)));
   main.append(sez);
+  const albero = await sezioneAlbero(pid);
+  if (!S.P || S.P.pratica_id !== pid || (quadro() && quadro().id !== "EG")) return;
+  main.append(albero);
   // file caricati non collegati a un rigo EG (vecchie conversioni, doppioni, originali gia' convertiti)
   const liberi = a.filter(x => !usati.has(x.id));
   if (liberi.length) {
