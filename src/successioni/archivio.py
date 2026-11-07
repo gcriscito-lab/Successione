@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
+import weakref
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -45,12 +47,29 @@ def cartella_dati() -> Path:
     return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "successioni"
 
 
+_ISTANZE: "weakref.WeakSet[Archivio]" = weakref.WeakSet()
+
+
+def chiudi_connessioni(base: Path | str | None = None) -> None:
+    """Chiude le connessioni di lettura riusate degli archivi aperti in questo processo (tutti, o quelli nella cartella
+    ``base``): da chiamare prima di spostare, rinominare o cancellare la cartella dei dati."""
+    radice = Path(base).resolve() if base else None
+    for a in list(_ISTANZE):
+        try:
+            if radice is None or a.base.resolve() == radice or radice in a.base.resolve().parents:
+                a.chiudi()
+        except OSError:
+            pass
+
+
 class Archivio:
     def __init__(self, base: Path | str | None = None):
         self.base = Path(base) if base else cartella_dati()
         self.base.mkdir(parents=True, exist_ok=True)
         (self.base / "allegati").mkdir(exist_ok=True)
         self.db_path = self.base / "archivio.sqlite3"
+        self._locale, self._aperte, self._aperte_lock = threading.local(), [], threading.Lock()
+        _ISTANZE.add(self)
         self._migra()
 
     def _apri(self) -> sqlite3.Connection:
@@ -69,6 +88,11 @@ class Archivio:
                 time.sleep(0.05)
         c.execute("PRAGMA foreign_keys=ON")
         c.execute("PRAGMA busy_timeout=10000")
+        # Prestazioni: ogni lettura apre e chiude una connessione; senza questa opzione la chiusura dell'ultima connessione
+        # esegue un checkpoint completo del WAL (circa 7 ms su Windows, il 65% del tempo della pagina iniziale con 11 pratiche).
+        # Il checkpoint resta automatico durante le scritture (wal_autocheckpoint); i dati sono comunque durevoli nel WAL.
+        if hasattr(c, "setconfig") and hasattr(sqlite3, "SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE"):
+            c.setconfig(sqlite3.SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, True)
         return c
 
     def _migra(self):
@@ -96,11 +120,29 @@ class Archivio:
 
     @contextmanager
     def lettura(self):
-        c = self._apri()
-        try:
-            yield c
-        finally:
-            c.close()
+        """Connessione di sola lettura riusata per thread: aprire e chiudere una connessione SQLite costa alcuni millisecondi
+        su Windows (mappatura del WAL), moltiplicati per decine di letture a ogni pagina. In modalita' autocommit ogni
+        istruzione legge l'ultimo stato confermato, anche se scritto da un'altra connessione o dal server MCP."""
+        c = getattr(self._locale, "c", None)
+        if c is None:
+            c = self._apri()
+            self._locale.c = c
+            with self._aperte_lock:
+                self._aperte.append(c)
+        if c.in_transaction:          # non dovrebbe accadere (solo letture): si riparte da uno stato pulito
+            c.execute("ROLLBACK")
+        yield c
+
+    def chiudi(self) -> None:
+        """Chiude le connessioni di lettura riusate (per esempio prima di spostare o cancellare la cartella dei dati)."""
+        with self._aperte_lock:
+            for c in self._aperte:
+                try:
+                    c.close()
+                except sqlite3.Error:
+                    pass
+            self._aperte.clear()
+        self._locale = threading.local()
 
     @contextmanager
     def transazione(self):
@@ -226,6 +268,7 @@ class Archivio:
                     (stage / 'ingresso').mkdir(exist_ok=True)
                 # Il ripristino richiede una destinazione nuova, senza client aperti.
                 # Se la preparazione fallisce, il database originale non e' mai toccato.
+                chiudi_connessioni(base)    # le letture riusate tengono aperto il file: su Windows impedirebbero lo spostamento
                 base.rename(precedente)
                 try:
                     stage.rename(base)
