@@ -545,3 +545,14 @@ table.calc-imp tr.tot td { font-weight:700; border-top:2px solid var(--sep-f); }
 /* «Mostra tutte» sotto l'elenco delle pratiche: non e' una scheda */
 .recenti li.altre button { display:block; width:100%; text-align:center; padding:10px; }
 .filtri-home { margin-top:4px; }
+
+/* Prossime azioni: un passo da correggere (file non generabile, invio rifiutato, dichiarazione scartata...) */
+.tappa.problema::before { background:var(--blu); }
+.tappa.problema .nodo { background:var(--solido); box-shadow:inset 0 0 0 2px var(--er), 0 0 0 4px color-mix(in srgb, var(--er) 18%, transparent); }
+.tappa.problema .nodo::after { content:"!"; position:absolute; inset:0; display:grid; place-items:center; font-size:12px; font-weight:800; color:var(--er); }
+.tappa.problema .nome-tappa { color:var(--er); font-weight:700; }
+.azione.problema { box-shadow:inset 3px 0 0 var(--er); }
+.azione.problema .freccia { border-color:var(--er); }
+.prossime-altre { margin:8px 2px 0; font-size:var(--fs-s); }
+/* Modifica di gruppo: scelta esplicita per svuotare un campo */
+.gruppo-svuota { display:block; margin-top:4px; font-size:var(--fs-s); color:var(--t2); }
