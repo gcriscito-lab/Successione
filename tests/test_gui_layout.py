@@ -287,7 +287,8 @@ def test_css_mobile_un_solo_scroll_e_cassetto(css):
     assert ".tab { max-height:none; }" in corpo                               # la tabella non ha uno scroll verticale proprio
     assert re.search(r"\.lat \{ position:fixed", corpo) and "visibility:hidden" in corpo   # cassetto chiuso: fuori dal Tab
     assert "body.navAperta .lat" in corpo
-    assert re.search(r"\.sb \{[^}]*flex-wrap:nowrap", corpo)                  # barra di stato su una riga
+    # barra di stato: a 390 px va a capo (review 07/11/2026 sera), senza scorrimento orizzontale proprio o della pagina
+    assert re.search(r"\.sb \{[^}]*flex-wrap:wrap", corpo) and not re.search(r"\.sb \{[^}]*overflow-x:auto", corpo)
 
 
 # ---------------------------------------------------------------- problema 9 e 7: comportamenti JS (controllo sul sorgente)

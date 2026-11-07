@@ -24,15 +24,15 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
     await page.route('**/aggiorna', async route => {
       const response = await route.fetch(); intercettata(); await gate; await route.fulfill({ response });
     });
-    await page.locator('#vista [aria-label="nome"]').first().fill('Primo salvataggio');
+    await page.locator('#vista [name="nome"]').first().fill('Primo salvataggio');
     await page.locator('#bSalva').click();
     await ricevuta;
     // Nessuna seconda richiesta mentre il salvataggio e' in attesa.
     assert.equal(await page.evaluate(() => salvaTutto()), false);
-    await page.locator('#vista [aria-label="nome"]').first().fill('Modifica durante attesa');
+    await page.locator('#vista [name="nome"]').first().fill('Modifica durante attesa');
     release();
     await page.waitForFunction(() => !S.writeBusy && S.P.revisione === 2);
-    const dopo = await page.evaluate(() => ({ dirty: nMod(), nome: document.querySelector('#vista [aria-label="nome"]').value }));
+    const dopo = await page.evaluate(() => ({ dirty: nMod(), nome: document.querySelector('#vista [name="nome"]').value }));
     assert.deepEqual(dopo, { dirty: 1, nome: 'Modifica durante attesa' });
     await page.unroute('**/aggiorna');
     await page.locator('#bSalva').click();
@@ -42,7 +42,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
     await apriCaso([{ id: 'b_gui0001', campi: { tipo: 'fabbricato', descrizione: 'Originale', comune: 'Roma', foglio: '1', particella: '2' } }]);
     await page.evaluate(() => { S.sel = 'EC'; render(); });
     await page.locator('#vista tbody tr[data-key]').first().click();
-    await page.locator('#ins [aria-label="descrizione"]').fill('Modifica non salvata');
+    await page.locator('#ins [name="descrizione"]').fill('Modifica non salvata');
     // Conferma accettata dal test; evita che il runner interattivo sospenda il caso.
     await page.evaluate(() => { window.__confermaOriginale = window.confirm; window.confirm = () => true; });
     await page.getByRole('button', { name: 'Elimina riga', exact: true }).click();
@@ -53,12 +53,12 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
 
     // Nuova riga modificata durante il primo salvataggio: un solo ID, nessun doppione.
     await page.getByRole('button', { name: 'Aggiungi riga', exact: true }).click();
-    await page.locator('#ins [aria-label="comune"]').fill('Roma');
+    await page.locator('#ins [name="comune"]').fill('Roma');
     const ricevuta2 = new Promise(r => intercettata = r);
     const gate2 = new Promise(r => release = r);
     await page.route('**/aggiorna', async route => { const response = await route.fetch(); intercettata(); await gate2; await route.fulfill({ response }); });
     await page.locator('#bSalva').click(); await ricevuta2;
-    await page.locator('#ins [aria-label="comune"]').fill('Torino');
+    await page.locator('#ins [name="comune"]').fill('Torino');
     release(); await page.waitForFunction(() => !S.writeBusy && S.P.revisione === 3);
     assert.equal(await page.locator('#vista tbody tr[data-key]').count(), 1);
     assert.equal(await page.evaluate(() => nMod()), 1);
@@ -69,16 +69,16 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
 
     // Una risposta 422 non cancella il buffer.
     await page.evaluate(() => { S.sel = 'AN'; render(); });
-    await page.locator('#vista [aria-label="codice_fiscale"]').first().fill('errato');
+    await page.locator('#vista [name="codice_fiscale"]').first().fill('errato');
     await page.locator('#bSalva').click();
     await page.waitForFunction(() => !S.writeBusy && document.querySelector('#msg').className === 'e');
     assert.equal(await page.evaluate(() => nMod()), 1);
-    await page.locator('#vista [aria-label="codice_fiscale"]').first().fill('');
+    await page.locator('#vista [name="codice_fiscale"]').first().fill('');
     await page.locator('#bSalva').click();
     await page.waitForFunction(() => !S.writeBusy && nMod() === 0);
 
     // Conflitto 409: nessuna sovrascrittura automatica e buffer conservato.
-    await page.locator('#vista [aria-label="nome"]').first().fill('Bozza locale');
+    await page.locator('#vista [name="nome"]').first().fill('Bozza locale');
     await page.evaluate(async () => {
       await post('/api/pratiche/' + S.P.pratica_id + '/aggiorna', { revisione_attesa: S.P.revisione,
         operazioni: [{ op: 'upsert', coll: 'persone', id: 'p_gui0001', campi: { nome: 'Modifica esterna' } }] });
@@ -87,7 +87,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
     await page.waitForFunction(() => !S.writeBusy && document.querySelector('#msg').textContent.includes('modificata altrove'));
     assert.equal(await page.evaluate(() => nMod()), 1);
     assert.equal(await page.evaluate(() => S.P.dati.persone[0].nome), 'Modifica esterna');
-    assert.equal(await page.locator('#vista [aria-label="nome"]').first().inputValue(), 'Bozza locale');
+    assert.equal(await page.locator('#vista [name="nome"]').first().inputValue(), 'Bozza locale');
     // La ripetizione e' una scelta esplicita, dopo il messaggio di conflitto.
     await page.locator('#bSalva').click();
     await page.waitForFunction(() => !S.writeBusy && nMod() === 0);

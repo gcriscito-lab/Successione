@@ -18,7 +18,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   let release; const gate = new Promise(r => release = r);
   let intercettata; const ricevuta = new Promise(r => intercettata = r);
   await page.route("**/api/codice-fiscale**", async route => { const response = await route.fetch(); intercettata(); await gate; await route.fulfill({ response }); });
-  const cf = page.locator('#vista [aria-label="codice_fiscale"]').first();
+  const cf = page.locator('#vista [name="codice_fiscale"]').first();
   await cf.fill("RSSMRA40A01H501K"); await cf.blur();
   await ricevuta;
   page.once("dialog", d => d.accept());
