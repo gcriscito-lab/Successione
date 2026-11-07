@@ -208,9 +208,14 @@ function renderHome() {
   $("#homeIntro").textContent = vuoto ? "L’archivio non contiene ancora pratiche. Crea la prima oppure importa un file telematico già preparato."
     : "Apri una pratica recente oppure inizia una nuova dichiarazione di successione.";
   ul.hidden = vuoto; $("#homeElencoT").textContent = vuoto ? "Come si arriva all’invio" : "Pratiche recenti"; $("#percorso").hidden = !vuoto;
-  if (vuoto) { $("#homeNota").hidden = true; return; }
+  if (vuoto) { $("#homeNota").hidden = true; const f = $("#homeFiltri"); if (f) f.remove(); return; }
+  // voce 8 dell'analisi del 07/11/2026: tutte le pratiche, filtrabili per termine ordinario e ordinabili per scadenza
+  const pratiche = praticheFiltrate(S.pratiche, HOME.filtro, HOME.ordine, HOME.cerca);
+  $("#homeElencoT").textContent = S.pratiche.length > 8 || HOME.filtro !== "tutte" || HOME.cerca ? "Pratiche (" + pratiche.length + " di " + S.pratiche.length + ")" : "Pratiche recenti";
+  filtriHome(ul);
+  if (!pratiche.length) ul.append(h("li", { class: "mut" }, "Nessuna pratica corrisponde al filtro."));
   let conTermine = false;
-  for (const p of S.pratiche.slice(0, 8)) {
+  for (const p of pratiche.slice(0, HOME.tutte ? pratiche.length : 8)) {
     const t = terminePresentazione(p.data_decesso); conTermine = conTermine || !!t;
     const term = !t ? h("span", { class: "term mut" }, "Data del decesso da indicare")
       : t.giorni < 0 ? h("span", { class: "term scaduto" }, "Termine ordinario superato il " + dataBreve(t.data))
@@ -219,7 +224,36 @@ function renderHome() {
       h("span", { class: "tit" }, p.titolo),
       h("span", { class: "dett" }, "Aggiornata il " + dataIt(String(p.aggiornata || "").slice(0, 10)) + ", revisione " + p.revisione), term)));
   }
+  if (pratiche.length > 8) ul.append(h("li", { class: "altre" }, h("button", { type: "button", class: "lk", onclick: () => { HOME.tutte = !HOME.tutte; renderHome(); } },
+    HOME.tutte ? "Mostra solo le prime 8" : "Mostra tutte (" + pratiche.length + ")")));
   $("#homeNota").hidden = !conTermine;
+}
+const HOME = { filtro: "tutte", ordine: "recenti", cerca: "", tutte: false };
+const FILTRI_HOME = { tutte: "Tutte", vicine: "In scadenza (60 giorni)", superate: "Termine superato", senza_data: "Senza data del decesso" };
+function praticheFiltrate(elenco, filtro, ordine, cerca) {
+  const c = String(cerca || "").trim().toLowerCase();
+  const out = elenco.filter(p => {
+    if (c && !String(p.titolo || "").toLowerCase().includes(c)) return false;
+    const t = terminePresentazione(p.data_decesso);
+    return filtro === "vicine" ? !!t && t.giorni >= 0 && t.giorni <= 60 : filtro === "superate" ? !!t && t.giorni < 0
+      : filtro === "senza_data" ? !t : true;
+  });
+  if (ordine === "scadenza") out.sort((a, b) => { const ta = terminePresentazione(a.data_decesso), tb = terminePresentazione(b.data_decesso);
+    return (ta ? ta.data.getTime() : Infinity) - (tb ? tb.data.getTime() : Infinity); });
+  return out;   // «recenti»: ordine del server (ultima modifica prima)
+}
+function filtriHome(ul) {
+  let f = $("#homeFiltri");
+  if (!f) {
+    const cerca = h("input", { type: "search", "aria-label": "Cerca nel titolo", placeholder: "Cerca nel titolo", oninput: ev => { HOME.cerca = ev.target.value; renderHome(); } });
+    const filtro = h("select", { "aria-label": "Filtra per termine", onchange: ev => { HOME.filtro = ev.target.value; renderHome(); } },
+      Object.entries(FILTRI_HOME).map(([v, t]) => h("option", { value: v }, t)));
+    const ordine = h("select", { "aria-label": "Ordina", onchange: ev => { HOME.ordine = ev.target.value; renderHome(); } },
+      h("option", { value: "recenti" }, "Ultime modificate"), h("option", { value: "scadenza" }, "Per termine di presentazione"));
+    f = h("div", { id: "homeFiltri", class: "filtri-home" }, cerca, filtro, ordine);
+    ul.before(f);
+  }
+  f.hidden = S.pratiche.length < 2;
 }
 async function caricaPratiche() {
   S.pratiche = await api("/api/pratiche");
@@ -297,8 +331,10 @@ function renderAlbero() {
     nav.append(h("div", { class: "gruppo" }, nome));
     for (const q of S.Q.quadri.filter(x => x.gruppo === g)) {
       const st = q.stato;
-      const testo = st === "rilievi" ? q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi") : (q.righe && st === "compilato" ? q.righe + (q.righe === 1 ? " riga" : " righe") : STATI[st]);
-      nav.append(h("button", { class: "voce", "data-stato": st, "data-q": q.id, title: q.id + " — " + q.titolo + (testo ? " (" + testo + ")" : ""), "aria-current": S.sel === q.id ? "true" : "false", onclick: () => scegliQuadro(q.id) },
+      const lav = statoLavoro(q.id);   // stato di lavorazione scelto dallo studio (voce 10), dopo lo stato calcolato
+      const testo = [st === "rilievi" ? q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi") : (q.righe && st === "compilato" ? q.righe + (q.righe === 1 ? " riga" : " righe") : STATI[st]),
+        lav && STATI_LAVORO[lav]].filter(Boolean).join(" · ");
+      nav.append(h("button", { class: "voce", "data-stato": st, "data-lavoro": lav || null, "data-q": q.id, title: q.id + " — " + q.titolo + (testo ? " (" + testo + ")" : ""), "aria-current": S.sel === q.id ? "true" : "false", onclick: () => scegliQuadro(q.id) },
         h("span", { class: "sigla" }, q.id), h("span", { class: "testi" }, h("span", { class: "nome" }, TITOLI_BREVI[q.id] || q.titolo), h("span", { class: "st" }, testo))));
     }
   }
@@ -427,7 +463,8 @@ function renderVista() {
   if (!q) return;
   const titoloQ = h("h1", {}, (q.id === "AN" || q.id === "DV" ? "" : q.id + " — ") + q.titolo);
   main.append(q.coll && (q.vista === "tabella" || q.vista === "documenti") && q.supportato ? h("div", { class: "testa-quadro" }, titoloQ, menuOperazioni(q)) : titoloQ);
-  main.append(h("div", { class: "sottotitolo" }, q.nota || (q.vista === "tabella" || q.vista === "documenti" ? (q.righe + (q.righe === 1 ? " riga" : " righe")) : "")));
+  // stato di lavorazione del quadro (voce 10: nota interna) nella riga sotto il titolo, per non spostare il menu «Operazioni»
+  main.append(h("div", { class: "sottotitolo" }, q.nota || (q.vista === "tabella" || q.vista === "documenti" ? (q.righe + (q.righe === 1 ? " riga" : " righe")) : ""), " ", selettoreStato(q)));
   if (!q.attivo && q.supportato) main.append(h("div", { class: "nota" }, "Questo quadro non è selezionato per la dichiarazione. ", h("button", { class: "lk", onclick: () => impostaQuadro(q.id, true) }, "Seleziona il quadro")));
   if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { class: "cresce" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
   if (q.vista === "frontespizio") renderFront(main);
@@ -526,7 +563,8 @@ function renderTabella(main, q) {
       if (q.coll === "documenti_ref" && c === "tipo_eg" && v) { const sd = struttDi(q.coll, c, null), o = sd && sd.opzioni.find(x => x.valore === v); if (o) txt = o.etichetta; }
       if (q.coll === "documenti_ref" && c === "allegato_id" && v) txt = descriviFileEG(v);
       const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
-      const td = h("td", { class: [clsCol(c, j), kind === "cf" ? "cf" : ""].filter(Boolean).join(" "), title: txt, "data-allegato": q.coll === "documenti_ref" && c === "allegato_id" ? (v || "") : null }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
+      const td = h("td", { class: [clsCol(c, j), kind === "cf" ? "cf" : ""].filter(Boolean).join(" "), title: txt, "data-allegato": q.coll === "documenti_ref" && c === "allegato_id" ? (v || "") : null }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt,
+        j === 0 && q.coll === "persone" && id && id === presentatoreId() ? h("span", { class: "pz ok badge-dich", title: "Presentatore della dichiarazione" }, "dichiarante") : null);   // voce 33
       tr.append(td);
     });
     tb.append(tr);
@@ -646,6 +684,10 @@ async function eliminaRigaSelezionata(q) {
 function menuOperazioni(q) {
   const voci = [["Aggiungi riga", "Alt+N", () => aggiungiRiga(q)], ["Duplica la riga selezionata", "Alt+D", () => duplicaRiga(q)]];
   if (q.coll === "beni" && ["EB", "EC"].includes(q.id)) voci.push(["Ricalcola valori catastali", "", () => ricalcolaValori(q)]);
+  if (CAMPI_GRUPPO[q.coll]) voci.push(["Modifica di gruppo…", "", () => modificaDiGruppo(q)]);
+  if (q.vista === "tabella" && colonneIncolla(q).length) voci.push(["Incolla da Excel…", "", () => incollaRighe(q)]);
+  if (q.coll === "beni" || q.coll === "devoluzioni") voci.push(["Brogliaccio da stampare", "", () => window.open("/api/pratiche/" + S.P.pratica_id + "/brogliaccio", "_blank")],
+    ["Brogliaccio in CSV", "", () => { const a = h("a", { href: "/api/pratiche/" + S.P.pratica_id + "/brogliaccio.csv", download: "" }); document.body.append(a); a.click(); a.remove(); }]);
   voci.push(["Elimina la riga selezionata", "", () => eliminaRigaSelezionata(q)]);
   const d = h("details", { class: "operazioni" }, h("summary", { class: "gh" }, "Operazioni"));
   d.append(h("div", { class: "menu-op", role: "menu" }, voci.map(([t, k, f]) => h("button", { role: "menuitem", onclick: () => { d.open = false; f(); } },
@@ -674,6 +716,164 @@ function tornaTabella() {
   if (tr) { tr.focus({ preventScroll: true }); tr.scrollIntoView({ block: "center" }); }
 }
 
+/* ---------- miglioramenti dall'analisi del 07/11/2026 (docs/ANALISI_REPLICA_2026-11-07.md, voci 5, 9, 10, 22, 33) ---------- */
+/* Voce 22: devoluzioni del bene e somma delle quote per diritto, visibili nella scheda del bene mentre si compila.
+   Conta anche le righe DV non ancora salvate; il controllo che blocca resta quello del servizio (DEVOLUZIONI_*). */
+const _mcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a || 1; };
+function quotaFrazione(v) {
+  if (v && typeof v === "object" && Number.isInteger(v.num) && Number.isInteger(v.den) && v.den > 0) return [v.num, v.den];
+  const m = typeof v === "string" && v.trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+  return m && +m[2] > 0 ? [+m[1], +m[2]] : null;
+}
+function sommaQuote(quote) {
+  let n = 0, d = 1, nonNote = 0;
+  for (const q of quote) { const f = quotaFrazione(q); if (!f) { nonNote++; continue; }
+    n = n * f[1] + f[0] * d; d = d * f[1]; const g = _mcd(n, d); n /= g; d /= g; }
+  return { n, d, nonNote };
+}
+const quadroDV = () => S.Q && S.Q.quadri.find(x => x.id === "DV");
+function righeDV(filtro) { const q = quadroDV(); return q ? righeQuadro(q).filter(filtro) : []; }
+function nomeDiritto(codice, tipoBene) {
+  const sd = struttDi("devoluzioni", "diritto", tipoBene), o = sd && sd.opzioni && sd.opzioni.find(x => x.valore === codice);
+  return o ? o.etichetta : (codice || "diritto non indicato");
+}
+function nomePersona(id) { const p = (S.P.dati.persone || []).find(x => x.id === id); return p ? etichetta("persone", p) : "soggetto non indicato"; }
+function boxDevoluzioniBene(r) {
+  const beneId = r.e.id, tipo = valRiga(r, "tipo");
+  const devs = righeDV(x => valRiga(x, "bene_id") === beneId);
+  const box = h("div", { class: "dv-bene" }, h("h4", {}, "Devoluzioni del bene"));
+  if (!devs.length) { box.append(h("p", { class: "mut" }, "Nessuna devoluzione: aggiungila nel quadro DV.")); return box; }
+  const perDiritto = new Map();
+  for (const x of devs) { const k = valRiga(x, "diritto") || ""; if (!perDiritto.has(k)) perDiritto.set(k, []); perDiritto.get(k).push(x); }
+  for (const [dir, righe] of perDiritto) {
+    const s = sommaQuote(righe.map(x => valRiga(x, "quota")));
+    const esito = s.nonNote ? ["am", s.nonNote + (s.nonNote === 1 ? " quota da indicare" : " quote da indicare")]
+      : s.n === s.d ? ["ok", "completa"] : s.n > s.d ? ["er", "supera 1/1"] : ["am", "manca " + (s.d - s.n) + "/" + s.d];
+    box.append(h("table", { class: "dv-somma" }, h("caption", {}, nomeDiritto(dir, tipo)),
+      h("tbody", {}, righe.map(x => h("tr", { class: "fisso" + ((x.nuova || S.dirty.has(x.key)) ? " mod" : "") },
+        h("td", {}, nomePersona(valRiga(x, "persona_id"))), h("td", { class: "n" }, mostra("quota", valRiga(x, "quota")))))),
+      h("tfoot", {}, h("tr", {}, h("td", {}, "Somma"), h("td", { class: "n" }, h("span", { class: "pz " + esito[0] }, s.n + "/" + s.d + " · " + esito[1]))))));
+  }
+  if (devs.some(x => x.nuova || S.dirty.has(x.key))) box.append(h("p", { class: "mut" }, "Comprende righe non ancora salvate."));
+  return box;
+}
+/* Voce 33: riepilogo del soggetto nel quadro EA (ruolo, parentela, dichiarante, beni ricevuti con la quota). */
+function presentatoreId() {
+  const dich = ((S.P.dati.opzioni.telematico || {}).dichiarazione || {});
+  return (dich.presentatore || {}).persona_id || ((S.P.dati.persone || []).find(p => p.ruolo === "presentatore") || {}).id || null;
+}
+function boxRiepilogoSoggetto(r) {
+  const pid = r.e.id, box = h("div", { class: "riepilogo-soggetto" }, h("h4", {}, "Nella successione"));
+  const voci = [nomeVal("persone", "ruolo", valRiga(r, "ruolo"))];
+  const sdg = struttDi("persone", "grado_parentela", null), g = valRiga(r, "grado_parentela");
+  const og = g && sdg && sdg.opzioni && sdg.opzioni.find(x => x.valore === riconosciVoce(sdg, g));
+  if (g) voci.push(og ? og.etichetta : g);
+  if (presentatoreId() === pid) voci.push("dichiarante");
+  if (valRiga(r, "rappresentato_cf")) voci.push("per rappresentazione");
+  if (valRiga(r, "certificatore_disabilita")) voci.push("disabilità o interdizione");
+  box.append(h("p", {}, voci.filter(Boolean).join(" · ")));
+  const devs = righeDV(x => valRiga(x, "persona_id") === pid);
+  if (!devs.length) { box.append(h("p", { class: "mut" }, "Nessun bene attribuito nel quadro DV.")); return box; }
+  box.append(h("ul", { class: "beni-soggetto" }, devs.map(x => { const b = (S.P.dati.beni || []).find(y => y.id === valRiga(x, "bene_id"));
+    return h("li", {}, (b ? etichetta("beni", b) : "bene non indicato") + " — " + mostra("quota", valRiga(x, "quota")) + " (" + nomeDiritto(valRiga(x, "diritto"), b && b.tipo) + ")"); })));
+  return box;
+}
+/* Voce 5: modifica di gruppo (beni e devoluzioni). I valori scelti diventano modifiche da salvare sulle righe spuntate: con
+   «Salva» si crea una sola revisione, annullabile dalla Cronologia. Nessun campo viene cambiato se non e' spuntato. */
+const CAMPI_GRUPPO = { beni: ["diritto", "quota_defunto", "data_visura"], devoluzioni: ["diritto", "quota"] };
+function dialogo(id, titolo, corpo, conferma, onConferma) {
+  const vecchio = document.getElementById(id); if (vecchio) vecchio.remove();
+  const err = h("p", { class: "e", role: "alert", hidden: true });
+  const d = h("dialog", { id, class: "dlg-op", "aria-labelledby": id + "T" }, h("form", { method: "dialog" }, h("h2", { id: id + "T" }, titolo), corpo, err,
+    h("div", { class: "wiz-az" }, h("button", { class: "gh", value: "annulla" }, "Annulla"), h("span", { class: "sp" }),
+      h("button", { class: "pil", value: "ok", onclick: ev => { ev.preventDefault(); const e = onConferma(); if (e) { err.textContent = e; err.hidden = false; } else d.close(); } }, conferma))));
+  document.body.append(d); d.showModal(); return d;
+}
+function descriviRigaGruppo(q, r) {
+  if (q.coll !== "devoluzioni") return etichetta(q.coll, r.e);
+  const b = (S.P.dati.beni || []).find(x => x.id === valRiga(r, "bene_id"));
+  return nomePersona(valRiga(r, "persona_id")) + " — " + (b ? etichetta("beni", b) : "bene non indicato");
+}
+function modificaDiGruppo(q) {
+  const campi = (CAMPI_GRUPPO[q.coll] || []).filter(c => c in S.schema.collezioni[q.coll]);
+  const righe = righeQuadro(q).filter(x => x.e);
+  if (!campi.length) return msg("La modifica di gruppo non è disponibile in questo quadro.", "e");
+  if (righe.length < 2) return msg("Servono almeno due righe salvate per la modifica di gruppo.", "e");
+  const tipoBene = q.coll === "beni" ? valRiga(righe[0], "tipo") : null;
+  const scelte = new Map(righe.map(r => [r.key, true])), valori = {}, attivi = new Set();
+  const elenco = h("fieldset", { class: "gruppo-righe" }, h("legend", {}, "Righe da modificare"), righe.map(r => h("label", { class: "riga-sc" },
+    h("input", { type: "checkbox", checked: true, "data-key": r.key, onchange: ev => scelte.set(r.key, ev.target.checked) }), " " + descriviRigaGruppo(q, r))));
+  const blocchi = campi.map(c => {
+    const spunta = h("input", { type: "checkbox", "data-campo": c, onchange: ev => ev.target.checked ? attivi.add(c) : attivi.delete(c) });
+    const w = campoInput(q.coll, null, c, S.schema.collezioni[q.coll][c], null, (campo, v) => { valori[campo] = v; attivi.add(campo); spunta.checked = true; }, tipoBene);
+    return h("div", { class: "rg", "data-gruppo": c }, h("label", {}, spunta, " " + lbl(q.coll, c, q.id)), w);
+  });
+  dialogo("dGruppo", "Modifica di gruppo · quadro " + q.id, h("div", {}, h("p", { class: "mut" }, "Spunta i campi da cambiare e le righe interessate. Le modifiche restano da salvare: controlla e premi «Salva»."), ...blocchi, elenco),
+    "Applica alle righe", () => {
+      const sel = righe.filter(r => scelte.get(r.key)), usati = [...attivi];
+      if (!usati.length) return "Spunta almeno un campo da cambiare.";
+      if (!sel.length) return "Spunta almeno una riga.";
+      for (const r of sel) { const d = S.dirty.get(r.key) || { coll: q.coll, id: r.e.id, campi: {} };
+        for (const c of usati) d.campi[c] = valori[c] === undefined ? null : valori[c]; S.dirty.set(r.key, d); }
+      render(); msg(usati.length + (usati.length === 1 ? " campo cambiato" : " campi cambiati") + " in " + sel.length + " righe: premi «Salva» per confermare (una sola revisione).", "o");
+      return null;
+    });
+}
+/* Voce 9: incolla righe da Excel o da testo tabulato. Le colonne sono quelle della tabella, nello stesso ordine (una riga di
+   intestazione con gli stessi nomi viene saltata). Le righe diventano righe nuove da salvare: i controlli sono quelli di «Salva». */
+function colonneIncolla(q) { return q.colonne.filter(c => !(S.schema.collezioni[q.coll][c] || "").startsWith("ref:")); }
+function incollaRighe(q) {
+  const cols = colonneIncolla(q);
+  const ta = h("textarea", { rows: 8, class: "incolla", "aria-label": "Righe da incollare", placeholder: cols.map(c => lbl(q.coll, c, q.id)).join("\t") });
+  dialogo("dIncolla", "Incolla righe · quadro " + q.id, h("div", {}, h("p", { class: "mut" }, "Copia le celle da Excel (o testo separato da tabulazioni o da «;») con le colonne in quest'ordine:"),
+    h("p", { class: "cod" }, cols.map(c => lbl(q.coll, c, q.id)).join(" · ")), ta), "Aggiungi le righe", () => {
+      const r = righeDaTesto(ta.value, q, cols);
+      if (r.errore) return r.errore;
+      for (const campi of r.righe) S.nuove.set("n:" + crypto.randomUUID(), { q: q.id, coll: q.coll, id: nuovoId(q.coll), campi: { ...q.preset, ...campi } });
+      S.riga = null; render(); msg(r.righe.length + (r.righe.length === 1 ? " riga aggiunta" : " righe aggiunte") + ": controllale e premi «Salva».", "o");
+      return null;
+    });
+}
+function righeDaTesto(testo, q, cols) {
+  const linee = String(testo || "").replace(/\r/g, "").split("\n").filter(x => x.trim());
+  if (!linee.length) return { errore: "Nessuna riga da aggiungere." };
+  const sep = linee.some(x => x.includes("\t")) ? "\t" : ";";
+  const nomi = cols.map(c => lbl(q.coll, c, q.id).toLowerCase());
+  if (linee[0].split(sep).some(x => nomi.includes(x.trim().toLowerCase()))) linee.shift();   // intestazione
+  const out = [];
+  for (const [i, l] of linee.entries()) {
+    const celle = l.split(sep);
+    if (celle.length > cols.length) return { errore: "Riga " + (i + 1) + ": " + celle.length + " colonne, al massimo " + cols.length + "." };
+    const campi = {};
+    celle.forEach((t, j) => { const v = leggi(S.schema.collezioni[q.coll][cols[j]], t); if (v !== null) campi[cols[j]] = v; });
+    if (Object.keys(campi).length) out.push(campi);
+  }
+  return out.length ? { righe: out } : { errore: "Nessuna riga con dati." };
+}
+/* Voce 10: appunti per riga (soggetto, bene, devoluzione...) e stato di lavorazione del quadro. Stanno nella sezione «note»:
+   non fanno parte del dichiarato, non entrano nel file telematico e non rendono obsoleti controlli ed esportazioni. */
+const STATI_LAVORO = { "": "stato: nessuno", da_completare: "da completare", da_controllare: "da controllare", completato: "completato" };
+const noteP = () => (S.P && S.P.dati.note) || {};
+function boxAppunti(q, r) {
+  const k = q.coll + ":" + r.e.id, attuale = ((noteP().appunti || {})[k]) || "";
+  const ta = h("textarea", { rows: 3, class: "appunti", "aria-label": "Appunti sulla riga" }); ta.value = attuale;
+  const bt = h("button", { class: "gh", onclick: () => {
+    const app = { ...(noteP().appunti || {}) }, v = ta.value.trim();
+    if (v) app[k] = v; else delete app[k];
+    salvaOps([{ op: "set", sezione: "note", campi: { appunti: Object.keys(app).length ? app : null } }]);
+  } }, "Salva appunti");
+  return h("details", { class: "gruppo-opzionale appunti-riga", open: !!attuale }, h("summary", {}, "Appunti" + (attuale ? " · presenti" : "")),
+    h("p", { class: "mut" }, "Nota interna dello studio: non entra nella dichiarazione."), ta, bt);
+}
+function statoLavoro(qid) { return ((noteP().stato_quadri || {})[qid]) || ""; }
+function selettoreStato(q) {
+  const s = h("select", { class: "stato-lavoro", "aria-label": "Stato di lavorazione del quadro " + q.id, onchange: ev => {
+    const st = { ...(noteP().stato_quadri || {}) }; if (ev.target.value) st[q.id] = ev.target.value; else delete st[q.id];
+    salvaOps([{ op: "set", sezione: "note", campi: { stato_quadri: Object.keys(st).length ? st : null } }]);
+  } }, Object.entries(STATI_LAVORO).map(([v, t]) => h("option", { value: v }, t)));
+  s.value = statoLavoro(q.id);
+  return s;
+}
 /* ---------- ispettore ---------- */
 function renderIns() {
   const ins = $("#ins"); ins.replaceChildren();
@@ -754,6 +954,9 @@ function insDati(ins) {
   if (nascostiEstero) ins.append(h("p", { class: "mut nota-campi" }, "Per un immobile all'estero scegli la provincia EE: compaiono i campi dello Stato estero."));
   renderStrutturati(ins, q, r);
   if (q.coll === "beni" && r.e && ["fabbricato", "terreno"].includes(valRiga(r, "tipo"))) ins.append(boxValoreCatastale(q, r));
+  if (q.coll === "beni" && r.e) ins.append(boxDevoluzioniBene(r));            // voce 22: somma delle quote del bene
+  if (q.coll === "persone" && r.e && valRiga(r, "ruolo") !== "defunto") ins.append(boxRiepilogoSoggetto(r));   // voce 33
+  if (r.e) ins.append(boxAppunti(q, r));                                        // voce 10: nota interna della riga
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
   const supKey = q.coll + ':' + (r.e ? r.e.id : r.nuova.id);
   if (r.nuova || S.dirty.has(r.key) || S.supDirty.has(supKey)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); S.supDirty.delete(supKey); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));
@@ -869,10 +1072,13 @@ function insControlli(ins) {
   ins.append(h("p", { class: "mut" }, q.ambito + (q.finalizzabile ? ". Finalizzabile." : ". Non finalizzabile.")));
   for (const b of (q.blocchi_finalizzazione || [])) ins.append(h("div", { class: "nota stretta" }, b.messaggio));
   // avvisi che non impediscono la finalizzazione (es. visure catastali vecchie o senza data)
-  for (const a of (q.avvisi || [])) ins.append(h("div", { class: "nota stretta", role: "status" }, h("b", {}, "Avviso: "), a.messaggio));
+  // ogni rilievo e avviso con il rimedio: dove intervenire e con quale comando (docs/ANALISI_REPLICA_2026-11-07.md, voce 19)
+  const rimedio = x => x.rimedio ? h("div", { class: "rimedio" }, h("b", {}, "Come risolvere: "), x.rimedio) : null;
+  for (const a of (q.avvisi || [])) ins.append(h("div", { class: "nota stretta", role: "status" }, h("b", {}, "Avviso: "), a.messaggio, rimedio(a),
+    a.quadro && a.percorso ? h("button", { class: "lk", onclick: () => vaiA(a) }, "Vai al dato") : null));
   if (!q.rilievi.length) { ins.append(h("p", { class: "ok esito-ok" }, "Nessun rilievo sui dati inseriti.")); return; }
   const ul = h("ul", { class: "rl" });
-  for (const r of q.rilievi) ul.append(h("li", {}, h("button", { onclick: () => vaiA(r) }, h("span", { class: "sigla" }, r.quadro), h("span", {}, h("div", {}, r.messaggio), h("div", { class: "cod" }, r.codice + " · " + r.percorso)))));
+  for (const r of q.rilievi) ul.append(h("li", {}, h("button", { onclick: () => vaiA(r) }, h("span", { class: "sigla" }, r.quadro), h("span", {}, h("div", {}, r.messaggio), rimedio(r), h("div", { class: "cod" }, r.codice + " · " + r.percorso)))));
   ins.append(ul);
 }
 async function insCronologia(ins) {
