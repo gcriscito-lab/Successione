@@ -6,8 +6,11 @@
 - Lavoro su un ramo nuovo creato da `50117d6`, in una copia separata (`.claude/worktrees/miglioramenti-replica`): il ramo
   `claude/successioni-dichiarazioni-app-fhcwbe` e l'archivio reale non sono stati toccati. Nel frattempo il ramo principale e'
   avanzato (`886ea2e`). Unito nel ramo principale il 07/11/2026 su richiesta del committente (commit `9c1aff6`; unico
-  conflitto l'elenco delle prove in `tests/e2e/esegui_tutti.py`, tenute entrambe). Dopo l'unione: 1921 passati e 1 saltato,
-  prove interfaccia 10/10 (con `gui_albero`), XML di prova ancora valido e identico.
+  conflitto l'elenco delle prove in `tests/e2e/esegui_tutti.py`, tenute entrambe). Alle 18:50 un'altra sessione ha unito sopra
+  guida, calcolatrice e Prossime azioni (`96ae8c7`). Verifiche su `95b99fc` (stato con entrambe le unioni): 1942 passati e
+  1 saltato; prove interfaccia 12/12; XML di prova valido sull'XSD.
+- Da guardare (non legato a queste modifiche): due allegati dello stesso rigo EG acquisiti nello stesso istante possono uscire
+  in ordine diverso fra due esportazioni (visto una volta su quattro con la fixture sintetica: stesso rigo, stesso contenuto).
 - Fatte (commit `d490387`, `f1842cb`):
   - 19 rimedio («Come risolvere») per ogni rilievo e avviso di `verifica_pratica`/`stato_quadri` (`rimedi.py`);
   - 21 avvisi di qualita' non bloccanti (`qualita.py`): spazi doppi, CF duplicato, carattere di controllo errato, CF incoerente
