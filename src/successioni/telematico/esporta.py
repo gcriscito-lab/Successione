@@ -65,7 +65,7 @@ PERIMETRO = {
     "EN": "aziende (denominazione, CF, diritto 1/2, valore); immobili aziendali, inventario, beni esteri non supportati; agevolazione Q e riduzioni art. 25 (riduzioni_art25.py)",
     "EP": "aeromobili con valore; beni esteri non supportati; riduzioni art. 25 c. 1 (codici 1-5)",
     "EQ": "navi e imbarcazioni con valore; beni esteri non supportati; riduzioni art. 25 c. 1 (codici 1-5)",
-    "EO": "titoli quotati (1), non quotati (2), esenti (3, ValoreEsente), fondi (4); beni esteri non supportati",
+    "EO": "titoli quotati (1), non quotati (2), esenti (3, ValoreEsente), fondi (4, Valore o ValoreEsente); beni esteri; agevolazioni D e Q",
     "ED": "passivita' con tipo, documento, possesso e ripartizione a un solo soggetto EA",
     "EE": "totali EE1, EE5, EE6, EE7, EE8 calcolati dai quadri esportati",
     "Devoluzioni": "diritto della devoluzione uguale al diritto del defunto; agevolazioni: prima casa P, X, Z in EC "
@@ -1353,7 +1353,7 @@ class _Export:
         return out
 
     def riga_eo(self, b: dict) -> dict | None:
-        """Quadro EO, rigo Titoli: quotati (1), non quotati (2), esenti (3, ValoreEsente), fondi comuni (4). Beni esteri: non supportati."""
+        """Quadro EO, rigo Titoli: quotati (1), non quotati (2), esenti (3, ValoreEsente), fondi comuni (4, Valore o ValoreEsente), anche esteri."""
         c, el = "beni", "QuadroEO/Modulo/Titoli"
         for campo in ("comune", "sezione", "foglio", "particella", "subalterno", "categoria", "rendita"):
             if b.get(campo) not in (None, ""):
@@ -1364,7 +1364,15 @@ class _Export:
         self.usa(b, "codice_fiscale_emittente")
         out: dict = {"TipoTitolo": tt}
         fonte_cf = FO.fonte_annotazione(el + "/CodiceFiscale")
-        if tt == "1" and cf_em in (None, ""):   # annotazione CodiceFiscale: obbligatorio se TipoTitolo = 1
+        from .quadri_efgh import _flag
+        # annotazione CodiceFiscale: «obbligatorio se TipoTitolo uguale a 1» e «non deve essere presente se e' barrata la
+        # casella Bene sito all'estero»: per il titolo estero (anche quotato) il codice fiscale non si chiede e non si scrive
+        estero = _flag(SUP.attr(self.d, c, b, "bene_estero"))
+        if estero:
+            if cf_em not in (None, ""):
+                self.err("DATI_INCOERENTI", f"beni[{b['id']}].codice_fiscale_emittente", "titolo estero: il codice fiscale "
+                         "dell'emittente non va indicato", fonte_cf)
+        elif tt == "1" and cf_em in (None, ""):
             self.err("DATO_MANCANTE", f"beni[{b['id']}].codice_fiscale_emittente",
                      "codice fiscale dell'emittente obbligatorio per i titoli quotati (TipoTitolo 1)", fonte_cf)
         elif cf_em not in (None, ""):
@@ -1419,7 +1427,18 @@ class _Export:
         # Titolo esente (TipoTitolo 3): il valore va in Possesso/ValoreEsente e NON in Possesso/Valore (annotazioni XSD
         # PossessoEO_Type/Valore e /ValoreEsente: l'uno esclude l'altro; Valore «non puo' essere presente se titolo = 3»,
         # ValoreEsente «obbligatorio se titolo = 3» e «non puo' essere presente se titolo = 1, 2»).
-        esente = tt == "3"
+        # Per il tipo 4 (fondo comune) l'XSD non vincola la scelta: il valore va in ValoreEsente se la casella
+        # «valore esente» del bene e' spuntata (es. file importato con ValoreEsente), altrimenti in Valore.
+        self.usa(b, "valore_esente")
+        ve_flag = SUP.attr(self.d, c, b, "valore_esente")
+        fonte_ve = FO.fonte_annotazione(el + "/Possesso/ValoreEsente")
+        if ve_flag not in (None, "") and tt in ("1", "2") and _flag(ve_flag):
+            self.err("DATI_INCOERENTI", f"beni[{b['id']}].valore_esente", "il valore esente non puo' essere indicato per i "
+                     "titoli di tipo 1 e 2 (va in Valore)", fonte_ve)
+        elif ve_flag not in (None, "") and tt == "3" and not _flag(ve_flag):
+            self.err("DATI_INCOERENTI", f"beni[{b['id']}].valore_esente", "per il titolo esente (tipo 3) il valore e' "
+                     "obbligatoriamente esente (ValoreEsente)", fonte_ve)
+        esente = tt == "3" or (tt == "4" and _flag(ve_flag))
         el_valore = el + ("/Possesso/ValoreEsente" if esente else "/Possesso/Valore")
         valore = self.valore_bene(b, el_valore)
         if None in (tt, descr, td, poss, dir_c, valore):
@@ -1439,10 +1458,7 @@ class _Export:
         riga["CodiceDiritto_C"] = dir_c
         be = self.beni_esteri(b, "EO")
         if be:
-            riga["BeniEsteri"] = be
-            if "CodiceFiscale" in riga:     # annotazione CodiceFiscale: non presente se e' barrata «Bene sito all'estero»
-                self.err("DATI_INCOERENTI", f"beni[{b['id']}].codice_fiscale_emittente", "titolo estero: il codice fiscale "
-                         "dell'emittente non va indicato", fonte_cf)
+            riga["BeniEsteri"] = be     # il codice fiscale dell'emittente e' gia' escluso sopra (annotazione CodiceFiscale)
         return riga
 
     def _valori_diritti_distinti(self, b: dict, el: str, valore, righe: list) -> dict | None:

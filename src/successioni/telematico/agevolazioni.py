@@ -43,8 +43,10 @@ QUADRI_XSD = {"A": ("EB", "EC", "EL", "EM", "EP", "EQ", "ER"),
               "H": ("EC", "EM"),
               "M": ("EB", "EC", "EL", "EM"),
               "N": ("EB", "EL")}
-#: quadri supportati da questa versione (i fabbricati/terreni tavolari EL ed EM non sono provati con queste agevolazioni)
-QUADRI_SUPPORTATI = {"A": ("EB", "EC"), "C": ("EB",), "D": ("EB", "EC", "EN"), "E": ("EB",), "G": ("EN",), "H": ("EC",),
+#: quadri supportati da questa versione (i fabbricati/terreni tavolari EL ed EM non sono provati con queste agevolazioni).
+#: EO: l'annotazione ammette solo D e Q (Q e' in riduzioni_art25.py); D = «quote sociali e azioni» (Fascicolo I p. PDF 56 e 58,
+#: cod. D: esenti da imposta di successione, ipotecaria e catastale; EH sez. IV FlagD per il dichiarante, altrimenti EG10)
+QUADRI_SUPPORTATI = {"A": ("EB", "EC"), "C": ("EB",), "D": ("EB", "EC", "EN", "EO"), "E": ("EB",), "G": ("EN",), "H": ("EC",),
                      "M": ("EB", "EC"), "N": ("EB",)}
 #: gradi di parentela ammessi (annotazione XSD di Devoluzione/Agevolazioni, righi «L'agevolazione N/D/G non puo' essere richiesta
 #: da soggetti con grado di parentela diverso da ...»)
@@ -86,6 +88,14 @@ def leggi_riga(x, d: dict, b: dict, quadro: str, perc: str, pid: str) -> None:
         x.ns.append(f"{perc}.agevolazioni={codice} nel quadro {quadro}: non supportato in questa versione (supportati: "
                     f"{', '.join(QUADRI_SUPPORTATI[codice])}; docs/regole/agevolazioni.md)")
         return
+    if codice == "D" and quadro == "EO":
+        tt = str(SUP.attr(x.d, "beni", b, "tipo_titolo") or "")
+        if tt in ("3", "4"):
+            # Fascicolo I p. PDF 58 (cod. D): «quote sociali e azioni»; un titolo esente (3) o un fondo comune (4) non lo e'.
+            # L'XSD non lo vieta: avviso non bloccante.
+            x.avv("AGEVOLAZIONE_D_TIPO_TITOLO", perc + ".agevolazioni", f"agevolazione D su un titolo di tipo {tt} (esente o "
+                  "fondo comune): il Fascicolo I la riferisce a quote sociali e azioni; verificare i requisiti",
+                  FO.fonte_fasc1(58, "cod. D") + "; " + fonte)
     grado = (x.soggetti_ea.get(pid) or {}).get("GradoParentela")
     if codice in GRADI and grado not in GRADI[codice]:
         x.err("REGOLA_AGEVOLAZIONE_GRADO", perc + ".agevolazioni", f"l'agevolazione {codice} non puo' essere richiesta da un "

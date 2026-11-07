@@ -1,6 +1,6 @@
 # Agevolazioni A, C, D, E, G, H, M, N (pacchetto 2)
 
-Codice: `src/successioni/telematico/agevolazioni.py`. Test: `tests/test_agevolazioni.py`. Le agevolazioni P, X, Y, Z sono in
+Codice: `src/successioni/telematico/agevolazioni.py`. Test: `tests/test_agevolazioni.py`, `tests/test_eo_agevolazioni_esteri.py` (quadro EO). Le agevolazioni P, X, Y, Z sono in
 `prima_casa.py`; L, Q, R, F e le riduzioni 1-5 in `riduzioni_art25.py`.
 
 ## Fonti
@@ -17,7 +17,7 @@ Codice: `src/successioni/telematico/agevolazioni.py`. Test: `tests/test_agevolaz
 | N boschi montani | base proporzionale | base proporzionale | esente | solo EB/EL; gradi 01-04, 5A, 5B, 06, 7A, 7B, 08, 9A, 9B |
 | C compendio unico (zone montane) | esente | esente | esente | EH sez. IV `FlagC` o EG10 |
 | E compendio unico generale | esente | esente | esente | EH sez. IV `FlagE` o EG10 |
-| D aziende e immobili | esente | esente | esente | EH sez. IV `FlagD` o EG10; gradi 01, 02, 04, 06, 08 |
+| D aziende, quote sociali e azioni | esente | esente | esente | EH sez. IV `FlagD` o EG10; gradi 01, 02, 04, 06, 08; quadri EB, EC, EN, **EO** |
 | H immobili demoliti/inagibili | esente | esente | esente | EG8 «Altro» obbligatorio; esclusi dalle circoscrizioni (EF15/EF16); solo persone fisiche |
 | M fondi rustici montani | fissa 200 (EF3) | esente | **dovuta** | esteso a tutti i beneficiari del bene |
 | G giovani imprenditori agricoli | fissa 200 (EF2) | esente | esente | EF2 somma solo EB-EM; **solo EN** in questa versione; meno di 40 anni al decesso |
@@ -25,6 +25,19 @@ Codice: `src/successioni/telematico/agevolazioni.py`. Test: `tests/test_agevolaz
 Regole generali: per ogni bene una sola tipologia fra A, C, D, E, L, M, N, P, X, Y, Z (F, G, Q, R possono convivere); le agevolazioni non
 sono ammesse con beneficiari trust (tipo 5); la richiesta di un beneficiario diverso dal dichiarante va allegata (EG10 per C, D, E; EG11 per A)
 con il documento d'identita' (EG7).
+
+## Quadro EO (titoli)
+- Codici ammessi: **solo D e Q** (annotazione di `Devoluzione/Agevolazioni`: «Per il quadro EO sono ammessi solo i codici
+  agevolazione D, Q»); ogni altro codice e' un errore `REGOLA_AGEVOLAZIONE_QUADRO`. Q e' in `riduzioni_art25.py`.
+- D (Fascicolo I p. PDF 56 Allegato 2, p. PDF 57 sinottico, p. PDF 58 «cod. D»: trasferimenti di «quote sociali e azioni» a coniuge e
+  discendenti): la quota con D esce dalla QE (guida p. 1); il titolo **resta** in EE3 (`TotaleValoreTitoli`: somma di Valore e
+  ValoreEsente, nessuna esclusione); ipotecaria e catastale non riguardano i titoli (EF considera solo gli immobili). Richiesta del
+  dichiarante: EH Sezione IV `Agevolazioni/FlagD`; di un altro beneficiario: rigo EG10 con documento d'identita' (EG7).
+- D su un titolo esente (tipo 3) o su un fondo comune (tipo 4): l'XSD non lo vieta, ma il Fascicolo riferisce D a quote sociali e
+  azioni: avviso `AGEVOLAZIONE_D_TIPO_TITOLO`, non blocco. Il requisito del controllo (art. 2359 c.c.) non e' verificabile dai dati.
+- Evidenze: controllo SUC13 locale positivo (solo 3345) con D sulle azioni del dichiarante, titolo estero quotato e fondo con
+  ValoreEsente; negativi: Sezione IV di EH rimossa, codice fiscale sul titolo estero (`tests/test_eo_agevolazioni_esteri.py`).
+  File reale (iniziali DG): reimportato e riesportato con lo stesso ImportoDaVersare dell'originale.
 
 ## Aggancio nel codice
 - Lettura riga e validazioni: `agevolazioni.leggi_riga` (dopo `PC.leggi_riga` e `RA.leggi_riga`), regole incrociate `agevolazioni.valida`.
@@ -43,7 +56,7 @@ con quella verificata dal controllo. Negativo: la base proporzionale con il rigo
 ## Non coperto (blocco con motivo)
 - **G su terreni e fabbricati** (EB, EC, EL, EM): l'annotazione richiede che siano beni aziendali, non supportati. G e' ammessa solo in EN.
 - **Quadri EL ed EM** (tavolari) con queste agevolazioni: non provati col controllo.
-- **D in EC/EB**: provato su fabbricato (EC); i requisiti soggettivi (discendenti e coniuge) si controllano solo sul grado di parentela.
+- **D in EC/EB/EO**: provato su fabbricato (EC) e su titoli (EO); i requisiti soggettivi (discendenti e coniuge) si controllano solo sul grado di parentela.
 - **Requisiti soggettivi** (coltivatore diretto, IAP, impegno a coltivare per sei anni): l'XSD non definisce campi dedicati per G, M, N;
   restano dichiarazioni del professionista.
 - **Combinazioni** con riduzioni art. 25 sulla stessa riga: gia' bloccate (riduzioni_art25.py); con prima casa sullo stesso bene: errore

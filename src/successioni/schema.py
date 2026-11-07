@@ -44,7 +44,7 @@ COLLEZIONI: dict[str, dict[str, str]] = {
         "provincia": "str", "codice_comune": "str", "comune_amministrativo": "str", "codice_comune_amministrativo": "str",
         "indirizzo": "str", "natura": "str", "tipologia_terreno": "str", "reddito_dominicale": "importo", "classe": "str",
         "zona_censuaria": "str", "consistenza": "str", "tipo_cespite": "str",
-        "tipo_titolo": "str", "quantita": "str", "codice_titolo": "str", "codice_fiscale_emittente": "str",
+        "tipo_titolo": "str", "quantita": "str", "codice_titolo": "str", "codice_fiscale_emittente": "str", "valore_esente": "str",
         "tipo_documento": "str", "data_documento": "data",
         "marca_modello": "str", "anno_costruzione": "str", "nazionalita": "str", "anno_immatricolazione": "str",
         "numero_immatricolazione": "str", "tipo_unita": "str", "sigla_ufficio_iscrizione": "str", "anno_iscrizione": "str",
@@ -147,7 +147,8 @@ STRUTTURATI: dict[str, dict] = {
                  "Entra comunque nei totali del quadro EE (XSD, TotaleValoreTitoli). Un titolo con una parte esente e una "
                  "imponibile va diviso in due righe. Una passività collegata a un titolo esente blocca l'esportazione: le "
                  "fonti non dicono se sia deducibile."),
-            _opz("4", "fondo comune d'investimento", "Fondo comune d'investimento: valore nel campo «valore»."),
+            _opz("4", "fondo comune d'investimento", "Fondo comune d'investimento: valore nel campo «valore», oppure esente "
+                 "(ValoreEsente) con la casella «valore esente»."),
         ],
     },
     # Caselle si'/no (DatoCB nell'XSD). Il modello le conserva come testo («si»/«no»): l'esportazione legge «1», «si», «true»
@@ -187,6 +188,12 @@ STRUTTURATI: dict[str, dict] = {
         "aiuto": "Si' se l'immobile e' un bene aziendale (ditta individuale): va compilato anche il quadro EN con l'azienda a cui appartiene "
                  "e il collegamento dell'immobile. Fascicolo I pp. 21 e 29.",
         "opzioni": [_opz("si", "si'", "Immobile aziendale."), _opz("no", "no", "Immobile non aziendale.")]},
+    "beni.valore_esente": {
+        "etichetta": "valore esente (quadro EO)", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
+        "aiuto": "Solo per i fondi comuni d'investimento (tipo titolo 4): si' se il valore va nel campo «valore esente» invece che in "
+                 "«valore» (escluso dalla base imponibile). Per i titoli esenti (tipo 3) il valore e' sempre esente; per i tipi 1 e 2 "
+                 "non e' ammesso (XSD, PossessoEO_Type/Valore e /ValoreEsente).",
+        "opzioni": [_opz("si", "si'", "Valore esente (ValoreEsente)."), _opz("no", "no", "Valore imponibile (Valore).")]},
     "beni.sistema_tavolare": {
         "etichetta": "sistema tavolare", "tipo": "enum", "senza_codice": True, "alias": dict(ALIAS_SINO),
         "aiuto": "Si' se l'immobile e' nel sistema tavolare (quadri EL/EM), anche fuori dalle province tavolari.",
