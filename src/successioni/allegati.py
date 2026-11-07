@@ -136,11 +136,15 @@ class AllegatiMixin:
             raise NonTrovato("allegato inesistente", allegato_id=allegato_id)
         return r
 
-    def _derivato_esistente(self, allegato_id: str):
-        """Ultimo derivato di conversione (non di suddivisione) gia' registrato per l'originale."""
-        with self.arch.lettura() as c:
-            righe = c.execute("SELECT * FROM allegati WHERE origine_id=? AND ruolo='derivato' ORDER BY ts DESC",
-                              (allegato_id,)).fetchall()
+    def _derivato_esistente(self, allegato_id: str, c=None):
+        """Ultimo derivato di conversione (non di suddivisione) gia' registrato per l'originale. Con ``c`` la lettura
+        avviene nella transazione di chi chiama (controllo e registrazione atomici)."""
+        sql = "SELECT * FROM allegati WHERE origine_id=? AND ruolo='derivato' ORDER BY ts DESC"
+        if c is not None:
+            righe = c.execute(sql, (allegato_id,)).fetchall()
+        else:
+            with self.arch.lettura() as cl:
+                righe = cl.execute(sql, (allegato_id,)).fetchall()
         for d in righe:
             rap = json.loads(d["rapporto"]) if d["rapporto"] else {}
             if "conversione" in rap:
@@ -160,20 +164,59 @@ class AllegatiMixin:
                                         for r in refs], autore="programma", canale=canale)
         return len(refs)
 
-    def _cancella_riga(self, r) -> None:
+    @staticmethod
+    def _usi_in(c, allegato_id: str, pratica_id: str | None) -> list[dict]:
+        """Righi ``documenti_ref`` (di qualunque pratica) che puntano all'allegato, letti con la connessione ``c``.
+
+        La pratica proprietaria si legge per intero; le altre solo se il loro JSON contiene l'identificativo (dati
+        anteriori alla validazione del collegamento potevano puntare all'allegato di un'altra pratica)."""
+        righe = []
+        if pratica_id:
+            righe += c.execute("SELECT id, dati FROM pratiche WHERE id=?", (pratica_id,)).fetchall()
+        righe += c.execute("SELECT id, dati FROM pratiche WHERE id IS NOT ? AND dati LIKE ?",
+                           (pratica_id, f"%{allegato_id}%")).fetchall()
+        out = []
+        for p in righe:
+            try:
+                refs = json.loads(p["dati"]).get("documenti_ref") or []
+            except (TypeError, ValueError, AttributeError):
+                continue
+            out += [{"pratica_id": p["id"], "id": x.get("id")} for x in refs
+                    if isinstance(x, dict) and x.get("allegato_id") == allegato_id]
+        return out
+
+    def _usi_altre_pratiche(self, c, allegato_id: str, pratica_id: str) -> bool:
+        return any(u["pratica_id"] != pratica_id for u in self._usi_in(c, allegato_id, pratica_id))
+
+    def _cancella_in(self, c, r) -> None:
+        """Cancellazione della riga e (se l'impronta non serve piu') del file, dentro la transazione ``c``."""
+        c.execute("DELETE FROM allegati WHERE id=?", (r["id"],))
+        if self._impronta_in_uso(c, r["sha256"]):
+            return
+        p = self.arch.base / r["percorso"]
+        if p.is_file() and p.name == r["sha256"]:
+            p.unlink()
+
+    def _cancella_riga(self, r, *, se_non_usato: bool = False) -> None:
         """Toglie la riga; il file del deposito si cancella solo se l'impronta non serve piu' a nessuno.
+
+        Con ``se_non_usato`` i righi EG che usano l'allegato si ricontrollano DENTRO la transazione che cancella: un
+        aggiornamento concorrente (GUI e MCP) che collega l'allegato a un rigo EG o viene prima, e la cancellazione e'
+        rifiutata (``DatiNonValidi`` con i righi), o viene dopo e trova l'allegato gia' cancellato (rifiutato da
+        ``aggiorna``). Nessun rigo puo' restare collegato a un allegato inesistente.
 
         Il deposito per impronta e' condiviso con ``DepositoArtefatti`` (ricevute, copie congelate, diagnostici), i cui
         descrittori stanno nel JSON di ``job.input``/``job.risultato``: se l'impronta compare li' (o in caso di dubbio)
         il file resta. Controllo e cancellazione avvengono sotto lo stesso lock di scrittura (BEGIN IMMEDIATE): un
         allegato con lo stesso contenuto, che scrive il file dentro la propria transazione, non puo' restare senza file."""
         with self.arch.transazione() as c:
-            c.execute("DELETE FROM allegati WHERE id=?", (r["id"],))
-            if self._impronta_in_uso(c, r["sha256"]):
-                return
-            p = self.arch.base / r["percorso"]
-            if p.is_file() and p.name == r["sha256"]:
-                p.unlink()
+            if se_non_usato:
+                usi = self._usi_in(c, r["id"], r["pratica_id"])
+                if usi:
+                    raise DatiNonValidi("l'allegato e' usato nel quadro EG: togli prima il rigo o sostituisci il file",
+                                        allegato_id=r["id"], righi=[u["id"] for u in usi],
+                                        pratiche=sorted({u["pratica_id"] for u in usi}))
+            self._cancella_in(c, r)
 
     @staticmethod
     def _impronta_in_uso(c, h: str) -> bool:
@@ -191,11 +234,7 @@ class AllegatiMixin:
     def elimina_allegato(self, allegato_id: str, *, canale: str = "gui") -> dict:
         """Elimina un allegato della pratica. Rifiutato se un rigo del quadro EG lo usa ancora."""
         r = self._riga_allegato(allegato_id)
-        refs = self._riferimenti(r["pratica_id"], allegato_id)
-        if refs:
-            raise DatiNonValidi("l'allegato e' usato nel quadro EG: togli prima il rigo o sostituisci il file",
-                                righi=[x["id"] for x in refs])
-        self._cancella_riga(r)
+        self._cancella_riga(r, se_non_usato=True)      # controllo dei righi EG e cancellazione nella stessa transazione
         return {"allegato_id": allegato_id, "eliminato": True}
 
     def riordina_allegati(self, pratica_id: str, *, canale: str = "gui") -> dict:
@@ -214,7 +253,10 @@ class AllegatiMixin:
             tenere = next((x for x in conv if x["id"] in usati), None) or max(conv, key=lambda x: x["ts"])
             for x in conv:
                 if x["id"] != tenere["id"] and x["id"] not in usati:
-                    self._cancella_riga(x)
+                    try:
+                        self._cancella_riga(x, se_non_usato=True)
+                    except DatiNonValidi:
+                        continue                     # collegato nel frattempo a un rigo EG: resta
                     rimossi.append(x["id"])
             ok, motivo = self.originale_sostituibile(json.loads(tenere["rapporto"]) if tenere["rapporto"] else None)
             if not ok:
@@ -224,9 +266,11 @@ class AllegatiMixin:
                     spostati += self._sposta_riferimenti(pratica_id, o["id"], tenere["id"], canale)
                 continue
             spostati += self._sposta_riferimenti(pratica_id, o["id"], tenere["id"], canale)
-            if not self._riferimenti(pratica_id, o["id"]):
-                self._cancella_riga(o)
-                rimossi.append(o["id"])
+            try:
+                self._cancella_riga(o, se_non_usato=True)
+            except DatiNonValidi:
+                continue                             # ancora (o di nuovo) usato da un rigo EG: l'originale resta
+            rimossi.append(o["id"])
         return {"pratica_id": pratica_id, "rimossi": rimossi, "righi_eg_aggiornati": spostati,
                 "originali_conservati": conservati}
 
@@ -251,13 +295,7 @@ class AllegatiMixin:
             raise DatiNonValidi("la conversione parte da un originale")
         gia, rap_gia = self._derivato_esistente(allegato_id)
         if gia is not None:
-            val = rap_gia.get("validazione") or {}
-            esito = {"allegato_id": allegato_id, "esito": val.get("esito"), "gia_convertito": True,
-                     "derivato": {"allegato_id": gia["id"], "nome": gia["nome"], "sha256": gia["sha256"], "bytes": gia["bytes"]},
-                     "avvisi": list(rap_gia.get("avvisi") or [])}
-            if sostituisci_originale:
-                esito.update(self._dopo_conversione(r, gia["id"], rap_gia, canale))
-            return esito
+            return self._esito_gia_convertito(r, gia, rap_gia, sostituisci_originale, canale)
         src = self.arch.base / r["percorso"]
         an = json.loads(r["analisi"])
         if an.get("esito") not in ("leggibile", "firmato"):
@@ -313,8 +351,16 @@ class AllegatiMixin:
             rapporto = {"conversione": conv, "validazione": val, "avvisi": avvisi, "livello": livello,
                         "verifica_testo": testo, "confronto_visivo": visivo}
             with self.arch.transazione() as c:
-                d = self._registra(c, r["pratica_id"], Path(r["nome"]).stem + "_pdfa.pdf", out, "derivato", allegato_id,
-                                   r["tipo_eg"], r["finalita"], r["persona_id"], an_d, rapporto)
+                # idempotenza sotto il lock di scrittura: due conversioni contemporanee (GUI e MCP) dello stesso
+                # originale registrano un solo derivato; la seconda scarta il proprio e restituisce quello esistente
+                if not c.execute("SELECT 1 FROM allegati WHERE id=?", (allegato_id,)).fetchone():
+                    raise NonTrovato("allegato inesistente (eliminato durante la conversione)", allegato_id=allegato_id)
+                gia, rap_gia = self._derivato_esistente(allegato_id, c)
+                d = None if gia is not None else self._registra(
+                    c, r["pratica_id"], Path(r["nome"]).stem + "_pdfa.pdf", out, "derivato", allegato_id,
+                    r["tipo_eg"], r["finalita"], r["persona_id"], an_d, rapporto)
+        if gia is not None:
+            return self._esito_gia_convertito(r, gia, rap_gia, sostituisci_originale, canale)
         esito = val["esito"]  # conforme / non_conforme / non_verificato
         out = {"allegato_id": allegato_id, "derivato": d, "esito": esito, "avvisi": avvisi,
                "verifica_indicativa": (val.get("verifica_indicativa") or {}).get("esito"),
@@ -322,6 +368,15 @@ class AllegatiMixin:
         if sostituisci_originale:
             out.update(self._dopo_conversione(r, d["allegato_id"], rapporto, canale))
         return out
+
+    def _esito_gia_convertito(self, r, gia, rap_gia: dict, sostituisci_originale: bool, canale: str) -> dict:
+        val = rap_gia.get("validazione") or {}
+        esito = {"allegato_id": r["id"], "esito": val.get("esito"), "gia_convertito": True,
+                 "derivato": {"allegato_id": gia["id"], "nome": gia["nome"], "sha256": gia["sha256"], "bytes": gia["bytes"]},
+                 "avvisi": list(rap_gia.get("avvisi") or [])}
+        if sostituisci_originale:
+            esito.update(self._dopo_conversione(r, gia["id"], rap_gia, canale))
+        return esito
 
     #: avvisi della conversione per cui l'originale resta (da confrontare a vista o perche' perde la firma)
     _RISCHI = ("firmato", "testo divergente", "differenze visive")
@@ -359,7 +414,13 @@ class AllegatiMixin:
                         if self.derivato_utilizzabile(rapporto_derivato) else 0)
             return {"originale_rimosso": False, "righi_eg_aggiornati": spostati, "motivo_originale_conservato": motivo}
         spostati = self._sposta_riferimenti(originale["pratica_id"], originale["id"], derivato_id, canale)
-        self._cancella_riga(originale)
+        try:
+            # ricontrollo dei righi EG nella stessa transazione della cancellazione (aggiornamenti concorrenti)
+            self._cancella_riga(originale, se_non_usato=True)
+        except DatiNonValidi as e:
+            return {"originale_rimosso": False, "righi_eg_aggiornati": spostati,
+                    "motivo_originale_conservato": "l'originale e' stato collegato a un rigo EG durante la conversione: "
+                    "resta (righi " + ", ".join(str(x) for x in e.dettagli.get("righi", [])) + ")"}
         return {"originale_rimosso": True, "righi_eg_aggiornati": spostati}
 
     def suddividi_allegato(self, allegato_id: str, limite_byte: int | None = None, livello: str = "1b",

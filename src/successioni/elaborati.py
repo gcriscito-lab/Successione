@@ -94,9 +94,22 @@ class ElaboratiMixin:
             cart.mkdir(parents=True, exist_ok=True)
             p = cart / f"{sha[:16]}.xml"
             if not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != sha:
-                tmp = p.with_name(p.name + ".tmp")   # assente o alterato: ripristina atomicamente i byte generati
-                tmp.write_bytes(es.xml)
-                os.replace(tmp, p)
+                # assente o alterato: ripristina atomicamente i byte generati (nome temporaneo univoco: due esportazioni
+                # contemporanee GUI e MCP dello stesso contenuto non scrivono sullo stesso file temporaneo)
+                tmp = p.with_name(f"{p.name}.{uuid.uuid4().hex}.tmp")
+                try:
+                    tmp.write_bytes(es.xml)
+                    for prova in range(20):      # Windows: sostituzione contemporanea dello stesso file -> accesso negato
+                        try:
+                            os.replace(tmp, p)
+                            break
+                        except PermissionError:
+                            if prova == 19:
+                                raise
+                            import time
+                            time.sleep(0.05)
+                finally:
+                    tmp.unlink(missing_ok=True)
             percorso = p.relative_to(self.arch.base).as_posix()
         ris = {"generato": es.xml is not None, "completo": es.completo, "scopo": scopo, "xml_sha256": sha, "percorso": percorso,
                "errori": [e.asdict() for e in es.errori], "non_supportato": list(es.non_supportato),
@@ -330,9 +343,20 @@ class ElaboratiMixin:
         cart.mkdir(parents=True, exist_ok=True)
         p = cart / f"modello_{sha[:16]}.pdf"
         if not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest() != sha:
-            tmp = p.with_name(p.name + ".tmp")
-            tmp.write_bytes(r.pdf)
-            os.replace(tmp, p)
+            tmp = p.with_name(f"{p.name}.{uuid.uuid4().hex}.tmp")   # nome univoco (stampe contemporanee)
+            try:
+                tmp.write_bytes(r.pdf)
+                for prova in range(20):          # Windows: sostituzione contemporanea dello stesso file -> accesso negato
+                    try:
+                        os.replace(tmp, p)
+                        break
+                    except PermissionError:
+                        if prova == 19:
+                            raise
+                        import time
+                        time.sleep(0.05)
+            finally:
+                tmp.unlink(missing_ok=True)
         ris = {"generato": True, "pdf_sha256": sha, "percorso": p.relative_to(self.arch.base).as_posix(), "pagine": r.pagine,
                "fonte": ST.FONTE,
                "ambito": "prova locale con il codice di stampa del componente ufficiale; non e' una verifica con l'Agenzia, "

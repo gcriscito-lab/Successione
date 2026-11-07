@@ -193,6 +193,9 @@ class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin
             for i, op in enumerate(operazioni):
                 self._applica(nuovi, op, origine, canale, i)
             errori = S.valida_forma(nuovi)
+            # allegati dei righi EG: esistenti e della stessa pratica (letti nella stessa transazione, cosi' una
+            # cancellazione concorrente non lascia righi collegati a un allegato inesistente)
+            errori += self._errori_allegati_ref(c, pratica_id, nuovi, solo_cambiati=vecchi)
             if errori:
                 raise DatiNonValidi("dati non validi: nessuna modifica applicata",
                                     errori=[e.asdict() for e in errori])
@@ -237,6 +240,8 @@ class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin
     def verifica(self, pratica_id: str) -> dict:
         d = self.leggi(pratica_id)
         errori = S.valida_forma(d["dati"]) + S.controlli_coerenza(d["dati"]) + Q.rilievi_quadri(d["dati"])
+        with self.arch.lettura() as c:
+            errori += self._errori_allegati_ref(c, pratica_id, d["dati"])
         from . import impostazioni
         pref = impostazioni.preferenze(self.arch.base)
         visure = Q.rilievi_visure(d["dati"], pref["avviso_visura_giorni"])
@@ -293,6 +298,34 @@ class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin
                 "ambito": v["ambito"]}
 
     # ------------------------------------------------------------------ interni
+    @staticmethod
+    def _errori_allegati_ref(c, pratica_id: str, dati: dict, *, solo_cambiati: dict | None = None) -> list:
+        """``documenti_ref.allegato_id`` deve indicare un allegato esistente della STESSA pratica.
+
+        Con ``solo_cambiati`` (i dati prima della modifica) si controllano solo i righi nuovi o con allegato cambiato:
+        una modifica di altro tipo non e' bloccata da un riferimento gia' presente (lo segnala ``verifica``)."""
+        prima = {}
+        if solo_cambiati is not None:
+            prima = {r.get("id"): r.get("allegato_id") for r in solo_cambiati.get("documenti_ref", []) if isinstance(r, dict)}
+        err = []
+        for r in dati.get("documenti_ref", []):
+            aid = r.get("allegato_id") if isinstance(r, dict) else None
+            if aid in (None, "") or not isinstance(aid, str) or V.e_stato(aid):
+                continue
+            if solo_cambiati is not None and r.get("id") in prima and prima[r.get("id")] == aid:
+                continue
+            perc = f"documenti_ref[{r.get('id')}].allegato_id"
+            a = c.execute("SELECT pratica_id FROM allegati WHERE id=?", (aid,)).fetchone()
+            if a is None:
+                err.append(S.Errore("ALLEGATO_INESISTENTE", perc,
+                                    f"l'allegato {aid!r} non esiste (eliminato o identificativo errato): sceglierne uno "
+                                    "fra i file della pratica"))
+            elif a["pratica_id"] != pratica_id:
+                err.append(S.Errore("ALLEGATO_DI_ALTRA_PRATICA", perc,
+                                    f"l'allegato {aid!r} appartiene a un'altra pratica ({a['pratica_id']}): acquisire il "
+                                    "file in questa pratica e collegare quello"))
+        return err
+
     @staticmethod
     def _canale(canale):
         if canale not in CANALI:
