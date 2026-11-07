@@ -233,14 +233,12 @@ def _leggi(xml: bytes) -> tuple[dict, list[Errore]]:
             if q == "ER" and _testo(riga, "TipoCespite"):
                 tipo_cespite = _testo(riga, "TipoCespite")
                 bi = bi or tipo_cespite == "BI"
-            # beni esteri e imposta estera: supportati (detrazione DET.estero, guida pp. 7-8); restano esclusi il bene aziendale e il
-            # diritto di abitazione
+            # beni esteri e imposta estera: supportati (detrazione DET.estero, guida pp. 7-8)
             if q in ("EB", "EC", "EL", "EM") and _testo(riga, "Valore") is not None:
                 az_riga = riga.find(SUC + "BeneAziendale") is not None      # i righi di continuazione ereditano la casella
-            for nome in ("DirittoAbitazione",):
-                if riga.find(SUC + nome) is not None:
-                    ns.append(Errore("CALCOLO_NON_SUPPORTATO", f"Quadro{q}/{nome}", f"{nome}: riduzioni, beni aziendali o "
-                                     "agevolazioni non supportati dal calcolo", _g(5, "riduzioni")))
+            # la casella DirittoAbitazione (codici 1-8) non modifica l'imposta di successione: la guida al calcolo (pp. 1 e 5) non la
+            # elenca fra esclusioni e riduzioni, le righe restano valutate «valore x quota» (annotazione XSD di Quota) e la prima casa
+            # incide solo sulle imposte ipotecaria e catastale (Fascicolo I p. PDF 57, quadro sinottico); docs/regole/diritto_abitazione.md
             for dv in riga.iter(SUC + "Devoluzione"):
                 if az_riga and q in ("EB", "EC", "EL", "EM"):
                     # immobile aziendale: il suo valore e' compreso nel valore dell'azienda del quadro EN (Fascicolo I pp. PDF 21 e 29:

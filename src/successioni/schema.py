@@ -171,8 +171,10 @@ STRUTTURATI: dict[str, dict] = {
         "etichetta": "diritto di abitazione del coniuge superstite", "tipo": "enum",
         "aiuto": "Solo per l'immobile su cui con l'apertura della successione si costituisce il diritto di abitazione del coniuge superstite "
                  "(art. 540 c.c.). Il codice dice se il coniuge chiede la prima casa (P, Z, X) o no, e se ha rinunciato all'eredita' ma non al "
-                 "legato ex lege. NON ancora supportato dall'esportazione: richiede la devoluzione con diritti distinti (abitazione e nuda "
-                 "proprieta') e la loro valutazione. Il dato si conserva in bozza. Fascicolo I p. 31-32.",
+                 "legato ex lege (codici 5-8: coniuge con tipo soggetto 4). Le righe di devoluzione restano quelle della proprieta' (valore "
+                 "quota = valore x quota): non serve una riga per il diritto di abitazione. Con i codici 1, 2, 3, 5, 6, 7 la prima casa si "
+                 "estende a tutti i beneficiari del bene (quadro EF); se il coniuge e' il dichiarante compila la Sezione II del quadro EH, "
+                 "altrimenti allega la richiesta (rigo EG9) e il documento d'identita'. Fascicolo I p. 31-32.",
         "opzioni": [
             _opz("1", "prima casa: immobile principale (P)", "Il coniuge superstite chiede la prima casa sull'immobile principale."),
             _opz("2", "prima casa: immobile contiguo (Z)", "Il coniuge superstite chiede la prima casa sull'immobile contiguo."),

@@ -35,7 +35,7 @@ tabella esplicita delle fonti): `FlagComuneResidenza`/`FlagComuneAttivita`/`Flag
 Il controllo ufficiale verifica la presenza ma non il significato: va riletta in sede di collaudo.
 
 ## Non supportato (blocca l'esportazione con il motivo)
-Codice Y; Z senza P dello stesso soggetto o di soggetto diverso dal dichiarante; quadro EM; diritto di abitazione del
-coniuge (`DirittoAbitazione` 1-8); requisiti per trasferiti all'estero, forze armate, residenti all'estero (altre scelte
+Codice Y; Z senza P dello stesso soggetto o di soggetto diverso dal dichiarante; quadro EM (il diritto di abitazione del
+coniuge, `DirittoAbitazione` 1-8, e' coperto: `docs/regole/diritto_abitazione.md`); requisiti per trasferiti all'estero, forze armate, residenti all'estero (altre scelte
 di `Opzioni`, `FlagTrasferimentoPrima`, ...); evento eccezionale cod. 1; credito d'imposta (Sezione III); combinazioni
 con altre agevolazioni o riduzioni; piu' comuni (come prima); categorie diverse da A/2-A/7 per P e Z.

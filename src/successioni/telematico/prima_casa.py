@@ -15,7 +15,8 @@ PERIMETRO SUPPORTATO
 - quadro EF: rigo EF4 (Numero, valore, imposta fissa), esclusione dei beni agevolati dai righi EF1 ed EF9.
 
 NON SUPPORTATI (blocco con motivo, mai implementati per analogia): codice Y; codice Z senza P dello stesso soggetto o richiesto da
-un soggetto diverso dal dichiarante; quadro EM; diritto di abitazione del coniuge (campo DirittoAbitazione, valori 1-8);
+un soggetto diverso dal dichiarante; quadro EM (il diritto di abitazione del coniuge, campo DirittoAbitazione, e' in
+diritto_abitazione.py, che estende pc_beni, pc_numero, pc_eg e pc_dichiarante);
 requisiti dei trasferiti all'estero, delle forze armate (Opzioni FlagTrasferitoEstero, FlagForzeArmate, ...); evento
 eccezionale cod. 1; credito d'imposta (Sezione III); combinazioni con altre agevolazioni o con riduzioni.
 """
