@@ -178,8 +178,18 @@ def costruisci(dati: dict, *, oggi: date | None = None) -> dict:
     coniugi: list[dict] = []
     rappresentati: dict[str, dict] = {}
     avvisi: list[str] = []
+    in_ciclo = _rappresentazioni_circolari(benef, benef_cf)
     for n in benef:
         rcf = n["rappresentato_cf"]
+        if n["id"] in in_ciclo:
+            # riferimento circolare (A rappresenta B e B rappresenta A, o se stesso): nessun collegamento, ma il
+            # soggetto resta nell'albero con il proprio grado e lo si segnala
+            avvisi.append(f"{_nominativo(n) or n['id']}: rappresentazione circolare (il rappresentato {rcf} risulta a sua "
+                          "volta rappresentato da questo soggetto, direttamente o attraverso altri): indicato senza "
+                          "collegamento al ramo; correggere il codice fiscale del rappresentato")
+            r = _ramo(n["grado"], None)
+            (coniugi if r == "coniuge" else rami[r]).append(n)
+            continue
         if rcf:
             if rcf in benef_cf and benef_cf[rcf] is not n:
                 capo = benef_cf[rcf]                     # rappresentato presente nel quadro EA (es. figlio rinunciatario)
@@ -189,7 +199,15 @@ def costruisci(dati: dict, *, oggi: date | None = None) -> dict:
                 if capo is None:
                     capo = _nodo_rappresentato(dati, rcf, per_cf.get(rcf), n["rappresentato_grado"], gradi, tipi, defunto)
                     rappresentati[rcf] = capo
-                    rami[_ramo(n["rappresentato_grado"], None)].append(capo)
+                    # il ramo segue il grado del RAPPRESENTATO (dalla persona in pratica o dal dato del rappresentante);
+                    # se manca, lo si ricava dal grado di chi rappresenta (annotazione XSD SuccessionePerRappresentazione:
+                    # 04/06/08 -> rappresentato figlio 02; 15/20/27 -> rappresentato fratello 10/11)
+                    r_capo = _ramo_rappresentato(capo.get("grado"), n["grado"])
+                    if not capo.get("grado"):
+                        avvisi.append(f"{_nominativo(capo) or rcf}: grado di parentela del rappresentato non indicato"
+                                      + (f": collocato fra i {dict(RAMI)[r_capo].lower()} in base al grado {n['grado']} "
+                                         f"di {_nominativo(n) or n['id']}" if r_capo != "altri" else ""))
+                    (coniugi if r_capo == "coniuge" else rami[r_capo]).append(capo)
             n["per_rappresentazione_di"] = _nominativo(capo) or rcf
             capo["figli"].append(n)
             continue
@@ -210,6 +228,38 @@ def costruisci(dati: dict, *, oggi: date | None = None) -> dict:
             "mancanti": mancanti, "avvisi": avvisi, "dichiarante": dich,
             "data_redazione": (oggi or date.today()).isoformat(), "fonti": FONTI,
             "codici_disponibili": bool(gradi)}
+
+
+#: grado del rappresentante -> ramo del rappresentato quando il grado di quest'ultimo manca (annotazione XSD del campo
+#: GradoParentela di SuccessionePerRappresentazione: 02 per 04/06/08; 10 o 11 per 15/20 e «nipote di nipote», codice 27
+#: nella tabella GradoParentela)
+_RAMO_DA_RAPPRESENTANTE = {"04": "discendenti", "06": "discendenti", "08": "discendenti",
+                           "15": "collaterali", "20": "collaterali", "27": "collaterali"}
+
+
+def _ramo_rappresentato(grado_rappresentato: str | None, grado_rappresentante: str | None) -> str:
+    if grado_rappresentato:
+        return _ramo(grado_rappresentato, None)
+    return _RAMO_DA_RAPPRESENTANTE.get(grado_rappresentante or "", "altri")
+
+
+def _rappresentazioni_circolari(benef: list[dict], benef_cf: dict[str, dict]) -> set:
+    """Id dei beneficiari che stanno in un ciclo di rappresentazione (A -> B -> ... -> A, o A -> A)."""
+    def succ(n):
+        rcf = n["rappresentato_cf"]
+        return benef_cf.get(rcf) if rcf else None
+    out: set = set()
+    for n in benef:
+        visti, x = [], n
+        while x is not None and x["id"] not in [v["id"] for v in visti]:
+            visti.append(x)
+            x = succ(x)
+        if x is not None and x["id"] == n["id"]:
+            out.add(n["id"])
+    # rappresentato uguale a se stesso (codice fiscale del rappresentato = proprio codice fiscale)
+    out |= {n["id"] for n in benef if n["rappresentato_cf"] and n["codice_fiscale"]
+            and n["rappresentato_cf"] == n["codice_fiscale"].upper()}
+    return out
 
 
 def _tutti(nodi: list[dict]) -> list[dict]:
@@ -519,6 +569,9 @@ class AlberoGenealogicoMixin:
             return {"pratica_id": pratica_id, "esito": "gia_aggiornato", "generato": False,
                     "allegato_id": refs[0]["allegato_id"], "revisione": rev, "mancanti": modello["mancanti"],
                     "avvisi": modello["avvisi"]}
+        # alberi generati gia' presenti all'avvio: solo questi (e quelli creati qui) possono essere ripuliti alla fine,
+        # cosi' una generazione concorrente (GUI e MCP) non perde i file che sta per collegare
+        preesistenti = {r["id"] for r in self._righe_pratica(pratica_id) if self._marcatore(r) is not None}
         marcatore = {"modulo": MARCATORE, "impronta": imp, "revisione_dati": rev, "data_redazione": modello["data_redazione"]}
         with tempfile.TemporaryDirectory() as t:
             f = Path(t) / NOME_FILE
@@ -545,30 +598,18 @@ class AlberoGenealogicoMixin:
                 avvisi_conv.append("PDF/A non creato (" + str(conv.get("esito")) + (": " + str(conv.get("dettaglio"))
                                    if conv.get("dettaglio") else "") + "): il rigo EG6 usa il PDF non convertito, da "
                                    "convertire prima dell'invio")
-            if refs:
-                primo = next((v for v in refs if v["generato"]), refs[0])
-                ops = [{"op": "upsert", "coll": "documenti_ref", "id": primo["documento_id"],
-                        "campi": {"allegato_id": usare, "tipo_eg": TIPO_EG, "finalita": FINALITA}}]
-                ops += [{"op": "remove", "coll": "documenti_ref", "id": v["documento_id"]} for v in refs
-                        if v["documento_id"] != primo["documento_id"]]
-            else:
-                import uuid
-                ops = [{"op": "upsert", "coll": "documenti_ref", "id": "dr_" + uuid.uuid4().hex[:12],
-                        "campi": {"allegato_id": usare, "tipo_eg": TIPO_EG, "finalita": FINALITA}}]
-            agg = self.aggiorna(pratica_id, rev, ops, autore=autore, canale=canale, origine="calcolato")
+            agg, manuali, cambiati = self._collega_eg6(pratica_id, usare, imp, sostituisci_manuale, autore, canale)
         except Exception:
             for i in nuovi:                                # nessun file orfano se il collegamento non riesce
                 try:
-                    self._cancella_riga(self._riga_allegato(i))
+                    self._cancella_riga(self._riga_allegato(i), se_non_usato=True)
                 except Exception:
                     pass
             raise
-        eliminati = []
-        usati = {r.get("allegato_id") for r in self.leggi(pratica_id)["dati"].get("documenti_ref", [])}
-        for r in self._righe_pratica(pratica_id):
-            if r["id"] not in usati and self._marcatore(r) is not None:
-                self._cancella_riga(r)                     # solo alberi GENERATI non piu' usati: mai un file caricato a mano
-                eliminati.append(r["id"])
+        if cambiati:
+            avvisi_conv.append("i dati della pratica sono cambiati durante la generazione: l'albero collegato non "
+                               "rispecchia l'ultima versione, rigenerarlo")
+        eliminati = self._pulisci_alberi(pratica_id, set(nuovi), preesistenti)
         val = (self.elenca_allegati_uno(usare) or {}).get("rapporto") or {}
         return {"pratica_id": pratica_id, "esito": "generato", "generato": True, "allegato_id": usare,
                 "pdfa": usare != orig["allegato_id"] or conv.get("esito") == "conforme",
@@ -577,6 +618,62 @@ class AlberoGenealogicoMixin:
                 "mancanti": modello["mancanti"], "avvisi": modello["avvisi"] + avvisi_conv,
                 "manuali_scollegati": [{"allegato_id": v["allegato_id"], "nome": v["nome"]} for v in manuali],
                 "eliminati": eliminati, "fonti": FONTI}
+
+    def _collega_eg6(self, pratica_id: str, usare: str, imp: str, sostituisci_manuale: bool, autore: str,
+                     canale: str) -> tuple[dict, list[dict], bool]:
+        """Collega ``usare`` all'unico rigo EG6 rileggendo la pratica AL MOMENTO del collegamento (la generazione e la
+        conversione richiedono tempo: nel frattempo GUI o MCP possono aver cambiato la pratica). Riprova se la revisione
+        cambia fra lettura e scrittura. Restituisce (risposta di aggiorna, alberi manuali scollegati, dati cambiati)."""
+        import uuid
+        from .errori import ConflittoRevisione
+        for tentativo in range(5):
+            p = self.leggi(pratica_id)
+            refs = self._stato_albero(pratica_id, p["dati"])["righi_eg6"]
+            manuali = [v for v in refs if not v["generato"]]
+            if manuali and not sostituisci_manuale:
+                raise DatiNonValidi("nel frattempo il rigo EG6 e' stato collegato a un albero genealogico caricato a mano: "
+                                    "albero generato non collegato; rigenerare confermando la sostituzione",
+                                    manuali=[v["allegato_id"] for v in manuali])
+            if refs:
+                primo = next((v for v in refs if v["generato"]), refs[0])
+                ops = [{"op": "upsert", "coll": "documenti_ref", "id": primo["documento_id"],
+                        "campi": {"allegato_id": usare, "tipo_eg": TIPO_EG, "finalita": FINALITA}}]
+                ops += [{"op": "remove", "coll": "documenti_ref", "id": v["documento_id"]} for v in refs
+                        if v["documento_id"] != primo["documento_id"]]
+            else:
+                ops = [{"op": "upsert", "coll": "documenti_ref", "id": "dr_" + uuid.uuid4().hex[:12],
+                        "campi": {"allegato_id": usare, "tipo_eg": TIPO_EG, "finalita": FINALITA}}]
+            try:
+                agg = self.aggiorna(pratica_id, p["revisione"], ops, autore=autore, canale=canale, origine="calcolato")
+            except ConflittoRevisione:
+                if tentativo == 4:
+                    raise
+                continue
+            try:
+                cambiati = impronta(costruisci(p["dati"])) != imp
+            except Exception:
+                cambiati = True
+            return agg, manuali, cambiati
+        raise AssertionError("non raggiungibile")
+
+    def _pulisci_alberi(self, pratica_id: str, nuovi: set, preesistenti: set) -> list[str]:
+        """Elimina gli alberi GENERATI non collegati a nessun rigo EG (mai un file caricato a mano), limitandosi a quelli
+        creati da questa generazione o gia' presenti al suo avvio. Lettura dei riferimenti e cancellazione nella stessa
+        transazione (BEGIN IMMEDIATE): un rigo collegato nel frattempo da GUI o MCP non resta senza file."""
+        eliminati = []
+        with self.arch.transazione() as c:
+            pr = c.execute("SELECT dati FROM pratiche WHERE id=?", (pratica_id,)).fetchone()
+            if not pr:
+                return []
+            usati = {r.get("allegato_id") for r in (json.loads(pr["dati"]).get("documenti_ref") or [])}
+            righe = c.execute("SELECT * FROM allegati WHERE pratica_id=?", (pratica_id,)).fetchall()
+            for r in righe:
+                if (r["id"] in usati or self._marcatore(r) is None or (r["id"] not in nuovi and r["id"] not in preesistenti)
+                        or self._usi_altre_pratiche(c, r["id"], pratica_id)):
+                    continue
+                self._cancella_in(c, r)
+                eliminati.append(r["id"])
+        return eliminati
 
     def elenca_allegati_uno(self, allegato_id: str) -> dict | None:
         r = self._riga_allegato(allegato_id)
