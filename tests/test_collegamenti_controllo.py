@@ -137,7 +137,10 @@ def test_adattatore_con_esecutore_finto_e_sempre_simulazione(arch, tmp_path):
     ruoli = {a["ruolo"] for a in r.artefatti}
     assert {"input_controllo", "diagnostico_dgn", "esito_schema", "rapporto_wri", "stdout_controllo"} <= ruoli
     assert j["ambiente"]["jar"][0]["nome"] == "controlliXMLREG2013.jar" and len(j["ambiente"]["jar"]) == 15
-    assert not (arch.base / "lavoro" / "controlli" / r.job_id).exists()  # cartella di lavoro rimossa
+    # cartella di lavoro rimossa: il nome reale e' <job_id>-<uuid> (registrato in cartella_lavoro)
+    assert j["cartella_lavoro"].startswith(f"lavoro/controlli/{r.job_id}-")
+    assert not (arch.base / j["cartella_lavoro"]).exists()
+    assert not list((arch.base / "lavoro" / "controlli").glob(r.job_id + "*"))
     n = len(es.chiamate)
     r2 = ctl.esegui(FIX / "frontespizio.xml", pratica_id="pr_1", impronta_dichiarativa="i1", chiave="c1")
     assert r2.job_id == r.job_id and len(es.chiamate) == n  # richiesta ripetuta: nessuna nuova esecuzione

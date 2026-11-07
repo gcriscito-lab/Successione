@@ -133,9 +133,13 @@ def test_gui_localhost_token_host_e_seconda_apertura(tmp_path):
         assert porta in A.PORTE
         # Identita' del server che risponde, non del launcher della venv.
         assert json.loads(_get(f"http://127.0.0.1:{porta}/api/info?t={tok}")[1])['pid'] == s['pid']
-        st, corpo = _get(f"http://127.0.0.1:{porta}/?t={tok}")
-        assert st == 200 and b"<html" in corpo.lower()
-        assert _get(f"http://127.0.0.1:{porta}/static/app.js?t={tok}")[0] == 200
+        # il token nell'indirizzo imposta il cookie della porta e reindirizza alla pagina senza query (revisione 2, punto 4)
+        import http.cookiejar
+        apri = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        with apri.open(f"http://127.0.0.1:{porta}/?t={tok}", timeout=5) as r:
+            assert r.status == 200 and b"<html" in r.read().lower() and "?t=" not in r.geturl()
+        with apri.open(f"http://127.0.0.1:{porta}/static/app.js", timeout=5) as r:
+            assert r.status == 200
         assert _get(f"http://127.0.0.1:{porta}/")[0] == 401                       # senza token
         assert _get(f"http://127.0.0.1:{porta}/?t={tok}", host=f"esempio.it:{porta}")[0] == 403  # Host estraneo
         # solo loopback: su un indirizzo non di loopback della macchina la porta non risponde

@@ -16,7 +16,8 @@ from test_telematico_importa import _xml, CTX
 NS = {"suc": "urn:www.agenziaentrate.gov.it:specificheTecniche:sco:suc:v1"}
 
 
-@pytest.mark.parametrize("tag", ["Agevolazioni", "ValorePrecSucc", "CampoNonConosciuto"])
+# «Agevolazioni» ora si importa (revisione 2, 07/11/2026): la regressione sui campi sconosciuti la copre CampoNonConosciuto
+@pytest.mark.parametrize("tag", ["ValorePrecSucc", "CampoNonConosciuto"])
 def test_nessuna_perdita_silenziosa_dei_campi_xml(tag):
     root = etree.fromstring(_xml())
     dv = root.xpath('//suc:QuadroEC//suc:Devoluzione', namespaces=NS)[0]

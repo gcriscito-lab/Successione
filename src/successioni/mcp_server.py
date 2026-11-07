@@ -31,7 +31,7 @@ STRUMENTI_LETTURA = frozenset({
     "file_in_ingresso", "elenca_allegati", "diagnosi", "valori_catastali",
 })
 STRUMENTI_SCRITTURA = frozenset({
-    "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "backup_archivio", "stampa_modello",
+    "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "registra_esito_controllo", "backup_archivio", "stampa_modello",
     "invio_prepara", "importa_xml_telematico", "acquisisci_allegato", "prepara_pdfa", "suddividi_allegato",
     "riordina_allegati",
 })
@@ -57,17 +57,28 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         "non_applicabile} quando il dato non e' noto. I risultati di verifica_pratica sono controlli interni, "
         "non il controllo ufficiale dell'Agenzia."))
 
-    def sola_lettura() -> bool:
+    def stato_sola_lettura() -> tuple[bool, str | None]:
+        """(sola lettura?, motivo). Fail-closed: un file di configurazione che esiste ma non si legge o non e' valido vale
+        sola lettura (i predefiniti permetterebbero la scrittura)."""
         from . import impostazioni
-        return bool(impostazioni.preferenze(sv.arch.base).get("mcp_sola_lettura"))
+        pref, problema = impostazioni.leggi_preferenze(sv.arch.base)
+        if impostazioni.sola_lettura_da_ambiente():
+            return True, "variabile d'ambiente SUCCESSIONI_MCP_SOLA_LETTURA"
+        if problema:
+            return True, problema + ": per sicurezza Claude resta in sola lettura finche' il file non viene corretto"
+        if pref.get("mcp_sola_lettura"):
+            return True, "preferenza Impostazioni -> Operativita' e sicurezza"
+        return False, None
 
     def protetto(fn):
         scrittura = fn.__name__ not in STRUMENTI_LETTURA          # fail-closed: non classificato = scrittura
 
         @functools.wraps(fn)
         def w(*a, **k):
-            if scrittura and sola_lettura():
-                raise ToolError("SOLA_LETTURA: " + MESSAGGIO_SOLA_LETTURA)
+            if scrittura:
+                attiva, motivo = stato_sola_lettura()
+                if attiva:
+                    raise ToolError("SOLA_LETTURA: " + MESSAGGIO_SOLA_LETTURA + (f" Motivo: {motivo}." if motivo else ""))
             try:
                 return fn(*a, **k)
             except ErroreServizio as e:
@@ -88,14 +99,17 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
 
     @tool
     def capacita() -> dict[str, Any]:
-        """Versione, funzioni disponibili e casi non ancora coperti (da leggere prima di iniziare)."""
+        """Versione, funzioni disponibili e casi non ancora coperti (da leggere prima di iniziare). 'sola_lettura' dice se gli
+        strumenti di scrittura sono disattivati e 'motivo_sola_lettura' perche' (preferenza, variabile d'ambiente o file di
+        configurazione illeggibile/non valido)."""
+        attiva, motivo = stato_sola_lettura()
         return {"versione_applicazione": __version__, "versione_regole": VERSIONE_REGOLE,
                 "funzioni": ["pratiche", "soggetti/beni/devoluzioni/passivita", "revisioni e differenze",
                              "allegati e conversione PDF/A", "verifica interna", "export XML nel perimetro coperto",
                              "controllo ufficiale locale se configurato"],
                 "non_disponibile": COPERTURA_NON_DISPONIBILE,
                 "strumenti_pdfa": {"ghostscript": bool(pdfa.trova_gs()), "veraPDF": bool(pdfa.trova_verapdf())},
-                "cartella_ingresso": str(sv.cartella_ingresso), "sola_lettura": sola_lettura()}
+                "cartella_ingresso": str(sv.cartella_ingresso), "sola_lettura": attiva, "motivo_sola_lettura": motivo}
 
     @tool
     def schema_dati() -> dict[str, Any]:
@@ -121,9 +135,12 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Dati completi e revisione. Con 'revisione' legge una versione precedente."""
         return sv.leggi(pratica_id, revisione)
 
-    @tool(ann=SCRITTURA)
+    # puo' rimuovere elementi (op 'remove'): distruttivo per la revisione corrente, ma ogni revisione resta nella storia
+    @tool(ann=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False))
     def aggiorna_pratica(pratica_id: str, revisione_attesa: int, operazioni: list[dict], chiave_richiesta: str) -> dict:
-        """Applica in modo atomico una lista di operazioni. Conflitto di revisione = nessuna modifica."""
+        """Applica in modo atomico una lista di operazioni. Conflitto di revisione = nessuna modifica. Con op 'remove' toglie
+        elementi dalla pratica: e' una modifica distruttiva della revisione corrente, ma le revisioni precedenti restano
+        conservate (revisioni_pratica, leggi_pratica con 'revisione') e si possono confrontare o ripristinare."""
         return sv.aggiorna(pratica_id, revisione_attesa, operazioni, chiave=chiave_richiesta,
                            autore="assistente", canale="mcp")
 
@@ -205,19 +222,43 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         return sorted(p.name for p in sv.cartella_ingresso.iterdir() if p.is_file())
 
     @tool(ann=LOCALE)
-    def importa_xml_telematico(nome_file: str, titolo: str | None = None) -> dict:
-        """Crea una nuova pratica da XML SUC13 nella cartella d'ingresso. Rifiuta campi non conservabili; non invia."""
+    def importa_xml_telematico(nome_file: str, titolo: str | None = None, chiave_richiesta: str | None = None) -> dict:
+        """Crea una nuova pratica da XML SUC13 nella cartella d'ingresso. Rifiuta campi non conservabili; non invia.
+        Con 'chiave_richiesta' (consigliata) ripetere la chiamata, per esempio dopo un timeout, restituisce la stessa
+        pratica ('ripetuta': true) invece di crearne un'altra; la stessa chiave con un file o titolo diverso e' un errore."""
         p = (sv.cartella_ingresso / nome_file).resolve()
-        if not p.is_relative_to(sv.cartella_ingresso.resolve()) or not p.is_file() or p.stat().st_size > 20_000_000:
-            raise DatiNonValidi("file non disponibile nella cartella d'ingresso o oltre 20 MB")
-        return sv.importa_xml_telematico(p.read_bytes(), titolo=titolo, autore="assistente", canale="mcp")
+        if not p.is_relative_to(sv.cartella_ingresso.resolve()) or not p.is_file() or p.stat().st_size > 60_000_000:
+            raise DatiNonValidi("file non disponibile nella cartella d'ingresso o oltre 60 MB (stesso limite dell'interfaccia)")
+        return sv.importa_xml_telematico(p.read_bytes(), titolo=titolo, autore="assistente", canale="mcp",
+                                         chiave=chiave_richiesta)
 
-    @tool(ann=LOCALE)
+    @tool(ann=SCRITTURA)
+    def registra_esito_controllo(pratica_id: str, file_dgn: str, file_log_schema: str, file_wri: str | None = None,
+                                 conferma_associazione: bool = False) -> dict:
+        """Chiude il controllo ufficiale eseguito A MANO con il programma dell'Agenzia: legge dalla cartella d'ingresso i file
+        originali prodotti (.dgn, _logSchema.xml, .wri facoltativo) e li associa al file corrente della pratica. Vale solo se il
+        controllo e' in attesa del diagnostico (stato_elaborati: controllo_ufficiale.stato_job = 'attesa_diagnostico'). Non e'
+        una verifica dell'Agenzia: registra l'esito che il professionista ha ottenuto sul proprio computer."""
+        def leggi(nome):
+            if not nome:
+                return None
+            p = (sv.cartella_ingresso / nome).resolve()
+            if not p.is_relative_to(sv.cartella_ingresso.resolve()) or not p.is_file() or p.stat().st_size > 20_000_000:
+                raise DatiNonValidi(f"file «{nome}» non disponibile nella cartella d'ingresso o oltre 20 MB")
+            return p.read_bytes()
+        return sv.registra_diagnostico_controllo(pratica_id, dgn=leggi(file_dgn), log_schema=leggi(file_log_schema),
+                                                 wri=leggi(file_wri), conferma_associazione=conferma_associazione)
+
+    @tool(ann=SCRITTURA)
     def acquisisci_allegato(pratica_id: str, nome_file: str, tipo_eg: str | None = None,
-                            finalita: str | None = None, persona_id: str | None = None) -> dict:
-        """Acquisisce un file della cartella d'ingresso come originale; tipo e finalita' li indica il chiamante."""
+                            finalita: str | None = None, persona_id: str | None = None,
+                            chiave_richiesta: str | None = None) -> dict:
+        """Acquisisce un file della cartella d'ingresso come originale; tipo e finalita' li indica il chiamante.
+        Idempotente: se la pratica ha gia' un originale con lo stesso contenuto (impronta), nome, tipo, finalita' e persona,
+        restituisce quello ('gia_presente': true) senza duplicarlo. Con 'chiave_richiesta' una ripetizione restituisce la
+        stessa risposta ('ripetuta': true); la stessa chiave con argomenti diversi e' un errore."""
         return sv.acquisisci_da_ingresso(pratica_id, nome_file, tipo_eg=tipo_eg, finalita=finalita,
-                                         persona_id=persona_id)
+                                         persona_id=persona_id, chiave=chiave_richiesta, riusa_identico=True)
 
     # puo' rimuovere l'originale (sostituisci_originale=True): distruttivo; una seconda chiamata riusa il PDF/A gia' creato
     @tool(ann=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False))

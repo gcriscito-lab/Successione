@@ -214,26 +214,71 @@ def _valida_preferenze(p) -> dict:
     return dict(p)
 
 
+def percorso_configurazione(cartella_dati: Path | str | None = None) -> Path:
+    """File di configurazione in uso per la cartella dati indicata (SUCCESSIONI_CONFIG prevale)."""
+    env = os.environ.get("SUCCESSIONI_CONFIG")
+    return Path(env) if env else (Path(cartella_dati) / "configurazione.json" if cartella_dati else file_configurazione())
+
+
+def sola_lettura_da_ambiente() -> bool:
+    return os.environ.get("SUCCESSIONI_MCP_SOLA_LETTURA", "").strip().lower() in ("1", "true", "si", "yes")
+
+
+def leggi_preferenze(cartella_dati: Path | str | None = None) -> tuple[dict, str | None]:
+    """(preferenze con i predefiniti, problema). ``problema`` e' None se il file manca o e' valido; altrimenti descrive perche'
+    il file esiste ma non si legge, non e' un oggetto JSON o ha una sezione/valore di preferenza non valido. Chi deve essere
+    prudente (server MCP: sola lettura) usa ``problema`` per scegliere il comportamento sicuro (fail-closed)."""
+    f = percorso_configurazione(cartella_dati)
+    valori = dict(PREFERENZE_DEFAULT)
+    problema = None
+    try:
+        testo = f.read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        testo = None
+    except OSError as e:
+        testo, problema = None, f"il file di configurazione {f} non e' leggibile ({type(e).__name__})"
+    if testo is not None:
+        try:
+            d = json.loads(testo)
+        except ValueError:
+            d, problema = None, f"il file di configurazione {f} non contiene JSON valido"
+        if d is not None and not isinstance(d, dict):
+            problema = f"il file di configurazione {f} non contiene un oggetto JSON"
+        elif isinstance(d, dict):
+            grezzi = d.get("preferenze", {})
+            if not isinstance(grezzi, dict):
+                problema = f"nel file di configurazione {f} la sezione 'preferenze' non e' un oggetto"
+                grezzi = {}
+            for k, v in grezzi.items():
+                try:
+                    _valida_preferenze({k: v})
+                    valori[k] = v
+                except DatiNonValidi as e:
+                    if k == "mcp_sola_lettura":         # il valore che governa la sicurezza deve essere leggibile
+                        problema = f"nel file di configurazione {f} la preferenza mcp_sola_lettura non e' valida ({e.messaggio})"
+    if sola_lettura_da_ambiente():
+        valori["mcp_sola_lettura"] = True
+    return valori, problema
+
+
 def preferenze(cartella_dati: Path | str | None = None) -> dict:
     """Preferenze correnti con i predefiniti (valori non validi nel file sono ignorati). Si leggono ad ogni chiamata, cosi' una
-    modifica dal pannello vale subito anche per il server MCP. La variabile d'ambiente SUCCESSIONI_MCP_SOLA_LETTURA=1 prevale."""
-    env = os.environ.get("SUCCESSIONI_CONFIG")
-    f = Path(env) if env else (Path(cartella_dati) / "configurazione.json" if cartella_dati else file_configurazione())
-    valori = dict(PREFERENZE_DEFAULT)
-    try:
-        d = json.loads(f.read_text(encoding="utf-8-sig"))
-        grezzi = d.get("preferenze", {}) if isinstance(d, dict) else {}
-        for k, v in (grezzi if isinstance(grezzi, dict) else {}).items():
-            try:
-                _valida_preferenze({k: v})
-                valori[k] = v
-            except DatiNonValidi:
-                pass
-    except (OSError, ValueError):
-        pass
-    if os.environ.get("SUCCESSIONI_MCP_SOLA_LETTURA", "").strip().lower() in ("1", "true", "si", "yes"):
-        valori["mcp_sola_lettura"] = True
-    return valori
+    modifica dal pannello vale subito anche per il server MCP. La variabile d'ambiente SUCCESSIONI_MCP_SOLA_LETTURA=1 prevale.
+    Per sapere se il file e' illeggibile o non valido usare ``leggi_preferenze`` (il server MCP va allora in sola lettura)."""
+    return leggi_preferenze(cartella_dati)[0]
+
+
+# Voci del file di configurazione copiate nel backup (elenco chiuso): percorsi degli strumenti, aspetto, profilo dello studio e
+# preferenze. Escluse le chiavi non note (potrebbero contenere qualunque cosa, anche segreti scritti a mano) e
+# SUCCESSIONI_DATA (dopo un ripristino punterebbe alla vecchia cartella dei dati).
+VOCI_BACKUP = frozenset(k for k in CHIAVI if k != "SUCCESSIONI_DATA") | {"interfaccia", "profilo", "preferenze"}
+
+
+def contenuto_per_backup(contenuto) -> dict | None:
+    """Copia filtrata (solo ``VOCI_BACKUP``) di un contenuto di configurazione; None se non e' un oggetto."""
+    if not isinstance(contenuto, dict):
+        return None
+    return {k: v for k, v in contenuto.items() if k in VOCI_BACKUP}
 
 
 # Profilo dello studio: dati del fornitore (chi presenta il file) applicati come predefiniti alle nuove pratiche.
@@ -306,8 +351,11 @@ def stato() -> dict:
                      "salvato": nel_file.get(chiave) if isinstance(nel_file.get(chiave), str) else None,
                      "origine": origine, "a_posto": ok, "dettaglio": descr,
                      "modificabile": tipo != "sola_lettura"})
+    pref, problema = leggi_preferenze()
+    # problema_configurazione: None se il file manca o e' valido; altrimenti il motivo (l'interfaccia usa i predefiniti e lo
+    # mostra; il server MCP in questo caso si considera in sola lettura)
     return {"file": str(file_configurazione()), "voci": voci, "interfaccia": preferenze_interfaccia(nel_file),
-            "profilo": profilo_studio(), "preferenze": preferenze(),
+            "profilo": profilo_studio(), "preferenze": pref, "problema_configurazione": problema,
             "componente_controllo": _componente_controllo()}
 
 

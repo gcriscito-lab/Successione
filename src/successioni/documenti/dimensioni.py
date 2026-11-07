@@ -251,9 +251,8 @@ def riduci_o_suddividi(pdf: Path | str, limite_byte: int = L.LIMITE_ALLEGATO_DEC
     """
     from .. import pdfa
     src = Path(pdf)
-    limite_byte = int(limite_byte)
-    if limite_byte <= 0:
-        raise ValueError("limite_byte deve essere positivo")
+    if isinstance(limite_byte, bool) or not isinstance(limite_byte, int) or limite_byte <= 0:
+        raise DatiNonValidi("limite_byte: indicare un numero intero di byte maggiore di zero", limite_byte=limite_byte)
     an = pdfa.analizza_pdf(src)
     if an.get("esito") not in ("leggibile", "firmato"):
         raise DatiNonValidi(f"file non elaborabile: esito '{an.get('esito')}'", esito=an.get("esito"),

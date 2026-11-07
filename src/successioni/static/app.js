@@ -60,11 +60,38 @@ try { applicaAspetto(JSON.parse(localStorage.getItem('successioni.aspetto') || '
 sistemaScuro.addEventListener('change', () => applicaAspetto($('#imp').open && IMP.aspetto ? IMP.aspetto : preferenze));
 window.addEventListener('resize', () => applicaAspetto($('#imp').open && IMP.aspetto ? IMP.aspetto : preferenze));
 
+/* Server spento o irraggiungibile: fetch rifiuta con un TypeError in inglese («Failed to fetch»). Si mostra un messaggio italiano
+   che dice cosa fare (revisione 2, punto 5). */
+const MSG_RETE = "Il programma non risponde: è stata chiusa la finestra del server? Riavvia con Avvia-pratica-reale.cmd";
+async function rete(url, opt) {
+  try { return await fetch(url, opt); }
+  catch (e) { if (e && e.name === "AbortError") throw e; throw Object.assign(new Error(MSG_RETE), { rete: true, causa: e }); }
+}
 async function api(url, opt) {
-  const r = await fetch(url, opt);
+  const r = await rete(url, opt);
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.messaggio || j.codice || r.statusText), { dati: j, stato: r.status });
+  if (!r.ok) throw Object.assign(new Error(j.messaggio || j.codice || (r.status === 401 ? "Sessione scaduta: riapri il programma con Avvia-pratica-reale.cmd" : r.statusText || ("errore " + r.status))), { dati: j, stato: r.status });
   return j;
+}
+/* Azioni che non mostrano da sole l'errore (apertura pratica, Controlla, allegati, cronologia...): un rifiuto non gestito
+   diventa un messaggio leggibile invece di restare solo nella console. */
+window.addEventListener("unhandledrejection", ev => {
+  const e = ev.reason;
+  ev.preventDefault();
+  msg(e && e.message ? e.message : String(e || "Errore imprevisto"), "e");
+});
+/* Un'azione alla volta per pulsante (revisione 2, punto 2): finche' la richiesta non finisce il pulsante e' disabilitato
+   e i clic successivi sono ignorati. Il nome identifica l'azione anche dopo un nuovo disegno della vista. */
+const OCCUPATI = new Set();
+function occupato(nome, fn) {
+  return async ev => {
+    if (OCCUPATI.has(nome)) return;
+    OCCUPATI.add(nome);
+    const b = ev && ev.currentTarget instanceof HTMLElement ? ev.currentTarget : null, prima = b ? b.disabled : false;
+    if (b) { b.disabled = true; b.setAttribute("aria-busy", "true"); }
+    try { return await fn(ev); }
+    finally { OCCUPATI.delete(nome); if (b) { b.disabled = prima; b.removeAttribute("aria-busy"); } }
+  };
 }
 const post = (u, b) => api(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) });
 /* Il messaggio e' un riquadro mobile in basso (non sposta il layout) con pulsante di chiusura. Stile aggiunto da qui. */
@@ -72,8 +99,13 @@ document.head.append(h("style", {}, `#msg{position:fixed;left:50%;bottom:44px;tr
   display:flex;gap:12px;align-items:flex-start;white-space:pre-line;overflow-wrap:anywhere;max-height:40vh;overflow:auto}
   #msg[hidden]{display:none} #msg .mt{flex:1} #msg .x{flex:none;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;line-height:1;padding:2px 6px}
   #msg .x::before{content:"\\00d7";font-size:1.3em}`));
+/* Gli esiti positivi (classe "o") spariscono da soli dopo 8 secondi: a 375 px il riquadro copriva i campi. Gli errori restano
+   finche' non si chiudono (revisione 2, punto 9). */
+let msgTimer = null;
 function msg(t, tipo) {
   const m = $("#msg"); m.className = tipo || ""; m.hidden = !t; m.replaceChildren();
+  clearTimeout(msgTimer); msgTimer = null;
+  if (t && tipo === "o") { const mio = m; msgTimer = setTimeout(() => { if (mio.className === "o") msg(""); }, 8000); }
   if (t) m.append(h("span", { class: "mt" }, t), h("button", { class: "x", "aria-label": "Chiudi il messaggio", title: "Chiudi", onclick: () => msg("") }));
 }
 
@@ -150,7 +182,8 @@ async function init() {
     const i = await api("/api/info");
     mostraInfo(i);
     S.schema = await api("/api/schema");
-    try { const imp = await api('/api/impostazioni'); memorizzaAspetto(imp.interfaccia); STUDIO.profilo = imp.profilo || {}; } catch (_) { /* l'app resta utilizzabile */ }
+    try { const imp = await api('/api/impostazioni'); memorizzaAspetto(imp.interfaccia); STUDIO.profilo = imp.profilo || {};
+      if (imp.problema_configurazione) msg("Il file delle impostazioni non è valido: Claude resta in sola lettura finché non lo correggi o lo salvi di nuovo dalle Impostazioni. Motivo: " + imp.problema_configurazione, "e"); } catch (_) { /* l'app resta utilizzabile */ }
     STUDIO.archivio = i.archivio || '';
     if (i.archivio) { const a = $("#homeArchivio"); a.replaceChildren("Archivio aperto: ", h("code", {}, i.archivio)); a.hidden = false; }
     await caricaPratiche(); renderSb(); aggiornaBottoni();
@@ -202,7 +235,8 @@ async function apri(id, sel) {
   S.gen++;   // invalida le risposte asincrone (es. codice fiscale) richieste per la pratica precedente
   S.dirty.clear(); S.nuove.clear(); S.dichDirty.clear(); S.supDirty.clear(); S.riga = null; S.tab = "dati"; S.salvata = null; S.allegati = null;
   S.fornitoreDirty = {};
-  await ricarica(id);
+  try { await ricarica(id); }
+  catch (e) { msg("Pratica non aperta. " + e.message, "e"); return; }
   S.sel = sel || "AN"; $('#vista').scrollTop = 0; render(); await caricaPratiche();
 }
 async function ricarica(id) {
@@ -725,7 +759,9 @@ function insDati(ins) {
   if (r.nuova || S.dirty.has(r.key) || S.supDirty.has(supKey)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); S.supDirty.delete(supKey); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));
   if (r.e) az.append(h("button", { class: "lk pericolo", onclick: async () => {
     if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di eliminare la riga.", "e");
-    if (confirm("Eliminare la riga?")) await salvaOps([{ op: "remove", coll: q.coll, id }], () => {
+    const nomeRiga = etichetta(q.coll, r.e), posRiga = righeQuadro(q).findIndex(x => x.key === r.key) + 1;
+    const descr = nomeRiga && nomeRiga !== r.e.id ? "«" + nomeRiga + "»" : posRiga ? "n. " + posRiga : "selezionata";
+    if (confirm("Eliminare la riga " + descr + " dal quadro " + q.id + (q.titolo ? " (" + q.titolo + ")" : "") + "?")) await salvaOps([{ op: "remove", coll: q.coll, id }], () => {
       S.dirty.delete(r.key); S.supDirty.delete(supKey); S.riga = null;
     });
   } }, "Elimina riga"));
@@ -841,7 +877,9 @@ function insControlli(ins) {
 }
 async function insCronologia(ins) {
   ins.append(h("p", { class: "mut" }, "Ogni salvataggio crea una revisione. Il ripristino non cancella la cronologia."));
-  const lista = await api("/api/pratiche/" + S.P.pratica_id + "/revisioni");
+  let lista;
+  try { lista = await api("/api/pratiche/" + S.P.pratica_id + "/revisioni"); }
+  catch (e) { if (S.tab === "cronologia") { ins.append(h("p", { class: "err" }, e.message)); msg(e.message, "e"); } return; }
   if (S.tab !== "cronologia") return;
   for (const x of lista.slice().reverse()) {
     const b = x.n !== S.P.revisione ? h("button", { class: "gh spazio-su", onclick: async () => {
@@ -904,64 +942,97 @@ async function insFile(dest) {
         dettagli.hidden = tipoIn.value !== '10'; msg('Profilo dello studio applicato: premi «Salva profilo» per confermarlo sulla pratica.', 'o');
       } }, 'Applica profilo dello studio') : null));
   const elaborati = passo(2, 'Genera il file telematico', fileOk);
-  const esegui = async scopo => {
+  const esegui = scopo => occupato('esporta', async () => {
     if (S.writeBusy) return;
     try {
       if (nMod() && !(await salvaTutto())) return;
       const r = await post('/api/pratiche/' + pid + '/esporta', { scopo });
-      const motivi = [...(r.quadri_mancanti || []).map(x => x.messaggio), ...(r.non_supportato || []), ...(r.errori || []).map(x => x.messaggio)];
+      const motivi = [...(r.quadri_mancanti || []), ...(r.non_supportato || []), ...(r.errori || [])].map(motivoLeggibile);
       if (!r.generato) msg('File non generato: ' + motivi.slice(0, 3).join(' | ') + '. Nessun file parziale è stato prodotto.', 'e');
       else msg((r.completo ? 'File generato e valido per lo schema.' : 'Bozza tecnica generata. ' + r.avvertenza)
         + ((r.avvisi || []).length ? ' Avvertenze: ' + r.avvisi.map(a => a.messaggio).join(' | ') : ''), r.completo ? 'o' : 'e');
       if (r.backup && r.backup.errore) msg('Attenzione: backup automatico non riuscito (' + r.backup.errore + ')', 'e');
       else if (r.backup && r.backup.eseguito) STUDIO.ultimoBackup = r.backup.nome;
-      if (S.P.pratica_id === pid) { await ricarica(); render(); }
+      if (S.P && S.P.pratica_id === pid) { await ricarica(); render(); }
     } catch (e) { msg(e.message, 'e'); }
-  };
+  });
   elaborati.append(h('p', { class: 'mut' }, 'Genera il file quando i dati sono pronti. La bozza tecnica conserva evidenza dei limiti e non è trasmissibile.'),
-    h('div', { class: 'az' }, h('button', { class: 'pil', onclick: () => esegui('completo') }, 'Genera file'),
-      h('button', { class: 'gh', onclick: () => esegui('bozza_tecnica') }, 'Genera bozza tecnica')));
+    h('div', { class: 'az' }, h('button', { class: 'pil', disabled: OCCUPATI.has('esporta'), onclick: esegui('completo') }, 'Genera file'),
+      h('button', { class: 'gh', disabled: OCCUPATI.has('esporta'), onclick: esegui('bozza_tecnica') }, 'Genera bozza tecnica')));
   if (ex.generato) elaborati.append(h('div', { class: 'az' },
     h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/file.xml?job=' + ex.job_id, download: '' }, 'Scarica XML')));
   const controllo = passo(3, 'Controllo ufficiale', ct.stato === 'positivo');
   controllo.append(h('p', { class: 'mut' }, 'Esegue sul file il componente di controllo SUC dell\'Agenzia installato su questo computer.'));
   if (ct.azione_richiesta) controllo.append(h('p', { class: 'nota pre' }, ct.azione_richiesta));
-  controllo.append(h('div', { class: 'az' }, h('button', { class: 'pil', disabled: ex.stato !== 'aggiornato' || !ex.generato, onclick: async () => {
+  controllo.append(h('div', { class: 'az' }, h('button', { class: 'pil', disabled: ex.stato !== 'aggiornato' || !ex.generato || OCCUPATI.has('controllo'), onclick: occupato('controllo', async () => {
     if (nMod()) return msg('Salva le modifiche e rigenera il file prima del controllo.', 'e');
     try { const r = await post('/api/pratiche/' + pid + '/controllo-ufficiale', {}); msg('Controllo ufficiale: ' + String(r.stato_controllo).replaceAll('_', ' ') + ' (' + r.esito + ').', r.stato_controllo === 'positivo' ? 'o' : 'e'); }
     catch (e) { msg(e.message, 'e'); }
-    if (S.P.pratica_id === pid && S.sel === 'FILE') renderVista();
-  } }, 'Esegui controllo ufficiale'),
+    if (S.P && S.P.pratica_id === pid && S.sel === 'FILE') renderVista();
+  }) }, 'Esegui controllo ufficiale'),
     ct.stato === 'positivo' && ct.job_adattatore ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/file.dcm', download: '' }, 'Scarica file controllato (.dcm)') : null));
+  // passaggio manuale: l'utente ha eseguito il controllo con il programma dell'Agenzia e carica qui gli esiti (revisione 2)
+  if (ct.stato_job === 'attesa_diagnostico') {
+    const fDgn = h('input', { type: 'file', accept: '.dgn', 'aria-label': 'File .dgn' }), fLog = h('input', { type: 'file', accept: '.xml', 'aria-label': 'File _logSchema.xml' });
+    const fWri = h('input', { type: 'file', accept: '.wri', 'aria-label': 'File .wri (facoltativo)' }), conf = h('input', { type: 'checkbox', id: 'dgn_conf' });
+    controllo.append(h('div', { class: 'sotto' }, h('h3', {}, 'Carica l’esito del controllo eseguito a mano'),
+      h('label', {}, 'Diagnostico (.dgn)', fDgn), h('label', {}, 'Esito dello schema (_logSchema.xml)', fLog), h('label', {}, 'Avvisi (.wri, facoltativo)', fWri),
+      h('label', { class: 'chk', for: 'dgn_conf' }, conf, h('span', {}, 'Confermo che questi esiti riguardano il file di questa pratica')),
+      h('div', { class: 'az' }, h('button', { class: 'gh', disabled: OCCUPATI.has('diagnostico'), onclick: occupato('diagnostico', async () => {
+        if (!fDgn.files[0] || !fLog.files[0]) return msg('Scegli il file .dgn e il file _logSchema.xml prodotti dal controllo.', 'e');
+        const fd = new FormData(); fd.append('dgn', fDgn.files[0]); fd.append('log_schema', fLog.files[0]);
+        if (fWri.files[0]) fd.append('wri', fWri.files[0]); if (conf.checked) fd.append('conferma_associazione', '1');
+        try { const r = await api('/api/pratiche/' + pid + '/controllo-ufficiale/diagnostico', { method: 'POST', body: fd });
+          msg('Esito registrato: controllo ' + String(r.stato).replaceAll('_', ' ') + '.', r.stato === 'positivo' ? 'o' : 'e'); }
+        catch (e) { msg(e.message, 'e'); }
+        if (S.P && S.P.pratica_id === pid && S.sel === 'FILE') renderVista();
+      }) }, 'Registra esito'))));
+  }
   const stampa = passo(4, 'Stampa e rileggi', (st.stampa_modello || {}).stato === 'aggiornata');
   stampa.append(h('p', { class: 'mut' }, 'Rileggi il modello stampato prima di inviare: confronta immobili, eredi, quote e imposte con i documenti.'),
-    h('div', { class: 'az' }, h('button', { class: 'gh', disabled: !fileOk, onclick: async () => {
+    h('div', { class: 'az' }, h('button', { class: 'gh', disabled: !fileOk || OCCUPATI.has('stampa'), onclick: occupato('stampa', async () => {
       if (nMod()) return msg('Salva le modifiche e rigenera il file prima della stampa.', 'e');
       try { const r = await post('/api/pratiche/' + pid + '/stampa-modello', {}); msg('Modello ministeriale generato (' + r.pagine + ' pagine). Prova locale: controllane il contenuto prima di usarlo.', 'o'); window.open('/api/pratiche/' + pid + '/stampa-modello.pdf', '_blank', 'noopener'); }
       catch (e) { msg(e.message, 'e'); }
-    } }, 'Stampa modello ministeriale'),
+    }) }, 'Stampa modello ministeriale'),
       ex.generato ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/prospetto-cliente', target: '_blank', rel: 'noopener',
         title: 'Riepilogo per gli eredi: beni, quote, passività e imposte, con gli stessi importi del file' }, 'Prospetto per il cliente') : null,
       ex.generato ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/stampa?job=' + ex.job_id, target: '_blank', rel: 'noopener' }, 'Prospetto tecnico del file') : null));
   const invio = passo(5, 'Invio e ricevute', st.trasmissione.stato === 'trasmessa' && st.trasmissione.modalita !== 'simulata', { id: 'invioPratica' });
   griglia.append(stato, fornitore, elaborati, controllo, stampa, invio);
-  await renderInvio(invio, ex);
+  await renderInvio(invio, ex, ct);
+}
+/* Profilo e importi della copia congelata in parole, non in JSON (revisione 2, punto 6). */
+function descriviFornitore(p) {
+  p = p || {};
+  if (!p.cf) return "non indicato";
+  const tipo = { "1": "dichiarante", "10": "intermediario" }[String(p.tipo || "")];
+  const impegno = { "1": "predisposta dal dichiarante", "2": "predisposta dall'intermediario" }[String(p.impegno_codice || "")];
+  return p.cf + (tipo ? " (" + tipo + ")" : "") + (impegno ? ", " + impegno : "") + (p.data_impegno ? ", impegno del " + dataIt(p.data_impegno) : "");
+}
+function descriviImporti(m) {
+  const voci = Object.entries(m || {});
+  if (!voci.length) return "nessuno";
+  return voci.map(([k, v]) => k.replaceAll("_", " ") + " € " + importoIt(String(v), true)).join(", ");
 }
 /* Invio: copia congelata -> conferma -> trasmissione. La modalita' «prova» usa un servizio FITTIZIO locale: non invia nulla all'Agenzia. */
-async function renderInvio(ins, ex) {
+async function renderInvio(ins, ex, ct) {
   const pid = S.P.pratica_id; const base = "/api/pratiche/" + pid + "/invio";
   ins.append(h("div", { class: "nota stretta" }, "PROVA SIMULATA: il programma non trasmette nulla all'Agenzia delle Entrate. L'invio reale si esegue con gli strumenti ufficiali (modalità manuale) e si registra qui."));
   let copie = [];
   try { copie = (await api(base)).copie; } catch (e) { ins.append(h("p", { class: "err" }, e.message)); return; }
   const ricarica = () => { if (S.sel === "FILE") renderVista(); };
-  const chiama = async (url, corpo, ok) => { try { const r = await post(url, corpo); msg(ok(r), "o"); } catch (e) { msg(e.message, "e"); } ricarica(); };
-  ins.append(h("div", { class: "az" }, h("button", { class: "pil", disabled: ex.stato !== "aggiornato" || !ex.completo, title: "Congela il file XML completo con il controllo ufficiale associato",
-    onclick: () => chiama(base + "/prepara", { chiave_richiesta: "prep-" + crypto.randomUUID() }, r => "Copia preparata. " + (r.azione_richiesta || "")) }, "Prepara invio")));
+  // ogni azione e' «occupata» finche' la richiesta non finisce: un secondo clic non parte (revisione 2, punto 2)
+  const chiama = (nome, url, corpo, ok) => occupato(nome, async () => { try { const r = await post(url, corpo); msg(ok(r), "o"); } catch (e) { msg(e.message, "e"); } ricarica(); });
+  // stessa chiave finche' non cambiano revisione, file generato e controllo: ripetere «Prepara invio» restituisce la stessa copia
+  const chiavePrep = ["prep", pid, "r" + S.P.revisione, ex.job_id || "", (ct || {}).job_adattatore || (ct || {}).stato || ""].join("-");
+  ins.append(h("div", { class: "az" }, h("button", { class: "pil", disabled: ex.stato !== "aggiornato" || !ex.completo || OCCUPATI.has("prepara"), title: "Congela il file XML completo con il controllo ufficiale associato",
+    onclick: chiama("prepara", base + "/prepara", { chiave_richiesta: chiavePrep }, r => "Copia preparata. " + (r.azione_richiesta || "")) }, "Prepara invio")));
   const c = copie[0];
   if (!c) { ins.append(h("p", { class: "mut testo-m" }, "Nessuna copia preparata. Serve un file completo e un controllo ufficiale positivo.")); return; }
   const d = c.dettaglio || {};
   ins.append(h("a", { href: "/api/invio/" + c.job_id + "/file", download: "" }, "Scarica la copia congelata"));
-  ins.append(h("p", { class: "mut" }, "Fornitore: " + JSON.stringify(d.profilo || {}) + " · Importi: " + JSON.stringify(d.importi || {})));
+  ins.append(h("p", { class: "mut" }, "Fornitore: " + descriviFornitore(d.profilo) + " · Importi: " + descriviImporti(d.importi)));
   const tentativo = (c.tentativi || []).find(t => t.dettaglio.job_id === d.tentativo_corrente);
   if (tentativo) {
     ins.append(riga_stato("Tentativo", tentativo.dettaglio.stato, tentativo.dettaglio.modalita + (tentativo.dettaglio.protocollo ? " · " + tentativo.dettaglio.protocollo : "")));
@@ -971,31 +1042,37 @@ async function renderInvio(ins, ex) {
   if (c.azione_richiesta) ins.append(h("div", { class: "nota stretta pre" }, c.azione_richiesta));
   if (c.stato === "preparata") {
     const sp = h("input", { type: "checkbox", id: "inv_ok" });
-    const bt = h("button", { class: "pil", disabled: true, onclick: () => chiama("/api/invio/" + c.job_id + "/conferma", { impronta: d.impronta_conferma, utente: "professionista" }, () => "Copia confermata.") }, "Conferma questa copia");
+    const bt = h("button", { class: "pil", disabled: true, onclick: chiama("conferma", "/api/invio/" + c.job_id + "/conferma", { impronta: d.impronta_conferma, utente: "professionista" }, () => "Copia confermata.") }, "Conferma questa copia");
     sp.addEventListener("change", () => { bt.disabled = !sp.checked; });
     ins.append(h("label", { class: "chk", for: "inv_ok" }, sp, h("span", {}, "Ho verificato il file (impronta " + (d.impronta_conferma || "").slice(0, 12) + "…), il fornitore e il controllo ufficiale")), h("div", { class: "az" }, bt));
   }
   if (c.stato === "confermata") {
     ins.append(h("div", { class: "az" },
-      h("button", { class: "pil", onclick: () => chiama("/api/invio/" + c.job_id + "/trasmetti", { chiave_richiesta: "t-" + crypto.randomUUID(), modalita: "simulata" }, r => (r.avvertenza || "") + " Esito: " + String(r.stato).replaceAll("_", " ")) }, "Invia in PROVA (simulata)"),
-      h("button", { class: "gh", onclick: () => chiama("/api/invio/" + c.job_id + "/trasmetti", { chiave_richiesta: "t-" + crypto.randomUUID(), modalita: "manuale" }, r => r.avvertenza) }, "Istruzioni per l'invio reale")));
+      h("button", { class: "pil", disabled: OCCUPATI.has("trasmetti"), onclick: chiama("trasmetti", "/api/invio/" + c.job_id + "/trasmetti", { chiave_richiesta: "t-" + crypto.randomUUID(), modalita: "simulata" }, r => (r.avvertenza || "") + " Esito: " + String(r.stato).replaceAll("_", " ")) }, "Invia in PROVA (simulata)"),
+      h("button", { class: "gh", disabled: OCCUPATI.has("trasmetti"), onclick: chiama("trasmetti", "/api/invio/" + c.job_id + "/trasmetti", { chiave_richiesta: "t-" + crypto.randomUUID(), modalita: "manuale" }, r => r.avvertenza) }, "Istruzioni per l'invio reale")));
   }
   if (tentativo && ["esito_incerto", "in_trasmissione", "attesa_invio_manuale"].includes(tentativo.dettaglio.stato)) {
     const url = "/api/invio/tentativi/" + d.tentativo_corrente + "/riconcilia";
     if (tentativo.dettaglio.modalita === "simulata")
-      ins.append(h("button", { onclick: () => chiama(url, {}, r => "Riconciliazione: " + r.stato) }, "Riconcilia (prova)"));
+      ins.append(h("button", { onclick: chiama("riconcilia", url, {}, r => "Riconciliazione: " + r.stato) }, "Riconcilia (prova)"));
     else {
       const protocollo = h("input", { "aria-label": "Protocollo dell'invio", placeholder: "Protocollo assegnato" });
       const fonte = h("input", { "aria-label": "Evidenza verificata", placeholder: "Dove hai verificato l'esito" });
       const registra = nonInviato => {
         if (!fonte.value.trim() || (!nonInviato && !protocollo.value.trim())) return msg("Indica il protocollo e dove hai verificato l'esito; per un invio non avvenuto indica l'evidenza.", "e");
         const evidenze = { verificato_su: fonte.value.trim(), ...(nonInviato ? { non_trasmesso: true } : { protocollo: protocollo.value.trim() }) };
-        return chiama(url, { evidenze }, r => "Esito registrato: " + r.stato);
+        return chiama("riconcilia", url, { evidenze }, r => "Esito registrato: " + r.stato)();
       };
       ins.append(protocollo, fonte, h("div", { class: "az" },
         h("button", { onclick: () => registra(false) }, "Registra protocollo"),
         h("button", { onclick: () => { if (confirm("Hai verificato che questo invio non è avvenuto?")) registra(true); } }, "Registra invio non avvenuto")));
     }
+  }
+  // le prove simulate sono separate: non consumano la copia confermata (revisione 2)
+  for (const p of c.prove || []) {
+    const pd = p.dettaglio || p;
+    ins.append(riga_stato("PROVA simulata", pd.stato, (pd.protocollo ? "protocollo fittizio " + pd.protocollo : "") + " · non è un invio all'Agenzia"));
+    if (["esito_incerto", "in_trasmissione"].includes(pd.stato)) ins.append(h("button", { class: "gh", onclick: chiama("riconcilia", "/api/invio/tentativi/" + pd.job_id + "/riconcilia", {}, r => "Riconciliazione della prova: " + r.stato) }, "Riconcilia (prova)"));
   }
   if (tentativo && tentativo.dettaglio.protocollo) await renderRicevute(ins, pid, tentativo.dettaglio.job_id);
   for (const tid of d.tentativi || []) ins.append(h("div", { class: "mut testo-m" }, "Tentativo " + tid + (tid === d.tentativo_corrente ? " (corrente)" : "")));
@@ -1334,7 +1411,9 @@ async function convertiAllegato(id) {
 }
 async function renderAllegati(main) {
   const pid = S.P.pratica_id;
-  const a = await api("/api/pratiche/" + pid + "/allegati");
+  let a;
+  try { a = await api("/api/pratiche/" + pid + "/allegati"); }
+  catch (e) { msg("Elenco dei documenti non disponibile. " + e.message, "e"); return; }
   if (!S.P || S.P.pratica_id !== pid || (quadro() && quadro().id !== "EG")) return;
   S.allegati = a;
   for (const td of document.querySelectorAll("#vista td[data-allegato]")) { const v = td.dataset.allegato; if (v) { td.textContent = descriviFileEG(v); td.title = td.textContent; } }
@@ -1408,6 +1487,19 @@ function descriviErrore(x) {
   const dove = (quadroId ? "Quadro " + quadroId + ", " : "") + riga;
   return { testo: dove + (nomeCampo ? " — " + nomeCampo : "") + ": " + x.messaggio, x, coll, eid, campo, quadroId, chiave,
            path: campo ? coll + "[" + eid + "]." + campo : null };
+}
+/* Motivo di un export non riuscito: oggetto {percorso, messaggio} o testo «beni[b_...].campo: spiegazione».
+   Il percorso interno diventa quadro, riga e campo (revisione 2, punto 6). */
+function motivoLeggibile(x) {
+  if (typeof x === "string") {
+    const m = x.match(/^((?:opzioni\.telematico\.)?[a-z_]+\[[^\]]+\](?:\.[a-z_]+)?):\s*(.*)$/s);
+    if (!m) return x;
+    x = { percorso: m[1], messaggio: m[2] };
+  }
+  if (!x || typeof x !== "object") return String(x);
+  const percorso = String(x.percorso || "").replace(/^opzioni\.telematico\./, "");
+  try { return descriviErrore({ ...x, percorso }).testo || String(x.messaggio || ""); }
+  catch (_) { return String(x.messaggio || x.percorso || ""); }
 }
 function mostraErroriSalvataggio(errori) {
   const d = errori.map(descriviErrore);
@@ -1569,22 +1661,29 @@ async function wizDaCF(valore) {
   const { testo } = await suggerisciDaCF(valore, "defunto", c => d[c], (c, x) => { d[c] = x; const el = $("#w_" + c); if (el) el.value = x; }, () => W.dati === d && String(d.codice_fiscale || "").trim().toUpperCase() === String(valore || "").trim().toUpperCase());
   const nota = $("#w_cf_nota"); if (nota) nota.textContent = testo;
 }
-function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; S.gen++; wizRender(); $("#wiz").showModal(); }
+/* Una chiave di richiesta per ogni apertura della procedura: un doppio clic o un nuovo tentativo dopo un errore di rete
+   non crea due pratiche (revisione 2, punto 1). */
+function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; W.chiave = crypto.randomUUID(); W.busy = false; S.gen++; wizRender(); $("#wAvanti").disabled = false; $("#wiz").showModal(); }
 async function wizAvanti() {
+  if (W.busy) return;
   const d = W.dati;
   if (W.passo === 0 && !(d.cognome || "").trim()) { $("#wizErr").textContent = "Indica almeno il cognome del defunto."; return; }
   if (W.passo < PASSI.length - 1) { W.passo++; wizRender(); return; }
   const campi = {}; for (const k of ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso", "comune_decesso", "provincia_decesso"]) if ((d[k] || "").trim()) campi[k] = (k === "codice_fiscale" || k.startsWith('provincia')) ? d[k].trim().toUpperCase() : (k.startsWith("data_") ? dataIso(d[k]) : d[k].trim());
   campi.ruolo = "defunto";
   const iniziali = [{ op: "upsert", coll: "persone", campi }, { op: "set", sezione: "opzioni", campi: { tipo_dichiarazione: d.tipo || "originaria", quadri_attivi: d.quadri || S.schema.predefiniti } }];
+  W.busy = true; const bt = $("#wAvanti"); bt.disabled = true; bt.setAttribute("aria-busy", "true"); $("#wizErr").textContent = "";
+  let r;
   try {
-    const r = await post("/api/pratiche", { titolo: titoloWiz(), chiave: crypto.randomUUID(), iniziali });
-    $("#wiz").close(); await caricaPratiche(); await apri(r.pratica_id, "AN"); msg("Dichiarazione creata.", "o");
+    r = await post("/api/pratiche", { titolo: titoloWiz(), chiave: W.chiave, iniziali });
   } catch (e) {
     const t = e.dati && e.dati.errori ? e.dati.errori.map(x => x.messaggio).join(" | ") : e.message;
+    if (e.stato === 422) W.chiave = crypto.randomUUID();   // rifiutata dal server: nessuna pratica creata, i dati corretti sono una nuova richiesta
     if (e.dati && e.dati.errori) { W.passo = 0; wizRender(); }
     $("#wizErr").textContent = t;
-  }
+    return;
+  } finally { W.busy = false; bt.disabled = false; bt.removeAttribute("aria-busy"); }
+  $("#wiz").close(); await caricaPratiche(); await apri(r.pratica_id, "AN"); msg("Dichiarazione creata.", "o");
 }
 
 /* Impostazioni: percorsi degli strumenti esterni (server: /api/impostazioni), con stato di rilevamento. */
@@ -1782,8 +1881,8 @@ collegaSeparatore($('#ridimensionaNav'), { chiave: 'larghezza_nav', pannello: '#
 async function importaXml(file) {
   if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di importare.", "e");
   try {
-    const r = await fetch("/api/importa", { method: "POST", body: await file.arrayBuffer(), headers: { "Content-Type": "application/xml" } });
-    const j = await r.json();
+    const r = await rete("/api/importa", { method: "POST", body: await file.arrayBuffer(), headers: { "Content-Type": "application/xml" } });
+    const j = await r.json().catch(() => ({}));
     if (!r.ok) return msg("Importazione non riuscita: " + (j.messaggio || j.codice || r.status), "e");
     await caricaPratiche(); await apri(j.pratica_id, "AN");
     const n = Object.entries(j.importato).map(([k, v]) => v + " " + k.replaceAll("_", " ")).join(", ");
@@ -1799,7 +1898,11 @@ $("#wIndietro").onclick = () => { W.passo--; wizRender(); };
 $("#wAvanti").onclick = wizAvanti;
 $("#bSalva").onclick = salvaTutto;
 $("#bGenera").onclick = vaiFile;
-$("#bControlla").onclick = async () => { if (!S.P) return; if (nMod() && !(await salvaTutto())) return; S.Q = await api("/api/pratiche/" + S.P.pratica_id + "/quadri"); if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); };
+$("#bControlla").onclick = async () => {
+  if (!S.P) return; if (nMod() && !(await salvaTutto())) return;
+  try { S.Q = await api("/api/pratiche/" + S.P.pratica_id + "/quadri"); } catch (e) { msg("Controllo non eseguito. " + e.message, "e"); return; }
+  if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render();
+};
 $('#homeNuova').onclick = wizApri;
 $('#homeImporta').onclick = () => $('#fImporta').click();
 $('#bHome').onclick = () => {

@@ -1,6 +1,6 @@
 # Collegamenti ufficiali: stato, prove e fonti (area 3)
 
-Aggiornato al 2026-11-01. Parole-esito come in `docs/COLLAUDO_CLOUD_WINDOWS.md`: **passato** / **fallito** (prova
+Aggiornato al 2026-11-07 (revisione 2 dei collegamenti; prove precedenti del 2026-11-01). Parole-esito come in `docs/COLLAUDO_CLOUD_WINDOWS.md`: **passato** / **fallito** (prova
 eseguita sul componente o servizio reale, input/output/ambiente registrati), **da_collaudare** (prova non eseguibile
 qui; procedura in `docs/COLLAUDO_RIPRENDIBILE.md`), **simulazione** (test locale dell'adattatore: non prova
 l'interoperabilita' con l'Agenzia). Codice: `src/successioni/collegamenti/`; test: `tests/test_collegamenti_*.py`.
@@ -11,13 +11,15 @@ l'interoperabilita' con l'Agenzia). Codice: `src/successioni/collegamenti/`; tes
 |---|---|---|
 | Invocazione del controllo ufficiale SUC13 dall'app, senza GUI (Linux, OpenJDK 21) | **passato** | 2026-11-01: componente 2.3.1 eseguito tramite `ControlloJar`, diagnostico originale conservato (§1) |
 | Lettura del diagnostico originale (`.dgn`, `_logSchema.xml`, `.wri`) | **passato** | lettori provati su 2 registrazioni reali; `_logSchema.xml` valido su `esitoFornitura_v3.xsd` delle fonti |
-| A10: diagnostico positivo + negativo predisposto, sul PC di destinazione | **da_collaudare** | negativi reali ottenuti; manca un caso positivo (serve un XML completo: EF/EG/EH non ancora esportati dall'area 1) e la prova su Windows |
-| File controllato `.dcm` (terzo argomento) | **da_collaudare** | prodotto dal componente solo per forniture trasmissibili: non ancora osservato |
-| Passaggio manuale tracciato del controllo | **da_collaudare** | implementato e provato con file reali registrati; uso sul PC Windows da provare |
+| A10: diagnostico positivo + negativo predisposto (controllo locale, dati sintetici) | **passato** (controllo locale) | 2026-11-01: positivo (solo (*) 3345) e due negativi predisposti, `tests/fixture_telematico/controllo_20261101/` (`docs/MATRICE_COPERTURA.md`, riga A10) |
+| A10 sul PC di destinazione con Desktop Telematico | **da_collaudare** | equivalenza con l'esecuzione in Desktop Telematico non provata |
+| File controllato `.dcm` (terzo argomento) | **passato** (controllo locale) / **da_collaudare** su Windows | prodotto sul positivo locale A10 (manifest del 2026-11-01); non conservato come fixture |
+| Passaggio manuale tracciato del controllo | **da_collaudare** | implementato e provato con file reali registrati; chiusura dal livello di servizio (`registra_diagnostico_controllo`); abbinamento con un `.dgn` reale di Desktop Telematico da provare |
 | Risultanze catastali via Entratel (A13) | **da_collaudare** | nessuna interfaccia o formato documentato trovato; nessun endpoint inventato (§2) |
 | Macchina a stati catasto, ripresa, duplicati, importazione selettiva (A14, A15) | **simulazione** | `tests/test_collegamenti_catasto.py` su fixture sintetiche |
 | Trasmissione SUC13 (Desktop Telematico / Entratel-Multifile) | **da_collaudare** | il programma non trasmette: trasporto "manuale tracciato" + riconciliazione (§3) |
 | Copia congelata, conferma, invalidazione (A16, A17) | **simulazione** | `tests/test_collegamenti_invio.py` |
+| Prova simulata separata dalla copia reale | **simulazione** | `tests/test_review2_collegamenti.py`: la prova non consuma la copia confermata |
 | Invio incerto senza reinvio cieco (A18) | **simulazione** | rete interrotta prima/dopo la ricezione, processo interrotto, riconciliazione con `.esi` |
 | Ricevute ed esiti separati (A19) | **simulazione** per l'associazione; **da_collaudare** per i canali reali | tipi dal Fascicolo I p. 5 (§4) |
 
@@ -66,7 +68,11 @@ Registrazioni (input, `.dgn`, `_logSchema.xml`, `.wri`, manifest con ambiente e 
 I testi dei messaggi non vengono ricostruiti (stanno nelle risorse del componente): fanno fede `.wri` e `.dgn`.
 
 **Valutazione** (`controllo.valuta`): `positivo` solo se schema valido, almeno una dichiarazione elaborata, nessuna
-scartata e nessun diagnostico di gravita' >= 14; altrimenti `negativo`; senza `.dgn` `non_verificabile`. Un
+scartata, nessun diagnostico di gravita' >= 14 e nessuna riga non riconosciuta o gravita' illeggibile; con motivi di
+scarto `negativo`; senza motivi ma con righe/gravita' non decodificate `da_verificare` (esito `da_collaudare`, non
+sblocca l'invio); senza `.dgn` `non_verificabile`. Uscite illeggibili (es. `_logSchema.xml` troncato da un Java
+interrotto) o qualunque errore dopo l'avvio: job `errore_esecuzione`, stato `non_verificabile`, cartella di lavoro
+rimossa comunque, record della pratica scritto. Un
 esecutore iniettato (test) produce sempre `simulazione`, anche con un diagnostico positivo.
 
 **Avvertenze d'ambiente rilevate.** Con Java >= 11 l'inizializzazione del modulo di stampa (`PrintModel.init`,
@@ -77,8 +83,17 @@ Telematico (JRE proprio) va provata sul PC (A10). Il JNLP dichiara `j2se 1.7+`.
 **Passaggio manuale tracciato.** Il file da controllare e' conservato con impronta; i file del controllo registrati
 dall'utente sono associati al file solo se il contenuto lo conferma (CF del defunto e identificativi dei record,
 numero di dichiarazioni elaborate, nome del file nell'intestazione del `.dgn`); altrimenti serve una conferma
-esplicita e l'esito resta `da_collaudare` (non sblocca la conferma dell'invio). Limite: il percorso manuale si fida
-dei file originali forniti; un `.dgn` alterato non e' riconoscibile. Per questo l'esecuzione diretta resta l'obiettivo.
+esplicita e l'esito resta `da_collaudare` (non sblocca la conferma dell'invio). Nomi riconosciuti per lo stesso file:
+`<sha16>.xml` (archivio), `successione_revN[_bozza].xml` (scaricato dall'app), `<ctl_job>.xml/.dcm` (componente), nome
+originale; un nome che segue questi schemi ma indica un'altra impronta, un'altra revisione o un controllo su un altro
+file e' **rifiutato** anche con la conferma. Lo stesso file richiesto piu' volte riprende il job manuale aperto; lo stato
+della pratica (`stato_elaborati`) legge lo stato attuale del job dell'adattatore. Chiusura dal livello di servizio:
+`registra_diagnostico_controllo(pratica_id, *, dgn, log_schema, wri=None, ambiente_dichiarato=None,
+conferma_associazione=False, job_adattatore=None)`. **Da collaudare:** quale nome scrive Desktop Telematico nel `.dgn`
+(non osservato su Windows). Limite: il percorso manuale si fida dei file originali forniti; un `.dgn` alterato non e'
+riconoscibile, e con lo stesso nome di revisione due export diversi della stessa revisione (es. fornitore cambiato) non
+sono distinguibili dal nome: valgono allora solo codice fiscale e identificativi. Per questo l'esecuzione diretta resta
+l'obiettivo.
 
 **Limiti.** La "conferma" degli errori (***C) avviene nel software di compilazione: come si rappresenta nel file e'
 da verificare. `esitoFornitura_v3.xsd` importa due volte lo stesso namespace e libxml2 non lo compila da solo: il
@@ -126,6 +141,21 @@ invalidazione se cambiano i dati dichiarativi (non per le note); un solo tentati
 (compare-and-set nella stessa transazione); `in_trasmissione` scritto prima della chiamata; errore di rete ->
 `esito_incerto`; riconciliazione con consultazione, protocollo verificato, `.esi` o `_stato.json` (candidati, mai
 associazione automatica per data); `non_trasmesso` solo con prova indicata; esiti finali mai sovrascritti.
+
+Abbinamento del `.esi` (revisione 2): una riga INVIO vale solo se il nome del file (senza cartella ne' estensioni
+`.xml/.dcm/.ccf/.p7m`) e' fra quelli noti del tentativo (`<sha16>`, `copia_congelata` scaricata dall'app,
+`successione_revN`, il `<ctl_job>` del controllo associato), se `startDate` e' leggibile e non precedente alla creazione
+del tentativo (tolleranza 10 minuti; ora locale della postazione) e se il protocollo non e' gia' associato a un altro
+tentativo; altrimenti resta incerto con le righe scartate e il motivo fra i candidati. Il nome `copia_congelata` e'
+generico: la data e' la difesa contro un `.esi` vecchio. **Da collaudare** con un `.esi` reale: quale `fileName` riporta
+Multifile per un `.ccf` prodotto da Desktop Telematico. Le istruzioni dell'invio manuale riportano nome e SHA-256 del
+file congelato.
+
+**Prova simulata.** «Invia in PROVA (simulata)» su una copia reale confermata crea un tentativo marcato `prova`
+(elenco `prove` della copia): la copia resta `confermata`, non cambia `tentativo_corrente`, la riconciliazione e lo
+stato della pratica (`stati_pratica`, `stato_elaborati`: campo `prova_simulata`) la tengono separata. Fra le prove
+valgono le stesse regole di non duplicazione. Gli archivi precedenti con una copia reale gia' «trasmessa» da una prova
+(protocollo `SIM...`) vengono riparati alla prima lettura: la copia torna `confermata`, il tentativo diventa una prova.
 
 ## 4. Ricevute ed esiti successivi
 

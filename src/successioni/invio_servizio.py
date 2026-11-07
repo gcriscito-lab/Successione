@@ -2,7 +2,8 @@
 
 Due modalita', mai una trasmissione reale dal programma:
 - ``simulata``: servizio fittizio locale (``TrasportoSimulato``) per PROVARE il percorso completo (anche rete interrotta e
-  riconciliazione). L'esito e' sempre ``simulazione``: non dimostra nulla sull'Agenzia.
+  riconciliazione). L'esito e' sempre ``simulazione``: non dimostra nulla sull'Agenzia. Sulla copia reale la prova e' un
+  tentativo separato (``prove``): la copia resta ``confermata`` e l'invio reale resta possibile.
 - ``manuale``: il programma non invia; restituisce le istruzioni per l'invio con gli strumenti ufficiali (Desktop Telematico /
   Entratel) e registra poi il protocollo con la riconciliazione. L'esito resta ``da_collaudare``.
 
@@ -77,7 +78,9 @@ class InvioMixin:
         out = r.asdict()
         out["job_id"], out["stato"] = out["dettaglio"].get("job_id"), out["dettaglio"].get("stato")
         out["modalita"] = modalita
-        out["avvertenza"] = ("PROVA SIMULATA: nessun file e' stato inviato all'Agenzia delle Entrate." if modalita == "simulata"
+        out["prova"] = bool(out["dettaglio"].get("prova_simulata"))
+        out["avvertenza"] = ("PROVA SIMULATA: nessun file e' stato inviato all'Agenzia delle Entrate; la copia confermata resta "
+                             "disponibile per l'invio reale." if modalita == "simulata"
                              else "Il programma NON ha trasmesso nulla: segui le istruzioni, poi registra l'esito con la riconciliazione.")
         return out
 
@@ -104,6 +107,8 @@ class InvioMixin:
                 ad._recupera_finale(ad.job.leggi(tid, "invio_tentativo"))
             copia = self._copia_json(ad.verifica_validita(j["job_id"]))
             copia["tentativi"] = [ad.leggi_tentativo(tid).asdict() for tid in copia["dettaglio"].get("tentativi", [])]
+            # prove simulate: elenco separato, non sono tentativi della copia reale
+            copia["prove"] = [ad.leggi_tentativo(tid).asdict() for tid in copia["dettaglio"].get("prove", [])]
             copie.append(copia)
         return {"pratica_id": pratica_id, "copie": copie}
 

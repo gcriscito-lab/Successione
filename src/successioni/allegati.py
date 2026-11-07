@@ -62,16 +62,46 @@ class AllegatiMixin:
                 tmp.unlink()
 
     def acquisisci_file(self, pratica_id: str, percorso: Path | str, *, tipo_eg: str | None = None,
-                        finalita: str | None = None, persona_id: str | None = None, nome: str | None = None) -> dict:
-        """Acquisisce un file come ORIGINALE (mai modificato). Tipo/finalita' li indica chi chiama."""
+                        finalita: str | None = None, persona_id: str | None = None, nome: str | None = None,
+                        chiave: str | None = None, riusa_identico: bool = False) -> dict:
+        """Acquisisce un file come ORIGINALE (mai modificato). Tipo/finalita' li indica chi chiama.
+
+        ``chiave``: idempotenza come per ``crea_pratica`` (tabella richieste): la ripetizione restituisce la stessa risposta
+        con ``ripetuta``; la stessa chiave con un altro file o altri argomenti e' ``ChiaveRiutilizzata``.
+        ``riusa_identico`` (canale MCP): se la pratica ha gia' un originale con stessa impronta, nome, tipo, finalita' e
+        persona e il file nel deposito e' integro, si restituisce quello (``gia_presente``) invece di crearne un doppione."""
         self.leggi(pratica_id)  # esistenza
         p = Path(percorso)
         if not p.is_file():
             raise NonTrovato("file inesistente", percorso=str(p))
+        nome = nome or p.name
+        h = self._sha_file(p)
+        impr = hashlib.sha256(json.dumps({"p": pratica_id, "sha256": h, "nome": nome, "tipo_eg": tipo_eg,
+                                          "finalita": finalita, "persona_id": persona_id},
+                                         sort_keys=True).encode()).hexdigest()
         analisi = pdfa.analizza_pdf(p)
         with self.arch.transazione() as c:
-            return self._registra(c, pratica_id, nome or p.name, p, "originale", None, tipo_eg, finalita,
-                                  persona_id, analisi)
+            if chiave:
+                prec = self._richiesta(c, chiave, "acquisisci_allegato", impr)
+                if prec is not None:
+                    return {**prec, "ripetuta": True}
+            risp = None
+            if riusa_identico:
+                for r in c.execute("SELECT * FROM allegati WHERE pratica_id=? AND sha256=? AND ruolo='originale' AND nome=? "
+                                   "AND tipo_eg IS ? AND finalita IS ? AND persona_id IS ? ORDER BY ts",
+                                   (pratica_id, h, nome, tipo_eg, finalita, persona_id)):
+                    dep = self.arch.base / r["percorso"]
+                    if dep.is_file() and self._sha_file(dep) == h:
+                        risp = {"allegato_id": r["id"], "nome": r["nome"], "sha256": h, "bytes": r["bytes"],
+                                "ruolo": r["ruolo"], "analisi": json.loads(r["analisi"]) if r["analisi"] else None,
+                                "rapporto": json.loads(r["rapporto"]) if r["rapporto"] else None, "gia_presente": True}
+                        break
+            if risp is None:
+                risp = self._registra(c, pratica_id, nome, p, "originale", None, tipo_eg, finalita, persona_id, analisi)
+            if chiave:
+                c.execute("INSERT INTO richieste VALUES(?,?,?,?,?,?)",
+                          (chiave, pratica_id, "acquisisci_allegato", impr, json.dumps(risp), ora()))
+            return risp
 
     def acquisisci_da_ingresso(self, pratica_id: str, nome_file: str, **kw) -> dict:
         """Per il canale MCP: solo file nella cartella d'ingresso dell'app (nessuna lettura arbitraria)."""
@@ -83,6 +113,8 @@ class AllegatiMixin:
 
     def elenca_allegati(self, pratica_id: str) -> list[dict]:
         with self.arch.lettura() as c:
+            if not c.execute("SELECT 1 FROM pratiche WHERE id=?", (pratica_id,)).fetchone():
+                raise NonTrovato("pratica inesistente", pratica_id=pratica_id)
             righe = c.execute("SELECT * FROM allegati WHERE pratica_id=? ORDER BY ts", (pratica_id,)).fetchall()
         out = []
         for r in righe:
@@ -338,7 +370,13 @@ class AllegatiMixin:
         from .documenti.dimensioni import riduci_o_suddividi
         r = self._riga_allegato(allegato_id)
         src = self.arch.base / r["percorso"]
-        limite = int(limite_byte or pdfa.LIMITE_ALLEGATO_BYTE)
+        if limite_byte is None:
+            limite = pdfa.LIMITE_ALLEGATO_BYTE
+        elif isinstance(limite_byte, bool) or not isinstance(limite_byte, int) or limite_byte <= 0:
+            raise DatiNonValidi("limite_byte: indicare un numero intero di byte maggiore di zero (o ometterlo per il "
+                                f"limite delle specifiche, {pdfa.LIMITE_ALLEGATO_BYTE} byte)", limite_byte=limite_byte)
+        else:
+            limite = limite_byte
         with tempfile.TemporaryDirectory() as t:
             parti = riduci_o_suddividi(src, limite, cartella_uscita=t, livello=livello, **opzioni)
             rap = parti.rapporto

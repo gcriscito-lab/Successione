@@ -9,7 +9,8 @@ chiamando la classe `it.finanze.entrate.sco.main.MSUC13` con due argomenti, come
 
 Produce `out/F.dgn` (diagnostico a record fissi), `out/F_logSchema.xml` (elemento `EsitoFornitura` di
 esitoFornitura_v3.xsd) e, con il terzo argomento, il file controllato `.dcm` (solo se la fornitura e' trasmissibile:
-`Main.elabora` -> `DcmService.createDcm`; non ancora osservato su un caso positivo). Il rapporto leggibile `.wri` lo
+`Main.elabora` -> `DcmService.createDcm`; osservato il 2026-11-01 sul caso positivo locale A10,
+tests/fixture_telematico/controllo_20261101/manifest.json; prova su Desktop Telematico da fare). Il rapporto leggibile `.wri` lo
 produce la classe ufficiale `it.finanze.entrate.sco.common2013.VisualXml` con argomenti `{F.dgn, "1"}` (elenco completo),
 come fa `AControlliSUC2013.visualizza()`.
 
@@ -38,8 +39,8 @@ from typing import Callable
 
 from ..archivio import Archivio
 from ..errori import DatiNonValidi, NonTrovato
-from .base import (DepositoArtefatti, Esito, RegistroJob, RisultatoAdattatore, risultato_da_job, sha256_bytes,
-                   sha256_file)
+from .base import (DepositoArtefatti, Esito, RegistroJob, RisultatoAdattatore, TransizioneNonAmmessa, risultato_da_job,
+                   sha256_bytes, sha256_file)
 
 TIPO_JOB = "controllo_ufficiale"
 CLASSE_CONTROLLO = "it.finanze.entrate.sco.main.MSUC13"
@@ -275,7 +276,11 @@ def leggi_wri(testo: str) -> dict:
 
 # ------------------------------------------------------------------------------------ valutazione
 def valuta(dgn: dict | None, esito_fornitura: dict | None) -> tuple[str, list[str]]:
-    """Stato del controllo (specifica §10) dai soli diagnostici originali: positivo | negativo | non_verificabile."""
+    """Stato del controllo (specifica §10) dai soli diagnostici originali:
+    positivo | negativo | da_verificare | non_verificabile.
+
+    `da_verificare`: nessun motivo di scarto, ma il .dgn contiene righe non riconosciute o diagnostici con gravita'
+    illeggibile/non decodificata: il programma non puo' concludere che il controllo sia positivo."""
     motivi: list[str] = []
     if not dgn and not esito_fornitura:
         return "non_verificabile", ["nessun diagnostico prodotto"]
@@ -300,7 +305,18 @@ def valuta(dgn: dict | None, esito_fornitura: dict | None) -> tuple[str, list[st
             motivi.append(f"diagnostici di gravita' (***C) o superiore: {len(gravi)}")
     elif not motivi:
         return "non_verificabile", ["manca il diagnostico .dgn: il solo esito di schema non basta"]
-    return ("negativo" if motivi else "positivo"), motivi
+    if motivi:
+        return "negativo", motivi
+    dubbi: list[str] = []
+    if dgn:
+        if dgn.get("righe_non_riconosciute"):
+            dubbi.append(f"righe del .dgn non riconosciute: {len(dgn['righe_non_riconosciute'])}")
+        illeggibili = [d for d in dgn.get("diagnostici", []) if not d.get("simbolo")]
+        if illeggibili:
+            dubbi.append(f"diagnostici con gravita' illeggibile o non decodificata: {len(illeggibili)}")
+    if dubbi:
+        return "da_verificare", dubbi + ["verificare il rapporto .wri originale: esito non dichiarabile positivo"]
+    return "positivo", []
 
 
 # ---------------------------------------------------------------------------------- configurazione
@@ -410,6 +426,52 @@ def _identificativi(xml: bytes) -> set[str]:
     return {m.decode() for m in re.findall(rb"<(?:\w+:)?Dichiarazione\b[^>]*\bidentificativo=\"(\d{5})\"", xml)}
 
 
+# Nomi con cui il programma consegna lo stesso file (elaborati.py, web.py): archivio `<sha16>.xml`, scaricamento
+# `successione_revN[_bozza].xml`, copia di lavoro del componente `<ctl_job>.xml` e file controllato `<ctl_job>.dcm`.
+_RX_SHA16 = re.compile(r"^([0-9a-f]{16})\.xml$")
+_RX_REV = re.compile(r"^successione_rev(\d+)(?:_bozza)?\.xml$")
+_RX_CTL = re.compile(r"^(ctl_[0-9a-f]{24})\.(?:xml|dcm)$")
+
+
+def nomi_noti(job: dict) -> set[str]:
+    """Nomi (minuscoli) con cui il file del job di controllo puo' comparire nel .dgn prodotto dall'utente."""
+    inp = job.get("input", {})
+    sha, nome = inp.get("xml_sha256") or "", (inp.get("xml_nome") or "").lower()
+    out = {n for n in (nome, f"{sha[:16]}.xml" if sha else "", f"{job['job_id']}.xml", f"{job['job_id']}.dcm") if n}
+    if inp.get("revisione") is not None:
+        out |= {f"successione_rev{inp['revisione']}.xml", f"successione_rev{inp['revisione']}_bozza.xml"}
+    return out
+
+
+def confronta_nome(nome: str, job: dict, registro: RegistroJob | None = None) -> tuple[str, str]:
+    """('coincide' | 'diverso' | 'sconosciuto', spiegazione). 'diverso': il nome segue uno schema del programma ma
+    indica un ALTRO file (altra impronta, altra revisione, altro controllo su file diverso)."""
+    n = Path((nome or "").replace("\\", "/")).name.strip().lower()
+    if not n:
+        return "sconosciuto", "nessun nome di file nel .dgn"
+    if n in nomi_noti(job):
+        return "coincide", f"nome {n} fra quelli noti per questo file"
+    inp = job.get("input", {})
+    m = _RX_SHA16.match(n)
+    if m:
+        return "diverso", f"{n}: impronta {m.group(1)} diversa da {(inp.get('xml_sha256') or '')[:16]}"
+    m = _RX_REV.match(n)
+    if m and inp.get("revisione") is not None:
+        return "diverso", f"{n}: revisione {m.group(1)}, il file controllato e' della revisione {inp['revisione']}"
+    m = _RX_CTL.match(n)
+    if m:
+        try:
+            altro = registro.leggi(m.group(1), TIPO_JOB) if registro else None
+        except NonTrovato:
+            altro = None
+        if altro is None:   # controllo di un altro archivio o di una postazione diversa: nome non verificabile
+            return "sconosciuto", f"{n}: controllo {m.group(1)} non presente in questo archivio"
+        if altro["input"].get("xml_sha256") == inp.get("xml_sha256"):
+            return "coincide", f"{n}: controllo {m.group(1)} sullo stesso file (stessa impronta)"
+        return "diverso", f"{n}: controllo {m.group(1)} eseguito su un file diverso (altra impronta)"
+    return "sconosciuto", f"{n}: nome non riconducibile a questo file"
+
+
 # ------------------------------------------------------------------------------------- adattatori
 class _BaseControllo:
     def __init__(self, archivio: Archivio):
@@ -438,6 +500,16 @@ class _BaseControllo:
 
     riprendi = leggi
 
+    def aperto_per(self, inp: dict) -> dict | None:
+        """Ultimo job manuale in attesa del diagnostico per lo stesso file (impronta) e gli stessi dati dichiarativi."""
+        for j in reversed(self.job.elenca(TIPO_JOB, inp.get("pratica_id"), stati=["attesa_diagnostico"])):
+            i = j["input"]
+            if (i.get("xml_sha256") == inp["xml_sha256"] and i.get("modalita") == "manuale_tracciato"
+                    and i.get("impronta_dichiarativa") == inp.get("impronta_dichiarativa")
+                    and i.get("pratica_id") == inp.get("pratica_id")):
+                return j
+        return None
+
     def registra_diagnostico(self, job_id: str, *, dgn: bytes, log_schema: bytes, wri: bytes | None = None,
                              ambiente_dichiarato: dict | None = None,
                              conferma_associazione: bool = False) -> RisultatoAdattatore:
@@ -450,7 +522,16 @@ class _BaseControllo:
         j = self.job.leggi(job_id, TIPO_JOB)
         if j["stato"] != "attesa_diagnostico":
             return self.leggi(job_id)
-        xml = self.deposito.leggi(j["risultato"]["artefatti"][0])
+        if not dgn or not log_schema:
+            raise DatiNonValidi("servono il file .dgn e il file _logSchema.xml prodotti dal controllo ufficiale")
+        try:   # un file troncato o non XML si rifiuta con un messaggio chiaro; il job resta in attesa
+            leggi_esito_fornitura(log_schema, valida=False)
+        except Exception as e:   # lxml XMLSyntaxError, DatiNonValidi
+            raise DatiNonValidi("il file _logSchema.xml non e' leggibile (troncato o non prodotto dal controllo): "
+                                "non registrato", dettaglio=str(e)[:300]) from None
+        art_in = next((a for a in j["risultato"].get("artefatti", []) if a.get("ruolo") == "input_controllo"),
+                      j["risultato"]["artefatti"][0])
+        xml = self.deposito.leggi(art_in)
         d = leggi_dgn(decodifica(dgn))
         cf, ids = _cf_defunto(xml), _identificativi(xml)
         sogg = {x["soggetto"] for x in d["diagnostici"] if x["soggetto"] and not x["soggetto"].startswith("VALIDAZ")}
@@ -467,10 +548,15 @@ class _BaseControllo:
             raise DatiNonValidi("il diagnostico non e' riferibile al file controllato: non registrato",
                                 incoerenze=incoerenze)
         nome_dgn = Path((d.get("file_controllato") or "").replace("\\", "/")).name
-        verificata = bool((sogg and cf) or (id_dgn and ids)) or nome_dgn == j["input"].get("xml_nome")
+        esito_nome, spiega_nome = confronta_nome(nome_dgn, j, self.job)
+        if esito_nome == "diverso":   # mai accettato, nemmeno con la conferma: e' il diagnostico di un altro file
+            raise DatiNonValidi("il diagnostico riguarda un altro file o un'altra revisione: non registrato",
+                                incoerenze=[spiega_nome], nomi_attesi=sorted(nomi_noti(j)))
+        verificata = bool((sogg and cf) or (id_dgn and ids)) or esito_nome == "coincide"
         if not verificata and not conferma_associazione:
             raise DatiNonValidi("associazione del diagnostico al file non verificabile (nessun record con codice "
-                                "fiscale e nome file diverso): confermarla esplicitamente", nome_nel_dgn=nome_dgn)
+                                "fiscale e nome file non riconosciuto): confermarla esplicitamente",
+                                nome_nel_dgn=nome_dgn, nomi_attesi=sorted(nomi_noti(j)))
         artefatti = list(j["risultato"].get("artefatti", []))
         for b, nome, ruolo in ((dgn, "diagnostico.dgn", "diagnostico_dgn"),
                                (log_schema, "diagnostico_logSchema.xml", "esito_schema"),
@@ -480,6 +566,7 @@ class _BaseControllo:
         extra = {"modalita": "manuale_tracciato", "requisito_automazione": "aperto",
                  "ambiente_dichiarato": ambiente_dichiarato or {},
                  "associazione": {"cf_defunto": cf, "identificativi": sorted(ids), "nome_nel_dgn": nome_dgn,
+                                  "confronto_nome": spiega_nome,
                                   "metodo": ("codice fiscale, identificativi, numero di dichiarazioni e nome del file "
                                              "confrontati con il file conservato") if verificata else
                                   "dichiarata dall'utente (non verificabile dal contenuto)"}}
@@ -493,10 +580,27 @@ class _BaseControllo:
 
     def _completa_con_diagnostici(self, j: dict, *, dgn_b: bytes | None, log_b: bytes | None, wri_b: bytes | None,
                                   reale: bool, extra: dict, artefatti: list, avvertenze: list) -> dict:
-        dgn = leggi_dgn(decodifica(dgn_b)) if dgn_b else None
-        ef = leggi_esito_fornitura(log_b) if log_b else None
-        wri = leggi_wri(decodifica(wri_b)) if wri_b else None
+        illeggibili: list[str] = []
+        dgn = ef = wri = None
+        for chiave, b, lettore in (("dgn", dgn_b, lambda x: leggi_dgn(decodifica(x))),
+                                   ("_logSchema.xml", log_b, leggi_esito_fornitura),
+                                   ("wri", wri_b, lambda x: leggi_wri(decodifica(x)))):
+            if not b:
+                continue
+            try:   # un file troncato (Java interrotto) non deve lasciare il job a meta'
+                v = lettore(b)
+            except Exception as e:   # lxml XMLSyntaxError, DatiNonValidi, decodifica
+                illeggibili.append(f"file {chiave} del componente illeggibile ({type(e).__name__}: {str(e)[:200]})")
+                continue
+            if chiave == "dgn":
+                dgn = v
+            elif chiave == "wri":
+                wri = v
+            else:
+                ef = v
         stato, motivi = valuta(dgn, ef)
+        if illeggibili:
+            stato, motivi = "non_verificabile", illeggibili + motivi
         if wri and dgn and wri.get("riepilogo") and dgn.get("riepilogo"):
             for k, v in wri["riepilogo"].items():
                 if v is not None and dgn["riepilogo"].get(k) not in (None, v):
@@ -507,9 +611,12 @@ class _BaseControllo:
             esito = Esito.SIMULAZIONE
         elif stato == "positivo":
             esito = Esito.PASSATO
+        elif stato == "da_verificare":   # diagnostico non interamente leggibile: ne' passato ne' fallito
+            esito = Esito.DA_COLLAUDARE
         else:
             esito = Esito.FALLITO
         patch = {"esito": esito.value, "stato_controllo": stato, "motivi": motivi, "avvertenze": avvertenze,
+                 "file_illeggibili": illeggibili,
                  "versione_controllo": (dgn or {}).get("versione_controllo") or (wri or {}).get("versione_controllo"),
                  "data_versione": (dgn or {}).get("data_versione") or (wri or {}).get("data_versione"),
                  "riepilogo": (dgn or {}).get("riepilogo") or (wri or {}).get("riepilogo"),
@@ -601,6 +708,29 @@ class ControlloJar(_BaseControllo):
                                  "cartella_lavoro": lavoro.relative_to(self.arch.base).as_posix()},
                                  nota="avvio del componente ufficiale")
         try:
+            self._esegui_e_registra(j, inp, lavoro, argv, base, nome, produci_dcm, rapporto_wri, art_in)
+        except Exception as e:
+            # Qualunque errore dopo l'avvio (lettura delle uscite, deposito, ...) chiude il job con un esito esplicito:
+            # mai un job lasciato 'in_esecuzione' ne' un'eccezione grezza a GUI/MCP.
+            motivo = f"{type(e).__name__}: {str(e)[:300]}"
+            try:
+                self.job.transizione(j["job_id"], ["in_esecuzione"], "errore_esecuzione", patch={
+                    "stato_controllo": "non_verificabile",
+                    "esito": (Esito.SIMULAZIONE if self.simulato else Esito.FALLITO).value,
+                    "motivi": [f"errore nell'elaborazione delle uscite del componente ({motivo})"],
+                    "azione_richiesta": "Controllo non concluso: rieseguire il controllo ufficiale; se si ripete, "
+                                        "verificare Java e i JAR del componente."},
+                    nota="errore dopo l'avvio del componente", errore=motivo)
+            except TransizioneNonAmmessa:  # pragma: no cover - gia' concluso
+                pass
+        finally:
+            # input, uscite, stdout/stderr sono nel deposito (con impronta): la cartella di lavoro non serve piu'
+            shutil.rmtree(lavoro, ignore_errors=True)
+        return self.leggi(j["job_id"])
+
+    def _esegui_e_registra(self, j: dict, inp: dict, lavoro: Path, argv: list[str], base: list[str], nome: str,
+                           produci_dcm: bool, rapporto_wri: bool, art_in: dict) -> None:
+        try:
             p = self._esec(argv, lavoro, self.config.timeout_s)
         except OSError as e:  # Java rimosso o non avviabile dopo la diagnostica
             p = Processo(None, b"", f"avvio non riuscito: {e}".encode(), 0.0)
@@ -642,7 +772,11 @@ class ControlloJar(_BaseControllo):
         patch = self._completa_con_diagnostici(j, dgn_b=letti.get("diagnostico_dgn"), log_b=letti.get("esito_schema"),
                                                wri_b=letti.get("rapporto_wri"), reale=not self.simulato, extra=extra,
                                                artefatti=artefatti, avvertenze=avvertenze)
-        if p.scaduto or "diagnostico_dgn" not in letti or not deposito_invariato or extra['input_modificato_dal_componente']:
+        if patch.get("file_illeggibili"):   # es. _logSchema.xml troncato da un Java interrotto
+            patch["azione_richiesta"] = ("Uscite del componente illeggibili (" + "; ".join(patch["file_illeggibili"])
+                                         + "): rieseguire il controllo ufficiale.")
+            stato_job = "errore_esecuzione"
+        elif p.scaduto or "diagnostico_dgn" not in letti or not deposito_invariato or extra['input_modificato_dal_componente']:
             patch["motivi"] = patch["motivi"] + [("tempo massimo superato" if p.scaduto else
                                                  "input alterato o copia di lavoro scomparsa senza DCM" if not deposito_invariato or extra['input_modificato_dal_componente'] else
                                                  f"il componente non ha prodotto il .dgn (uscita {p.codice_uscita})")]
@@ -652,9 +786,6 @@ class ControlloJar(_BaseControllo):
         else:
             stato_job = "completato"
         self.job.transizione(j["job_id"], ["in_esecuzione"], stato_job, patch=patch, nota=patch["stato_controllo"])
-        # input, uscite, stdout/stderr sono ormai nel deposito (con impronta): la cartella di lavoro non serve piu'
-        shutil.rmtree(lavoro, ignore_errors=True)
-        return self.leggi(j["job_id"])
 
 
 class ControlloManuale(_BaseControllo):
@@ -662,13 +793,18 @@ class ControlloManuale(_BaseControllo):
 
     def esegui(self, xml_path: Path | str, *, chiave: str | None = None, **kw) -> RisultatoAdattatore:
         dati, inp = self._input(xml_path, kw, "manuale_tracciato")
+        if chiave is None:   # stesso file, stessi dati: si riprende il passaggio manuale gia' aperto, non se ne crea un altro
+            aperto = self.aperto_per(inp)
+            if aperto is not None:
+                return self.leggi(aperto["job_id"])
         j, nuovo = self.job.crea(TIPO_JOB, kw.get("pratica_id"), inp, stato="creato", chiave=chiave)
         if not nuovo and j["stato"] != "creato":
             return self.leggi(j["job_id"])
         art = self.deposito.salva_bytes(dati, inp["xml_nome"], "input_controllo")
         j = self.job.transizione(j["job_id"], ["creato"], "attesa_diagnostico", patch={
             "esito": Esito.DA_COLLAUDARE.value, "stato_controllo": "non_eseguito", "artefatti": [art],
-            "azione_richiesta": ISTRUZIONI_MANUALI + f"\nFile: {inp['xml_nome']} — SHA-256 {inp['xml_sha256']}",
+            "azione_richiesta": ISTRUZIONI_MANUALI + f"\nFile: {inp['xml_nome']} — SHA-256 {inp['xml_sha256']}"
+                                + "\nNomi del file riconosciuti nel .dgn: " + ", ".join(sorted(nomi_noti(j))),
             "modalita": "manuale_tracciato", "requisito_automazione": "aperto"}, nota="in attesa del diagnostico")
         return self.leggi(j["job_id"])
 

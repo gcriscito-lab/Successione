@@ -44,6 +44,12 @@ def controllo_finto(ctx, *, esito="passato", stato="positivo", sha=None) -> str:
     return j["job_id"]
 
 
+def adesso_esi() -> str:
+    """startDate del .esi (GGMMAAAAhhmmss, ora locale) al momento del test."""
+    from datetime import datetime
+    return datetime.now().strftime("%d%m%Y%H%M%S")
+
+
 def prepara(ctx, ad, **kw):
     kw.setdefault("controllo_job_id", controllo_finto(ctx))
     return ad.prepara(ctx["pid"], elaborati=[{"percorso": ctx["xml"], "ruolo": "telematico"},
@@ -180,8 +186,10 @@ def test_a18_processo_interrotto_durante_la_chiamata_riconciliazione_con_esi(ctx
     ad2 = I.InvioAdattatore(Archivio(ctx["arch"].base), I.TrasportoSimulato())
     with pytest.raises(ReinvioNonAmmesso):
         ad2.trasmetti(c.job_id, chiave_richiesta="y")
-    esi = ('{"tipoOperazione":"INVIO","resultCode":"00","startDate":"01112026173448","endDate":"01112026173448",'
-           '"fileName":"SUC13_prova.ccf","versioneApplicazione":"1.7.6 ","protocollo":"26110117344816257"}\n')
+    # nome realistico: la copia scaricata dall'app si chiama copia_congelata.xml (web.py), Multifile riporta il .ccf;
+    # startDate (ora locale) successiva alla creazione del tentativo
+    esi = ('{"tipoOperazione":"INVIO","resultCode":"00","startDate":"' + adesso_esi() + '","endDate":"' + adesso_esi()
+           + '","fileName":"copia_congelata.ccf","versioneApplicazione":"1.7.6 ","protocollo":"26110117344816257"}\n')
     r = ad2.riconcilia(tid, evidenze={"esi": esi})
     assert r.stato == I.TRASMESSO and r.dettaglio["protocollo"] == "26110117344816257"
     assert r.dettaglio["prova"]["metodo"].startswith("file .esi")
@@ -290,8 +298,8 @@ def test_r12_esi_con_esito_negativo_non_sblocca_un_nuovo_invio(ctx):
         ad.trasmetti(c.job_id, chiave_richiesta="x")
     tid = ad.job.id_da_chiave(I.TIPO_TENTATIVO, "x")
     ad2 = I.InvioAdattatore(Archivio(ctx["arch"].base), I.TrasportoSimulato())
-    esi = ('{"tipoOperazione":"INVIO","resultCode":"05","startDate":"01112026173448","endDate":"01112026173448",'
-           '"fileName":"SUC13_prova.ccf","versioneApplicazione":"1.7.6 "}\n')
+    esi = ('{"tipoOperazione":"INVIO","resultCode":"05","startDate":"' + adesso_esi() + '","endDate":"' + adesso_esi()
+           + '","fileName":"copia_congelata.ccf","versioneApplicazione":"1.7.6 "}\n')
     r = ad2.riconcilia(tid, evidenze={"esi": esi})
     assert r.stato == I.ESITO_INCERTO and "non prova" in (r.azione_richiesta or "") and "NON reinviare" in r.azione_richiesta
     with pytest.raises(ReinvioNonAmmesso):                   # nessun nuovo tentativo finche' non c'e' una verifica esplicita

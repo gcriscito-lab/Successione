@@ -311,14 +311,16 @@ def test_date_non_valide_nei_quadri_nuovi():
 
 
 # ------------------------------------------------------------------------- coerenza di ordine, province, EI, casi particolari
-def test_righi_fuori_ordine_non_si_importano():
+def test_righi_fuori_ordine_si_importano_con_avviso():
+    # revisione 2 (2026-11-07): un file valido con un ordine dei righi diverso da quello dell'esportazione non si rifiuta piu';
+    # si importa con un avviso esplicito sul riordino (prima: XmlNonImportabile)
     root = etree.fromstring(_xml(caso_titoli()))
     mod = root.xpath("//suc:QuadroEO/suc:Modulo", namespaces=NS)[0]
     primo, secondo = mod.xpath("suc:Titoli", namespaces=NS)
     mod.remove(primo)
     mod.append(primo)
-    with pytest.raises(XmlNonImportabile, match="ordine"):
-        importa_xml(etree.tostring(root))
+    r = importa_xml(etree.tostring(root))
+    assert any(a.startswith("QuadroEO: i righi del file non sono nell'ordine") for a in r["avvisi"]), r["avvisi"]
 
 
 def test_provincia_tavolare_non_ricreabile():
@@ -398,9 +400,10 @@ def test_ei_estremo_incompleto():
 
 def test_ei_sezioni_in_ordine_diverso_da_quello_degli_id():
     """Con piu' immobili l'EI e' scritto nell'ordine degli id originali; gli id importati seguono EB poi EC: se l'ordine
-    non coincide la riesportazione sarebbe diversa e il file si rifiuta (invece di riprodurlo cambiato)."""
-    with pytest.raises(XmlNonImportabile, match="ordine degli identificativi"):
-        importa_xml(_xml(_caso_voltura_due(False)))
+    non coincide la riesportazione cambia l'ordine delle sezioni. Revisione 2 (2026-11-07): avviso esplicito invece del
+    rifiuto (i dati non cambiano)."""
+    r = importa_xml(_xml(_caso_voltura_due(False)))
+    assert any("QuadroEI_new: le sezioni II non sono nell'ordine" in a for a in r["avvisi"]), r["avvisi"]
 
 
 def _sezioni_ei(root):
@@ -522,7 +525,9 @@ def test_la_modifica_di_ogni_campo_non_sparisce_in_silenzio(sv, nome, quadri):
 def test_nessuna_perdita_nel_quadro_nuovo_in_presenza_di_un_quadro_gia_importato():
     """Regressione: l'elemento non letto dentro EB/EC resta un errore anche con i quadri nuovi presenti."""
     root = etree.fromstring(_xml(caso_titoli()))
+    # revisione 2 (2026-11-07): Agevolazioni e' ora importata (opzioni.telematico.devoluzioni); la regressione si verifica con
+    # un elemento che l'importazione non legge
     dv = root.xpath("//suc:QuadroEC//suc:Devoluzione", namespaces=NS)[0]
-    etree.SubElement(dv, f"{{{SUC}}}Agevolazioni").text = "P"
-    with pytest.raises(XmlNonImportabile, match="Agevolazioni"):
+    etree.SubElement(dv, f"{{{SUC}}}ElementoNonLetto").text = "P"
+    with pytest.raises(XmlNonImportabile, match="ElementoNonLetto"):
         importa_xml(etree.tostring(root))

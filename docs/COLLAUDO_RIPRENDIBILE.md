@@ -52,6 +52,13 @@ stessi file con Desktop Telematico (Controlli atti del registro > SUC) e confron
 (passaggio manuale tracciato). Controllare il file con Desktop Telematico, poi:
 `collaudo registra-diagnostico --job ID --dgn F.dgn --log F_logSchema.xml --wri F.wri --ambiente-dichiarato
 '{"os":"Windows 11","desktop_telematico":"x.y"}'`. Il requisito di automazione resta aperto.
+Dalla GUI/MCP lo stesso passaggio si chiude con il servizio `registra_diagnostico_controllo(pratica_id, dgn=..., log_schema=...,
+wri=...)` (revisione 2; il collegamento nell'interfaccia e nel server MCP e' a cura di quelle aree). Richiedere piu' volte il
+controllo sullo stesso file riprende il job manuale aperto, non ne crea un altro. Il `.dgn` e' accettato se riferibile al
+file: codice fiscale e identificativi dei record, oppure nome del file fra quelli noti (`<sha16>.xml` dell'archivio,
+`successione_revN.xml` scaricato, `<ctl_job>.xml/.dcm`); un nome che indica un'altra impronta o un'altra revisione e'
+rifiutato anche con la conferma. **Da collaudare** con un `.dgn` reale di Desktop Telematico: quale nome vi compare
+(percorso completo del file aperto? nome del `.dcm`?) non e' stato osservato.
 
 ## A13 — Acquisizione delle risultanze catastali via Entratel
 
@@ -127,8 +134,10 @@ reali di ciascuna ricevuta SUC13.
 
 - PC Windows con Java, Desktop Telematico e (se usato) Entratel-Multifile aggiornati; indicazione della cartella dei
   JAR del controllo installati, se si vogliono usare quelli.
-- Un file XML di una pratica effettiva (o il consenso a usare l'export sintetico quando completo) per il caso
-  positivo A10; il controllo resta locale.
+- Un file XML di una pratica effettiva (o il consenso a usare l'export sintetico) per ripetere il caso positivo A10
+  su Desktop Telematico: il positivo locale su dati sintetici esiste (2026-11-01, registro sotto); il controllo resta locale.
+- Un `.dgn` e un `.esi` reali (anche di prova) per collaudare l'abbinamento per nome del passaggio manuale e della
+  riconciliazione.
 - Una sessione assistita su Entratel per A13: percorso del servizio, formato e un esempio dei risultati.
 - Per A18/A19: una pratica effettiva verificata e l'autorizzazione specifica all'invio; ricevute scaricate.
 
@@ -138,7 +147,8 @@ reali di ciascuna ricevuta SUC13.
 |---|---|---|---|---|---|---|
 | 2026-11-01 | A10 negativo (frontespizio) | container Linux, OpenJDK 21.0.12.1, controllo 2.3.1 | 02d93434bb40... | (archivio di sviluppo) | fallito (negativo atteso) | eseguito dall'adattatore; non e' la prova su Windows |
 | 2026-11-01 | A10 schema non valido (minimo) | come sopra | vedi manifest | (archivio di sviluppo) | fallito (negativo atteso) | record (****) |
-| | A10 positivo | | | | da_collaudare | |
+| 2026-11-01 | A10 positivo (controllo locale) | container Linux, OpenJDK 8u504 (verifica con 21 + jaxb-api), controllo 2.3.1 | 662414ac99b8... (`tests/fixture_telematico/controllo_20261101/manifest.json`) | (archivio di sviluppo) | passato (controllo locale) | solo (*) 3345, `.dcm` prodotto; dati sintetici, non e' la prova su Windows |
+| | A10 positivo su Desktop Telematico (Windows) | | | | da_collaudare | anche il passaggio manuale con un `.dgn` reale registrato da GUI/MCP |
 | | A13 | | | | da_collaudare | |
 | | A14 reale | | | | da_collaudare | |
 | | A18 reale | | | | da_collaudare | |

@@ -40,7 +40,7 @@ class Esito(str, Enum):
 ESITI = tuple(e.value for e in Esito)
 
 # Stato del controllo ufficiale come dimensione separata della pratica (specifica §10).
-STATI_CONTROLLO = ("non_eseguito", "positivo", "negativo", "non_verificabile")
+STATI_CONTROLLO = ("non_eseguito", "positivo", "negativo", "da_verificare", "non_verificabile")
 
 
 @dataclass

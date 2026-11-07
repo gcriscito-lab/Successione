@@ -52,6 +52,7 @@ def argomenti_scrittura(pid, aid):
         "prepara_pdfa": {"allegato_id": aid},
         "suddividi_allegato": {"allegato_id": aid},
         "riordina_allegati": {"pratica_id": pid},
+        "registra_esito_controllo": {"pratica_id": pid, "file_dgn": "x.dgn", "file_log_schema": "x_logSchema.xml"},
     }
 
 

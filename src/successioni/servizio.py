@@ -76,13 +76,13 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
 
     # ---------------------------------------------------------------- pratiche
     def crea_pratica(self, titolo: str, *, chiave: str | None = None, autore="utente", canale="gui",
-                     iniziali: list[dict] | None = None) -> dict:
+                     iniziali: list[dict] | None = None, _operazione: str = "crea_pratica") -> dict:
         """Crea la pratica; con `iniziali` applica nella stessa transazione le operazioni di partenza (creazione guidata)."""
         self._canale(canale)
         impr = _impronta({"titolo": titolo, "iniziali": iniziali or []})
         with self.arch.transazione() as c:
             if chiave:
-                prec = self._richiesta(c, chiave, "crea_pratica", impr)
+                prec = self._richiesta(c, chiave, _operazione, impr)
                 if prec is not None:
                     return {**prec, "ripetuta": True}
             pid = "pr_" + uuid.uuid4().hex[:12]
@@ -104,18 +104,23 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
             risp = {"pratica_id": pid, "revisione": 1, "titolo": titolo}
             if chiave:
                 c.execute("INSERT INTO richieste VALUES(?,?,?,?,?,?)",
-                          (chiave, pid, "crea_pratica", impr, json.dumps(risp), t))
+                          (chiave, pid, _operazione, impr, json.dumps(risp), t))
             return risp
 
-    def importa_xml_telematico(self, xml: bytes, *, titolo: str | None = None, autore="utente", canale="gui") -> dict:
+    def importa_xml_telematico(self, xml: bytes, *, titolo: str | None = None, autore="utente", canale="gui",
+                               chiave: str | None = None) -> dict:
         """Crea una pratica a partire da un file telematico SUC13 (vedi `telematico/importa.py`): solo i dati che
-        l'esportazione sa riprodurre; il resto e' nell'elenco `non_importato`. I dati restano da verificare."""
+        l'esportazione sa riprodurre; il resto e' nell'elenco `non_importato`. I dati restano da verificare.
+
+        Con `chiave` l'importazione e' idempotente come `crea_pratica`: ripetere con la stessa chiave e lo stesso file (e
+        titolo) restituisce la pratica gia' creata (`ripetuta`); la stessa chiave con un contenuto diverso e' rifiutata."""
         from .telematico.importa import XmlNonImportabile, importa_xml
         try:
             letto = importa_xml(xml)
         except XmlNonImportabile as e:
             raise DatiNonValidi(f"file non importabile: {e}") from None
-        r = self.crea_pratica(titolo or letto["titolo"], autore=autore, canale=canale, iniziali=letto["operazioni"])
+        r = self.crea_pratica(titolo or letto["titolo"], autore=autore, canale=canale, iniziali=letto["operazioni"],
+                              chiave=chiave, _operazione="importa_xml_telematico")
         return {**r, "importato": letto["importato"], "non_importato": letto["non_importato"], "avvisi": letto["avvisi"]}
 
     def elenca(self) -> list[dict]:
@@ -164,6 +169,8 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
         origine = origine or ("proposto_assistente" if canale == "mcp" else "inserito")
         if origine not in V.ORIGINI:
             raise DatiNonValidi("origine non ammessa", ammesse=list(V.ORIGINI))
+        if not isinstance(operazioni, (list, tuple)):
+            raise DatiNonValidi("operazioni: attesa una lista di oggetti {op, ...}")
         impr = _impronta({"p": pratica_id, "r": revisione_attesa, "o": operazioni})
         with self.arch.transazione() as c:
             if chiave:
@@ -204,9 +211,16 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
     def ripristina_revisione(self, pratica_id: str, revisione_attesa: int, a_revisione: int, *,
                              autore="utente", canale="gui") -> dict:
         """Ripristino non distruttivo: crea una nuova revisione con i dati di quella richiesta."""
+        self._canale(canale)
         snap = self.leggi(pratica_id, a_revisione)["dati"]
+        errori = S.valida_forma(snap)          # le regole di forma possono essere cambiate dopo quella revisione
+        if errori:
+            raise DatiNonValidi(f"i dati della revisione {a_revisione} non superano i controlli di forma attuali: "
+                                "nessun ripristino applicato", errori=[e.asdict() for e in errori])
         with self.arch.transazione() as c:
             p = c.execute("SELECT revisione FROM pratiche WHERE id=?", (pratica_id,)).fetchone()
+            if not p:
+                raise NonTrovato("pratica inesistente", pratica_id=pratica_id)
             if p["revisione"] != revisione_attesa:
                 raise ConflittoRevisione("revisione obsoleta", revisione_corrente=p["revisione"],
                                          revisione_attesa=revisione_attesa)
@@ -279,7 +293,11 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
 
     @staticmethod
     def _applica(dati: dict, op: dict, origine: str, canale: str, i: int):
+        if not isinstance(op, dict):
+            raise DatiNonValidi(f"operazione {i}: attesa un oggetto {{op, ...}}, ricevuto {type(op).__name__}")
         tipo = op.get("op")
+        if op.get("campi") is not None and not isinstance(op.get("campi"), dict):
+            raise DatiNonValidi(f"operazione {i}: 'campi' deve essere un oggetto")
         if tipo in ("upsert", "remove"):
             coll = op.get("coll")
             if coll not in S.COLLEZIONI:

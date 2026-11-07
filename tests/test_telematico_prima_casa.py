@@ -423,11 +423,11 @@ def test_valore_quote_prima_casa_non_intero_blocca_ef():
         [m.messaggio for m in es.quadri_mancanti]
 
 
-def test_importazione_rifiuta_le_agevolazioni():
+def test_importazione_legge_le_agevolazioni():
     es = _es(caso_prima_casa())
-    # l'importazione non legge Agevolazioni: il meccanismo generale dei nodi non letti rifiuta il file (nessuna perdita)
-    with pytest.raises(importa.XmlNonImportabile, match="Agevolazioni"):
-        importa.importa_xml(es.xml)
+    # dalla revisione 2 (07/11/2026) l'importazione legge Agevolazioni nelle stesse chiavi dell'export
+    ops = importa.importa_xml(es.xml)
+    assert "'agevolazioni': 'P'" in repr(ops)
 
 
 def test_calcolo_blocca_ancora_le_altre_agevolazioni():

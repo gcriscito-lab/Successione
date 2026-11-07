@@ -229,21 +229,74 @@ class ElaboratiMixin:
         # Con il componente reale si chiede sempre il file controllato (.dcm): senza, il componente cancella la copia di lavoro
         # anche a controllo positivo (prova generale del 2026-11-05) e il risultato sembrerebbe un'alterazione dell'input.
         extra = {"produci_dcm": True} if isinstance(adattatore, ControlloJar) else {}
-        r = adattatore.esegui(xml_path, chiave=chiave, pratica_id=pratica_id,
-                             revisione=j["input"]["revisione"],
-                             impronta_dichiarativa=j["input"]["impronta_dichiarativa"], **extra)
-        det = r.dettaglio or {}
-        reg = adattatore.job.leggi(r.job_id, TIPO_JOB)["risultato"] if r.job_id else {}   # dettagli registrati dall'adattatore
-        ris = {"esito": r.esito.value, "stato_controllo": det.get("stato_controllo", "non_eseguito"),
-               "versione_controllo": reg.get("versione_controllo"), "data_versione": reg.get("data_versione"),
-               "job_adattatore": r.job_id, "azione_richiesta": r.azione_richiesta,
-               "riepilogo": reg.get("riepilogo"), "motivi": reg.get("motivi"),
-               "bozza_tecnica": exp.get("scopo") == "bozza_tecnica", "modalita": reg.get("modalita")}
         inp = {"xml_sha256": exp["xml_sha256"], "impronta_dichiarativa": j["input"]["impronta_dichiarativa"]}
-        jid = self._job_scrivi(TIPO_CONTROLLO, pratica_id, "completato", inp, ris)
+        bozza = exp.get("scopo") == "bozza_tecnica"
+        try:
+            r = adattatore.esegui(xml_path, chiave=chiave, pratica_id=pratica_id,
+                                 revisione=j["input"]["revisione"],
+                                 impronta_dichiarativa=j["input"]["impronta_dichiarativa"], **extra)
+        except Exception as e:
+            # Il record della pratica si scrive sempre: lo stato mostra un controllo non concluso, non quello precedente.
+            motivo = str(getattr(e, "messaggio", None) or f"{type(e).__name__}: {e}")[:300]
+            ris = {"esito": "fallito" if isinstance(adattatore, ControlloJar) else "da_collaudare",
+                   "stato_controllo": "non_verificabile", "versione_controllo": None, "data_versione": None,
+                   "job_adattatore": None, "azione_richiesta": "Controllo ufficiale non concluso: " + motivo
+                   + ". Rieseguire il controllo.", "riepilogo": None, "motivi": [motivo],
+                   "bozza_tecnica": bozza, "modalita": None, "errore": motivo}
+            self._job_scrivi(TIPO_CONTROLLO, pratica_id, "errore", inp, ris)
+            raise ErroreServizio("controllo ufficiale non concluso: " + motivo) from None
+        ris = self._ris_controllo(r.job_id, r.esito.value, (r.dettaglio or {}).get("stato_controllo", "non_eseguito"),
+                                  r.azione_richiesta, bozza)
+        prec = self._job_ultimo(TIPO_CONTROLLO, pratica_id)
+        if (prec and r.job_id and prec["risultato"].get("job_adattatore") == r.job_id
+                and prec["input"].get("xml_sha256") == inp["xml_sha256"]):
+            jid = prec["id"]     # stesso passaggio manuale ancora aperto: nessun record duplicato
+        else:
+            jid = self._job_scrivi(TIPO_CONTROLLO, pratica_id, "completato", inp, ris)
         from .pulizia import pulisci_silenziosa
         pulisci_silenziosa(self.arch.base)           # temporanei vecchi: mai causa di fallimento del controllo
         return {"pratica_id": pratica_id, "job_id": jid, **ris}
+
+    def _ris_controllo(self, job_adattatore: str | None, esito: str, stato: str, azione: str | None, bozza) -> dict:
+        from .collegamenti.base import RegistroJob
+        from .collegamenti.controllo import TIPO_JOB
+        reg = RegistroJob(self.arch).leggi(job_adattatore, TIPO_JOB)["risultato"] if job_adattatore else {}
+        return {"esito": esito, "stato_controllo": stato,
+                "versione_controllo": reg.get("versione_controllo"), "data_versione": reg.get("data_versione"),
+                "job_adattatore": job_adattatore, "azione_richiesta": azione,
+                "riepilogo": reg.get("riepilogo"), "motivi": reg.get("motivi"),
+                "bozza_tecnica": bozza, "modalita": reg.get("modalita")}
+
+    def registra_diagnostico_controllo(self, pratica_id: str, *, dgn: bytes, log_schema: bytes, wri: bytes | None = None,
+                                       ambiente_dichiarato: dict | None = None, conferma_associazione: bool = False,
+                                       job_adattatore: str | None = None) -> dict:
+        """Chiude il passaggio manuale del controllo ufficiale con i file ORIGINALI prodotti dall'utente (Desktop Telematico
+        o ControlliSUC13): `.dgn` e `_logSchema.xml` obbligatori, `.wri` facoltativo. Il diagnostico e' accettato solo se
+        riferibile al file controllato (codice fiscale, identificativi, nome del file fra quelli noti); un nome che indica
+        un altro file o un'altra revisione e' rifiutato. `conferma_associazione` registra la dichiarazione dell'utente quando
+        il contenuto non permette la verifica: l'esito resta 'da_collaudare' e non sblocca l'invio."""
+        from .collegamenti.base import RegistroJob
+        from .collegamenti.controllo import TIPO_JOB, ControlloManuale
+        st = self.stato_elaborati(pratica_id)
+        ctl, exp = st["controllo_ufficiale"], st["export"]
+        jid = job_adattatore or ctl.get("job_adattatore")
+        if not jid:
+            raise DatiNonValidi("nessun controllo ufficiale in attesa del diagnostico: avvia prima il controllo")
+        for nome, b in (("dgn", dgn), ("_logSchema.xml", log_schema), ("wri", wri)):
+            if b is not None and len(b) > 20_000_000:
+                raise DatiNonValidi(f"file {nome} oltre 20 MB")
+        j = RegistroJob(self.arch).leggi(jid, TIPO_JOB)
+        if j["pratica_id"] != pratica_id:
+            raise DatiNonValidi("il controllo indicato appartiene a un'altra pratica")
+        if exp.get("stato") != "aggiornato" or j["input"].get("xml_sha256") != exp.get("xml_sha256"):
+            raise DatiNonValidi("il controllo in attesa riguarda un file non piu' corrente: rigenera il file e riavvia il "
+                                "controllo", stato_export=exp.get("stato"))
+        if j["stato"] != "attesa_diagnostico":
+            raise DatiNonValidi(f"il controllo {jid} non e' in attesa del diagnostico (stato {j['stato']})")
+        ControlloManuale(self.arch).registra_diagnostico(
+            jid, dgn=dgn, log_schema=log_schema, wri=wri, ambiente_dichiarato=ambiente_dichiarato,
+            conferma_associazione=conferma_associazione)
+        return {"pratica_id": pratica_id, **self.stato_elaborati(pratica_id)["controllo_ufficiale"]}
 
     def file_controllato_dcm(self, pratica_id: str) -> tuple[bytes, dict]:
         """File controllato (.dcm) prodotto dal componente ufficiale per l'export corrente, se il controllo e' positivo."""
@@ -327,9 +380,22 @@ class ElaboratiMixin:
         if not c:
             ctl = {"stato": "non_eseguito"}
         else:
-            r = c["risultato"]
+            r = dict(c["risultato"])
+            if r.get("job_adattatore"):   # stato ATTUALE del job dell'adattatore (es. diagnostico registrato dopo)
+                from .collegamenti.base import RegistroJob
+                from .collegamenti.controllo import TIPO_JOB
+                try:
+                    ja = RegistroJob(self.arch).leggi(r["job_adattatore"], TIPO_JOB)
+                except ErroreServizio:
+                    ja = None
+                if ja is not None:
+                    ra = ja["risultato"]
+                    r.update(stato_controllo=ra.get("stato_controllo", r.get("stato_controllo")),
+                             esito=ra.get("esito", r.get("esito")), azione_richiesta=ra.get("azione_richiesta"),
+                             versione_controllo=ra.get("versione_controllo") or r.get("versione_controllo"),
+                             stato_job=ja["stato"], modalita=ra.get("modalita") or r.get("modalita"))
             corrente = (export.get("stato") == "aggiornato" and c["input"].get("xml_sha256") == export.get("xml_sha256"))
-            ctl = {"stato": r.get("stato_controllo") if corrente else "obsoleto", "ultimo_esito_registrato": r.get("stato_controllo"),
+            ctl = {"stato_job": r.get("stato_job"), "modalita": r.get("modalita"), "stato": r.get("stato_controllo") if corrente else "obsoleto", "ultimo_esito_registrato": r.get("stato_controllo"),
                    "parola_esito": r.get("esito"), "versione_controllo": r.get("versione_controllo"),
                    "bozza_tecnica": r.get("bozza_tecnica"), "job_id": c["id"], "job_adattatore": r.get("job_adattatore"),
                    "azione_richiesta": r.get("azione_richiesta") if corrente else None}
@@ -348,6 +414,12 @@ class ElaboratiMixin:
             trasmissione.update(stato=copia["stato"], modalita=copia["dettaglio"].get("modalita"))
             if trasmissione["modalita"] == "simulata":
                 trasmissione["nota"] = "PROVA SIMULATA: nessun invio all'Agenzia"
+            if copia.get("prove"):   # prove simulate sulla copia reale: separate, non cambiano lo stato della copia
+                u = copia["prove"][-1]["dettaglio"]
+                trasmissione["prova_simulata"] = {
+                    "tentativo": u.get("job_id"), "stato": u.get("stato"), "protocollo_fittizio": u.get("protocollo"),
+                    "numero": len(copia["prove"]), "esito": "simulazione",
+                    "nota": "PROVA SIMULATA: nessun invio all'Agenzia; la copia reale resta da inviare"}
         return {"pratica_id": pratica_id, "revisione": d["revisione"], "impronta_dichiarativa": imp,
                 "dati": {"stato": "senza_rilievi" if ver["esito"] == "ok" else "con_rilievi", "rilievi": len(ver["rilievi"])},
                 "export": export, "xsd": xsd, "controllo_ufficiale": ctl, "stampa_modello": stampa,

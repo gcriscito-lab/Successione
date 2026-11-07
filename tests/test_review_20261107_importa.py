@@ -129,7 +129,12 @@ def test_dato_dichiarato_di_ef_non_importato_e_segnalato():
     v = etree.SubElement(s1, f"{{{NS['suc']}}}ImpostaIpotecariaVersata")
     v.text = "100"
     avvisi = importa_xml(etree.tostring(doc), data_riferimento=OGGI)["avvisi"]
-    assert any("SezioneI_ImpostaIpotecaria/ImpostaIpotecariaVersata = 100 non importato" in a for a in avvisi), avvisi
+    # revisione 2 (2026-11-07): EF6 (imposta gia' versata) e' importata per le sostitutive; in una prima dichiarazione resta
+    # un avviso esplicito perche' la riesportazione non la scrive
+    assert any("SezioneI_ImpostaIpotecaria/ImpostaIpotecariaVersata = 100 in una prima dichiarazione" in a for a in avvisi), avvisi
+    v.tag = f"{{{NS['suc']}}}CampoNonRicalcolato"
+    avvisi = importa_xml(etree.tostring(doc), data_riferimento=OGGI)["avvisi"]
+    assert any("SezioneI_ImpostaIpotecaria/CampoNonRicalcolato = 100 non importato" in a for a in avvisi), avvisi
 
 
 def test_sezione_eh_non_importata_e_dichiarata():
@@ -139,4 +144,6 @@ def test_sezione_eh_non_importata_e_dichiarata():
     sez = etree.SubElement(pm, f"{{{NS['suc']}}}SezioneIV_AltreAgevRiduz")
     etree.SubElement(sez, f"{{{NS['suc']}}}Qualsiasi").text = "1"
     r = importa_xml(etree.tostring(doc), data_riferimento=OGGI)
-    assert "QuadroEH SezioneIV_AltreAgevRiduz: non importata, da reinserire" in r["non_importato"]
+    # revisione 2 (2026-11-07): la Sezione IV si importa (riduzioni_art25); il campo che non si legge resta elencato
+    assert ("QuadroEH SezioneIV_AltreAgevRiduz: campi non importati, da reinserire: PrimoModulo/SezioneIV_AltreAgevRiduz/"
+            "Qualsiasi = 1") in r["non_importato"], r["non_importato"]
