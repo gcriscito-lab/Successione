@@ -1738,7 +1738,7 @@ async function wizDaCF(valore) {
 }
 /* Una chiave di richiesta per ogni apertura della procedura: un doppio clic o un nuovo tentativo dopo un errore di rete
    non crea due pratiche (revisione 2, punto 1). */
-function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; W.chiave = crypto.randomUUID(); W.busy = false; S.gen++; wizRender(); $("#wAvanti").disabled = false; $("#wiz").showModal(); }
+function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; W.extra = null; W.chiave = crypto.randomUUID(); W.busy = false; S.gen++; wizRender(); $("#wAvanti").disabled = false; $("#wiz").showModal(); }
 async function wizAvanti() {
   if (W.busy) return;
   const d = W.dati;
@@ -1746,7 +1746,7 @@ async function wizAvanti() {
   if (W.passo < PASSI.length - 1) { W.passo++; wizRender(); return; }
   const campi = {}; for (const k of ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "sesso", "provincia_nascita", "data_decesso", "comune_decesso", "provincia_decesso"]) if ((d[k] || "").trim()) campi[k] = (k === "codice_fiscale" || k.startsWith('provincia')) ? d[k].trim().toUpperCase() : (k.startsWith("data_") ? dataIso(d[k]) : d[k].trim());
   campi.ruolo = "defunto";
-  const iniziali = [{ op: "upsert", coll: "persone", campi }, { op: "set", sezione: "opzioni", campi: { tipo_dichiarazione: d.tipo || "originaria", quadri_attivi: d.quadri || S.schema.predefiniti } }];
+  const iniziali = [{ op: "upsert", coll: "persone", campi }, { op: "set", sezione: "opzioni", campi: { tipo_dichiarazione: d.tipo || "originaria", quadri_attivi: d.quadri || S.schema.predefiniti } }, ...(W.extra || [])];
   W.busy = true; const bt = $("#wAvanti"); bt.disabled = true; bt.setAttribute("aria-busy", "true"); $("#wizErr").textContent = "";
   let r;
   try {
@@ -2064,7 +2064,8 @@ async function apriGuida(scheda) {
         h("li", {}, h("b", {}, "Crea la pratica: "), "«Nuova dichiarazione» chiede defunto e quadri; «Importa XML» riprende un file .suc già inviato."),
         h("li", {}, h("b", {}, "Compila i quadri: "), "eredi in EA, terreni in EB, fabbricati in EC, passività in ED, gli altri beni negli altri quadri. «Controlla» dice cosa manca; il valore catastale è proposto nella scheda dell'immobile."),
         h("li", {}, h("b", {}, "Allegati: "), "nel quadro EG carichi i documenti (convertiti in PDF/A) e generi l'albero genealogico dai dati."),
-        h("li", {}, h("b", {}, "File e invio: "), "genera il file, esegui il controllo ufficiale sul tuo computer, stampa e rileggi, prepara la copia da inviare con Desktop Telematico, poi registra protocollo e ricevute.")),
+        h("li", {}, h("b", {}, "File e invio: "), "genera il file, esegui il controllo ufficiale sul tuo computer, stampa e rileggi, prepara la copia da inviare con Desktop Telematico, poi registra protocollo e ricevute."),
+        h("li", {}, h("b", {}, "Stima veloce: "), h("button", { type: "button", class: "lk", id: "guidaCalc", onclick: () => { $("#dGuida").close(); apriCalcolatrice(); } }, "Calcolatrice"), " stima le imposte da pochi dati (eredi, beni, passività) senza creare una pratica.")),
         h("h3", {}, "Scorciatoie da tastiera"),
         h("table", { class: "scorciatoie" }, h("tbody", {}, SCORCIATOIE.map(([k, t]) => h("tr", { class: "fisso" }, h("td", {}, h("kbd", {}, k)), h("td", {}, t))))),
         h("p", { class: "mut piccolo" }, "Dati non noti: scrivi «?» (da confermare), «assente», «zero» o «non applicabile». Importi all'italiana: 150.000 oppure 1.234,50."));
@@ -2088,3 +2089,131 @@ async function apriGuida(scheda) {
 $("#bGuida").onclick = () => apriGuida();
 document.addEventListener("keydown", ev => { if (ev.key === "F1") { ev.preventDefault(); apriGuida(); } });
 datiGuida().then(() => { if (S.P && S.sel !== "FILE") renderVista(); }).catch(() => { /* la guida resta raggiungibile dal pulsante */ });
+
+/* ---------- Calcolatrice rapida ----------
+   Stima delle imposte da pochi dati: il server (calcolatrice.py, POST /api/calcolatrice) costruisce una pratica sintetica IN
+   MEMORIA e usa gli stessi motori della dichiarazione. Nulla viene salvato nell'archivio. Risultato aggiornato mentre si scrive. */
+const CALC = { dati: null, seq: 0, timer: null, ultimo: null };
+const CALC_ALTRI = [["CR", "Conti, depositi, crediti"], ["AB", "Titoli e altri beni"], ["DN", "Denaro, gioielli, mobilia"]];
+function calcNuovi() {
+  return { data_decesso: "", eredi: [{ grado: "02", quota: "", disabile: false, nome: "" }], immobili: [], altri_beni: [], passivita: [], circoscrizioni: 1 };
+}
+function calcOpzioni(chiave) { return ((S.schema && S.schema.strutturati[chiave]) || { opzioni: [] }).opzioni; }
+function calcSelect(valore, opzioni, onchange, etichetta) {
+  const s = h("select", { "aria-label": etichetta, onchange: ev => onchange(ev.target.value) }, opzioni.map(([v, t]) => h("option", { value: v }, t)));
+  s.value = valore; return s;
+}
+function calcInput(o, k, attrs) { return h("input", { ...attrs, value: o[k] == null ? "" : String(o[k]), oninput: ev => { o[k] = ev.target.value; calcPianifica(); } }); }
+function calcCheck(o, k, testo) {
+  const cb = h("input", { type: "checkbox", onchange: ev => { o[k] = ev.target.checked; calcPianifica(); } }); cb.checked = !!o[k];
+  return h("label", { class: "chk" }, cb, testo);
+}
+function calcTogli(lista, i) { return h("button", { type: "button", class: "gh x", "aria-label": "Togli la riga", title: "Togli", onclick: () => { lista.splice(i, 1); calcDisegnaDati(); calcPianifica(); } }, "×"); }
+function calcDisegnaDati() {
+  const d = CALC.dati, box = $("#calcDati"), sugg = (CALC.ultimo && CALC.ultimo.valori_catastali) || [];
+  const gradi = calcOpzioni("persone.grado_parentela").map(o => [o.valore, o.valore + " — " + o.etichetta]);
+  const tipiPass = calcOpzioni("passivita.tipo").map(o => [o.valore, o.valore + " — " + o.etichetta]);
+  const legge = (CALC.ultimo && CALC.ultimo.quote_di_legge) || [];
+  const dataD = h("input", { type: "date", id: "calcData", "aria-label": "Data del decesso", value: d.data_decesso, oninput: ev => { d.data_decesso = ev.target.value; calcPianifica(); } });
+  const sez = (titolo, lista, nuovo, riga, testoAgg) => [h("h3", {}, titolo), ...lista.map((o, i) => riga(o, i)),
+    h("button", { type: "button", class: "gh", onclick: () => { lista.push(nuovo()); calcDisegnaDati(); calcPianifica(); } }, testoAgg)];
+  box.replaceChildren(...[
+    h("div", { class: "campo" }, h("label", { for: "calcData" }, "Data del decesso"), dataD),
+    ...sez("Eredi", d.eredi, () => ({ grado: "02", quota: "", disabile: false, nome: "" }), (o, i) => h("div", { class: "calc-riga calc-erede" },
+      calcInput(o, "nome", { class: "nome", placeholder: "Erede " + (i + 1), "aria-label": "Nome (facoltativo)" }),
+      calcSelect(o.grado, gradi, v => { o.grado = v; calcPianifica(); }, "Grado di parentela"),
+      calcInput(o, "quota", { class: "q", placeholder: legge[i] || "di legge", "aria-label": "Quota (es. 1/2)", title: "Quota dell'eredità, es. 1/2. Vuota per tutti: quote di legge" }),
+      calcCheck(o, "disabile", "disabilità grave"), d.eredi.length > 1 ? calcTogli(d.eredi, i) : null), "+ Aggiungi erede"),
+    ...sez("Immobili", d.immobili, () => ({ tipo: "fabbricato", valore: "", rendita: "", categoria: "A/2", prima_casa: false }), (o, i) => {
+      const s = sugg[i] || {};
+      return h("div", { class: "calc-riga calc-immobile" },
+        calcSelect(o.tipo, [["fabbricato", "Fabbricato"], ["terreno", "Terreno"]], v => { o.tipo = v; calcDisegnaDati(); calcPianifica(); }, "Tipo di immobile"),
+        calcInput(o, "valore", { class: "n", placeholder: "valore €", "aria-label": "Valore", inputmode: "decimal" }),
+        o.tipo === "terreno" ? calcInput(o, "reddito_dominicale", { class: "n", placeholder: "reddito dominicale", "aria-label": "Reddito dominicale", inputmode: "decimal" })
+          : [calcInput(o, "rendita", { class: "n", placeholder: "rendita", "aria-label": "Rendita catastale", inputmode: "decimal" }),
+             calcInput(o, "categoria", { class: "c", placeholder: "A/2", "aria-label": "Categoria catastale" }), calcCheck(o, "prima_casa", "prima casa")],
+        calcTogli(d.immobili, i),
+        s.valore_catastale ? h("span", { class: "calc-sugg" }, "Valore catastale proposto: " + Number(s.valore_catastale).toLocaleString("it-IT") + " € (" + s.formula + ")" + (o.valore ? "" : " — usato nella stima"))
+          : s.motivo ? h("span", { class: "calc-sugg" }, "Valore catastale non calcolabile: " + s.motivo) : null);
+    }, "+ Aggiungi immobile"),
+    d.immobili.length ? h("div", { class: "calc-riga" }, h("label", { for: "calcCirc" }, "Circoscrizioni immobiliari (conservatorie) diverse"),
+      calcInput(d, "circoscrizioni", { id: "calcCirc", class: "c", type: "number", min: "1", max: "50" })) : null,
+    ...sez("Altri beni", d.altri_beni, () => ({ tipo: "CR", valore: "" }), (o, i) => h("div", { class: "calc-riga calc-altro" },
+      calcSelect(o.tipo, CALC_ALTRI, v => { o.tipo = v; calcPianifica(); }, "Tipo di bene"),
+      calcInput(o, "valore", { class: "n", placeholder: "valore €", "aria-label": "Valore", inputmode: "decimal" }), calcTogli(d.altri_beni, i)), "+ Aggiungi conto, titolo o altro bene"),
+    ...sez("Passività", d.passivita, () => ({ tipo: "3", importo: "" }), (o, i) => h("div", { class: "calc-riga calc-passivita" },
+      calcSelect(o.tipo, tipiPass, v => { o.tipo = v; calcPianifica(); }, "Tipo di passività"),
+      calcInput(o, "importo", { class: "n", placeholder: "importo €", "aria-label": "Importo", inputmode: "decimal" }), calcTogli(d.passivita, i)), "+ Aggiungi passività")].filter(Boolean));
+}
+function calcPianifica() { clearTimeout(CALC.timer); CALC.timer = setTimeout(calcEsegui, 450); }
+async function calcEsegui() {
+  const d = CALC.dati, ris = $("#calcRis"), mio = ++CALC.seq;
+  if (!d.data_decesso) { ris.replaceChildren(h("p", { class: "calc-avv" }, "Stima: non sostituisce la dichiarazione né il controllo ufficiale."), h("p", { class: "mut" }, "Indica la data del decesso, gli eredi e almeno un bene: il risultato compare qui mentre scrivi.")); return; }
+  ris.setAttribute("aria-busy", "true");
+  let r;
+  try { r = await post("/api/calcolatrice", d); }
+  catch (e) { if (mio !== CALC.seq) return; ris.removeAttribute("aria-busy"); calcMostraErrore(e.message); return; }
+  if (mio !== CALC.seq) return;            // risposta superata da una modifica successiva
+  ris.removeAttribute("aria-busy");
+  const primaSugg = JSON.stringify((CALC.ultimo || {}).valori_catastali || []) + JSON.stringify((CALC.ultimo || {}).quote_di_legge);
+  CALC.ultimo = r;
+  calcMostra(r);
+  if (primaSugg !== JSON.stringify(r.valori_catastali || []) + JSON.stringify(r.quote_di_legge)) {
+    const att = document.activeElement, idx = att && [...$("#calcDati").querySelectorAll("input,select")].indexOf(att), pos = att && att.selectionStart;
+    calcDisegnaDati();
+    if (idx >= 0) { const el = [...$("#calcDati").querySelectorAll("input,select")][idx]; if (el) { el.focus(); try { if (pos != null) el.setSelectionRange(pos, pos); } catch (_) { /* campi senza selezione */ } } }
+  }
+}
+function calcMostraErrore(t) {
+  CALC.ultimo = null;
+  $("#calcRis").replaceChildren(h("p", { class: "calc-avv" }, "Stima: non sostituisce la dichiarazione né il controllo ufficiale."), h("p", { class: "err", id: "calcErrore" }, t));
+}
+function calcMostra(r) {
+  const lista = (cls, voci) => voci && voci.length ? h("ul", { class: cls }, voci.map(v => h("li", {}, v))) : null;
+  const imp = r.imposte || [];
+  $("#calcRis").replaceChildren(...[
+    h("p", { class: "calc-avv", id: "calcAvv" }, r.avvertenza),
+    imp.length ? h("table", { class: "calc-imp", id: "calcImposte" }, h("tbody", {},
+      imp.map(x => h("tr", { class: "fisso" }, h("td", {}, x.voce), h("td", { class: "n" }, x.testo))),
+      h("tr", { class: "fisso tot" }, h("td", {}, "Totale stimato"), h("td", { class: "n", id: "calcTotale" }, r.totale_testo || "")))) : null,
+    r.non_stimabile && r.non_stimabile.length ? [h("h3", {}, "Non stimabile"), lista("calc-ns", r.non_stimabile.map(m => "non stimabile: " + m))] : null,
+    r.eredi && r.eredi.length ? [h("h3", {}, "Imposta di successione per erede"), ...r.eredi.map(e => h("details", { class: "calc-erede-ris" },
+      h("summary", {}, e.nome + " (" + (e.grado_testo || e.grado) + ", quota " + e.quota + "): " + e.imposta),
+      h("p", { class: "mut" }, "Franchigia " + e.franchigia + (e.disabile ? " (disabilità grave)" : "") + ", aliquota " + e.aliquota + "."),
+      h("ol", {}, e.passaggi.map(p => h("li", {}, p.voce + ": " + p.valore)))))] : null,
+    r.passaggi && r.passaggi.length ? [h("h3", {}, "Come si arriva al risultato"), lista("", r.passaggi)] : null,
+    r.note && r.note.length ? [h("h3", {}, "Note"), lista("", r.note)] : null,
+    r.assunzioni ? h("details", {}, h("summary", {}, "Ipotesi della stima"), lista("", r.assunzioni)) : null].flat().filter(Boolean));
+}
+async function calcCreaPratica() {
+  if (!CALC.dati.data_decesso) return calcMostraErrore("Indica almeno la data del decesso e gli eredi.");
+  let r;
+  try { r = await post("/api/calcolatrice", { ...CALC.dati, azione: "pratica_iniziale" }); } catch (e) { return calcMostraErrore(e.message); }
+  $("#dCalc").close();
+  wizApri();
+  if (!$("#wiz").open) return;
+  W.dati.data_decesso = dataIt(r.data_decesso); W.extra = r.operazioni;
+  wizRender();
+  msg("Procedura guidata compilata con la data del decesso e " + r.operazioni.length + " eredi. Da completare: " + r.da_completare + ".", "o");
+}
+function apriCalcolatrice() {
+  let d = $("#dCalc");
+  if (!d) {
+    d = h("dialog", { id: "dCalc", class: "calc", "aria-labelledby": "dCalcT" }, h("form", { method: "dialog" },
+      h("h2", { id: "dCalcT" }, "Calcolatrice rapida"),
+      h("p", { class: "mut" }, "Stima delle imposte di successione con i motori di calcolo del programma. Non crea e non salva pratiche."),
+      h("div", { class: "calc-corpo" }, h("div", { class: "calc-dati", id: "calcDati" }), h("div", { class: "calc-ris", id: "calcRis", "aria-live": "polite" })),
+      h("div", { class: "wiz-az" },
+        h("button", { type: "button", class: "gh", id: "calcAzzera", onclick: () => { CALC.dati = calcNuovi(); CALC.ultimo = null; calcDisegnaDati(); calcEsegui(); } }, "Azzera"),
+        h("span", { class: "sp" }),
+        h("button", { type: "button", class: "gh", id: "calcCrea", onclick: occupato("calcCrea", calcCreaPratica) }, "Crea una pratica da questi dati"),
+        h("button", { class: "pil" }, "Chiudi"))));
+    document.body.append(d);
+  }
+  if (!CALC.dati) CALC.dati = calcNuovi();
+  calcDisegnaDati(); calcEsegui();
+  if (!d.open) d.showModal();
+  $("#calcData").focus();
+}
+$("#bCalc").onclick = () => apriCalcolatrice();
+$("#homeCalc").onclick = () => apriCalcolatrice();

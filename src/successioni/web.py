@@ -460,6 +460,16 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         return await request.json() if (await request.body()) else {}
 
     @api
+    async def calcolatrice_api(request):
+        # calcolatrice rapida: stima su una pratica sintetica in memoria, nessuna scrittura nell'archivio
+        import json
+        from . import calcolatrice
+        b = json.loads(await corpo_limitato(request, 200_000, "dati della calcolatrice") or b"{}")
+        if b.get("azione") == "pratica_iniziale":
+            return calcolatrice.pratica_iniziale(b)
+        return calcolatrice.stima(b)
+
+    @api
     async def cf_decodifica(request):
         from .codice_fiscale import decodifica
         return decodifica(request.query_params.get("cf", ""), ruolo=request.query_params.get("ruolo"))
@@ -519,7 +529,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     from .pulizia import pulisci_silenziosa
     threading.Thread(target=pulisci_silenziosa, args=(sv.arch.base,), daemon=True, name="pulizia-avvio").start()
     return Starlette(routes=[
-        Route("/api/codice-fiscale", cf_decodifica), Route("/api/importa", importa, methods=["POST"]),
+        Route("/api/codice-fiscale", cf_decodifica), Route("/api/calcolatrice", calcolatrice_api, methods=["POST"]), Route("/api/importa", importa, methods=["POST"]),
         Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
