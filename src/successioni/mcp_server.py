@@ -28,7 +28,7 @@ COPERTURA_NON_DISPONIBILE = [
 STRUMENTI_LETTURA = frozenset({
     "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
     "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
-    "file_in_ingresso", "elenca_allegati", "diagnosi", "valori_catastali", "brogliaccio",
+    "file_in_ingresso", "elenca_allegati", "diagnosi", "valori_catastali", "brogliaccio", "stima_imposte",
 })
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "registra_esito_controllo", "backup_archivio", "stampa_modello",
@@ -220,6 +220,15 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Dati anagrafici ricavabili da un codice fiscale di persona fisica (sesso, data di nascita, comune e provincia se le tabelle del componente SUC13 sono configurate), con controllo del carattere di controllo. E' un suggerimento da verificare: il secolo non e' nel codice e viene dedotto (ruolo 'defunto' per il defunto)."""
         from .codice_fiscale import decodifica
         return decodifica(codice_fiscale, ruolo=ruolo)
+
+    @tool
+    def stima_imposte(data_decesso: str, eredi: list[dict], immobili: list[dict] | None = None,
+                      altri_beni: list[dict] | None = None, passivita: list[dict] | None = None,
+                      circoscrizioni: int = 1) -> dict:
+        """Calcolatrice rapida: STIMA delle imposte (successione per erede con franchigia e aliquota, ipotecaria, catastale, tassa ipotecaria, bollo) senza creare ne' modificare pratiche. Usa i motori di calcolo del programma su una pratica sintetica in memoria. eredi: [{grado (codice GradoParentela, es. '01' coniuge, '02' figlio, '10' fratello), quota ('1/2', facoltativa: senza quote si usano quelle di legge), disabile (bool)}]; immobili: [{tipo 'fabbricato'|'terreno', valore, oppure rendita + categoria (es. 'A/2') o reddito_dominicale per il valore catastale, prima_casa (bool), quota_defunto}]; altri_beni: [{tipo 'CR'|'AB'|'DN', valore}]; passivita: [{tipo (codice 1-12), importo}]. I casi non coperti tornano in 'non_stimabile' con il motivo. Non sostituisce la dichiarazione ne' il controllo ufficiale."""
+        from .calcolatrice import stima
+        return stima({"data_decesso": data_decesso, "eredi": eredi, "immobili": immobili or [], "altri_beni": altri_beni or [],
+                      "passivita": passivita or [], "circoscrizioni": circoscrizioni})
 
     @tool
     def file_in_ingresso() -> list[str]:

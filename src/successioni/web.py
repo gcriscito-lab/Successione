@@ -199,6 +199,29 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     info = api(info, query_ammessa=True)   # il lanciatore verifica la sessione con /api/info?t=...
 
     @api
+    async def cruscotto_api(request):
+        from . import cruscotto
+        return cruscotto.cruscotto(sv)
+
+    @api
+    async def guida_api(request):
+        from . import guida
+        return guida.elenco()
+
+    @api
+    async def guida_documento(request):
+        from . import guida
+        from urllib.parse import quote
+        dati = guida.file_documento(request.path_params["doc"])
+        return Response(dati, media_type="application/pdf", headers={
+            "Content-Disposition": "inline; filename*=UTF-8''" + quote(request.path_params["doc"] + ".pdf"), "Cache-Control": "no-store"})
+
+    @api
+    async def informazioni_api(request):
+        from . import guida
+        return guida.informazioni(sv.arch)
+
+    @api
     async def schema_(request):
         from .collegamenti.invio import TIPI_RICEVUTA
         from . import codici, etichette as E
@@ -456,6 +479,16 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         return await request.json() if (await request.body()) else {}
 
     @api
+    async def calcolatrice_api(request):
+        # calcolatrice rapida: stima su una pratica sintetica in memoria, nessuna scrittura nell'archivio
+        import json
+        from . import calcolatrice
+        b = json.loads(await corpo_limitato(request, 200_000, "dati della calcolatrice") or b"{}")
+        if b.get("azione") == "pratica_iniziale":
+            return calcolatrice.pratica_iniziale(b)
+        return calcolatrice.stima(b)
+
+    @api
     async def cf_decodifica(request):
         from .codice_fiscale import decodifica
         return decodifica(request.query_params.get("cf", ""), ruolo=request.query_params.get("ruolo"))
@@ -515,7 +548,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     from .pulizia import pulisci_silenziosa
     threading.Thread(target=pulisci_silenziosa, args=(sv.arch.base,), daemon=True, name="pulizia-avvio").start()
     return Starlette(routes=[
-        Route("/api/codice-fiscale", cf_decodifica), Route("/api/importa", importa, methods=["POST"]),
+        Route("/api/codice-fiscale", cf_decodifica), Route("/api/calcolatrice", calcolatrice_api, methods=["POST"]), Route("/api/importa", importa, methods=["POST"]),
         Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
@@ -525,7 +558,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route("/api/invio/{cid}/file", scarica_copia),
         Route("/api/invio/{cid}/trasmetti", invio_trasmetti, methods=["POST"]),
         Route("/api/invio/tentativi/{tid}/riconcilia", invio_riconcilia, methods=["POST"]),
-        Route("/", home), Route("/static/{nome}", statico), Route("/api/info", info), Route("/favicon.ico", lambda richiesta: Response((STATIC / "logo.svg").read_bytes(), media_type="image/svg+xml")),
+        Route("/", home), Route("/static/{nome}", statico), Route("/api/guida", guida_api), Route("/api/cruscotto", cruscotto_api), Route("/api/guida/{doc}.pdf", guida_documento), Route("/api/informazioni", informazioni_api),
+        Route("/api/info", info), Route("/favicon.ico", lambda richiesta: Response((STATIC / "logo.svg").read_bytes(), media_type="image/svg+xml")),
         Route("/api/pratiche/{pid}/quadri", quadri), Route("/api/schema", schema_),
         Route("/api/pratiche", elenca), Route("/api/pratiche", crea, methods=["POST"]),
         Route(P, leggi), Route(P + "/aggiorna", aggiorna, methods=["POST"]),
