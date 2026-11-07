@@ -286,3 +286,26 @@ def test_strumento_mcp_in_sola_lettura(tmp_path, monkeypatch):
     d = sc.get("result", sc) if isinstance(sc, dict) else json.loads(res.content[0].text)
     assert imposte(d)["Imposta di successione"] == 6600 and d["avvertenza"].startswith("Stima")
     assert _file(tmp_path) == prima and sv.elenca() == []
+
+
+def test_richiesta_non_oggetto_e_mcp_con_voce_non_oggetto(tmp_path):
+    """Messaggi in italiano anche quando la richiesta intera (web) o una voce (MCP) non e' un oggetto."""
+    import asyncio
+    from mcp.client import Client
+    from starlette.testclient import TestClient
+    from successioni.archivio import Archivio
+    from successioni.mcp_server import costruisci
+    from successioni.servizio import Servizio
+    from successioni.web import crea_app
+    sv = Servizio(Archivio(tmp_path / "d"))
+    c = TestClient(crea_app(sv, token="tk", porta=8765), base_url="http://127.0.0.1:8765", follow_redirects=False)
+    c.get("/", params={"t": "tk"})
+    r = c.post("/api/calcolatrice", json=["02"], headers={"Origin": "http://127.0.0.1:8765"})
+    assert r.status_code == 422 and "oggetto" in r.json()["messaggio"]
+
+    async def scenario():
+        async with Client(costruisci(sv)) as cl:
+            return await cl.call_tool("successioni_stima_imposte", {"data_decesso": "2025-03-10", "eredi": ["02"]})
+    res = asyncio.run(scenario())
+    testo = res.content[0].text
+    assert res.is_error and "Input should be" not in testo

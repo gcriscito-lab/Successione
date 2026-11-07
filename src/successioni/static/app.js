@@ -196,7 +196,8 @@ async function init() {
 function terminePresentazione(decesso) {
   const m = typeof decesso === "string" && decesso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;
-  const t = new Date(+m[1] + 1, +m[2] - 1, +m[3]);
+  // stessa regola di cruscotto._termine e della calcolatrice: stesso giorno dell'anno dopo, 28 febbraio per un decesso il 29
+  const t = new Date(+m[1] + 1, +m[2] - 1, +m[2] === 2 && +m[3] === 29 ? 28 : +m[3]);
   const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
   return { data: t, giorni: Math.round((t - oggi) / 86400000) };
 }

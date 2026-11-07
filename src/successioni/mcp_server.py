@@ -238,10 +238,10 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         return decodifica(codice_fiscale, ruolo=ruolo)
 
     @tool
-    def stima_imposte(data_decesso: str, eredi: list[dict], immobili: list[dict] | None = None,
-                      altri_beni: list[dict] | None = None, passivita: list[dict] | None = None,
+    def stima_imposte(data_decesso: str, eredi: list, immobili: list | None = None,
+                      altri_beni: list | None = None, passivita: list | None = None,
                       circoscrizioni: int = 1) -> dict:
-        """Calcolatrice rapida: STIMA delle imposte (successione per erede con franchigia e aliquota, ipotecaria, catastale, tassa ipotecaria, bollo) senza creare ne' modificare pratiche. Usa i motori di calcolo del programma su una pratica sintetica in memoria. eredi: [{grado (codice GradoParentela, es. '01' coniuge, '02' figlio, '10' fratello), quota ('1/2', facoltativa: senza quote si usano quelle di legge), disabile (bool)}]; immobili: [{tipo 'fabbricato'|'terreno', valore, oppure rendita + categoria (es. 'A/2') o reddito_dominicale per il valore catastale, prima_casa (bool), quota_defunto}]; altri_beni: [{tipo 'CR'|'AB'|'DN', valore}]; passivita: [{tipo (codice 1-12), importo}]. I casi non coperti tornano in 'non_stimabile' con il motivo. Non sostituisce la dichiarazione ne' il controllo ufficiale."""
+        """Calcolatrice rapida: STIMA delle imposte (successione per erede con franchigia e aliquota, ipotecaria, catastale, tassa ipotecaria, bollo) senza creare ne' modificare pratiche. Usa i motori di calcolo del programma su una pratica sintetica in memoria. eredi: [{grado (codice GradoParentela, es. '01' coniuge, '02' figlio, '10' fratello), quota ('1/2', facoltativa: senza quote si usano quelle di legge), disabile (bool)}]; immobili: [{tipo 'fabbricato'|'terreno', valore, oppure rendita + categoria (es. 'A/2') o reddito_dominicale per il valore catastale, prima_casa (bool), quota_defunto}]; altri_beni: [{tipo 'CR'|'AB'|'DN', valore}]; passivita: [{tipo (codice 1-12, predefinito 12 «altre passivita'»), importo, per i tipi 3/4/5/7 anche immobile o altro_bene: numero (da 1) del bene di riferimento; il mutuo (3) solo su un immobile}]. Importi con centesimi arrotondati all'euro per la stima. I casi non coperti tornano in 'non_stimabile' con il motivo. Non sostituisce la dichiarazione ne' il controllo ufficiale."""
         from .calcolatrice import stima
         return stima({"data_decesso": data_decesso, "eredi": eredi, "immobili": immobili or [], "altri_beni": altri_beni or [],
                       "passivita": passivita or [], "circoscrizioni": circoscrizioni})
