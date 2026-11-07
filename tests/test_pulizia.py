@@ -148,13 +148,39 @@ def test_base_inesistente_e_silenziosa(tmp_path):
     assert pulizia.pulisci_silenziosa(tmp_path / "manca")["eseguita"] is False
 
 
-def test_api_pulizia_e_aggancio_all_avvio(tmp_path):
-    from starlette.testclient import TestClient
+def test_aggancio_della_pulizia_all_avvio(tmp_path, monkeypatch):
+    """La pulizia all'avvio parte da sola (thread «pulizia-avvio») ed elimina il temporaneo vecchio PRIMA di qualunque
+    richiesta. Review 3: il test precedente chiamava anche /api/pulizia, che puliva comunque e lo faceva passare."""
+    import threading
     from successioni.web import crea_app
     s = Servizio(Archivio(tmp_path / "a"))
     tmp = scrivi(s.arch.base / "elaborati" / "x.tmp", 8, 48)
+    fatto, chiamate = threading.Event(), []
+    originale = pulizia.pulisci_silenziosa
+
+    def spia(base):
+        try:
+            r = originale(base)
+            chiamate.append((Path(base), threading.current_thread().name, r))
+            return r
+        finally:
+            fatto.set()
+    monkeypatch.setattr(pulizia, "pulisci_silenziosa", spia)
+    crea_app(s, token="t", ammetti_host_di_prova=True)                  # nessuna richiesta HTTP
+    assert fatto.wait(10), "la pulizia all'avvio non e' partita"
+    (base, thread, r), = chiamate
+    assert base == s.arch.base and thread == "pulizia-avvio"
+    assert r["eseguita"] is True and r["eliminati"] == 1 and not tmp.exists()
+
+
+def test_api_pulizia_forzata(tmp_path, monkeypatch):
+    from starlette.testclient import TestClient
+    from successioni.web import crea_app
+    monkeypatch.setattr(pulizia, "pulisci_silenziosa", lambda base: None)   # niente pulizia all'avvio: prova solo l'API
+    s = Servizio(Archivio(tmp_path / "a"))
+    tmp = scrivi(s.arch.base / "elaborati" / "x.tmp", 8, 48)
     with TestClient(crea_app(s, token="t", ammetti_host_di_prova=True)) as cl:
-        time.sleep(0.5)                                                  # pulizia all'avvio in un thread
+        assert tmp.exists()
         r = cl.post("/api/pulizia?t=t", json={})
+    assert r.status_code == 200 and r.json()["eseguita"] is True and r.json()["eliminati"] == 1
     assert not tmp.exists()
-    assert r.status_code == 200 and r.json()["eseguita"] is True

@@ -1,6 +1,6 @@
 # Collegamenti ufficiali: stato, prove e fonti (area 3)
 
-Aggiornato al 2026-11-07 (revisione 2 dei collegamenti; prove precedenti del 2026-11-01). Parole-esito come in `docs/COLLAUDO_CLOUD_WINDOWS.md`: **passato** / **fallito** (prova
+Aggiornato al 2026-11-07 sera (revisione 3 dei collegamenti; prove precedenti del 2026-11-01). Parole-esito come in `docs/COLLAUDO_CLOUD_WINDOWS.md`: **passato** / **fallito** (prova
 eseguita sul componente o servizio reale, input/output/ambiente registrati), **da_collaudare** (prova non eseguibile
 qui; procedura in `docs/COLLAUDO_RIPRENDIBILE.md`), **simulazione** (test locale dell'adattatore: non prova
 l'interoperabilita' con l'Agenzia). Codice: `src/successioni/collegamenti/`; test: `tests/test_collegamenti_*.py`.
@@ -20,6 +20,8 @@ l'interoperabilita' con l'Agenzia). Codice: `src/successioni/collegamenti/`; tes
 | Trasmissione SUC13 (Desktop Telematico / Entratel-Multifile) | **da_collaudare** | il programma non trasmette: trasporto "manuale tracciato" + riconciliazione (§3) |
 | Copia congelata, conferma, invalidazione (A16, A17) | **simulazione** | `tests/test_collegamenti_invio.py` |
 | Prova simulata separata dalla copia reale | **simulazione** | `tests/test_review2_collegamenti.py`: la prova non consuma la copia confermata |
+| Nessuna nuova copia con un invio aperto o trasmesso; tentativo aperto sempre visibile | **simulazione** | `tests/test_review3_collegamenti.py` (§3) |
+| `.dgn` di un altro file nel passaggio manuale (CF/identificativo non bastano) | **simulazione** | `tests/test_review3_collegamenti.py`: `a10_positivo.dgn` (uscita reale del controllo locale) registrato su un XML diverso (§1) |
 | Invio incerto senza reinvio cieco (A18) | **simulazione** | rete interrotta prima/dopo la ricezione, processo interrotto, riconciliazione con `.esi` |
 | Ricevute ed esiti separati (A19) | **simulazione** per l'associazione; **da_collaudare** per i canali reali | tipi dal Fascicolo I p. 5 (§4) |
 
@@ -69,8 +71,8 @@ I testi dei messaggi non vengono ricostruiti (stanno nelle risorse del component
 
 **Valutazione** (`controllo.valuta`): `positivo` solo se schema valido, almeno una dichiarazione elaborata, nessuna
 scartata, nessun diagnostico di gravita' >= 14 e nessuna riga non riconosciuta o gravita' illeggibile; con motivi di
-scarto `negativo`; senza motivi ma con righe/gravita' non decodificate `da_verificare` (esito `da_collaudare`, non
-sblocca l'invio); senza `.dgn` `non_verificabile`. Uscite illeggibili (es. `_logSchema.xml` troncato da un Java
+scarto `negativo`; senza motivi ma con righe/gravita' non decodificate o contatori del record 9 (elaborate, scartate)
+illeggibili - mai letti come zero - `da_verificare` (esito `da_collaudare`, non sblocca l'invio); senza `.dgn` `non_verificabile`. Uscite illeggibili (es. `_logSchema.xml` troncato da un Java
 interrotto) o qualunque errore dopo l'avvio: job `errore_esecuzione`, stato `non_verificabile`, cartella di lavoro
 rimossa comunque, record della pratica scritto. Un
 esecutore iniettato (test) produce sempre `simulazione`, anche con un diagnostico positivo.
@@ -81,12 +83,20 @@ Spring) fallisce per `javax/annotation/PostConstruct` assente; il controllo pros
 Telematico (JRE proprio) va provata sul PC (A10). Il JNLP dichiara `j2se 1.7+`.
 
 **Passaggio manuale tracciato.** Il file da controllare e' conservato con impronta; i file del controllo registrati
-dall'utente sono associati al file solo se il contenuto lo conferma (CF del defunto e identificativi dei record,
-numero di dichiarazioni elaborate, nome del file nell'intestazione del `.dgn`); altrimenti serve una conferma
-esplicita e l'esito resta `da_collaudare` (non sblocca la conferma dell'invio). Nomi riconosciuti per lo stesso file:
+dall'utente sono rifiutati se incoerenti (CF del defunto, identificativi dei record, numero di dichiarazioni
+elaborate). **Revisione 3:** CF del defunto e identificativo (sempre `00001`) sono uguali in tutte le revisioni della
+pratica e NON provano che il `.dgn` sia dello STESSO file: l'associazione e' verificata solo dal nome del file
+nell'intestazione del `.dgn` fra quelli noti. Con un nome non riconosciuto serve la conferma esplicita
+(`conferma_associazione`, il messaggio lo dice): con il contenuto coerente l'esito segue il diagnostico ed e' registrato
+come «confermato dall'utente» (avvertenza nel job); senza alcun riscontro nel contenuto resta `da_collaudare` (non
+sblocca la conferma dell'invio). Se e' fornito il `.wri`, la sua data («Data: G/M/AAAA», solo il giorno) non puo'
+precedere la prima esportazione di quei byte: un rapporto anteriore e' rifiutato anche con la conferma. Il `.dgn` e il
+`_logSchema.xml` non contengono date (l'`IdentificativoFornitura` e' un nome temporaneo casuale del componente), quindi
+senza `.wri` la data non e' verificabile. Nomi riconosciuti per lo stesso file:
 `<sha16>.xml` (archivio), `successione_revN[_bozza].xml` (scaricato dall'app), `<ctl_job>.xml/.dcm` (componente), nome
 originale; un nome che segue questi schemi ma indica un'altra impronta, un'altra revisione o un controllo su un altro
-file e' **rifiutato** anche con la conferma. Lo stesso file richiesto piu' volte riprende il job manuale aperto; lo stato
+file e' **rifiutato** anche con la conferma. Lo stesso file richiesto piu' volte riprende il job manuale aperto (anche nel
+ripiego di `ControlloJar` quando Java o i JAR mancano; le istruzioni riportano nome, SHA-256 e nomi riconosciuti); lo stato
 della pratica (`stato_elaborati`) legge lo stato attuale del job dell'adattatore. Chiusura dal livello di servizio:
 `registra_diagnostico_controllo(pratica_id, *, dgn, log_schema, wri=None, ambiente_dichiarato=None,
 conferma_associazione=False, job_adattatore=None)`. **Da collaudare:** quale nome scrive Desktop Telematico nel `.dgn`
@@ -113,8 +123,11 @@ Telematico (che li aggiorna da se', avviso 11/03/2026).
   `registra_originale` (continuita' operativa: il file scaricato e' conservato con impronta; letto solo se nel
   formato interno), `TrasportoSimulato` per i test.
 - Stati persistiti: `avviato` (anche "acquisizione in corso"), `attesa_utente`, `sessione_scaduta`, `completato`,
-  `parziale`, `errore`, `annullato`. La sessione non e' mai salvata (solo "attiva/scaduta" e la pagina di ripresa).
-  `completato` solo se il servizio conferma la completezza e non dichiara limiti; altrimenti `parziale`.
+  `parziale`, `caricato_manualmente`, `errore`, `annullato`. La sessione non e' mai salvata (solo "attiva/scaduta" e la
+  pagina di ripresa). `completato` solo se il servizio conferma la completezza e non dichiara limiti; altrimenti
+  `parziale`. Un file nel formato interno registrato a mano con `"completo": true` diventa `caricato_manualmente`
+  (completezza dichiarata dal file, non da Entratel; la proposta lo segnala); un JSON malformato o con `immobili`/`limiti`
+  non validi e' rifiutato (`DatiNonValidi`) e la lavorazione resta com'era.
 - Duplicati: chiave comune+sezione+foglio+particella+subalterno, distinta per catasto (T/F); numeri senza zeri
   iniziali, maiuscole, spazi rimossi. Identificativo del bene acquisito deterministico (`b_` + impronta della chiave):
   importazioni ripetute non creano doppioni.
@@ -140,7 +153,19 @@ controllo ufficiale associato non e' **passato/positivo** sullo stesso file (una
 invalidazione se cambiano i dati dichiarativi (non per le note); un solo tentativo attivo per copia e per pratica
 (compare-and-set nella stessa transazione); `in_trasmissione` scritto prima della chiamata; errore di rete ->
 `esito_incerto`; riconciliazione con consultazione, protocollo verificato, `.esi` o `_stato.json` (candidati, mai
-associazione automatica per data); `non_trasmesso` solo con prova indicata; esiti finali mai sovrascritti.
+associazione automatica per data); `non_trasmesso` e protocollo indicato a mano solo con l'evidenza (`verificato_su`);
+esiti finali mai sovrascritti.
+
+**Nuova copia con un invio aperto (revisione 3).** `prepara` RIFIUTA una nuova copia della pratica (`ReinvioNonAmmesso`,
+«c'e' un invio in corso o da riconciliare: registra prima l'esito») se una copia della stessa modalita' e' `in_invio`
+(tentativo creato, in trasmissione, `attesa_invio_manuale` o `esito_incerto`) e, con un altro messaggio, se una copia e'
+gia' `trasmessa`; la stessa richiesta ripetuta (stessa chiave) restituisce la copia esistente; le prove simulate non
+bloccano. Dopo un «invio non avvenuto» verificato la copia torna `confermata` e si puo' preparare una nuova copia.
+`invio_stato` espone tutte le copie con il loro stato (`copie`, `elenco_copie`), la `copia_attiva` (invio aperto o
+trasmessa) e il `tentativo_aperto`; `stato_elaborati.trasmissione` e l'interfaccia mostrano la copia attiva (non la piu'
+recente) con tentativo e protocollo, e il pulsante «Prepara invio» resta disattivato con il motivo. Limite: dopo una
+trasmissione il programma non prepara un secondo invio della stessa pratica (dichiarazione scartata o sostitutiva: fuori
+dal percorso coperto).
 
 Abbinamento del `.esi` (revisione 2): una riga INVIO vale solo se il nome del file (senza cartella ne' estensioni
 `.xml/.dcm/.ccf/.p7m`) e' fra quelli noti del tentativo (`<sha16>`, `copia_congelata` scaricata dall'app,
@@ -153,7 +178,7 @@ file congelato.
 
 **Prova simulata.** «Invia in PROVA (simulata)» su una copia reale confermata crea un tentativo marcato `prova`
 (elenco `prove` della copia): la copia resta `confermata`, non cambia `tentativo_corrente`, la riconciliazione e lo
-stato della pratica (`stati_pratica`, `stato_elaborati`: campo `prova_simulata`) la tengono separata. Fra le prove
+stato della pratica (`stato_elaborati`: campo `prova_simulata`) la tengono separata. Fra le prove
 valgono le stesse regole di non duplicazione. Gli archivi precedenti con una copia reale gia' «trasmessa» da una prova
 (protocollo `SIM...`) vengono riparati alla prima lettura: la copia torna `confermata`, il tentativo diventa una prova.
 

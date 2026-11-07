@@ -110,7 +110,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--wri")
     s.add_argument("--ambiente-dichiarato", default="{}")
     s.add_argument("--conferma-associazione", action="store_true",
-                   help="il diagnostico non contiene riferimenti verificabili: l'utente dichiara che e' di quel file")
+                   help="nome del file nel .dgn non riconosciuto: l'utente dichiara che e' il controllo di quel file")
+    s.add_argument("--non-prima-di", help="istante ISO dell'esportazione del file: un .wri anteriore e' rifiutato "
+                                          "(predefinito: creazione del job)")
     s = sub.add_parser("catasto-avvia")
     s.add_argument("--pratica", required=True)
     s.add_argument("--cf", required=True)
@@ -150,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         r = ControlloManuale(arch).registra_diagnostico(
             a.job, dgn=Path(a.dgn).read_bytes(), log_schema=Path(a.log).read_bytes(),
             wri=Path(a.wri).read_bytes() if a.wri else None, ambiente_dichiarato=json.loads(a.ambiente_dichiarato),
-            conferma_associazione=a.conferma_associazione)
+            conferma_associazione=a.conferma_associazione, non_prima_di=a.non_prima_di)
         _stampa(_riassunto_controllo(arch, r.job_id))
     elif a.cmd in ("catasto-avvia", "catasto-registra"):
         from .catasto import CatastoEntratelAdattatore

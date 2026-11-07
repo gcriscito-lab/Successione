@@ -34,10 +34,28 @@ def test_prepara_congela_e_chiede_controllo_ufficiale(tmp_path):
 
 
 def test_la_conferma_non_si_da_da_mcp(tmp_path):
+    """Il rifiuto deve dipendere dal CANALE, non da un altro requisito mancante (review 3: prima bastava qualunque
+    ErroreServizio, e la copia senza controllo positivo sarebbe stata rifiutata comunque)."""
+    from successioni.collegamenti.base import ConfermaNonValida
     s, pid = _esporta_e_prepara(tmp_path)
     c = s.invio_prepara(pid)
-    with pytest.raises(ErroreServizio):
+    with pytest.raises(ConfermaNonValida, match="si da' nell'app, non da mcp") as e:
         s.invio_conferma(c["job_id"], c["dettaglio"]["impronta_conferma"], canale="mcp")
+    assert "requisiti" not in e.value.dettagli
+    with pytest.raises(ConfermaNonValida, match="requisiti mancanti"):     # dalla GUI il motivo e' un altro
+        s.invio_conferma(c["job_id"], c["dettaglio"]["impronta_conferma"], canale="gui")
+    assert s.invio_copia(c["job_id"])["stato"] == "preparata"
+
+
+@pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+def test_la_conferma_da_mcp_rifiutata_anche_su_copia_confermabile(tmp_path):
+    s, pid, copia = _pronta(tmp_path)
+    assert not copia["dettaglio"].get("requisiti_mancanti") and not copia["azione_richiesta"].startswith("Requisiti")
+    for canale in ("mcp", "claude", ""):
+        with pytest.raises(ErroreServizio, match="nell'app"):
+            s.invio_conferma(copia["job_id"], copia["dettaglio"]["impronta_conferma"], canale=canale)
+    assert s.invio_copia(copia["job_id"])["stato"] == "preparata"
+    assert s.invio_conferma(copia["job_id"], copia["dettaglio"]["impronta_conferma"])["stato"] == "confermata"
 
 
 def test_percorso_completo_simulato_senza_controllo_positivo_bloccato(tmp_path):

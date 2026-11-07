@@ -384,6 +384,7 @@ class InvioAdattatore:
             raise DatiNonValidi("serve esattamente un elaborato con ruolo 'telematico'")
         tel = next(m for m in manifest if m["ruolo"] == "telematico")
         requisiti = self._requisiti_controllo(controllo_job_id, tel["sha256"], attuale["impronta_dichiarativa"])
+        self._blocco_nuova_copia(pratica_id, chiave)
         base_conf = {"pratica_id": pratica_id, "revisione": attuale["revisione"],
                      "impronta_dichiarativa": attuale["impronta_dichiarativa"], "manifest": manifest,
                      "importi": dict(importi or {}), "profilo": dict(profilo or {})}
@@ -403,6 +404,69 @@ class InvioAdattatore:
                     except TransizioneNonAmmessa:  # pragma: no cover - cambiata nel frattempo
                         pass
         return self.leggi_copia(j["job_id"])
+
+    def invio_aperto(self, pratica_id: str) -> tuple[dict | None, dict | None]:
+        """(copia, tentativo) che impediscono un'altra copia della stessa pratica, nella modalita' di questo adattatore:
+        la copia con un tentativo non concluso (copia 'in_invio': tentativo creato, in trasmissione, in attesa
+        dell'invio manuale o con esito incerto) e, in mancanza, la copia gia' 'trasmessa'. Le prove simulate su una
+        copia reale non contano (vengono separate prima della valutazione)."""
+        trasmessa = None
+        for c in reversed(self.job.elenca(TIPO_COPIA, pratica_id)):   # dal piu' recente
+            if self.copia_reale(c) != bool(self.trasporto.reale):
+                continue
+            if c["stato"] in (IN_INVIO, TRASMESSA):
+                c = self._separa_prove(c)
+            if c["stato"] == IN_INVIO:
+                tid = c["risultato"].get("tentativo_corrente")
+                t = None
+                if tid:
+                    try:
+                        t = self.job.leggi(tid, TIPO_TENTATIVO)
+                    except NonTrovato:
+                        t = None
+                if t is not None and t["stato"] in FINALI_TENTATIVO:   # archivio non allineato: si ripara
+                    self._recupera_finale(t)
+                    c = self.job.leggi(c["job_id"], TIPO_COPIA)
+                    if c["stato"] != IN_INVIO:
+                        if c["stato"] == TRASMESSA and trasmessa is None:
+                            trasmessa = c
+                        continue
+                return c, t
+            if c["stato"] == TRASMESSA and trasmessa is None:
+                trasmessa = c
+        if trasmessa is not None:
+            tid = trasmessa["risultato"].get("tentativo_corrente")
+            try:
+                return trasmessa, (self.job.leggi(tid, TIPO_TENTATIVO) if tid else None)
+            except NonTrovato:
+                return trasmessa, None
+        return None, None
+
+    def _blocco_nuova_copia(self, pratica_id: str, chiave: str | None) -> None:
+        """Rifiuta una nuova copia se un invio della pratica e' in corso, da riconciliare o gia' trasmesso: altrimenti il
+        tentativo aperto sparirebbe dalla vista e la nuova copia non sarebbe comunque inviabile (rischio di doppio invio
+        con Desktop Telematico). La stessa richiesta ripetuta (stessa chiave) restituisce la copia gia' preparata."""
+        if chiave:
+            try:
+                self.job.leggi(self.job.id_da_chiave(TIPO_COPIA, chiave), TIPO_COPIA)
+                return
+            except NonTrovato:
+                pass
+        copia, t = self.invio_aperto(pratica_id)
+        if copia is None:
+            return
+        if copia["stato"] == IN_INVIO:
+            stato_t = t["stato"] if t else "sconosciuto"
+            raise ReinvioNonAmmesso(
+                f"c'e' un invio in corso o da riconciliare (copia {copia['job_id']}, tentativo "
+                f"{t['job_id'] if t else '-'} in stato '{stato_t}'): registra prima l'esito (protocollo, file .esi "
+                "oppure invio non avvenuto verificato) e solo dopo prepara una nuova copia",
+                copia_id=copia["job_id"], tentativo=t["job_id"] if t else None, stato_tentativo=stato_t)
+        raise ReinvioNonAmmesso(
+            f"la dichiarazione risulta gia' trasmessa (copia {copia['job_id']}"
+            + (f", protocollo {t['risultato'].get('protocollo')}" if t and t["risultato"].get("protocollo") else "")
+            + "): non si prepara un'altra copia della stessa pratica; registra le ricevute sul tentativo trasmesso",
+            copia_id=copia["job_id"], tentativo=t["job_id"] if t else None, stato_copia=TRASMESSA)
 
     def _requisiti_controllo(self, controllo_job_id, sha_tel: str, impronta: str) -> list[str]:
         if not controllo_job_id:
@@ -663,7 +727,8 @@ class InvioAdattatore:
 
         `evidenze` (facoltative, anche combinate): {"esi": testo del file .esi di Multifile},
         {"stato_invii": testo di ..._stato.json}, {"protocollo": "...", "verificato_su": "..."},
-        {"non_trasmesso": True, "verificato_su": "..."}. Senza evidenze si interroga il trasporto."""
+        {"non_trasmesso": True, "verificato_su": "..."} (`verificato_su` obbligatorio per protocollo e non trasmesso).
+        Senza evidenze si interroga il trasporto."""
         t = self.job.leggi(tentativo_id, TIPO_TENTATIVO)
         if t["stato"] in FINALI_TENTATIVO:
             self._recupera_finale(t)
@@ -707,6 +772,10 @@ class InvioAdattatore:
 
     def _valuta_evidenze(self, t: dict, ev: dict) -> tuple[RispostaInvio | None, dict | None]:
         if ev.get("protocollo"):
+            if not str(ev.get("verificato_su") or "").strip():
+                # come per «non trasmesso»: un protocollo senza evidenza non chiude un tentativo
+                raise DatiNonValidi("indicare dove e' stato verificato il protocollo (verificato_su: ad es. 'Ricerca "
+                                    "ricevute', prima ricevuta, file .esi)")
             altrui = self._protocollo_altrui(t, str(ev["protocollo"]))
             if altrui:
                 raise DatiNonValidi("protocollo gia' associato a un altro tentativo: verificare", tentativo=altrui)
@@ -760,7 +829,7 @@ class InvioAdattatore:
                                   "{'protocollo': ...}: l'associazione automatica per data non e' sicura",
                                   candidati=cand), {"metodo": "stato invii Multifile", "result": st["result"]})
         if ev.get("non_trasmesso") is True:
-            if not ev.get("verificato_su"):
+            if not str(ev.get("verificato_su") or "").strip():
                 raise DatiNonValidi("indicare dove e' stata verificata l'assenza dell'invio (verificato_su)")
             return (RispostaInvio("non_trasmesso", motivo="assenza dell'invio verificata dall'utente"),
                     {"metodo": "dichiarazione dell'utente", "verificato_su": ev["verificato_su"], "ts": ora()})
@@ -834,47 +903,3 @@ class InvioAdattatore:
             "documenti": [{"job_id": d["job_id"], "tipo": d["input"]["tipo"], "esito": d["input"]["esito"],
                            "nome": d["input"]["nome"], "sha256": d["input"]["sha256"]} for d in docs],
         }
-
-
-def stati_pratica(archivio: Archivio, pratica_id: str, impronta_dichiarativa_corrente: str | None = None) -> dict:
-    """Riepilogo per pratica delle dimensioni gestite dai collegamenti: controllo ufficiale e trasmissione.
-    Un controllo eseguito su dati precedenti resta registrato ma per la versione corrente e' 'obsoleto'."""
-    reg = RegistroJob(archivio)
-    ctl = [c for c in reg.elenca("controllo_ufficiale", pratica_id) if c["stato"] in ("completato",
-                                                                                      "errore_esecuzione")]
-    controllo = {"stato": "non_eseguito"}
-    if ctl:
-        c = ctl[-1]
-        obs = (impronta_dichiarativa_corrente is not None and c["input"].get("impronta_dichiarativa") not in
-               (None, impronta_dichiarativa_corrente))
-        controllo = {"stato": c["risultato"].get("stato_controllo"), "esito": c["risultato"].get("esito"),
-                     "job_id": c["job_id"], "data": c["aggiornato"], "obsoleto": obs}
-    copie = reg.elenca(TIPO_COPIA, pratica_id)
-    trasmissione = {"stato": "non_preparata"}
-    if copie:
-        cp = copie[-1]
-        trasmissione = {"stato": cp["stato"], "copia_id": cp["job_id"],
-                        "tentativo": cp["risultato"].get("tentativo_corrente")}
-        tid = cp["risultato"].get("tentativo_corrente")
-        reale = InvioAdattatore.copia_reale(cp)
-        if tid:
-            t = reg.leggi(tid)
-            if reale and InvioAdattatore._modalita_tentativo(t) == "simulata":
-                # archivio precedente non ancora riparato (la riparazione avviene alla prima lettura della copia):
-                # una prova simulata non e' un invio della copia reale
-                trasmissione.update(stato=CONFERMATA if cp["stato"] in (IN_INVIO, TRASMESSA, RIFIUTATA) else cp["stato"],
-                                    tentativo=None)
-                t = None
-            if t is not None:
-                trasmissione["tentativo_stato"] = t["stato"]
-                trasmissione["protocollo"] = t["risultato"].get("protocollo")
-        prove = [reg.leggi(x) for x in cp["risultato"].get("prove", [])]
-        if not prove and tid and reale and trasmissione.get("tentativo") is None:
-            prove = [reg.leggi(tid)]
-        if prove:
-            u = prove[-1]
-            trasmissione["prova_simulata"] = {
-                "tentativo": u["job_id"], "stato": u["stato"], "protocollo_fittizio": u["risultato"].get("protocollo"),
-                "numero": len(prove), "esito": Esito.SIMULAZIONE.value,
-                "nota": "PROVA SIMULATA: nessun invio all'Agenzia; non cambia lo stato della copia reale"}
-    return {"pratica_id": pratica_id, "controllo_ufficiale": controllo, "trasmissione": trasmissione}
