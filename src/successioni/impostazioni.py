@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json
 import os
+import time
+import threading
 import re
 import shutil
 import tempfile
@@ -394,10 +396,33 @@ def _valida(chiave: str, valore) -> str:
     return v
 
 
+_SALVATAGGIO = threading.Lock()
+
+
+def _sostituisci(temp: Path, destinazione: Path) -> None:
+    """os.replace con pochi tentativi: su Windows fallisce se nello stesso istante un altro thread o processo sta leggendo
+    il file (le richieste dell'interfaccia ora girano in parallelo)."""
+    for tentativo in range(20):
+        try:
+            os.replace(temp, destinazione)
+            return
+        except PermissionError:
+            if tentativo == 19:
+                raise
+            time.sleep(0.05)
+
+
 def salva(modifiche: dict, interfaccia: dict | None = None, profilo: dict | None = None,
           preferenze_nuove: dict | None = None) -> dict:
     """Applica e salva le modifiche (valore vuoto = rimuove l'impostazione). Tutto o niente: se un valore e' errato non si
-    scrive nulla. Restituisce lo stato aggiornato piu' gli eventuali `avvisi`."""
+    scrive nulla. Restituisce lo stato aggiornato piu' gli eventuali `avvisi`. Un salvataggio alla volta: leggere, unire e
+    riscrivere il file in parallelo perderebbe le modifiche dell'altro (per esempio due larghezze salvate di seguito)."""
+    with _SALVATAGGIO:
+        return _salva(modifiche, interfaccia, profilo, preferenze_nuove)
+
+
+def _salva(modifiche: dict, interfaccia: dict | None = None, profilo: dict | None = None,
+           preferenze_nuove: dict | None = None) -> dict:
     if not isinstance(modifiche, dict) or (not modifiche and not interfaccia and profilo is None and preferenze_nuove is None):
         raise DatiNonValidi("nessuna modifica indicata")
     nuove = {k: _valida(k, v) for k, v in modifiche.items()}
@@ -427,7 +452,7 @@ def salva(modifiche: dict, interfaccia: dict | None = None, profilo: dict | None
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=destinazione.parent, suffix=".tmp", delete=False) as f:
             json.dump(contenuto, f, ensure_ascii=False, indent=2)
             temp = Path(f.name)
-        os.replace(temp, destinazione)
+        _sostituisci(temp, destinazione)
     except OSError as e:
         raise DatiNonValidi(f"impossibile scrivere il file di configurazione {destinazione}: {e}") from None
     for k, v in nuove.items():
