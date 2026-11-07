@@ -227,6 +227,49 @@ function renderHome() {
   }
   $("#homeNota").hidden = !conTermine;
   statoHome();
+  renderProssime();
+}
+/* «Prossime azioni» (proposta Canva 07/11/2026; server: cruscotto.py): per ogni pratica le cinque tappe e la cosa da fare,
+   che porta dritto al punto dell'interfaccia in cui farla. */
+let prossimeGen = 0;
+async function renderProssime() {
+  const box = $("#prossime"); if (!box || S.P) return;   // si calcola solo sulla pagina iniziale, non durante il lavoro
+  const gen = ++prossimeGen;
+  if (!S.pratiche.length) { box.replaceChildren(h("p", { class: "mut" }, "Qui compariranno, pratica per pratica, i passi che restano fino alle ricevute.")); return; }
+  let c;
+  try { c = await api("/api/cruscotto"); } catch (e) { if (gen === prossimeGen) box.replaceChildren(h("p", { class: "err" }, e.message)); return; }
+  if (gen !== prossimeGen || S.P) return;
+  const termine = t => !t ? null : t.giorni < 0 ? h("span", { class: "scad er" }, "superato")
+    : h("span", { class: "scad" + (t.giorni <= 60 ? " am" : "") }, t.giorni === 0 ? "oggi" : "tra " + t.giorni + (t.giorni === 1 ? " giorno" : " giorni"));
+  const testoAzione = a => {
+    if (!a) return "";
+    const m = String((a.dove || {}).percorso || "").match(/^([a-z_]+)\[[^\]]+\]\.([a-z_]+)$/);
+    const campo = m && S.schema.collezioni[m[1]] ? lbl(m[1], m[2], a.dove.sel) : null;
+    return (campo ? campo.charAt(0).toUpperCase() + campo.slice(1) + ": " : "") + a.testo + (a.altri ? " (e altri " + a.altri + ")" : "");
+  };
+  box.replaceChildren(...c.pratiche.map(v => {
+    const tappe = h("ol", { class: "tappe", "aria-label": "Avanzamento della pratica" }, c.tappe.map(t => {
+      const st = (v.tappe || {})[t.id] || "da_fare";
+      return h("li", { class: "tappa " + st, "aria-current": st === "corrente" ? "step" : null },
+        h("span", { class: "nodo", "aria-hidden": "true" }), h("span", { class: "nome-tappa" }, t.nome),
+        h("span", { class: "vh" }, st === "fatto" ? " (fatto)" : st === "corrente" ? " (in corso)" : " (da fare)"));
+    }));
+    return h("article", { class: "card-azione" + (v.completata ? " completata" : "") },
+      h("button", { type: "button", class: "card-tit", onclick: () => apri(v.pratica_id) }, v.titolo),
+      tappe,
+      h("button", { type: "button", class: "azione", onclick: () => vaiAllAzione(v) },
+        h("span", { class: "freccia", "aria-hidden": "true" }), h("span", { class: "testo-az" }, testoAzione(v.azione)), termine(v.termine)));
+  }));
+}
+async function vaiAllAzione(v) {
+  const dove = (v.azione || {}).dove || {};
+  await apri(v.pratica_id, dove.sel === "FILE" ? "AN" : dove.sel || "AN");
+  if (!S.P || S.P.pratica_id !== v.pratica_id) return;
+  if (dove.sel === "FILE") return vaiFile();
+  const m = String(dove.percorso || "").match(/^([a-z_]+)\[([^\]]+)\]/);
+  if (m && S.schema.collezioni[m[1]]) { S.riga = "e:" + m[1] + ":" + m[2]; S.tab = "dati"; render(); }
+  setTimeout(() => { const el = dove.percorso && document.querySelector('[data-path="' + CSS.escape(dove.percorso) + '"]');
+    if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } }, 50);
 }
 /* Striscia di stato della pagina iniziale: archivio, versione e componenti (una richiesta, solo quando serve). */
 let statoHomeCaricato = false;

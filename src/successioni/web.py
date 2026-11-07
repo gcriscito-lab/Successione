@@ -199,6 +199,11 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     info = api(info, query_ammessa=True)   # il lanciatore verifica la sessione con /api/info?t=...
 
     @api
+    async def cruscotto_api(request):
+        from . import cruscotto
+        return cruscotto.cruscotto(sv)
+
+    @api
     async def guida_api(request):
         from . import guida
         return guida.elenco()
@@ -529,7 +534,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route("/api/invio/{cid}/file", scarica_copia),
         Route("/api/invio/{cid}/trasmetti", invio_trasmetti, methods=["POST"]),
         Route("/api/invio/tentativi/{tid}/riconcilia", invio_riconcilia, methods=["POST"]),
-        Route("/", home), Route("/static/{nome}", statico), Route("/api/guida", guida_api), Route("/api/guida/{doc}.pdf", guida_documento), Route("/api/informazioni", informazioni_api),
+        Route("/", home), Route("/static/{nome}", statico), Route("/api/guida", guida_api), Route("/api/cruscotto", cruscotto_api), Route("/api/guida/{doc}.pdf", guida_documento), Route("/api/informazioni", informazioni_api),
         Route("/api/info", info), Route("/favicon.ico", lambda richiesta: Response((STATIC / "logo.svg").read_bytes(), media_type="image/svg+xml")),
         Route("/api/pratiche/{pid}/quadri", quadri), Route("/api/schema", schema_),
         Route("/api/pratiche", elenca), Route("/api/pratiche", crea, methods=["POST"]),
