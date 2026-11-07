@@ -94,7 +94,7 @@ def test_mcp_annotazioni_prefisso_e_paginazione(tmp_path):
                 assert all(n.startswith("successioni_") for n in tools)
                 assert tools["successioni_leggi_pratica"].annotations.read_only_hint is True
                 assert tools["successioni_aggiorna_pratica"].annotations.read_only_hint is False
-                assert tools["successioni_aggiorna_pratica"].annotations.destructive_hint is False
+                assert tools["successioni_aggiorna_pratica"].annotations.destructive_hint is True   # ammette «remove» (revisione 2); le revisioni restano
                 for i in range(3):
                     await s.call_tool("successioni_crea_pratica", {"titolo": f"P{i}", "chiave_richiesta": f"k{i}"})
                 pag = dati(await s.call_tool("successioni_elenca_pratiche", {"limit": 2}))
