@@ -1,4 +1,31 @@
-# Stato dei lavori (aggiornato 2026-11-05)
+# Stato dei lavori (aggiornato 2026-11-07)
+
+## Miglioramenti dall'analisi di DE.A.S. II (2026-11-07, ramo `miglioramenti-replica`)
+- Analisi e voci approvate: `docs/ANALISI_REPLICA_2026-11-07.md` (gruppi 1-4 del §8, approvati dal committente il 07/11/2026).
+  Solo comportamento osservato: nessun codice, testo o tabella di DEAS (licenza proprietaria).
+- Lavoro su un ramo nuovo creato da `50117d6`, in una copia separata (`.claude/worktrees/miglioramenti-replica`): il ramo
+  `claude/successioni-dichiarazioni-app-fhcwbe` e l'archivio reale non sono stati toccati. Nel frattempo il ramo principale e'
+  avanzato (`886ea2e`): prima dell'unione serve allineare.
+- Fatte (commit `d490387`, `f1842cb`):
+  - 19 rimedio («Come risolvere») per ogni rilievo e avviso di `verifica_pratica`/`stato_quadri` (`rimedi.py`);
+  - 21 avvisi di qualita' non bloccanti (`qualita.py`): spazi doppi, CF duplicato, carattere di controllo errato, CF incoerente
+    con sesso o nascita, nascita dopo il decesso, provincia diversa da quella del codice comune (solo con le tabelle SUC13);
+  - 22 somma delle quote per bene e diritto nella scheda del bene, anche con righe DV non salvate;
+  - 33 riepilogo del soggetto in EA (ruolo, parentela, dichiarante, beni e quote) e segno «dichiarante» in tabella;
+  - 5 modifica di gruppo per beni e devoluzioni (modifiche da salvare: una revisione, annullabile dalla Cronologia);
+  - 9 incolla da Excel/testo tabulato nelle tabelle;
+  - 10 appunti per riga e stato di lavorazione del quadro nella sezione `note` (non dichiarati, impronta invariata);
+  - 8 pagina iniziale: tutte le pratiche, ricerca, filtri per termine ordinario, ordine per scadenza;
+  - 23 brogliaccio beni e quote: CSV per Excel, pagina stampabile, strumento MCP `brogliaccio` (sola lettura).
+- Gia' fatte da un'altra sessione prima della fase 2 (commit `783b1f7`): 27, 28, 29, 24, 31, 34 (province).
+- Non fatte, con motivo: 17 (imposte ipocatastali per erede: manca in `fonti/` la regola di ripartizione); 34 per la
+  consistenza (campo di testo libero usato dall'export: cambiarne il formato tocca l'XML); 21 per zeri di foglio/particella e
+  termine dei 5 anni prima casa (nessuna fonte).
+- Verifiche: suite Python prima 1840 passati e 1 saltato, dopo 1857 passati e 1 saltato (17 test nuovi in
+  `tests/test_rimedi_qualita.py` e `tests/test_brogliaccio.py`); prove interfaccia 8/8 prima e 9/9 dopo (porta 8823, per non
+  scontrarsi con il server di prova di un'altra sessione sulla 8813). XML SUC13 completo di una pratica sintetica con allegati
+  valido sull'XSD `fonti/Specifiche tecniche/SUC13_20250702/SUC/xsd/fornituraSUC13_v1.xsd` e identico byte per byte a quello
+  del ramo principale (sha256 `d332eb88…`). Controllo ufficiale non rieseguito su questo file.
 
 ## Sintesi corrente (2026-11-05, dopo la revisione esterna `docs/REVISIONE_ESTERNA_CODEX_20261105.md`)
 - Corretti R01 (risposte CF tardive tra pratiche: contatore `S.gen` e verifica di coerenza in `suggerisciDaCF`), R02 (tipo
