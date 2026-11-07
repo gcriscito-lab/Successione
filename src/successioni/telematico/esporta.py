@@ -44,6 +44,7 @@ from . import formati as F
 from . import identificativi as ID
 from . import modello_xsd as M
 from . import agevolazioni as AG
+from . import diritto_abitazione as DA
 from . import prima_casa as PC
 from . import riduzioni_art25 as RA
 from . import quadri_efgh as EFGH
@@ -729,6 +730,11 @@ class _Export:
         if imposta is not None:
             riga["ImpostaVersataEstero"] = imposta
         riga["Valore"] = valore
+        if quadro == "EC":
+            dir_ab = DA.leggi(self, b, False, True)      # immobile estero: solo i codici 4 e 8
+            if dir_ab:
+                riga["DirittoAbitazione"] = dir_ab
+                self.da_beni[b["id"]] = dir_ab
         return riga
 
     def luogo(self, b: dict, quadro: str, *, indirizzo_obbl: bool, tavolare: bool = False) -> dict | None:
@@ -952,21 +958,11 @@ class _Export:
         riga.update(self.flag_aziendale(b, tavolare))
         return riga
 
-    def diritto_abitazione_ec(self, b: dict) -> None:
-        """Diritto di abitazione del coniuge superstite (campo ``DirittoAbitazione``, codici 1-8): non esportabile finche' la devoluzione
-        non supporta diritti distinti (abitazione e nuda proprieta') con la loro valutazione (Fascicolo I pp. PDF 24-27, 31-32): il dato
-        si conserva in bozza e blocca l'XML completo."""
-        self.usa(b, "diritto_abitazione")
-        v = SUP.attr(self.d, "beni", b, "diritto_abitazione")
-        if v in (None, ""):
-            return
-        self.ns.append(f"beni[{b['id']}].diritto_abitazione={v}: il diritto di abitazione del coniuge superstite richiede la devoluzione "
-                       "con diritti distinti (abitazione e nuda proprieta') e la loro valutazione, non ancora supportate (Fascicolo I "
-                       "pp. PDF 24-27 e 31-32)")
-
     def avviso_diritto_abitazione(self) -> None:
-        """Avviso non bloccante: con un coniuge fra gli eredi e un'abitazione (categoria A, esclusa A/1, A/8, A/9) puo' spettare il diritto
-        di abitazione ex lege, che questa versione non gestisce: l'omissione sarebbe silenziosa."""
+        """Avviso non bloccante: con un coniuge fra gli eredi e un'abitazione (categoria A, esclusa A/1, A/8, A/9) senza la casella
+        del diritto di abitazione puo' spettare comunque il diritto di abitazione ex lege: l'omissione sarebbe silenziosa."""
+        if any(self.da_beni.values()):
+            return
         if not any(self.grado_ea.get(p["id"]) == "01" for p in self.ea):
             return
         beni = {b["id"]: b for b in self.d.get("beni", [])}
@@ -974,8 +970,8 @@ class _Export:
             categ = str(ec.get("categoria") or "")
             if categ[:1] == "A" and categ not in ("A1", "A8", "A9", "A10", "A11") and beni.get(bid) is not None                     and SUP.attr(self.d, "beni", beni[bid], "diritto_abitazione") in (None, ""):
                 self.avv("DIRITTO_ABITAZIONE_DA_VERIFICARE", f"beni[{bid}]", "c'e' un coniuge superstite e un'abitazione: se l'immobile era la "
-                         "residenza familiare spetta al coniuge il diritto di abitazione (art. 540 c.c.), che questa versione non gestisce: "
-                         "verificalo prima di presentare", FO.fonte_fasc1(31, "Diritto di abitazione"))
+                         "residenza familiare spetta al coniuge il diritto di abitazione (art. 540 c.c.): in tal caso indicalo nel campo "
+                         "«diritto di abitazione del coniuge» del fabbricato (codici 1-8)", FO.fonte_fasc1(31, "Diritto di abitazione"))
                 return
 
     def rendita_proposta_ec(self, b: dict, df: dict, rend, categoria_f: bool, eld: str, tavolare: bool) -> None:
@@ -1081,7 +1077,7 @@ class _Export:
         elif rend:
             df["RenditaCatastale"] = rend
         self.rendita_proposta_ec(b, df, rend, categoria_f, eld, tavolare)
-        self.diritto_abitazione_ec(b)
+        dir_ab = DA.leggi(self, b, tavolare, False)
         poss, fposs = self.quota_possesso(b, el + "/Possesso")
         dir_p = self.diritto_defunto(b, "CodiciDirittoImmobili_Type", el + "/CodiceDiritto_P")
         valore = self.valore_bene(b, el + "/Valore")
@@ -1097,6 +1093,10 @@ class _Export:
         self._niente_estero_in_italia(b)
         riga.update(self._flag_ei(b, "EC", luogo, cat, df.get("SezioneUrbana"), tavolare))
         riga.update(self.flag_aziendale(b, tavolare))
+        if dir_ab:
+            # casella del diritto di abitazione del coniuge (Fascicolo I pp. PDF 31-32; telematico/diritto_abitazione.py)
+            riga["DirittoAbitazione"] = dir_ab
+            self.da_beni[b["id"]] = dir_ab
         graffati = self.graffati_ec(b, df.get("SezioneUrbana"), tavolare)
         if graffati:
             riga["Graffati"] = graffati
@@ -1464,9 +1464,11 @@ class _Export:
             return {}
         persone = {p.get("id"): p for p in self.d.get("persone", [])}
         info, ok = [], True
+        abitazione = any(dir_r == DA.ABITAZIONE for _, dir_r, _, _, _ in righe)
         for (_m, _r), dir_r, did, n, den in righe:
             coef = None
-            if dir_r == USU.USUFRUTTO:
+            # diritto di abitazione (3): stesse regole dell'usufrutto (Fascicolo I p. PDF 25, tabella «Usufrutto, uso e abitazione»)
+            if dir_r in (USU.USUFRUTTO, DA.ABITAZIONE):
                 pid = self.persona_dev.get(did)
                 nasc = (persone.get(pid) or {}).get("data_nascita")
                 try:
@@ -1487,9 +1489,12 @@ class _Export:
             info.append({"id": did, "diritto": dir_r, "quota": Fraction(n, den), "coefficiente": coef})
         if not ok:
             return {}
-        r = USU.valori(int(valore), info)
+        r = DA.valori(int(valore), info) if abitazione else USU.valori(int(valore), info)
+        if r.get("non_supportato"):
+            self.ns.append(f"{perc}: {r['non_supportato']}")
+            return {}
         for e in r["errori"]:
-            self.err("QUOTE_DEVOLUZIONE", perc, e, USU.FONTE)
+            self.err("QUOTE_DEVOLUZIONE", perc, e, DA.FONTE_VALORE if abitazione else USU.FONTE)
         if r["errori"]:
             return {}
         if dec > USU.VERIFICATO_FINO:
@@ -1541,6 +1546,17 @@ class _Export:
                 continue
             if dir_def is not None and dir_r != dir_def and USU.supportato(dir_def, dir_r) and quadro in ("EB", "EC"):
                 distinti = True      # usufrutto (08) / nuda proprieta' (02) su piena proprieta': valore quota da usufrutto.py
+            elif dir_def is not None and DA.riga_supportata(dir_def, dir_r, quadro):
+                # diritto di abitazione (3) in aggiunta alla proprieta' (annotazione CodiceDiritto_Rip): valore quota da
+                # diritto_abitazione.py; per legge i codici devono coincidere con quello del defunto
+                if not DA.ammessa_per_legge(self):
+                    self.err("REGOLA_CODICE_DIRITTO", perc + ".diritto", "devoluzione per legge: il codice diritto della riga deve "
+                             "coincidere con quello del defunto; il diritto di abitazione del coniuge ex lege si indica con la "
+                             "casella «diritto di abitazione» del fabbricato (codici 1-8)",
+                             FO.fonte_annotazione(el + "/CodiceDiritto_Rip") + "; " + DA.FONTE)
+                    continue
+                distinti = True
+                self.da_righe3.add(b["id"])
             elif dir_def is not None and dir_r != dir_def:
                 self.ns.append(f"{perc}: diritto devoluto {dir_r} diverso dal diritto del defunto {dir_def} (il valore "
                                "quota richiede le regole di valutazione dei diritti, Fascicolo I p. PDF 24): non supportato")
@@ -2254,6 +2270,7 @@ class _Export:
         self.testamento_x, self.test_reg = None, None
         self.eh_navi, self.eh_aeromobili, self.ei_beni = [], [], []
         PC.inizializza(self)
+        DA.inizializza(self)
         RA.inizializza(self)
         AG.inizializza(self)
 
@@ -2313,6 +2330,7 @@ class _Export:
         if self.ea:
             self.avviso_diritto_abitazione()
         PC.valida(self)
+        DA.valida(self)
         RA.valida(self)
         AG.valida(self)
         if self.ea:

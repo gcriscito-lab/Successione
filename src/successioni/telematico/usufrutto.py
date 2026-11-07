@@ -14,7 +14,7 @@ Fonti (lette il 2026-11-07):
 
 Ambito: decessi dal 2025-01-01 (prospetto esteso alle successioni dal D.Lgs. 139/2024, che ha effetto dal 2025). Per il
 2026 il saggio del 2,5% vale se il tasso legale non lo supera (art. 102 c. 3): il decreto 2026 non e' stato letto e il
-programma lo segnala. Uso, abitazione, enfiteusi, usufrutto a termine o congiunto: non gestiti.
+programma lo segnala. Il diritto di abitazione (codice 3) usa SAGGIO e coefficienti da diritto_abitazione.py. Uso, enfiteusi, usufrutto a termine o congiunto: non gestiti.
 """
 from __future__ import annotations
 

@@ -11,7 +11,7 @@ Test: `tests/test_immobili_particolari.py` (controllo ufficiale SUC13 2.3.1 eseg
 | Rendita proposta (`DeterminazioneRendita` = 1) | coperto | 3 positivi |
 | Immobili graffati nel quadro EC (fino a 4) | coperto | 3 positivi (anche con sezione urbana) |
 | Immobili aziendali (casella in EB/EC + `ImmobiliAziendali` in EN) | coperto | 3 positivi (anche con imposta di successione dovuta), 1 negativo |
-| Diritto di abitazione del coniuge (codici 1-8) | **bloccato con motivo** + avviso | non provabile: dipende dai diritti distinti |
+| Diritto di abitazione del coniuge (codici 1-8) | coperto: `docs/regole/diritto_abitazione.md` | 6 positivi, 2 negativi (`tests/test_diritto_abitazione.py`) |
 | Caselle discordanza/passaggi nei beni tavolari (EL/EM) | **non previste dall'XSD**: restano non supportate | - |
 
 ## EI con piu' di tre estremi
@@ -66,11 +66,7 @@ un'imposta alterata. Nelle ipotecaria/catastale (EF) l'immobile aziendale resta 
 all'eredita' ma non al legato (5-8); molte condizioni), Fascicolo I pp. PDF 31-32 («il diritto di abitazione ... viene riportato nella trascrizione ... al
 pari degli altri diritti presenti nella sezione devoluzione»).
 
-**Perche' bloccato**: il diritto va riportato nella devoluzione insieme alla nuda proprieta' degli altri beneficiari, cioe' con **diritti distinti** dal
-diritto del defunto e valutati con i coefficienti del TUS (Fascicolo I pp. PDF 24-27). L'esportazione della devoluzione non supporta oggi diritti diversi da
-quello del defunto (`devoluzioni_bene`: «diritto devoluto diverso ...: non supportato»). Il campo `beni.diritto_abitazione` (menu dei codici) si conserva in
-bozza e blocca l'XML completo con un motivo esplicito. In piu' l'export emette l'avviso non bloccante `DIRITTO_ABITAZIONE_DA_VERIFICARE` quando fra gli
-eredi c'e' un coniuge e fra i beni un'abitazione (categoria A esclusa A/1, A/8, A/9): l'omissione sarebbe altrimenti silenziosa.
+**Stato (2026-11-07)**: implementato in `telematico/diritto_abitazione.py`; regole, fonti e casi non coperti in `docs/regole/diritto_abitazione.md`. La casella non richiede diritti distinti nella devoluzione (le righe restano quelle della proprieta', come nelle dichiarazioni reali dello studio). Resta l'avviso non bloccante `DIRITTO_ABITAZIONE_DA_VERIFICARE` quando fra gli eredi c'e' un coniuge, fra i beni un'abitazione e nessun bene ha la casella.
 
 ## Modifiche a app.js (minime)
 Due tabelle nel pannello del bene, riusando l'helper `tabella` esistente: «Immobile graffato» (quadro EC, campi sezione, foglio, particella, subalterno) e

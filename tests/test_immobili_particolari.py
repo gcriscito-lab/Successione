@@ -267,12 +267,13 @@ def test_immobile_aziendale_imposta_alterata_respinta(tmp_path):
     assert stato == "negativo", dgn["diagnostici"]
 
 
-# ------------------------------------------------------------------------------------------ diritto di abitazione (non supportato)
-def test_diritto_abitazione_blocca_con_motivo_esplicito():
+# ------------------------------------------------------------------------------------------ diritto di abitazione (casi in
+# tests/test_diritto_abitazione.py)
+def test_diritto_abitazione_senza_coniuge_errore_esplicito():
     d = caso_a10()
     next(b for b in d["beni"] if b["id"] == "b_casa0001")["diritto_abitazione"] = "1"
     es = esporta_xml(d, contesto_caso_a10(data_riferimento=date(2026, 3, 9)))
-    assert es.xml is None and any("diritti distinti" in s and "diritto_abitazione=1" in s for s in es.non_supportato)
+    assert es.xml is None and any(e.codice == "REGOLA_DIRITTO_ABITAZIONE" for e in es.errori)
 
 
 def test_senza_coniuge_nessun_avviso_sul_diritto_di_abitazione():

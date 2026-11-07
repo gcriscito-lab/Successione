@@ -216,13 +216,19 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                              Decimal(0)) * Decimal("112.5")
             else:
                 solo_terreni = False   # terreni edificabili o con agevolazioni: imposta proporzionale ordinaria
-        if immobili_prop and imponibile != imponibile.to_integral_value():
-            motivi.append(f"somma dei 'Valore quota' degli immobili {imponibile} non intera: l'arrotondamento "
-                          "dell'imponibile EF1/EF9 (cm:DatoNP_Type) non e' indicato dalle fonti")
         # EF1: quadri EB, EC, EL, EM (Fascicolo I p. 40). EF9 (catastale): il testo (p. 43) non elenca i quadri; il controllo
         # ufficiale SUC13 2.3.1 eseguito in locale il 2026-11-03 esclude i terreni tavolari (EL) dalla base catastale.
         prop_cat = [r for r in immobili_prop if r["quadro"] != "EL"]
         imponibile_cat = sum((r["quota_valore"] for r in prop_cat), Decimal(0))
+        if immobili_prop and (imponibile != imponibile.to_integral_value() or imponibile_cat != imponibile_cat.to_integral_value()):
+            # somma dei 'Valore quota' (centesimi) non intera: l'imponibile EF1/EF9 e' cm:DatoNP_Type (euro interi) e le fonti non
+            # indicano l'arrotondamento; la si arrotonda all'euro come i righi d'imposta (meta' per eccesso), con avviso. Riscontro: il
+            # controllo ufficiale SUC13 2.3.1 locale (2026-11-07, tests/test_diritto_abitazione.py) accetta l'arrotondamento per
+            # eccesso e respinge il troncamento; la dichiarazione reale DNZRME dello studio (somma 386.054,99) riporta 386.055
+            x.avv("ARROTONDAMENTO_IMPONIBILE_EF", "quadro[EF].EF1", f"somma dei 'Valore quota' degli immobili {imponibile} non "
+                  "intera: imponibile EF1/EF9 arrotondato all'unita' di euro (meta' per eccesso), criterio non indicato dalle "
+                  "fonti ma accettato dal controllo ufficiale locale", _fa(el + "/SezioneI_ImpostaIpotecaria/ImpostaProporzionale"))
+            imponibile, imponibile_cat = Decimal(arrotonda_euro(imponibile)), Decimal(arrotonda_euro(imponibile_cat))
         ip = arrotonda_euro(imponibile * ALIQUOTA_IPOTECARIA)
         cat = arrotonda_euro(imponibile_cat * ALIQUOTA_CATASTALE)
         # imposta proporzionale inferiore alla fissa: il Fascicolo I (pp. 40 e 43) parla di «indicare 200 euro» ma il controllo

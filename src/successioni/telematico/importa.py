@@ -865,13 +865,11 @@ def _importa_xml(radice) -> dict:
                     if v:
                         campi[campo] = v
                 if not tavolare:
-                    # diritto di abitazione del coniuge superstite (codici 1-8): campo del modello comune; l'esportazione
-                    # non lo supporta ancora e lo dichiara (non_supportato), quindi la riesportazione completa si blocca
+                    # diritto di abitazione del coniuge superstite (codici 1-8, telematico/diritto_abitazione.py): campo del
+                    # modello comune, riesportato con i suoi effetti su EF e sulla Sezione II del quadro EH
                     da = _t(b, "suc:DirittoAbitazione")
                     if da:
                         campi["diritto_abitazione"] = da
-                        avvisi.append(f"{ctx}: diritto di abitazione del coniuge superstite (codice {da}) importato; la "
-                                      "riesportazione non lo supporta ancora e non genera il file finche' non e' gestito")
                     # immobili graffati (fino a 4 per rigo; l'esportazione non scrive ContinuazioneGraffati)
                     if b.xpath("suc:Graffati/suc:ContinuazioneGraffati", namespaces=NS):
                         raise XmlNonImportabile(f"{ctx}: piu' di quattro immobili graffati (ContinuazioneGraffati) non supportato")
