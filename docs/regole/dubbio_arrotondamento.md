@@ -105,3 +105,30 @@ franchigia per i gradi non elencati a p. 3; corrispondenza `05a/07a/09a` (guida)
 - Ispezione statica aggiuntiva (`javap -c`, nessuna esecuzione): scale di `AgevolazioniRiduzioni.calcolaAliquota` e
   `calcolaRiduzione` riportate nel §3 di riduzioni_art25.md.
 
+
+## 7. Aggiornamento 2026-11-07: somme dei 'Valore quota' con centesimi nei campi interi del quadro EF
+
+**Problema.** Ogni `QuotaValore` (cm:DatoVP_Type) e' il valore del bene per la quota, arrotondato al centesimo
+(ROUND_HALF_UP, `formati.frazione_a_centesimi`): con quote 1/3 la somma delle righe puo' avere centesimi (3 x 2004,33 =
+6012,99 per un bene da 6013). I campi che riportano queste somme sono in euro interi (cm:DatoNP_Type): EF1 e EF9 col. 1
+(`ImpostaProporzionale_Imponibile`), EF4 col. 2 (`AgevolazionePX_Valore`). Prima di questa modifica il quadro EF non veniva
+generato («somma dei 'Valore quota' ... non intera»): caso reale di una sostitutiva codice 1 con prima casa, somma 104.903,97.
+
+**Fonti.**
+- Annotazione XSD di `QuotaValore`: la somma dei valori quota puo' scostarsi dal valore del bene fino all'1% e comunque non
+  oltre 100 euro (i centesimi dell'arrotondamento delle quote sono quindi ammessi).
+- Annotazioni XSD dei righi EF (`ImpostaProporzionale_Imposta` di EF1 ed EF9, `AgevolazioneG_Imposta`, EF8, EF14): importi
+  «arrotondato all'unita' di euro, per difetto se la frazione e' inferiore a 50 centesimi e per eccesso se non inferiore»;
+  l'imposta e' calcolata sul «campo precedente» (l'imponibile intero).
+- Il file originale del caso reale, accettato dall'Agenzia, riporta 104.904 (somma 104.903,97) in EF1 e EF9 e imposte
+  2.098 e 1.049.
+
+**Riscontro col controllo ufficiale SUC13 2.3.1 eseguito in locale** (non e' la verifica dell'Agenzia): la riesportazione
+del caso reale con 104.904 e' accettata; la stessa con 104.903 e' scartata con il diagnostico 3120 su EF1 col. 1 e EF9
+col. 1 (valore atteso dal componente: 104.904). Quindi arrotondamento all'euro (HALF_UP), non troncamento.
+
+**Decisione implementata** (`quadri_efgh._somma_in_euro`): le somme dei valori quota di EF1, EF9 (col. 1) ed EF4 (col. 2)
+sono arrotondate all'unita' di euro con la regola sopra, con l'avviso `ARROTONDAMENTO_SOMMA_VALORI_QUOTA`; le imposte
+proporzionali sono il 2% / 1% dell'imponibile intero, poi arrotondate all'euro. Le somme delle agevolazioni G ed M (EF2, EF3)
+restano bloccanti se non intere: nessun caso provato col componente. Prove: `tests/test_quote_non_intere.py` (caso sintetico
+con tre eredi a 1/3, controllo ufficiale locale positivo, imponibile troncato scartato con 3120).
