@@ -181,6 +181,12 @@ def _anagrafica(el, base: str) -> dict:
     return out
 
 
+def _chiave_ea(campi: dict, pid: str) -> tuple:
+    """Chiave con cui ``esporta.ordina_ea`` ordina il quadro EA (cognome, nome, codice fiscale, id)."""
+    return tuple((campi.get(k) or "").upper() if isinstance(campi.get(k), str) else ""
+                 for k in ("cognome", "nome", "codice_fiscale")) + (pid,)
+
+
 def _quota(el, percorso: str, cosa: str, avvisi: list[str] | None = None) -> dict | None:
     """Quota {num, den}. Con ``avvisi`` (quote di possesso, PossessoNumeratore cm:DatoVP_Type con due decimali) il numeratore
     decimale si converte esattamente in frazione intera (20,66/100 -> 2066/10000) e l'avviso dice come la riesportazione lo
@@ -459,16 +465,42 @@ def _importo(s: str | None) -> Decimal | None:
     return Decimal(s.replace(",", ".")) if s else None
 
 
-def _confronta_ef(radice, ops: list[dict], data_riferimento: date | None) -> list[str]:
-    """Riesporta la pratica che si sta per creare e confronta il quadro EF e l'ImportoDaVersare con l'originale: ogni differenza
-    e' un avviso esplicito con i due valori (mai una variazione silenziosa degli importi da versare)."""
+#: differenza oltre la quale il QuotaValore riesportato e' segnalato: il centesimo dell'arrotondamento ROUND_HALF_UP del
+#: valore x quota (docs/regole/dubbio_arrotondamento.md § 7; annotazione XSD di QuotaValore)
+TOLLERANZA_QUOTA_VALORE = Decimal("0.01")
+
+
+def _confronta_quota_valore(qv_orig: dict, es, nuovo_d) -> list[str]:
+    """Confronta ogni QuotaValore del file importato con quello ricalcolato dalla riesportazione (stesso id di devoluzione):
+    un avviso per bene e beneficiario con i due valori quando differiscono oltre il centesimo."""
+    out = []
+    for did, (orig, dove) in qv_orig.items():
+        m = es.mappa.get(did)
+        # percorso assoluto della riga nella riesportazione (esporta.quadro_beni, mappa delle devoluzioni)
+        nodo = nuovo_d.xpath(m["xpath"] + "/suc:Quota/suc:QuotaValore/text()", namespaces=NS) if m and m.get("xpath") else []
+        nuovo = nodo[0].strip() if nodo else None
+        try:
+            diff = abs(_importo(orig) - _importo(nuovo)) if nuovo else None
+        except ArithmeticError:
+            diff = None
+        if diff is None or diff > TOLLERANZA_QUOTA_VALORE:
+            out.append(f"QuotaValore ricalcolato diverso dall'originale: {dove}: originale {orig}, ricalcolato "
+                       f"{nuovo or 'assente'} (tolleranza di arrotondamento 0,01): verificare valore, quota e diritto "
+                       "prima di riesportare (il valore quota va in trascrizione e voltura)")
+    return out
+
+
+def _confronta_ef(radice, ops: list[dict], data_riferimento: date | None, qv_orig: dict | None = None) -> list[str]:
+    """Riesporta la pratica che si sta per creare e confronta il quadro EF, l'ImportoDaVersare e i QuotaValore delle sezioni
+    devoluzione con l'originale: ogni differenza e' un avviso esplicito con i due valori (mai una variazione silenziosa)."""
     from ..servizio import Servizio, nuovi_dati
     from .esporta import ContestoExport, esporta_xml
     orig_d = radice.xpath("//suc:Fornitura/suc:Dichiarazione", namespaces=NS)[0]
     orig_ef = orig_d.find(f"{{{NS['suc']}}}QuadroEF")
     orig_imp = orig_d.xpath("suc:Frontespizio/suc:ImportoDaVersare/text()", namespaces=NS)
     orig_imp = orig_imp[0].strip() if orig_imp else None
-    if orig_ef is None and orig_imp is None:
+    qv_orig = qv_orig or {}
+    if orig_ef is None and orig_imp is None and not qv_orig:
         return []
     dati = nuovi_dati()
     try:
@@ -479,14 +511,15 @@ def _confronta_ef(radice, ops: list[dict], data_riferimento: date | None) -> lis
                                               scopo="bozza_tecnica"))
     except Exception as e:  # noqa: BLE001 - il confronto non deve impedire l'importazione, ma l'esito va detto
         return [f"QuadroEF: confronto con l'originale non eseguito ({type(e).__name__}): verificare a mano ImportoDaVersare "
-                f"({orig_imp or 'assente'}) e totali del quadro EF dopo la riesportazione"]
+                f"({orig_imp or 'assente'}), totali del quadro EF e valori quota (QuotaValore) dopo la riesportazione"]
     if es.xml is None:
         tot_orig = orig_ef.findtext(f"{{{NS['suc']}}}TotaleDaVersare") if orig_ef is not None else None
         ef_map = es.mappa.get("quadro:EF") or {}
         tot_nuovo = ef_map.get("totale_da_versare")
         motivo = "; ".join(sorted({f"{e.codice} {e.percorso}" for e in es.errori})[:5]) or "file non generato"
         msg = (f"QuadroEF: riesportazione non completa senza i dati da reinserire ({motivo}); ImportoDaVersare originale "
-               f"{orig_imp or 'assente'} non confrontabile")
+               f"{orig_imp or 'assente'} non confrontabile" + (f"; {len(qv_orig)} valori quota (QuotaValore) del file non "
+                                                               "confrontati" if qv_orig else ""))
         if (_importo(tot_orig) or Decimal(0)) != (_importo(tot_nuovo) or Decimal(0)):
             msg += f"; TotaleDaVersare (EF19) originale {tot_orig or 'assente'}, ricalcolato {tot_nuovo or 'non determinato'}"
         return [msg]
@@ -495,7 +528,7 @@ def _confronta_ef(radice, ops: list[dict], data_riferimento: date | None) -> lis
     nuovo_imp = nuovo_d.xpath("suc:Frontespizio/suc:ImportoDaVersare/text()", namespaces=NS)
     nuovo_imp = nuovo_imp[0].strip() if nuovo_imp else None
     nuovo_ef = nuovo_d.find(f"{{{NS['suc']}}}QuadroEF")
-    out_eh = []
+    out_eh = _confronta_quota_valore(qv_orig, es, nuovo_d)
     for nome in _EH_SEZIONI_LETTE:
         # sezioni del quadro EH importate: immobili e caselle derivate sono ricostruiti, ogni differenza e' un avviso
         xp = f"suc:QuadroEH/suc:PrimoModulo/suc:{nome}"
@@ -537,7 +570,7 @@ def importa_xml(xml: bytes, *, data_riferimento: date | None = None) -> dict:
     if tolti:
         r["avvisi"].insert(0, f"{tolti} commenti o istruzioni di elaborazione tolti dal file: il testo che separavano e' stato "
                               "unito al valore dell'elemento; la riesportazione non li riproduce")
-    r["avvisi"] += _confronta_ef(radice, r["operazioni"], data_riferimento)
+    r["avvisi"] += _confronta_ef(radice, r["operazioni"], data_riferimento, r.pop("_quota_valore", None))
     return r
 
 
@@ -655,6 +688,7 @@ def _importa_xml(radice) -> dict:
     persona_di_cf: dict[str, str] = {}
     tel_persone: dict[str, dict] = {}
     cf_tipo_visti: dict[tuple, str] = {}
+    chiavi_ea: list[tuple] = []
     n = 0
     for m, mod in enumerate(d.xpath("suc:QuadroEA/suc:Modulo", namespaces=NS), 1):
         for r, s in enumerate(mod.xpath("suc:Soggetto", namespaces=NS), 1):
@@ -694,7 +728,15 @@ def _importa_xml(radice) -> dict:
             ops.append(_upsert("persone", pid, campi))
             persona_di_rigo[(m, r)] = pid
             persona_di_cf.setdefault(cf, pid)
+            chiavi_ea.append(_chiave_ea(campi, pid))
     importato["eredi"] = n
+    if chiavi_ea != sorted(chiavi_ea):
+        # esporta.ordina_ea riscrive il quadro EA per cognome, nome e codice fiscale: come per i righi dei beni (scorri), il
+        # cambio d'ordine non e' silenzioso
+        spostati = sum(1 for a, b in zip(chiavi_ea, sorted(chiavi_ea)) if a != b)
+        avvisi.append(f"QuadroEA: i soggetti del file non sono nell'ordine con cui la riesportazione li riscrive (cognome, nome, "
+                      f"codice fiscale): {spostati} soggetti su {len(chiavi_ea)} cambiano posizione e riferimenti modulo/rigo "
+                      "(anche quelli richiamati nelle sezioni devoluzione e nel quadro ED); i dati non cambiano")
 
     # ---- presentatore
     pres = fr.xpath("suc:Presentatore", namespaces=NS)
@@ -724,6 +766,7 @@ def _importa_xml(radice) -> dict:
     posizione_bene: dict[tuple[str, int, int], str] = {}      # (quadro, modulo, rigo) -> id bene
     devoluzioni: list[dict] = []
     tel_dev: dict[str, dict] = {}
+    quota_valore_orig: dict[str, tuple[str, str]] = {}       # id devoluzione -> (QuotaValore del file, posizione nel file)
 
     def devoluzioni_di(bid: str, nodo, tag: str, elemento: str, ctx: str):
         for k, dv in enumerate(nodo.xpath(f"suc:{tag}/suc:{elemento}", namespaces=NS), 1):
@@ -747,6 +790,11 @@ def _importa_xml(radice) -> dict:
                     extra[chiave] = v
             if extra:
                 tel_dev[did] = extra
+            qv = _t(dv, "suc:Quota/suc:QuotaValore")
+            if qv:
+                # ricalcolato dalla riesportazione e confrontato in _confronta_ef (mai sostituito in silenzio)
+                quota_valore_orig[did] = (qv, f"{ctx}, devoluzione {k} (soggetto EA modulo {mod} rigo {rigo}, diritto "
+                                              f"{dr or 'assente'})")
             devoluzioni.append(_upsert("devoluzioni", did, campi))
 
     def continuazione(b, tag, corrente, attesa, ctx):
@@ -1287,4 +1335,5 @@ def _importa_xml(radice) -> dict:
     non_importato += non_importato_eh
     cognome = defunto.get("cognome", "")
     titolo = f"Importata: {cognome} {defunto.get('nome', '')}".strip()
-    return {"operazioni": ops, "titolo": titolo, "importato": importato, "non_importato": non_importato, "avvisi": avvisi}
+    return {"operazioni": ops, "titolo": titolo, "importato": importato, "non_importato": non_importato, "avvisi": avvisi,
+            "_quota_valore": quota_valore_orig}

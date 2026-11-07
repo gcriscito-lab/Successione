@@ -18,12 +18,19 @@ Il defunto aveva il bene (EB o EC) in **piena proprietà** (codice 1). I benefic
 
 **Più nudi proprietari.** Ognuno sottrae la parte dell'usufrutto proporzionale alla sua quota di nuda proprietà. Le quote devono coprire il bene per ogni diritto: piena + usufrutto = 1 e piena + nuda proprietà = 1.
 
-**Arrotondamento.** Il valore quota è al centesimo, con la stessa regola delle altre righe (`docs/regole/dubbio_arrotondamento.md`).
+**Arrotondamento.** Il valore quota è al centesimo, con la stessa regola delle altre righe (`docs/regole/dubbio_arrotondamento.md`). L'avviso `ARROTONDAMENTO_VALORE_QUOTA` indica la regola del diritto (usufrutto: valore × quota × saggio × coefficiente; nuda proprietà: valore × quota meno l'usufrutto che la grava), non il semplice valore × quota.
+
+**Solo per testamento o legge estera.** Con la devoluzione per legge (senza testamento e con «legge estera» = 0) i codici diritto della sezione devoluzione devono coincidere con quello del defunto (annotazione XSD di `CodiceDiritto_Rip`, `fornituraSUC13_v1.xsd`): usufrutto e nuda proprietà distinti sono un errore `REGOLA_CODICE_DIRITTO`, come la riga con il diritto di abitazione (codice 3). Prima di questa regola il file risultava completo ma il controllo ufficiale lo scartava con 6 errori (codice diritto, quote di legge, valore quota; `docs/REVIEW_COMPLETA_20261107_SERA.md`, punto 1).
+
+**Imposta estera.** Un immobile estero con imposta versata all'estero e diritti distinti è «non supportato»: la detrazione (imposta estera × quota di devoluzione, guida al calcolo pp. 7-8) conterebbe l'imposta una volta per ciascun diritto (quote 1/1 + 1/1) e le fonti non indicano il riparto.
+
+**Importazione.** Ogni `QuotaValore` del file importato è confrontato con quello della riesportazione: oltre il centesimo c'è un avviso con i due valori, per bene e beneficiario.
 
 ## Prove
 
 - Esempi del Fascicolo I riprodotti: p. 25 (47.500 / 45.000 / 7.500) e p. 31 (coefficiente 20, nuda proprietà 50.000).
 - Controllo ufficiale SUC13 locale **positivo** su un caso con usufrutto 1/1 alla figlia (55 anni, coefficiente 26) e nuda proprietà 1/1 al figlio. È un controllo locale, non una verifica dell'Agenzia.
+- Devoluzione per legge: la variante 8/2 è bloccata (`REGOLA_CODICE_DIRITTO`); lo stesso caso con codice 1 e quote di legge è positivo al controllo ufficiale locale (`test_controllo_ufficiale_per_legge_codici_coincidenti`).
 
 ## Limiti
 

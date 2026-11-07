@@ -35,7 +35,7 @@ Test: `tests/test_diritto_abitazione.py`. Fonti lette il 2026-11-07; nessuna reg
    defunto, con righe di proprieta' (1) che coprono l'intero e righe di abitazione per 1/1; valore = valore x quota x 2,5% x
    coefficiente per l'eta' del titolare al decesso; proprieta' gravata = valore x quota meno la quota proporzionale
    dell'abitazione. Con la devoluzione per legge e' un errore (va usata la casella).
-4. **Imponibile EF1/EF9 non intero** (somma di valori quota con centesimi, es. 1/3 di 1.465): arrotondato all'euro meta' per
+4. **Imponibile EF1/EF9 ed EF4 col. 2 non interi** (somma di valori quota con centesimi, es. 1/3 di 1.465): arrotondati all'euro meta' per
    eccesso con avviso `ARROTONDAMENTO_SOMMA_VALORI_QUOTA` (regola unica, docs/regole/dubbio_arrotondamento.md §7). Le fonti non danno il criterio; riscontro del controllo ufficiale SUC13
    2.3.1 locale (2026-11-07): arrotondamento accettato, troncamento respinto; la dichiarazione reale DNZRME riporta lo stesso
    valore. Non e' distinguibile dal calcolo «valore x quota esatto» del componente: coincidono finche' l'errore accumulato delle
@@ -60,6 +60,7 @@ Test: `tests/test_diritto_abitazione.py`. Fonti lette il 2026-11-07; nessuna reg
 - Casella e riga con codice 3 sullo stesso immobile (combinazione non descritta).
 - Riga con codice 3 insieme a usufrutto/nuda proprieta' o su proprieta' superficiaria (3S); riga 3 per quote diverse da 1/1.
 - Successioni aperte prima del 2025 per la riga con codice 3 (prospetto dei coefficienti, come l'usufrutto).
-- Somma non intera dei valori quota degli immobili prima casa (EF4 col. 2) o con agevolazione G/M: resta bloccata come prima
-  (l'arrotondamento provato col controllo riguarda solo l'imponibile EF1/EF9).
+- Somma non intera dei valori quota degli immobili con agevolazione G/M (EF2, EF3): resta bloccata. La somma non intera degli
+  immobili prima casa (EF4 col. 2, `AgevolazionePX_Valore`) non e' piu' bloccata: si arrotonda all'euro come EF1/EF9, con
+  l'avviso `ARROTONDAMENTO_SOMMA_VALORI_QUOTA` (`quadri_efgh._somma_in_euro`, docs/regole/dubbio_arrotondamento.md §7).
 - Il caso «separazione per colpa con devoluzione per legge» resta bloccato a monte (il coniuge non puo' essere beneficiario).

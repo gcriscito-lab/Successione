@@ -48,6 +48,24 @@ def test_prima_casa_basta_un_beneficiario():
     assert r["valore"] == "115500" and "lettera e" in r["formula"]     # 1000 x 1,05 x 110
 
 
+@pytest.mark.parametrize("codice,atteso", [("1", "115500"), ("2", "115500"), ("5", "115500"), ("6", "115500"),
+                                           ("3", "126000"), ("4", "126000"), ("7", "126000"), ("8", "126000")])
+def test_prima_casa_dal_diritto_di_abitazione(codice, atteso):
+    """Fascicolo I pp. PDF 31-32: casella «Diritto di abitazione» con i codici 1, 2, 5, 6 (prima casa sull'immobile principale o
+    contiguo); N.B.: l'agevolazione si estende alle quote degli altri beneficiari. Nessuna riga P/Z nelle devoluzioni."""
+    b = _fab()
+    devs = [{"id": "d1", "bene_id": "b_x", "persona_id": "p1"}, {"id": "d2", "bene_id": "b_x", "persona_id": "p2"}]
+    dati = _dati([b], devoluzioni=devs)
+    dati["opzioni"] = {"telematico": {"beni": {"b_x": {"diritto_abitazione": codice}}}}   # chiave letta dall'esportazione
+    r = VC.calcola(dati, b)
+    assert r["valore"] == atteso, r
+    if atteso == "115500":
+        assert "lettera e" in r["formula"] and any("Diritto di abitazione" in f for f in r["fonti"])
+        assert not VC.avvisi(dict(dati, beni=[_fab(valore="116000")]))     # niente avviso falso con il valore a 110
+    b2 = _fab(diritto_abitazione=codice)                                      # anche sull'entita'
+    assert VC.calcola(_dati([b2], devoluzioni=devs), b2)["valore"] == atteso
+
+
 def test_prima_casa_non_vale_per_le_pertinenze_c():
     b = _fab(categoria="C/6")
     devs = [{"id": "d1", "bene_id": "b_x", "persona_id": "p1", "agevolazioni": "P"}]
