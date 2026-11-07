@@ -409,3 +409,23 @@ table.scorciatoie td { white-space:normal; max-width:none; }
 .documenti-pratica { margin-top:20px; padding-bottom:10px; }
 /* portatile 1366: pannello un po' piu' stretto di default se non e' stato regolato */
 @media (min-width:961px) and (max-width:1440px) { .ins { padding:12px; } main { padding:16px 20px 28px; } }
+/* miglioramenti dall'analisi del 07/11/2026 (docs/ANALISI_REPLICA_2026-11-07.md): solo token esistenti */
+.rimedio { margin-top:4px; font-size:var(--fs-s); color:var(--t); }
+.dv-bene, .riepilogo-soggetto { border:1px solid var(--sep); border-radius:var(--r1); padding:10px 12px; margin:12px 0; }
+.dv-bene h4, .riepilogo-soggetto h4 { margin:0 0 6px; font-size:.95em; }
+.dv-somma { width:100%; border-collapse:collapse; margin:4px 0 8px; }
+.dv-somma caption { text-align:left; font-weight:600; padding:2px 0; }
+.dv-somma td { padding:2px 4px; border-bottom:1px solid var(--sep); } .dv-somma tfoot td { border-bottom:0; font-weight:600; }
+.dv-somma tr.mod td { font-style:italic; }
+.beni-soggetto { margin:4px 0; padding-left:18px; }
+.appunti-riga textarea, textarea.appunti, textarea.incolla { width:100%; box-sizing:border-box; font:inherit; }
+textarea.incolla { font-family:var(--f-mono); font-size:var(--fs-s); }
+select.stato-lavoro { font-size:var(--fs-s); width:auto; max-width:14rem; margin-left:10px; padding:1px 6px; display:inline-block; vertical-align:baseline; }
+.badge-dich { margin-left:6px; }
+.voce[data-lavoro=completato] .st, .voce[data-lavoro=da_controllare] .st { font-weight:600; }
+.dlg-op .rg { margin:6px 0; } .dlg-op .rg > label { display:block; font-weight:600; }
+.gruppo-righe { border:1px solid var(--sep); border-radius:var(--r1); max-height:40vh; overflow:auto; margin:10px 0; }
+.gruppo-righe .riga-sc { display:flex; align-items:center; gap:8px; padding:2px 8px; text-align:left; }
+.dlg-op input[type=checkbox] { width:auto; min-width:0; flex:none; margin:0 6px 0 0; display:inline-block; vertical-align:middle; }
+.dlg-op .rg > label { display:flex; align-items:center; gap:4px; }
+.filtri-home { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; } .filtri-home input { flex:1; min-width:12rem; }

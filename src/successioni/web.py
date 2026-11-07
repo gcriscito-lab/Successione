@@ -311,6 +311,20 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                             headers={"Cache-Control": "no-store"})
 
     @api
+    async def brogliaccio_csv(request):
+        """Brogliaccio dei beni e delle quote in CSV per Excel (voce 23 dell'analisi del 07/11/2026)."""
+        from . import brogliaccio as BR
+        d = sv.leggi(request.path_params["pid"])
+        return Response(BR.csv_testo(d["dati"]).encode("utf-8"), media_type="text/csv; charset=utf-8", headers={
+            "Content-Disposition": f'attachment; filename="brogliaccio_rev{d["revisione"]}.csv"', "Cache-Control": "no-store"})
+
+    @api
+    async def brogliaccio_html(request):
+        from . import brogliaccio as BR
+        d = sv.leggi(request.path_params["pid"])
+        return HTMLResponse(BR.html(d["dati"], titolo=d["titolo"], revisione=d["revisione"]), headers={"Cache-Control": "no-store"})
+
+    @api
     async def diagnosi_api(request):
         from . import strumenti
         return strumenti.diagnosi(sv.arch)
@@ -518,7 +532,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/revisioni", revisioni), Route(P + "/differenze", differenze),
         Route(P + "/ripristina", ripristina, methods=["POST"]),
         Route(P + "/esporta", esporta, methods=["POST"]), Route(P + "/elaborati", elaborati),
-        Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa), Route(P + "/prospetto-cliente", prospetto_cliente_api),Route(P + "/stampa-modello", stampa_modello_api, methods=["POST"]),
+        Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa), Route(P + "/prospetto-cliente", prospetto_cliente_api),
+        Route(P + "/brogliaccio.csv", brogliaccio_csv), Route(P + "/brogliaccio", brogliaccio_html),Route(P + "/stampa-modello", stampa_modello_api, methods=["POST"]),
         Route(P + "/stampa-modello.pdf", scarica_stampa_modello), Route(P + "/file.dcm", scarica_dcm),
         Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]),
         Route(P + "/controllo-ufficiale/diagnostico", diagnostico_controllo, methods=["POST"]), Route(P + "/verifica", verifica),
