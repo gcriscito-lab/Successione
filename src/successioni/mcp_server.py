@@ -33,7 +33,7 @@ STRUMENTI_LETTURA = frozenset({
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "registra_esito_controllo", "backup_archivio", "stampa_modello",
     "invio_prepara", "importa_xml_telematico", "acquisisci_allegato", "prepara_pdfa", "suddividi_allegato",
-    "riordina_allegati",
+    "riordina_allegati", "genera_albero_genealogico",
 })
 MESSAGGIO_SOLA_LETTURA = ("Claude è in sola lettura: modifica disattivata nelle Impostazioni → Operatività e sicurezza. "
                           "Lo strumento non è stato eseguito e nulla è stato modificato.")
@@ -273,6 +273,17 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Toglie i doppioni degli allegati: una sola versione PDF/A per documento, righi EG spostati sul PDF/A, originali
         gia' convertiti rimossi."""
         return sv.riordina_allegati(pratica_id, canale="mcp")
+
+    # puo' scollegare dal rigo EG6 un albero caricato a mano (solo con sostituisci_manuale) ed elimina alberi GENERATI non piu' usati
+    @tool(ann=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False))
+    def genera_albero_genealogico(pratica_id: str, sostituisci_manuale: bool = False, forza: bool = False) -> dict:
+        """Genera dai dati della pratica l'albero genealogico (quadro EG, rigo EG6): defunto, coniuge, discendenti, ascendenti e
+        collaterali con nome, cognome, luogo e data di nascita e grado di parentela (Fascicolo I p. PDF 6), rappresentati premorti
+        o rinunciatari, data di redazione e dichiarante. Il PDF viene convertito in PDF/A e collegato all'unico rigo EG6. Non
+        inventa dati: quelli mancanti sono scritti come tali e restituiti in 'mancanti'. Con dati invariati restituisce
+        'gia_aggiornato' (salvo forza=true). Se il rigo EG6 contiene un albero caricato a mano risponde 'conferma_richiesta':
+        chiedere all'utente prima di ripetere con sostituisci_manuale=true (il file manuale resta fra i documenti, non si cancella)."""
+        return sv.genera_albero_genealogico(pratica_id, sostituisci_manuale=sostituisci_manuale, forza=forza, canale="mcp")
 
     @tool(ann=LOCALE)
     def suddividi_allegato(allegato_id: str, limite_byte: int | None = None) -> dict:

@@ -389,6 +389,25 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         return sv.elimina_allegato(request.path_params["aid"])
 
     @api
+    async def albero_stato(request):
+        return sv.stato_albero_genealogico(request.path_params["pid"])
+
+    @api
+    async def albero_genera(request):
+        b = await request.json() if (await request.body()) else {}
+        return sv.genera_albero_genealogico(request.path_params["pid"], sostituisci_manuale=b.get("sostituisci_manuale") is True,
+                                            forza=b.get("forza") is True)
+
+    @api
+    async def file_allegato_api(request):
+        """Anteprima di un allegato (PDF o TIFF) nel browser; solo lettura dal deposito della pratica."""
+        dati, r = sv.file_allegato(request.path_params["aid"])
+        tipo = "application/pdf" if dati[:5] == b"%PDF-" else "image/tiff" if dati[:4] in (b"II*\x00", b"MM\x00*") else "application/octet-stream"
+        nome = "".join(ch if ch.isascii() and (ch.isalnum() or ch in "._-") else "_" for ch in (r.get("nome") or "")) or "allegato"
+        return Response(dati, media_type=tipo, headers={"Content-Disposition": f'inline; filename="{nome}"',
+                                                        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+    @api
     async def riordina_allegati_api(request):
         return sv.riordina_allegati(request.path_params["pid"])
 
@@ -507,6 +526,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),
         Route("/api/allegati/{aid}/elimina", elimina_allegato_api, methods=["POST"]),
         Route(P + "/allegati/riordina", riordina_allegati_api, methods=["POST"]),
+        Route(P + "/albero-genealogico", albero_stato), Route(P + "/albero-genealogico", albero_genera, methods=["POST"]),
+        Route("/api/allegati/{aid}/file", file_allegato_api),
         Route(P + "/anteprima-quadri", anteprima_quadri_api),
         Route(P + "/valori-catastali", valori_catastali_api),
         Route("/api/allegati/{aid}/suddividi", suddividi, methods=["POST"]),

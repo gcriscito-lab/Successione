@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from . import quadri as Q
 from . import schema as S
 from . import valori as V
+from .albero_genealogico import AlberoGenealogicoMixin
 from .allegati import AllegatiMixin
 from .elaborati import ElaboratiMixin
 from .invio_servizio import InvioMixin
@@ -70,7 +71,7 @@ ID_VALIDO = re.compile(r"^[a-z]{1,4}_[a-z0-9]{4,32}$")
 PREFISSI = {"persone": "p", "beni": "b", "devoluzioni": "d", "passivita": "ps", "documenti_ref": "dr"}
 
 
-class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
+class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin):
     def __init__(self, archivio: Archivio | None = None):
         self.arch = archivio or Archivio()
 
