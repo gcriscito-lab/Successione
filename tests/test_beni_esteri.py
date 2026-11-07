@@ -258,6 +258,7 @@ CASI = {"immobile_estero_senza_imposta": _imm, "terreno_estero_con_imposta": _te
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("nome", sorted(CASI))
+@pytest.mark.java
 def test_controllo_ufficiale_locale(tmp_path, nome):
     es = ok(esporta(CASI[nome](), data_riferimento=date(2026, 3, 9)))
     stato, dgn, wri, _ = _esegui(es.xml, tmp_path)
@@ -265,11 +266,12 @@ def test_controllo_ufficiale_locale(tmp_path, nome):
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_una_detrazione_sbagliata(tmp_path):
     """Il controllo ricalcola l'imposta (EF18bis) con la detrazione: una imposta senza detrazione viene respinta."""
     es = ok(esporta(_mix_con_det(), data_riferimento=date(2026, 3, 9)))
     imposta = str(es.mappa["calcolo:EF18bis"]["imposta"]).encode()
     alterata = es.xml.replace(b">" + imposta + b"<", b">" + str(int(imposta) + 500).encode() + b"<")
     assert alterata != es.xml
-    stato, dgn, _, _ = _esegui(alterata, tmp_path)
+    stato, dgn, _, _ = _esegui(alterata, tmp_path, rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]

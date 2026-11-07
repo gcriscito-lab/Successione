@@ -107,6 +107,7 @@ def test_d_imposta_non_dovuta_con_versata_da_rimborsare():
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("versata", [None, "partial"])
+@pytest.mark.java
 def test_e_controllo_ufficiale_locale(tmp_path, versata):
     extra = {}
     if versata:

@@ -48,6 +48,7 @@ def test_la_conferma_non_si_da_da_mcp(tmp_path):
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_la_conferma_da_mcp_rifiutata_anche_su_copia_confermabile(tmp_path):
     s, pid, copia = _pronta(tmp_path)
     assert not copia["dettaglio"].get("requisiti_mancanti") and not copia["azione_richiesta"].startswith("Requisiti")
@@ -81,6 +82,7 @@ skip_ctl = pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto(
 
 
 @skip_ctl
+@pytest.mark.java
 def test_invio_simulato_completo_e_nessun_doppio_invio(tmp_path):
     s, pid, copia = _pronta(tmp_path)
     cid, imp = copia["job_id"], copia["dettaglio"]["impronta_conferma"]
@@ -99,6 +101,7 @@ def test_invio_simulato_completo_e_nessun_doppio_invio(tmp_path):
 
 
 @skip_ctl
+@pytest.mark.java
 def test_rete_interrotta_dopo_la_ricezione_si_riconcilia_senza_reinviare(tmp_path):
     s, pid, copia = _pronta(tmp_path)
     cid = copia["job_id"]
@@ -115,6 +118,7 @@ def test_rete_interrotta_dopo_la_ricezione_si_riconcilia_senza_reinviare(tmp_pat
 
 
 @skip_ctl
+@pytest.mark.java
 def test_modalita_manuale_non_trasmette_nulla(tmp_path):
     s, pid, copia = _pronta(tmp_path)
     cid = copia["job_id"]
@@ -126,6 +130,7 @@ def test_modalita_manuale_non_trasmette_nulla(tmp_path):
 
 
 @skip_ctl
+@pytest.mark.java
 def test_modifica_della_pratica_rende_obsoleta_la_copia(tmp_path):
     s, pid, copia = _pronta(tmp_path)
     cid = copia["job_id"]

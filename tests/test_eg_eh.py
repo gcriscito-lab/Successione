@@ -208,6 +208,7 @@ def test_eg10_per_agevolazione_c_di_un_altro_beneficiario():
                                 dich={"dichiara_copie_conformi": True})),
     ("eg10_agevolazione_c", lambda: caso(modif=_c_per_luca)),
 ])
+@pytest.mark.java
 def test_controllo_ufficiale_locale(tmp_path, nome, costruisci):
     controllo_positivo(esporta(costruisci()), tmp_path)
 
@@ -216,11 +217,12 @@ def _negativo(tmp_path, es, cerca, sostituisci, codice, flags=0):
     import re
     xml = re.sub(cerca, sostituisci, es.xml, count=1, flags=flags)
     assert xml != es.xml
-    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    stato, dgn, _, _ = _esegui(xml, tmp_path, rapporto=False)
     assert stato == "negativo" and codice in {x["codice"] for x in dgn["diagnostici"]}, dgn["diagnostici"]
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_negativi_del_controllo_ufficiale(tmp_path):
     """Alterazioni dell'XML corretto respinte dal controllo: FlagSeparazione con stato civile 4 (3130), FlagNoScioglimentoUnioneCivile con
     stato civile 2 (3271), «assenza di interdetti» con una persona con disabilita' nel quadro EA (2097)."""

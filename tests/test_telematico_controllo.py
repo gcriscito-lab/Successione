@@ -14,6 +14,7 @@ sostituisce il collaudo su Desktop Telematico (Windows).
 from __future__ import annotations
 
 import base64
+import functools
 import hashlib
 import json
 import os
@@ -26,6 +27,7 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
+import _cache_controllo as CACHE
 from successioni.collegamenti import controllo as C
 from successioni.telematico import fonti, xsd
 from successioni.telematico.esporta import esporta_xml
@@ -234,6 +236,7 @@ JAVA = os.environ.get("SUCCESSIONI_JAVA") or shutil.which("java")
 EXTRA = os.environ.get("SUCCESSIONI_CONTROLLI_CLASSPATH_EXTRA")
 
 
+@functools.lru_cache(maxsize=None)
 def _java_major() -> int | None:
     try:
         r = subprocess.run([JAVA, "-version"], capture_output=True, text=True, timeout=60,
@@ -246,6 +249,7 @@ def _java_major() -> int | None:
     return int(m.group(2)) if m.group(1) == "1" else int(m.group(1))
 
 
+@functools.lru_cache(maxsize=None)
 def _motivo_salto() -> str | None:
     if not JAR or not Path(JAR).is_dir():
         return "componenti del controllo ufficiale non configurati (SUCCESSIONI_CONTROLLI_SUC13)"
@@ -261,18 +265,26 @@ def _motivo_salto() -> str | None:
     return None
 
 
-def _esegui(xml: bytes, lavoro: Path) -> tuple[str, dict, str, bool]:
-    """Stessi comandi di docs/COLLEGAMENTI.md §1; diagnostici letti con collegamenti.controllo."""
+def _esegui_reale(argv: list[str], cwd: Path, timeout: int) -> C.Processo:
+    env = {**os.environ, "JAVA_TOOL_OPTIONS": ""}
+    p = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, timeout=timeout, check=False)
+    return C.Processo(p.returncode, p.stdout, p.stderr, 0.0)
+
+
+def _esegui(xml: bytes, lavoro: Path, *, rapporto: bool = True) -> tuple[str, dict, str, bool]:
+    """Stessi comandi di docs/COLLEGAMENTI.md §1; diagnostici letti con collegamenti.controllo.
+
+    Le uscite del componente passano dalla cache dei test (tests/_cache_controllo.py; SUCCESSIONI_TEST_SENZA_CACHE=1
+    la disattiva). Con ``rapporto=False`` VisualXml non viene avviato e il testo del .wri restituito e' vuoto: da usare
+    solo nei test che non leggono il rapporto."""
     for d in ("in", "out", "tmp"):
         (lavoro / d).mkdir(parents=True, exist_ok=True)
     (lavoro / "in" / "F.xml").write_bytes(xml)
     cp = os.pathsep.join([str(Path(JAR) / "*")] + ([EXTRA] if EXTRA else []))
-    env = {**os.environ, "JAVA_TOOL_OPTIONS": ""}
     base = [JAVA, "-Djava.awt.headless=true", f"-Djava.io.tmpdir={lavoro / 'tmp'}", "-cp", cp]
-    subprocess.run(base + [C.CLASSE_CONTROLLO, "in/F.xml", "out/F.xml", "out/F.dcm"], cwd=lavoro, env=env,
-                   capture_output=True, timeout=600, check=False)
-    subprocess.run(base + [C.CLASSE_RAPPORTO, "out/F.dgn", "1"], cwd=lavoro, env=env, capture_output=True,
-                   timeout=600, check=False)
+    CACHE.esegui(base + [C.CLASSE_CONTROLLO, "in/F.xml", "out/F.xml", "out/F.dcm"], lavoro, 600, _esegui_reale)
+    if rapporto:
+        CACHE.esegui(base + [C.CLASSE_RAPPORTO, "out/F.dgn", "1"], lavoro, 600, _esegui_reale)
     # Il componente puo' consumare la copia di lavoro nel produrre il DCM.
     copia = lavoro / 'in' / 'F.xml'
     if copia.exists():
@@ -282,11 +294,13 @@ def _esegui(xml: bytes, lavoro: Path) -> tuple[str, dict, str, bool]:
     dgn = C.leggi_dgn(C.decodifica((lavoro / "out" / "F.dgn").read_bytes()))
     ef = C.leggi_esito_fornitura((lavoro / "out" / "F_logSchema.xml").read_bytes())
     stato, _ = C.valuta(dgn, ef)
-    return stato, dgn, C.decodifica((lavoro / "out" / "F.wri").read_bytes()), (lavoro / "out" / "F.dcm").exists()
+    wri = C.decodifica((lavoro / "out" / "F.wri").read_bytes()) if rapporto else ""
+    return stato, dgn, wri, (lavoro / "out" / "F.dcm").exists()
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("nome", sorted(ATTESI))
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale(nome, tmp_path):
     if nome == "a10_positivo":
         xml = _a10().xml  # il file prodotto ora dall'export

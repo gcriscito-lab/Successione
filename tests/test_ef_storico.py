@@ -174,6 +174,7 @@ def test_dati_di_pagamento_non_applicabili_prima_del_2025_sono_segnalati():
     ("prima_casa_2013", caso_prima_casa, "2013-03-10"),
     ("prima_casa_2024", caso_prima_casa, "2024-03-10"),
 ])
+@pytest.mark.java
 def test_controllo_ufficiale_positivo(tmp_path, nome, costruisci, data):
     es = esporta_xml(con_data(costruisci(), data), contesto_caso_a10())
     assert es.completo
@@ -185,6 +186,7 @@ def test_controllo_ufficiale_positivo(tmp_path, nome, costruisci, data):
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("codice", ["1", "2"])
 @pytest.mark.parametrize("data", ["2013-03-10", "2020-03-10"])
+@pytest.mark.java
 def test_controllo_ufficiale_sostitutive_storiche(tmp_path, data, codice):
     d = con_data(piccolo(), data)
     d["opzioni"]["tipo_dichiarazione"] = "sostitutiva"
@@ -198,18 +200,20 @@ def test_controllo_ufficiale_sostitutive_storiche(tmp_path, data, codice):
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("data,da,a", [("2013-03-10", b">168<", b">200<"), ("2024-03-10", b">200<", b">168<")])
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_la_misura_fissa_di_un_altro_periodo(tmp_path, data, da, a):
     es = esporta_xml(con_data(piccolo(), data), contesto_caso_a10())
     xml = es.xml.replace(da, a)
     assert xml != es.xml
-    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    stato, dgn, _, _ = _esegui(xml, tmp_path, rapporto=False)
     assert stato == "negativo" and any(x["codice"] == "3076" for x in dgn["diagnostici"]), dgn["diagnostici"]
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_il_totale_alterato(tmp_path):
     es = esporta_xml(con_data(piccolo(), "2016-03-10"), contesto_caso_a10())
     xml = es.xml.replace(b"605,00", b"600,00")
     assert xml != es.xml
-    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    stato, dgn, _, _ = _esegui(xml, tmp_path, rapporto=False)
     assert stato == "negativo" and any(x["codice"] == "1012" for x in dgn["diagnostici"]), dgn["diagnostici"]

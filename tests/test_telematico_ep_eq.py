@@ -82,6 +82,7 @@ def test_senza_devoluzione_e_un_errore():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale_mezzi(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es().xml, tmp_path)
     assert stato == "positivo", (stato, dgn["diagnostici"])

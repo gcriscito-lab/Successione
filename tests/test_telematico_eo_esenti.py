@@ -180,6 +180,7 @@ def test_senza_devoluzione_il_titolo_esente_e_un_errore():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_positivo_con_titolo_esente(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es().xml, tmp_path)
     assert stato == "positivo", (stato, dgn["diagnostici"])
@@ -211,6 +212,7 @@ def _entrambi(doc):
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("mut", [_ee3_senza_esente, _valore_al_posto_di_esente, _entrambi])
+@pytest.mark.java
 def test_reale_controllo_ufficiale_negativi(mut, tmp_path):
     stato, dgn, wri, dcm = _esegui(_muta(mut), tmp_path)
     assert stato != "positivo", (mut.__name__, dgn["diagnostici"])

@@ -440,7 +440,7 @@ def test_calcolo_blocca_ancora_le_altre_agevolazioni():
 
 # ------------------------------------------------------------------------------- controllo ufficiale locale (SUC13 2.3.1)
 def _controllo(xml: bytes, tmp_path):
-    stato, dgn, _wri, _dcm = _esegui(xml, tmp_path)
+    stato, dgn, _wri, _dcm = _esegui(xml, tmp_path, rapporto=False)
     return stato, sorted((x["codice"], x["gravita"], x["campo"]) for x in dgn["diagnostici"])
 
 
@@ -450,6 +450,7 @@ CASI_POSITIVI = {"p": caso_prima_casa, "p_x": caso_p_x, "p_z": caso_p_z, "p_altr
 
 @SALTO
 @pytest.mark.parametrize("nome", sorted(CASI_POSITIVI))
+@pytest.mark.java
 def test_reale_controllo_ufficiale_positivo(nome, tmp_path):
     es = _es(CASI_POSITIVI[nome]())
     assert es.errori == [] and es.xml
@@ -479,6 +480,7 @@ NEGATIVI = {
 
 @SALTO
 @pytest.mark.parametrize("nome", sorted(NEGATIVI))
+@pytest.mark.java
 def test_reale_controllo_ufficiale_negativo(nome, tmp_path):
     modifica, attesi = NEGATIVI[nome]
     es = _es(caso_prima_casa())

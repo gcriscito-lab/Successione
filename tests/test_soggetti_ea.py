@@ -212,6 +212,7 @@ def _positivo(xml, tmp_path):
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
 @pytest.mark.parametrize("fabbrica", [caso_chiamato_rinunciatario, caso_coniuge_rinunciatario, caso_due_rinunciatari],
                          ids=["chiamato_rinunciatario", "coniuge_rinunciatario_tipo4", "due_rinunciatari"])
+@pytest.mark.java
 def test_controllo_ufficiale_rinunciatari(tmp_path, fabbrica):
     xml = _xml(fabbrica())
     assert xml.count(b"RegistrazioneRinuncia") >= 2                     # apertura e chiusura dell'elemento
@@ -219,11 +220,12 @@ def test_controllo_ufficiale_rinunciatari(tmp_path, fabbrica):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_rinuncia_non_dichiarata_nel_quadro_ea(tmp_path):
     xml = _xml(caso_chiamato_rinunciatario())
     senza = re.sub(rb"<suc:Rinuncia>1</suc:Rinuncia>", b"", xml, count=1)
     assert senza != xml
-    stato, dgn, _, _ = _esegui(senza, tmp_path)
+    stato, dgn, _, _ = _esegui(senza, tmp_path, rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]
 
 
@@ -231,6 +233,7 @@ def test_controllo_ufficiale_respinge_rinuncia_non_dichiarata_nel_quadro_ea(tmp_
 @pytest.mark.parametrize("nome,stato,extra", [("FRANCIA", "FRANCIA", None),
                                               ("STATI UNITI", "STATI UNITI D'AMERICA", {"stato_federato": "CALIFORNIA", "localita": "San Francisco"}),
                                               ("GERMANIA", "GERMANIA", {"localita": "Berlino"})])
+@pytest.mark.java
 def test_controllo_ufficiale_residenza_estera(tmp_path, nome, stato, extra):
     codice = next(k for k, v in SE.tabella().items() if v == nome)
     xml = _xml(caso_estero(codice, stato, extra))
@@ -239,6 +242,7 @@ def test_controllo_ufficiale_residenza_estera(tmp_path, nome, stato, extra):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_erede_e_legatario_sullo_stesso_soggetto(tmp_path):
     xml = _xml(caso_erede_e_legatario())
     assert xml.count(b"RSSNNA70A41H501J") >= 3                           # due righi EA + EH (un solo rigo) + dichiarante
@@ -247,6 +251,7 @@ def test_controllo_ufficiale_erede_e_legatario_sullo_stesso_soggetto(tmp_path):
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
 @pytest.mark.parametrize("grado", ["37", "38", "39"])
+@pytest.mark.java
 def test_controllo_ufficiale_enti(tmp_path, grado):
     xml = _xml(caso_ente(grado))
     assert b"<suc:Denominazione>COMUNE DI ESEMPIO</suc:Denominazione>" in xml
@@ -254,6 +259,7 @@ def test_controllo_ufficiale_enti(tmp_path, grado):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_ente_co_erede_del_fabbricato_e_denominazione_grado_35(tmp_path):
     d = caso_ente("38", ruolo="erede")
     d["devoluzioni"] = [x for x in d["devoluzioni"] if x["id"] != "d_casaluca"]

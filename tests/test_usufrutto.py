@@ -121,10 +121,11 @@ def test_altri_diritti_distinti_restano_non_supportati():
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_usufrutto_e_nuda(tmp_path):
     es = esporta_xml(_caso(), T.contesto_caso_a10())
     assert es.completo
-    stato, dgn, _, _ = _esegui(es.xml, tmp_path)
+    stato, dgn, _, _ = _esegui(es.xml, tmp_path, rapporto=False)
     assert stato == "positivo", dgn
 
 
@@ -196,11 +197,12 @@ def test_usufrutto_per_legge_ammesso_con_legge_estera():
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_per_legge_codici_coincidenti(tmp_path):
     """Lo stesso caso corretto per legge (codice diritto 1 e quote dell'allegato 5, come in caso_a10) e' accettato dal
     controllo ufficiale eseguito in locale; la variante con 8/2 non produce piu' un file «completo»."""
     assert not esporta_xml(_caso_per_legge(), T.contesto_caso_a10()).completo
     es = esporta_xml(copy.deepcopy(T.caso_a10()), T.contesto_caso_a10())
     assert es.completo, [e.messaggio for e in es.errori]
-    stato, dgn, _, _ = _esegui(es.xml, tmp_path)
+    stato, dgn, _, _ = _esegui(es.xml, tmp_path, rapporto=False)
     assert stato == "positivo", dgn

@@ -92,6 +92,7 @@ def test_quadro_eo_non_attivo_e_un_errore():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale_titoli(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es().xml, tmp_path)
     assert stato == "positivo", (stato, dgn["diagnostici"])
@@ -99,6 +100,7 @@ def test_reale_controllo_ufficiale_locale_titoli(tmp_path):
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale_titolo_quotato(tmp_path):
     es = _es(lambda b: b.update(tipo_titolo="1", codice_fiscale_emittente="00000000018", codice_titolo="IT0000000019"))
     assert es.errori == [], es.errori

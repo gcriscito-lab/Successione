@@ -64,6 +64,7 @@ def test_comune_sconosciuto_non_determinabile():
 
 @pytest.mark.skipif(_motivo_salto() is not None or SALTO, reason=_motivo_salto() or "tabella conservatorie assente")
 @pytest.mark.parametrize("casa,terreno", [(("A024", "NA"), ("B963", "CE")), (("H501", "RM"), ("F205", "MI"))])
+@pytest.mark.java
 def test_controllo_ufficiale_accetta_e_respinge(tmp_path, casa, terreno):
     es = esporta_xml(caso_comuni(casa, terreno), contesto_caso_a10())
     assert es.completo
@@ -78,7 +79,7 @@ def test_controllo_ufficiale_accetta_e_respinge(tmp_path, casa, terreno):
         import re
         xml = re.sub(rb"(<(?:\w+:)?Circoscrizioni_Numero>)" + giusto.encode() + rb"(</)", rb"\g<1>" + sbagliato.encode() + rb"\2", es.xml, count=1)
     assert xml != es.xml
-    stato2, dgn2, _, _ = _esegui(xml, tmp_path / "ko")
+    stato2, dgn2, _, _ = _esegui(xml, tmp_path / "ko", rapporto=False)
     assert stato2 == "negativo", dgn2["diagnostici"]
 
 

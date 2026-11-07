@@ -74,6 +74,7 @@ def test_reddito_dominicale_mancante_blocca():
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("valore,rd,tip", [("15000", None, "3"), ("100000", None, "3"), ("100000", "0.50", "3"),
                                            ("3000", None, "1"), ("100000", None, "1")])
+@pytest.mark.java
 def test_controllo_ufficiale_locale(tmp_path, valore, rd, tip):
     es = esporta(solo_terreni(valore, rd, tip))
     stato, dgn, wri, _ = _esegui(es.xml, tmp_path)

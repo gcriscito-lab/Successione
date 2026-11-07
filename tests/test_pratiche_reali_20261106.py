@@ -34,6 +34,7 @@ def test_fabbricato_senza_indirizzo_avviso_non_blocco():
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_fabbricato_senza_indirizzo_controllo_ufficiale(tmp_path):
     stato, dgn, wri, _ = _esegui(esporta_xml(_senza_indirizzo(), CTX).xml, tmp_path)
     assert stato == "positivo", (dgn["diagnostici"], wri[:1200])

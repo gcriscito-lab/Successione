@@ -109,6 +109,7 @@ from test_telematico_controllo import _esegui, _motivo_salto  # noqa: E402
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or '')
 @pytest.mark.parametrize('codice,extra', [('2', dict(ipotecaria_versata='2000', catastale_versata='1000')),
                                           ('1', dict(ipotecaria_versata='2820', catastale_versata='500'))])
+@pytest.mark.java
 def test_controllo_ufficiale_locale_sostitutiva(tmp_path, codice, extra):
     s, pid = pratica_con_allegati(tmp_path / 'dati')
     configura(s, pid, codice_sostitutiva=codice, **extra, **BASE)

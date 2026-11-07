@@ -191,6 +191,7 @@ def test_valore_esente_su_tipo_2_importato_resta_esente_e_blocca():
 
 # --------------------------------------------------------------------------------------------- controllo ufficiale locale
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_positivo(tmp_path):
     es = _es(caso(d_azioni_anna=True, estero=True, fondo_esente=True))
     assert es.completo, ([e.messaggio for e in es.errori], es.non_supportato)
@@ -213,8 +214,9 @@ def _cf_su_estero(doc):
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
 @pytest.mark.parametrize("mut", [_senza_flag_d, _cf_su_estero])
+@pytest.mark.java
 def test_reale_controllo_ufficiale_negativi(mut, tmp_path):
     doc = etree.fromstring(_es(caso(d_azioni_anna=True, estero=True, fondo_esente=True)).xml)
     mut(doc)
-    stato, dgn, _, _ = _esegui(etree.tostring(doc, xml_declaration=True, encoding="UTF-8"), tmp_path)
+    stato, dgn, _, _ = _esegui(etree.tostring(doc, xml_declaration=True, encoding="UTF-8"), tmp_path, rapporto=False)
     assert stato != "positivo", (mut.__name__, dgn["diagnostici"])

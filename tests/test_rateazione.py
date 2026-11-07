@@ -107,6 +107,7 @@ def test_rateale_senza_imposta_dovuta_e_respinto():
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("tempistica", ["1", "2"])
+@pytest.mark.java
 def test_controllo_ufficiale_locale(tmp_path, tempistica):
     es = esporta(caso(tempistica=tempistica, rate=8, acconto="5000"))
     assert es.completo

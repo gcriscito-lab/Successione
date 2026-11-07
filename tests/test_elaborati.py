@@ -89,6 +89,7 @@ JAR = os.environ.get("SUCCESSIONI_CONTROLLI_SUC13")
 
 @pytest.mark.skipif(not JAR or not Path(JAR).is_dir() or not shutil.which("java"),
                     reason="componenti del controllo ufficiale o Java non configurati (SUCCESSIONI_CONTROLLI_SUC13)")
+@pytest.mark.java
 def test_controllo_ufficiale_reale_locale_sulla_bozza_e_invalidazione(sv):
     s, pid = sv
     s.esporta(pid, cf_fornitore=CF_FORN, scopo="bozza_tecnica")

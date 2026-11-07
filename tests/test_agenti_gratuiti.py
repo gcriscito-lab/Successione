@@ -10,6 +10,53 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "agenti_gratuiti"))
 import lancia as L  # noqa: E402
+import subprocess  # noqa: E402
+import types  # noqa: E402
+
+
+class _CopiaRiusata:
+    """Il lanciatore crea a ogni esecuzione una copia isolata con ``git worktree add`` (6-7 s su Windows, quasi tutti
+    di checkout dei file). Nei test la prima copia e' creata davvero con lo stesso comando; alla rimozione viene
+    riportata allo stato del commit (``git reset --hard`` + ``git clean -fdx``) e messa da parte, e la successiva
+    ``git worktree add`` la sposta (``git worktree move``, una rinomina) nel percorso richiesto. Il lanciatore vede
+    sempre una copia pulita e staccata dello stesso commit; in caso di problemi si usa il comando originale."""
+
+    def __init__(self, riserva):
+        self.riserva, self.pronta = riserva, False
+
+    def run(self, argv, *a, **k):
+        vero = subprocess.run
+        try:
+            if argv[:4] == ["git", "worktree", "add", "--detach"] and self.pronta:
+                r = vero(["git", "worktree", "move", str(self.riserva), argv[4]], cwd=k.get("cwd"), capture_output=True)
+                if r.returncode == 0:
+                    self.pronta = False
+                    return subprocess.CompletedProcess(argv, 0, b"", b"")
+            if argv[:4] == ["git", "worktree", "remove", "--force"]:
+                copia = argv[4]
+                ok = all(vero(c, cwd=copia, capture_output=True).returncode == 0
+                         for c in (["git", "reset", "--hard", "-q"], ["git", "clean", "-fdxq"]))
+                if ok and vero(["git", "worktree", "move", copia, str(self.riserva)], cwd=k.get("cwd"),
+                               capture_output=True).returncode == 0:
+                    self.pronta = True
+                    return subprocess.CompletedProcess(argv, 0, b"", b"")
+        except (OSError, IndexError):
+            pass
+        return vero(argv, *a, **k)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _copia_riusata(tmp_path_factory):
+    c = _CopiaRiusata(tmp_path_factory.mktemp("agenti") / "riserva")
+    originale = L.subprocess
+    L.subprocess = types.SimpleNamespace(**{n: getattr(subprocess, n) for n in dir(subprocess) if not n.startswith("__")})
+    L.subprocess.run = c.run
+    try:
+        yield c
+    finally:
+        L.subprocess = originale
+        if c.pronta:
+            subprocess.run(["git", "worktree", "remove", "--force", str(c.riserva)], cwd=L.RADICE, capture_output=True)
 
 CHIAVE = "freellmapi-CHIAVE-DI-PROVA-NON-REALE-0123456789"
 TEST_NUOVO = "def test_prova_agente():\n    assert 1 + 1 == 2\n"

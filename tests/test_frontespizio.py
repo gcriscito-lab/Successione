@@ -73,6 +73,7 @@ def caso_casella(nome):
 
 @SALTA
 @pytest.mark.parametrize("nome", ["legge", "eventi", "opzione", "inventario", "res1", "res2", "casi", "decorrenza"])
+@pytest.mark.java
 def test_caselle_accettate_dal_controllo(nome, tmp_path):
     es = ok(esporta(caso_casella(nome)))
     controllo(es, tmp_path)
@@ -103,11 +104,12 @@ def test_casi_particolari_tassa_ipotecaria_65_per_circoscrizione():
 
 
 @SALTA
+@pytest.mark.java
 def test_casi_particolari_con_120_e_respinto(tmp_path):
     es = ok(esporta(caso_casella("casi")))
     alterato = es.xml.replace(b">65<", b">120<", 1)
     assert alterato != es.xml
-    stato, dgn, _, _ = _esegui(alterato, tmp_path)
+    stato, dgn, _, _ = _esegui(alterato, tmp_path, rapporto=False)
     assert stato == "negativo" and any(d["codice"] == "3076" for d in dgn["diagnostici"])
 
 
@@ -150,6 +152,7 @@ def caso_integrativa(base=caso_a10, extra=None):
 
 @SALTA
 @pytest.mark.parametrize("base", [caso_a10, caso_testamento, caso_testamento_legatario])
+@pytest.mark.java
 def test_integrativa_accettata_dal_controllo(base, tmp_path):
     es = ok(esporta(caso_integrativa(base)))
     controllo(es, tmp_path)
@@ -223,6 +226,7 @@ def carica_7():
 
 @SALTA
 @pytest.mark.parametrize("caso", [carica_2, carica_3, carica_4, carica_4_estero, carica_7], ids=lambda f: f.__name__)
+@pytest.mark.java
 def test_cariche_accettate_dal_controllo(caso, tmp_path):
     es = ok(esporta(caso()))
     controllo(es, tmp_path)
