@@ -1561,7 +1561,15 @@ class _Export:
                 self.err("VALORE_NON_VALIDO", perc + ".diritto", str(e), FO.fonte_xsd(el + "/CodiceDiritto_Rip"))
                 continue
             if dir_def is not None and dir_r != dir_def and USU.supportato(dir_def, dir_r) and quadro in ("EB", "EC"):
-                distinti = True      # usufrutto (08) / nuda proprieta' (02) su piena proprieta': valore quota da usufrutto.py
+                # usufrutto (08) / nuda proprieta' (02) su piena proprieta': valore quota da usufrutto.py; per legge i codici
+                # devono coincidere con quello del defunto (annotazione CodiceDiritto_Rip), come per la riga con codice 3
+                if not DA.ammessa_per_legge(self):
+                    self.err("REGOLA_CODICE_DIRITTO", perc + ".diritto", "devoluzione per legge: il codice diritto della riga deve "
+                             f"coincidere con quello del defunto ({dir_def}); usufrutto (8) e nuda proprieta' (2) distinti sono "
+                             "ammessi solo con devoluzione per testamento o con la legge estera",
+                             FO.fonte_annotazione(el + "/CodiceDiritto_Rip") + "; " + USU.FONTE)
+                    continue
+                distinti = True
             elif dir_def is not None and DA.riga_supportata(dir_def, dir_r, quadro):
                 # diritto di abitazione (3) in aggiunta alla proprieta' (annotazione CodiceDiritto_Rip): valore quota da
                 # diritto_abitazione.py; per legge i codici devono coincidere con quello del defunto
@@ -1595,6 +1603,14 @@ class _Export:
             self.persona_dev[d["id"]] = pid
             righe.append((self.pos_ea[pid], dir_r, d["id"], n, den))
         valori_dist = None
+        if distinti and righe and self.imposta_estera.get(b["id"]):
+            # DET.estero: IE = imposta versata all'estero x quota di devoluzione della riga (guida al calcolo pp. 7-8; calcolo.py
+            # detrazione_estera_*): con diritti distinti ogni diritto ha quota 1/1 (Fascicolo I p. PDF 24), le quote sommano a
+            # piu' di 1/1 e l'imposta estera sarebbe detratta piu' volte; le fonti non descrivono il riparto fra i diritti
+            self.ns.append(f"beni[{b['id']}]: imposta versata all'estero su un bene devoluto con diritti distinti (usufrutto/nuda "
+                           "proprieta' o abitazione): la detrazione (quota di devoluzione x imposta estera, guida al calcolo pp. "
+                           "7-8) conterebbe l'imposta piu' volte e le fonti non indicano il riparto fra i diritti: non supportato")
+            return []
         if distinti and righe:
             valori_dist = self._valori_diritti_distinti(b, el, valore, righe)
         elif righe and somma != 1:
@@ -1621,8 +1637,16 @@ class _Export:
                                        "codice_comune": self.comune_bene.get(b["id"]),
                                        "estero": bool(self.estero_bene.get(b["id"]))}
                 if not esatto:
+                    if valori_dist is None or (dir_r == USU.DIRITTO_PIENA and b["id"] not in self.da_righe3):
+                        calcolo = f"valore quota {valore} x {n}/{den}"     # piena proprieta' accanto a usufrutto e nuda
+                    elif dir_r in (USU.USUFRUTTO, DA.ABITAZIONE):
+                        calcolo = (f"valore quota del diritto {dir_r} ({valore} x {n}/{den} x saggio 2,5% x coefficiente per eta', "
+                                   "Fascicolo I p. PDF 25)")
+                    else:
+                        calcolo = (f"valore quota del diritto {dir_r} ({valore} x {n}/{den} meno la parte del diritto che lo "
+                                   "grava, Fascicolo I p. PDF 25)")
                     self.avv("ARROTONDAMENTO_VALORE_QUOTA", f"devoluzioni[{did}]",
-                             f"valore quota {valore} x {n}/{den} non esatto al centesimo: arrotondato a {qv} "
+                             f"{calcolo} non esatto al centesimo: arrotondato a {qv} "
                              "(ROUND_HALF_UP, scelta implementativa entro la tolleranza dell'annotazione QuotaValore)",
                              FO.fonte_annotazione(el + "/Quota/QuotaValore") + "; " + FO.fonte_fasc1(24, "Valore quota"))
             quota = {"QuotaElementi": {"QuotaNumeratore": str(n), "QuotaDenominatore": str(den)}}

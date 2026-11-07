@@ -13,7 +13,9 @@ Fonti (testi letti il 2026-11-07, scheda in ``docs/regole/valore_catastale.md``)
   (+40% gruppo B). Per questo valgono anche per le successioni aperte prima del 2027, a partire dal 2007 (prima del D.L.
   262/2006 il gruppo B aveva un altro moltiplicatore: quelle date non sono calcolate).
 - prima casa: «L'agevolazione 'prima casa' si estende agli altri eventuali soggetti beneficiari» (Fascicolo I p. PDF 26):
-  basta un codice P o Z su una riga di devoluzione del bene.
+  basta un codice P o Z su una riga di devoluzione del bene. Lo stesso vale per la casella «Diritto di abitazione» del
+  fabbricato con i codici 1, 2, 5, 6 (Fascicolo I pp. PDF 31-32, N.B.: «L'agevolazione, qualora richiesta, si estende anche
+  alle quote dell'immobile spettanti agli altri beneficiari»).
 - esclusi (c. 8): terreni con destinazione edificatoria. Esclusi qui anche i diritti diversi dalla piena proprieta' (c. 7
   rinvia all'art. 99 del testo unico registro per nuda proprieta' e diritti reali: non ancora implementato).
 """
@@ -40,6 +42,11 @@ MOLT_A10_D = Decimal("60")
 MOLT_PRIMA_CASA = Decimal("110")
 MOLT_ALTRI = Decimal("120")
 CODICI_PRIMA_CASA = ("P", "Z")
+#: casella «Diritto di abitazione» del fabbricato: codici con prima casa sull'immobile principale o contiguo (1, 2; 5, 6 per il
+#: coniuge rinunciatario che mantiene il legato ex lege); 3 e 7 riguardano la pertinenza (cod. X), 4 e 8 sono senza prima casa
+CODICI_DA_PRIMA_CASA = ("1", "2", "5", "6")
+FONTE_PRIMA_CASA_DA = ("Succ_FASCICOLO_I_Nov_23.pdf pp. PDF 31-32, «Diritto di abitazione», codici 1, 2, 5, 6 e N.B.: "
+                       "l'agevolazione si estende alle quote degli altri beneficiari della sezione devoluzione")
 
 
 def _num(v):
@@ -150,16 +157,19 @@ def calcola(dati: dict, b: dict) -> dict:
         if rendita is None:
             out["motivo"] = "manca la rendita catastale"
             return out
-        prima = any(d.get("bene_id") == b.get("id")
-                    and str(SUP.attr(dati, "devoluzioni", d, "agevolazioni") or "").strip().upper() in CODICI_PRIMA_CASA
-                    for d in dati.get("devoluzioni", []))
+        da = SUP.attr(dati, "beni", b, "diritto_abitazione")
+        prima_da = not isinstance(da, dict) and str(da or "").strip() in CODICI_DA_PRIMA_CASA
+        prima = prima_da or any(d.get("bene_id") == b.get("id")
+                                and str(SUP.attr(dati, "devoluzioni", d, "agevolazioni") or "").strip().upper() in CODICI_PRIMA_CASA
+                                for d in dati.get("devoluzioni", []))
         molt, voce = moltiplicatore_fabbricato(_categoria(b), prima)
         if molt is None:
             out["motivo"] = voce
             return out
         base = rendita * RIV_RENDITA * molt
         formula = f"rendita {rendita} × 1,05 × {str(molt).replace('.', ',')} ({voce}) × quota {q.numerator}/{q.denominator}"
-        out["fonti"] = [FONTE_RIVALUTAZIONE, FONTE_MOLTIPLICATORI] + ([FONTE_PRIMA_CASA] if prima else [])
+        out["fonti"] = [FONTE_RIVALUTAZIONE, FONTE_MOLTIPLICATORI] + ([FONTE_PRIMA_CASA] if prima else []) + (
+            [FONTE_PRIMA_CASA_DA] if prima_da else [])
     valore = (base * Decimal(q.numerator) / Decimal(q.denominator)).quantize(Decimal("1"), rounding=ROUND_CEILING)
     out.update(calcolabile=True, valore=str(valore), formula=formula + f" = {valore} euro (arrotondato per eccesso)",
                inferiore=dich is not None and dich < valore)

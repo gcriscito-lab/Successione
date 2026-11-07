@@ -22,6 +22,7 @@ Codice: `src/successioni/valore_catastale.py`. Test: `tests/test_valore_catastal
 | Moltiplicatori: terreni 90; gruppo B 168; C/1 e gruppo E 40,80; A/10 e gruppo D 60; abitazioni prima casa 110; altre abitazioni e altre categorie 120 | D.Lgs. 5/8/2026 n. 141, art. 309, c. 6 (GU n. 181 del 6/8/2026, S.O. n. 28, p. 267) |
 | Esclusi i terreni con destinazione edificatoria | art. 309, c. 8 |
 | La prima casa chiesta da un beneficiario si estende agli altri | Fascicolo I, p. PDF 26 |
+| Anche la casella «Diritto di abitazione» del fabbricato con i codici 1, 2, 5, 6 (prima casa sull'immobile principale o contiguo) vale come prima casa per il bene: «L'agevolazione, qualora richiesta, si estende anche alle quote dell'immobile spettanti agli altri beneficiari» | Fascicolo I, pp. PDF 31-32, «Diritto di abitazione», N.B. |
 
 **Validità nel tempo.** Il D.Lgs. 141/2026 si applica dal 1/1/2027 (art. 368). L'art. 309 è compilativo: la sua sotto-rubrica elenca le norme da cui riprende i valori, cioè:
 - art. 34 D.Lgs. 346/1990;
