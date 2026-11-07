@@ -952,12 +952,16 @@ def _importa_xml(radice) -> dict:
         if v:
             campi["valore"] = v
         if ve:
-            # l'esportazione scrive ValoreEsente solo per il tipo titolo 3 (titolo esente) e Valore negli altri casi
+            # l'esportazione scrive ValoreEsente per il tipo 3 (sempre) e per il tipo 4 con la casella «valore esente»
+            # (XSD PossessoEO_Type: ValoreEsente vietato solo per i tipi 1 e 2)
             campi["valore"] = ve
             if campi.get("tipo_titolo") != "3":
-                avvisi.append(f"{ctx}: ValoreEsente {ve} con tipo titolo {campi.get('tipo_titolo')!r}: importato come valore del "
-                              "titolo, ma la riesportazione lo scrive come Valore (imponibile) perche' ValoreEsente e' previsto per il "
-                              "tipo 3: verificare il tipo titolo prima di riesportare")
+                campi["valore_esente"] = "si"
+            if campi.get("tipo_titolo") not in ("3", "4"):
+                # il valore resta esente: la riesportazione segnala l'incoerenza invece di trasformarlo in imponibile
+                avvisi.append(f"{ctx}: ValoreEsente {ve} con tipo titolo {campi.get('tipo_titolo')!r}: per i tipi 1 e 2 il "
+                              "valore esente non e' ammesso (XSD PossessoEO_Type): importato come esente, la riesportazione "
+                              "lo segnala; verificare il tipo titolo")
         dr = _t(b, "suc:CodiceDiritto_C")
         if dr:
             campi["diritto"] = dr

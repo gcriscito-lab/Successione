@@ -46,7 +46,7 @@ ETICHETTE: dict[str, dict[str, str]] = {
         "porzione_materiale": "Porzione materiale", "sistema_tavolare": "Sistema tavolare",
         "tipo_cespite": "Tipo di cespite",
         "tipo_titolo": "Tipo di titolo", "quantita": "Quantita'", "codice_titolo": "Codice titolo",
-        "codice_fiscale_emittente": "Codice fiscale dell'emittente",
+        "codice_fiscale_emittente": "Codice fiscale dell'emittente", "valore_esente": "Valore esente",
         "tipo_documento": "Tipo di documento", "data_documento": "Data del documento",
         "inventario": "Inventario", "data_redazione_inventario": "Data di redazione dell'inventario",
         "marca_modello": "Marca e modello", "anno_costruzione": "Anno di costruzione", "nazionalita": "Nazionalita'",
@@ -238,7 +238,7 @@ ORDINE: dict[str, list[str]] = {
     "EN": ["tipo", "descrizione", "codice_fiscale_emittente", "inventario", "data_redazione_inventario"] + _DIRITTO_VALORE
           + ["bene_estero", "imposta_estera"],
     "EO": ["tipo", "tipo_titolo", "codice_fiscale_emittente", "quantita", "codice_titolo", "descrizione", "tipo_documento",
-           "data_documento"] + _DIRITTO_VALORE + ["bene_estero", "imposta_estera"],
+           "data_documento"] + _DIRITTO_VALORE + ["valore_esente", "bene_estero", "imposta_estera"],
     "EP": ["tipo", "marca_modello", "anno_costruzione", "nazionalita", "anno_immatricolazione", "numero_immatricolazione",
            "descrizione"] + _DIRITTO_VALORE + ["bene_estero", "imposta_estera"],
     "EQ": ["tipo", "tipo_unita", "nazionalita", "sigla_ufficio_iscrizione", "anno_iscrizione", "numero_iscrizione",
