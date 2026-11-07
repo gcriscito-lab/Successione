@@ -246,6 +246,14 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
             avvisi = [x.asdict() for x in visure]   # solo avviso: non impedisce la finalizzazione
         from . import valore_catastale as VC
         avvisi += VC.avvisi(d["dati"], Q.attivi(d["dati"]))   # valore sotto il minimo catastale: solo avviso
+        from . import qualita as QA
+        avvisi += [x.asdict() for x in QA.avvisi(d["dati"])]  # qualita' dei dati anagrafici e catastali: solo avvisi
+        from . import rimedi as RM
+
+        def con_rimedio(x: dict) -> dict:   # dove intervenire e con quale comando (docs/ANALISI_REPLICA_2026-11-07.md, voce 19)
+            q = Q.quadro_per_percorso(d["dati"], x.get("percorso") or "")
+            return {**x, "quadro": x.get("quadro") or q, "rimedio": RM.rimedio(x.get("codice", ""), q)}
+        avvisi = [con_rimedio(x) for x in avvisi]
         blocchi = []
         e = self._job_ultimo("esporta_xml", pratica_id)
         if not (e and e["input"].get("impronta_dichiarativa") == d["impronta_dichiarativa"] and e["risultato"].get("completo")):
@@ -257,7 +265,14 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
                 "versione_regole": VERSIONE_REGOLE,
                 "ambito": "controlli interni di forma e coerenza; NON e' il controllo ufficiale",
                 "esito": "ok" if not errori else "rilievi", "finalizzabile": not errori and not blocchi,
-                "blocchi_finalizzazione": blocchi, "rilievi": [x.asdict() for x in errori], "avvisi": avvisi}
+                "blocchi_finalizzazione": blocchi, "rilievi": [con_rimedio(x.asdict()) for x in errori], "avvisi": avvisi}
+
+    def brogliaccio(self, pratica_id: str) -> dict:
+        """Brogliaccio di lavoro: beni, quote per bene e soggetti, con i dati come inseriti (nessun calcolo d'imposta)."""
+        from . import brogliaccio as BR
+        d = self.leggi(pratica_id)
+        return {"pratica_id": pratica_id, "revisione": d["revisione"], **BR.righe(d["dati"]),
+                "ambito": "documento di lavoro dello studio: dati come inseriti, nessun calcolo d'imposta"}
 
     def valori_catastali(self, pratica_id: str) -> dict:
         """Valore catastale proposto per ogni fabbricato e terreno (minimo non rettificabile), con formula e fonti."""
