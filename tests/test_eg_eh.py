@@ -10,6 +10,7 @@ import pytest
 from lxml import etree
 
 from telematico_casi import caso_a10, contesto_caso_a10
+from test_soggetti_ea import aggiungi
 from successioni.telematico.esporta import esporta_xml
 from test_telematico_controllo import _esegui, _motivo_salto
 
@@ -80,6 +81,26 @@ def test_separato_con_colpa_il_coniuge_non_e_beneficiario():
     assert v(es, f"{SEZ}/suc:Separazione/suc:FlagSeparazione/text()") == ["1"]
     es = esporta(caso("5", {"separazione_con_colpa": True}, coniuge=True), completo=False)
     assert es.xml is None and ("REGOLA_SEPARAZIONE", "opzioni.telematico.dichiarazione.separazione_con_colpa") in errori(es)
+
+
+def caso_sep_coniuge_rinunciatario():
+    """Coniuge rinunciatario (tipo 4) nel quadro EA, senza righe di devoluzione: l'annotazione di FlagSeparazione vieta il grado 01
+    solo nella sezione devoluzione dei quadri, non nell'elenco dei soggetti."""
+    d = caso("5", {"separazione_con_colpa": True})
+    aggiungi(d, "p_marta001", "Marta", "Bianchi", "F", "1948-03-03", "01", "4")
+    return d
+
+
+def caso_sep_legge_estera():
+    """Con «legge estera» il divieto dell'annotazione di FlagSeparazione non si applica («se 'legge estera' ... = 0»)."""
+    return caso("5", {"separazione_con_colpa": True, "legge_estera": True}, coniuge=True)
+
+
+def test_separato_con_colpa_coniuge_solo_nel_quadro_ea_o_con_legge_estera():
+    for d in (caso_sep_coniuge_rinunciatario(), caso_sep_legge_estera()):
+        es = esporta(d)
+        assert v(es, f"{SEZ}/suc:Separazione/suc:FlagSeparazione/text()") == ["1"]
+        assert "REGOLA_SEPARAZIONE" not in {c for c, _ in errori(es)}
 
 
 def test_separazione_dati_mancanti_o_incoerenti():
@@ -176,6 +197,8 @@ def test_eg10_per_agevolazione_c_di_un_altro_beneficiario():
 @pytest.mark.parametrize("nome,costruisci", [
     ("separato_senza_colpa", lambda: caso("5", {"separazione_con_colpa": False}, coniuge=True)),
     ("separato_con_colpa_senza_coniuge", lambda: caso("5", {"separazione_con_colpa": True})),
+    ("separato_con_colpa_coniuge_rinunciatario", caso_sep_coniuge_rinunciatario),
+    ("separato_con_colpa_legge_estera", caso_sep_legge_estera),
     ("unione_civile", lambda: caso("7", {"no_scioglimento_unione_civile": True}, coniuge=True)),
     ("un_disabile", lambda: caso(disabili=("p_anna0001",), cert="VERBALE ASL RM1 N 1")),
     ("due_disabili", lambda: caso(disabili=("p_anna0001", "p_luca0001"), cert="VERBALE ASL RM1 N 1")),
@@ -208,3 +231,17 @@ def test_negativi_del_controllo_ufficiale(tmp_path):
     _negativo(tmp_path / "c", esporta(caso(disabili=("p_anna0001",), cert="VERBALE ASL RM1 N 1")),
               rb"<suc:PresenzaInterdetti>.*?</suc:PresenzaInterdetti>", b"<suc:FlagAssenzaInterdetti>1</suc:FlagAssenzaInterdetti>", "2097",
               flags=16)
+
+
+@pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+def test_coniuge_beneficiario_con_separazione_per_colpa_bloccato_solo_dall_export(tmp_path):
+    """Il blocco REGOLA_SEPARAZIONE dell'export resta per il coniuge nella sezione devoluzione (annotazione XSD di FlagSeparazione).
+    Il controllo ufficiale SUC13 2.3.1 (prova locale del 07/11/2026) NON applica questa annotazione: lo stesso file con FlagSeparazione
+    al posto di FlagAssenzaSeparazione risulta positivo. Se il componente cambia, il test lo segnala."""
+    es = esporta(caso("5", {"separazione_con_colpa": True}, coniuge=True), completo=False)
+    assert ("REGOLA_SEPARAZIONE", "opzioni.telematico.dichiarazione.separazione_con_colpa") in errori(es)
+    xml = esporta(caso("5", {"separazione_con_colpa": False}, coniuge=True)).xml
+    alterato = xml.replace(b"FlagAssenzaSeparazione>", b"FlagSeparazione>")
+    assert alterato != xml
+    stato, dgn, _, _ = _esegui(alterato, tmp_path)
+    assert stato == "positivo", dgn["diagnostici"]

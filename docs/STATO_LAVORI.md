@@ -1,4 +1,33 @@
-# Stato dei lavori (aggiornato 2026-11-07)
+# Stato dei lavori (aggiornato 2026-11-07 sera)
+
+## Correzioni dalla seconda review completa del 07/11/2026 sera (`docs/REVIEW_COMPLETA_20261107_SERA.md`)
+Priorita' 1, tutte affrontate (commit su `moduli/integr4`):
+- 1 usufrutto/nuda proprieta' con devoluzione per legge bloccati (`REGOLA_CODICE_DIRITTO`); 8 QuotaValore del file confrontato
+  con la riesportazione e avviso sull'ordine del quadro EA; valore catastale con la prima casa dal diritto di abitazione
+  (codici 1, 2, 5, 6) — `6e10873`.
+- 2 `.dgn` del controllo manuale non piu' accettato per il solo CF; 3 nessuna nuova copia con un tentativo aperto, copia
+  attiva in interfaccia, `.esi` dalla GUI, `stati_pratica` rimossa; catasto manuale «completo» -> `caricato_manualmente`;
+  guida della prima pratica (passi 9-12) e matrice allineate — `8b58f96`.
+- 4 `SUCCESSIONI_CONFIG` in tutti i modi dell'avviatore; 6 archivio senza connessioni a riposo, WAL svuotato;
+  7 richieste web in un thread di lavoro, «database is locked» -> 503 — `7a2bcdc`; impostazioni salvate una alla volta — `64f717d`.
+- 5 modifica di gruppo, tasto Invio, Ctrl+S, Prossime azioni (5 punti del cruscotto) — `306f82d`.
+- 9 righi EG ricontrollati nella transazione che cancella, `allegato_id` validato, PDF/A idempotente, albero genealogico con
+  revisione riletta — `d69b2d8`.
+Pulizia (ramo `worktree-agent-a1c72ea2a83cb926f`):
+- import inutilizzati tolti da `telematico/agevolazioni.py` (analisi statica con `ast` su `telematico/` e moduli vicini;
+  fuori da quest'area restano `cli.py` Servizio, `elaborati.py` Path, `servizio.py` datetime/timezone/ErroreServizio);
+- eta' calcolata solo da `usufrutto.eta`; data del decesso letta solo da `formati.data_decesso_defunto` (export e valore
+  catastale);
+- separazione con colpa: annotazione XSD di FlagSeparazione applicata alla lettera (divieto del grado 01 solo nella sezione
+  devoluzione dei quadri, non con «legge estera»); il controllo ufficiale SUC13 2.3.1 non applica questa annotazione (prova
+  locale in `tests/test_eg_eh.py`), il blocco resta dell'export;
+- spostamento dei righi EG sul PDF/A (`riordina_allegati`, `_dopo_conversione`) con revisione riletta e nuovi tentativi
+  (`tests/test_allegati_conflitto_revisione.py`);
+- importazione: avviso per testi con spazi ripetuti o a capo (DatoAN_Type li ammette, `formati.an` li riduce);
+- docstring di `calcolo.py`, `quadri_efgh.py`, `sostitutiva.py` riallineati al perimetro reale; riferimenti a `stati_pratica`
+  aggiornati in `docs/PROPOSTE_collegamenti.md` e `docs/COMPITI_PER_AGENTI_GRATUITI.md`.
+Da riscontrare punto per punto: le voci di priorita' 2 e 3 non citate sopra (per esempio brogliaccio e `opzioni.telematico`,
+calcolatrice, accessibilita', prestazioni, test dipendenti da Java, accelerazione della suite), su cui lavorano altre sessioni.
 
 ## Miglioramenti dall'analisi di DE.A.S. II (2026-11-07, ramo `miglioramenti-replica`)
 - Analisi e voci approvate: `docs/ANALISI_REPLICA_2026-11-07.md` (gruppi 1-4 del §8, approvati dal committente il 07/11/2026).

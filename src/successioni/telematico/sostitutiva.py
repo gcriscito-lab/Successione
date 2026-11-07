@@ -9,10 +9,11 @@ Fonti (nessuna regola ricavata dalla memoria):
 - Fascicolo I (Nov 2023): p. PDF 11-12 (tipo di dichiarazione, codici 1/2/3, «sostituisce integralmente la precedente»),
   p. PDF 13 (estremi della prima dichiarazione), pp. PDF 42-47 (righi EF6, EF8, EF12, EF14, EF15, EF16, EF18bis col. 3).
 
-Perimetro: codici 1 e 2. Il codice 3 (solo frontespizio ed EG) e' dichiarato NON supportato: nessun XML.
+Perimetro: codici 1, 2 e 3. Con il codice 3 (integrativa con sola documentazione) il file contiene solo frontespizio e quadro EG
+(`e_integrativa` e `frontespizio.riduci_per_integrativa`); il calcolo dell'imposta non si applica.
 I dati specifici stanno in ``opzioni.telematico.dichiarazione``::
 
-    codice_sostitutiva   "1" (nuova trascrizione e voltura) | "2" (senza nuova trascrizione) | "3" (non supportato)
+    codice_sostitutiva   "1" (nuova trascrizione e voltura) | "2" (senza nuova trascrizione) | "3" (integrativa: solo frontespizio ed EG)
     prima_anno, prima_volume, prima_numero          estremi di registrazione della dichiarazione sostituita
                          (volume: 88888 o 88889)
     ipotecaria_versata   EF6  (rigo EF8 della dichiarazione sostituita), euro interi

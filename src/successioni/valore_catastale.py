@@ -25,6 +25,7 @@ from datetime import date
 from decimal import ROUND_CEILING, Decimal
 
 from . import valori as V
+from .telematico import formati as F
 from .telematico import supplemento as SUP
 
 FONTE_RIVALUTAZIONE = "L. 662/1996 art. 3 c. 48 (rendite +5%) e c. 51 (redditi dominicali +25%)"
@@ -64,13 +65,6 @@ def _quota(v):
     except V.ValoreNonValido:
         return None
 
-
-def _data_decesso(dati: dict):
-    d = next((p.get("data_decesso") for p in dati.get("persone", []) if p.get("ruolo") == "defunto"), None)
-    try:
-        return date.fromisoformat(d) if isinstance(d, str) else None
-    except ValueError:
-        return None
 
 
 def _codice_diritto(v) -> str:
@@ -121,7 +115,7 @@ def calcola(dati: dict, b: dict) -> dict:
     if str(b.get("provincia") or "").strip().upper() == "EE":
         out["motivo"] = "immobile all'estero: nessun valore catastale italiano"
         return out
-    dd = _data_decesso(dati)
+    dd = F.data_decesso_defunto(dati)
     if dd is None:
         out["motivo"] = "manca la data del decesso"
         return out

@@ -1467,11 +1467,7 @@ class _Export:
         perc = f"beni[{b['id']}]"
         dec = self.data_decesso
         if dec is None:     # i quadri dei beni si compilano prima di EH, dove si fissa self.data_decesso
-            dd = next((p.get("data_decesso") for p in self.d.get("persone", []) if p.get("ruolo") == "defunto"), None)
-            try:
-                dec = date.fromisoformat(dd) if isinstance(dd, str) else None
-            except ValueError:
-                dec = None
+            dec = F.data_decesso_defunto(self.d)
         if dec is None or dec < USU.DECORRENZA:
             self.ns.append(f"{perc}: usufrutto e nuda proprieta' calcolati solo per le successioni aperte dal 2025 "
                            "(prospetto dei coefficienti esteso alle successioni dal D.Lgs. 139/2024): non supportato")

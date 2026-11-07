@@ -4,21 +4,23 @@ Usato da ``esporta._Export`` (stessa istanza ``x``: errori, non supportati, mapp
 EA/EB/EC/ER/ED). Ogni regola cita la fonte: annotazione dell'elemento XSD (fornituraSUC13_v1.xsd, SUC13_20250702) o
 istruzioni ``Succ_FASCICOLO_I_Nov_23.pdf`` (pagina PDF = pagina stampata). Nessuna regola dalla memoria.
 
-PERIMETRO (il resto e' ``non_supportato`` oppure ``quadri_mancanti`` con il motivo):
+PERIMETRO (il resto e' ``non_supportato`` oppure ``quadri_mancanti`` con il motivo; elenco aggiornato al 07/11/2026, per i
+singoli casi vedi docs/MATRICE_COPERTURA.md):
 
-- EF: successioni aperte dal 2006-10-03 (misura fissa 168 fino al 2013, 200 dal 2014; sezione V-bis solo dal 2025-01-01, vedi docs/regole/ef_successioni_storiche.md), prima dichiarazione o sostitutiva 1/2, immobili anche in piu' comuni (circoscrizioni da ``conservatorie.py``, col componente di controllo configurato), senza agevolazioni/riduzioni
-  salvo la prima casa (codici P, X, Z: rigo EF4 e Sezione II di EH, vedi ``prima_casa.py``); Sezioni I (ipotecaria 2%), II (catastale 1%), III (tassa ipotecaria 120 euro per circoscrizione), IV (bollo
-  85 euro per circoscrizione), V-bis (imposta di successione da ``calcolo.calcola_da_xml`` sul file dichiarato),
-  totale EF19. Non coperti: agevolazioni (G, M, Y, Z senza P, trust), regola dei valori fiscali dei soli terreni
-  (Fascicolo I p. 40), (imposta proporzionale inferiore alla fissa: ora coperta, vedi sotto),
-  attestazione/copia conforme, crediti
-  d'imposta, sostitutive con rimborso o tardive con imposta aggiuntiva, sanzioni e interessi, rateazione.
-- EG: righi EG1 DichSost, EG5 DocumentiPassivita, EG6 AlberoGenealogico, EG7 DocumentiIdentita, EG8 Altro; i
-  contenuti vengono SOLO da ``documenti.base64.dati_file_attachment`` (nome maiuscolo/conforme a cm:DatoAN_Type).
-- EH: Sezione I con dichiarante erede/chiamato (carica 1), defunto deceduto (non morte presunta), devoluzione per
-  legge, nessun interdetto/disabile, nessuna rinuncia, stato civile diverso da 5 e 7. Sezione II (prima casa del
-  dichiarante) coperta da ``prima_casa.sezione_eh``; Sezioni III-IV non coperte.
-"""
+- EF: successioni aperte dal 2006-10-03 (misura fissa 168 fino al 2013, 200 dal 2014; sezione V-bis solo dal 2025-01-01, vedi
+  docs/regole/ef_successioni_storiche.md), prima dichiarazione o sostitutiva 1/2, immobili anche in piu' comuni (circoscrizioni
+  da ``conservatorie.py``), agevolazioni e riduzioni ipocatastali (prima casa in ``prima_casa.py``, G, M e le altre in
+  ``agevolazioni.py``), valori fiscali dei terreni, attestazione, crediti d'imposta, sanzioni e interessi dichiarati,
+  rateazione, V-bis da ``calcolo.calcola_da_xml`` sul file dichiarato. Restano fuori (``quadri_mancanti`` con il motivo):
+  successioni anteriori al 2006-10-03, somme G o M non intere, prima casa senza codice P, oneri reali (diritto 10) nelle
+  circoscrizioni, terreni senza reddito dominicale, attestazione con trust.
+- EG: tutti gli undici righi (EG1-EG11, ``SEZIONI_EG``); i contenuti vengono SOLO da
+  ``documenti.base64.dati_file_attachment`` (nome maiuscolo/conforme a cm:DatoAN_Type); gli allegati obbligatori mancanti
+  finiscono in ``quadri_mancanti``.
+- EH: Sezione I (testamento, separazione con o senza colpa, unione civile, disabili e interdetti, rinunce, reintegri, morte
+  presunta, navi e aeromobili), Sezione II (prima casa, ``prima_casa.sezione_eh``), Sezione III (crediti d'imposta). Non
+  supportati: piu' di una nave o di un aeromobile (secondo modulo della sezione).
+- EI: estremi di trascrizione e registrazione insieme nei moduli di continuazione: caso non esprimibile, ``non_supportato``."""
 from __future__ import annotations
 
 from datetime import date
@@ -1132,7 +1134,10 @@ def _eh_separazione_unione(x, stato_civile) -> dict:
     perc = "opzioni.telematico.dichiarazione."
     sep, nus = SUP.dich(x.d, "separazione_con_colpa"), SUP.dich(x.d, "no_scioglimento_unione_civile")
     out: dict = {}
-    legge = SUP.dich(x.d, "devoluzione_per_testamento") is not True
+    # annotazione XSD di FlagSeparazione: «In presenza del campo e di devoluzione per legge (e in assenza di devoluzione per
+    # testamento e se 'legge estera' del frontespizio = 0) non può essere indicato nella sezione devoluzione dei vari quadri un
+    # soggetto con grado di parentela = 01»: il divieto riguarda le righe di devoluzione, non il solo elenco del quadro EA
+    legge = (SUP.dich(x.d, "devoluzione_per_testamento") is not True and SUP.dich(x.d, "legge_estera") is not True)
     if stato_civile == "5":
         if sep not in (True, False):
             x.err("DATO_MANCANTE", perc + "separazione_con_colpa", "stato civile 5 (separato/a): indicare se e' stata pronunciata "
@@ -1140,9 +1145,11 @@ def _eh_separazione_unione(x, stato_civile) -> dict:
                   _fa(el + "/Separazione") + "; " + FO.fonte_fasc1(51, "lettera g"))
         elif sep:
             out["Separazione"] = {"FlagSeparazione": "1"}
-            if legge and any(g == "01" for g in x.grado_ea.values()):
+            beneficiari = {pid for did, pid in x.persona_dev.items() if did not in x.scartati}
+            if legge and any(x.grado_ea.get(pid) == "01" for pid in beneficiari):
                 x.err("REGOLA_SEPARAZIONE", perc + "separazione_con_colpa", "separazione con addebito: con la devoluzione per legge "
-                      "il coniuge (grado 01) non puo' essere beneficiario (annotazione XSD di FlagSeparazione; Fascicolo I p. PDF 18)",
+                      "(senza testamento e senza legge estera) il coniuge (grado 01) non puo' comparire nella sezione devoluzione dei "
+                      "quadri (annotazione XSD di FlagSeparazione; Fascicolo I p. PDF 18)",
                       _fa(el + "/Separazione/FlagSeparazione"))
         else:
             out["Separazione"] = {"FlagAssenzaSeparazione": "1"}
