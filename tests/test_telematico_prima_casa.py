@@ -397,8 +397,9 @@ def test_sezione_urbana_riportata_nella_sezione_ii():
     assert _x(es, EH2 + "/suc:ImmobilePrincipale/suc:SezioneUrbana/text()") == ["AB"]
 
 
-def test_valore_quote_prima_casa_non_intero_blocca_ef():
-    # tre figli con quota 1/3 su un fabbricato da 126001 euro: 3 x 42000,33 = 126000,99, somma non intera
+def test_valore_quote_prima_casa_non_intero_arrotondato_all_euro():
+    # tre figli con quota 1/3 su un fabbricato da 126001 euro: 3 x 42000,33 = 126000,99, somma non intera. Dal 2026-11-07 la
+    # somma e' arrotondata all'euro nel rigo EF4 col. 2 (docs/regole/dubbio_arrotondamento.md §7; tests/test_quote_non_intere.py)
     from successioni.telematico.identificativi import genera_cf_sintetico
     d = caso_prima_casa()
     tel = _tel(d)
@@ -418,9 +419,9 @@ def test_valore_quote_prima_casa_non_intero_blocca_ef():
                                                        for p in ("p_anna0001", "p_luca0001", "p_figlio003")]
     es = _es(d)
     assert es.errori == [] and es.non_supportato == [], (es.errori, es.non_supportato)
-    assert es.completo is False
-    assert any("prima casa 126000.99 non intera" in m.messaggio for m in es.quadri_mancanti), \
-        [m.messaggio for m in es.quadri_mancanti]
+    assert not [m for m in es.quadri_mancanti if m.percorso == "quadro[EF]"], [m.messaggio for m in es.quadri_mancanti]
+    assert _x(es, EF + "/suc:SezioneI_ImpostaIpotecaria/suc:PrimaCasa/suc:AgevolazionePX_Valore/text()") == ["126001"]
+    assert any(a.codice == "ARROTONDAMENTO_SOMMA_VALORI_QUOTA" and "126000,99" in a.messaggio for a in es.avvisi)
 
 
 def test_importazione_legge_le_agevolazioni():

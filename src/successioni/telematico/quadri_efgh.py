@@ -110,6 +110,22 @@ def _fa(el: str) -> str:
     return FO.fonte_annotazione(el)
 
 
+def _somma_in_euro(x, somma: Decimal, elemento: str, descrizione: str) -> Decimal:
+    """Somma dei 'Valore quota' (QuotaValore, cm:DatoVP_Type al centesimo) riportata in un campo in euro interi
+    (cm:DatoNP_Type) del quadro EF: arrotondata all'unita' di euro con la regola delle annotazioni EF («per difetto se la
+    frazione e' inferiore a 50 centesimi e per eccesso se non inferiore»). I centesimi nascono solo dall'arrotondamento
+    dei singoli valori quota (quote non esatte al centesimo), ammesso entro la tolleranza dell'annotazione QuotaValore
+    (1% del valore del bene, al massimo 100 euro). Riscontri: file originale accettato dall'Agenzia (104.903,97 -> 104.904)
+    e controllo ufficiale SUC13 2.3.1 locale (docs/regole/dubbio_arrotondamento.md §7)."""
+    intero = Decimal(arrotonda_euro(somma))
+    if intero != somma:
+        x.avv("ARROTONDAMENTO_SOMMA_VALORI_QUOTA", "quadro[EF]",
+              f"somma dei 'Valore quota' degli {descrizione} {F.euro_centesimi(somma)} arrotondata a {int(intero)} euro "
+              "(campo in euro interi)", _fa(elemento) + "; " + _fa("QuadroEF/SezioneI_ImpostaIpotecaria/ImpostaProporzionale/"
+                                                                   "ImpostaProporzionale_Imposta"))
+    return intero
+
+
 # ============================================================================================== EF
 def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
     """Quadro EF. ``xml_pre``: dichiarazione gia' serializzata senza EF (fonte dei dati per il calcolo V-bis)."""
@@ -190,9 +206,10 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
         if agevolati and n_pc == 0:
             motivi.append("immobili con agevolazione prima casa senza alcun codice P: il numero di immobili del rigo EF4 "
                           "(solo P, o Z in assenza di P) non e' determinabile")
-        if valore_pc != valore_pc.to_integral_value():
-            motivi.append(f"somma dei 'Valore quota' degli immobili prima casa {valore_pc} non intera: l'arrotondamento "
-                          "del rigo EF4 colonna 2 non e' indicato dalle fonti")
+        # somme dei 'Valore quota' (DatoVP, al centesimo) nei campi in euro interi (cm:DatoNP_Type) EF1/EF9 col. 1 ed EF4 col. 2:
+        # arrotondate all'unita' di euro (docs/regole/dubbio_arrotondamento.md §7)
+        valore_pc = _somma_in_euro(x, valore_pc, el + "/SezioneI_ImpostaIpotecaria/PrimaCasa/AgevolazionePX_Valore",
+                                   "immobili prima casa (rigo EF4 col. 2)")
         if any(r["diritto"] == "10" for r in tutti):
             motivi.append("immobili gravati da oneri reali (codice diritto 10): esclusi dalle circoscrizioni "
                           "(Fascicolo I p. 44), caso non coperto")
@@ -216,13 +233,17 @@ def quadro_ef(x, xml_pre: bytes | None) -> dict | None:
                              Decimal(0)) * Decimal("112.5")
             else:
                 solo_terreni = False   # terreni edificabili o con agevolazioni: imposta proporzionale ordinaria
-        if immobili_prop and imponibile != imponibile.to_integral_value():
-            motivi.append(f"somma dei 'Valore quota' degli immobili {imponibile} non intera: l'arrotondamento "
-                          "dell'imponibile EF1/EF9 (cm:DatoNP_Type) non e' indicato dalle fonti")
+        if immobili_prop:
+            imponibile = _somma_in_euro(x, imponibile, el + "/SezioneI_ImpostaIpotecaria/ImpostaProporzionale/"
+                                        "ImpostaProporzionale_Imponibile", "immobili soggetti a imposta ipotecaria (rigo EF1 col. 1)")
         # EF1: quadri EB, EC, EL, EM (Fascicolo I p. 40). EF9 (catastale): il testo (p. 43) non elenca i quadri; il controllo
         # ufficiale SUC13 2.3.1 eseguito in locale il 2026-11-03 esclude i terreni tavolari (EL) dalla base catastale.
         prop_cat = [r for r in immobili_prop if r["quadro"] != "EL"]
         imponibile_cat = sum((r["quota_valore"] for r in prop_cat), Decimal(0))
+        if prop_cat:
+            imponibile_cat = _somma_in_euro(x, imponibile_cat, el + "/SezioneII_ImpostaCatastale/ImpostaProporzionale/"
+                                            "ImpostaProporzionale_Imponibile", "immobili soggetti a imposta catastale (rigo EF9 col. 1)")
+        # imposta = aliquota x «campo precedente» (annotazioni ImpostaProporzionale_Imposta di EF1 ed EF9): l'imponibile intero
         ip = arrotonda_euro(imponibile * ALIQUOTA_IPOTECARIA)
         cat = arrotonda_euro(imponibile_cat * ALIQUOTA_CATASTALE)
         # imposta proporzionale inferiore alla fissa: il Fascicolo I (pp. 40 e 43) parla di «indicare 200 euro» ma il controllo
