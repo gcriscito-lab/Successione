@@ -1,5 +1,9 @@
 # Proposte dell'area 3 (collegamenti) per il coordinatore
 
+> **Documento storico, in parte superato (07/11/2026).** Le proposte sono state integrate o sostituite: lo stato attuale dei
+> collegamenti e' in `docs/COLLEGAMENTI.md`. `invio.stati_pratica` e' stata rimossa (review 3): lo stato della pratica
+> e' `Servizio.stato_elaborati`.
+
 Modifiche a file di proprieta' del coordinatore, necessarie per integrare `successioni.collegamenti`. Nessuna e'
 stata applicata dall'area 3.
 
@@ -21,14 +25,14 @@ Strumenti delimitati (nessuno trasmette):
 - `successioni_controllo_ufficiale(pratica_id, chiave_richiesta)`: esporta l'XML (area 1), chiama
   `controllo.controllo_ufficiale(arch).esegui(xml, pratica_id=..., revisione=..., impronta_dichiarativa=...)`,
   restituisce `job_id`, `esito`, `stato_controllo`, `azione_richiesta`. Passare SEMPRE `impronta_dichiarativa`:
-  serve a `stati_pratica` per marcare obsoleto il controllo quando cambia il dichiarato (A16).
+  serve allo stato della pratica (`Servizio.stato_elaborati`) per marcare obsoleto il controllo quando cambia il dichiarato (A16).
 - `successioni_controllo_registra_diagnostico(job_id, file_dgn, file_log, file_wri?)`: file presi solo dalla
   cartella d'ingresso dell'app (come gli allegati).
 - `successioni_catasto_avvia(pratica_id, ambito, chiave_richiesta)`, `successioni_catasto_riprendi(job_id)`,
   `successioni_catasto_risultati(job_id)`, `successioni_catasto_proponi(job_id, selezione?)`; l'applicazione della
   proposta passa da `aggiorna_pratica` con `origine="acquisito"` (esporre il parametro `origine` nello strumento
   MCP di aggiornamento, oggi fissato a `proposto_assistente` per il canale mcp).
-- `successioni_invio_prepara(pratica_id, ...)`, `successioni_invio_stato(pratica_id)` (= `invio.stati_pratica`),
+- `successioni_invio_prepara(pratica_id, ...)`, `successioni_invio_stato(pratica_id)` (stato della pratica da `Servizio.stato_elaborati`),
   `successioni_esiti(protocollo)` (= `stato_esiti`), `successioni_ricevuta_registra(protocollo, tipo, esito, file)`.
 - **Solo nell'interfaccia, non via MCP:** `conferma` (gia' rifiutata da `canale != "gui"`), `trasmetti` e la
   riconciliazione `non_trasmesso` (abilita un nuovo invio). Motivo: "la conferma finale nell'app autorizza la
@@ -40,7 +44,7 @@ Strumenti delimitati (nessuno trasmette):
 Area "Invio ed esiti": copia congelata (elenco elaborati con impronta, importi, profilo, revisione) e pulsante di
 conferma che invia `impronta_conferma` mostrata; stato del tentativo con `azione_richiesta`; modulo di
 riconciliazione (protocollo + "verificato su", file `.esi`); registrazione delle ricevute con tipo scelto
-dall'utente. Barra di stato: "controllo ufficiale" da `stati_pratica` (positivo/negativo/obsoleto/non eseguito).
+dall'utente. Barra di stato: "controllo ufficiale" da `stato_elaborati` (positivo/negativo/obsoleto/non eseguito).
 Impostazioni: percorso di Java e cartella dei JAR (`SUCCESSIONI_JAVA`, `SUCCESSIONI_CONTROLLI_SUC13`), non segreti.
 
 ## 4. Archivio (`archivio.py`)

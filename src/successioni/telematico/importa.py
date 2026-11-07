@@ -565,13 +565,34 @@ def importa_xml(xml: bytes, *, data_riferimento: date | None = None) -> dict:
     token = _letti.set(set())
     try:
         r = _importa_xml(radice)
+        letti = _letti.get()
     finally:
         _letti.reset(token)
+    spazi = _avviso_spazi_multipli(radice, letti)
+    if spazi:
+        r["avvisi"].append(spazi)
     if tolti:
         r["avvisi"].insert(0, f"{tolti} commenti o istruzioni di elaborazione tolti dal file: il testo che separavano e' stato "
                               "unito al valore dell'elemento; la riesportazione non li riproduce")
     r["avvisi"] += _confronta_ef(radice, r["operazioni"], data_riferimento, r.pop("_quota_valore", None))
     return r
+
+
+_SPAZI = re.compile(r"\s{2,}|[^\S ]")
+
+
+def _avviso_spazi_multipli(radice, letti) -> str | None:
+    """Testi importati con spazi ripetuti, tabulazioni o a capo all'interno. Il pattern di DatoAN_Type (typesDati_v2.xsd) li
+    ammetterebbe (``\\s``), ma la riesportazione li riduce a un solo spazio (``formati.an``, trasformazione di forma
+    documentata): il testo riesportato sarebbe diverso da quello del file, quindi lo si dice invece di farlo in silenzio."""
+    voci = [e for e in radice.iter() if isinstance(e.tag, str) and not len(e) and e in (letti or ())
+            and _SPAZI.search((e.text or "").strip())]
+    if not voci:
+        return None
+    es = "; ".join(f"{_percorso_relativo(e, e.getparent().getparent())} = {(e.text or '').strip()!r}" for e in voci[:5])
+    altri = f" e altri {len(voci) - 5}" if len(voci) > 5 else ""
+    return (f"{len(voci)} testi con spazi ripetuti o a capo ({es}{altri}): importati come nel file, ma la riesportazione li "
+            "riduce a un solo spazio; verificare il testo")
 
 
 def _elenco_foglie(el, sopra) -> str:

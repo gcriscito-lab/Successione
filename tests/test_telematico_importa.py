@@ -39,6 +39,19 @@ def test_andata_e_ritorno_identica(sv):
     assert r["importato"] == {"eredi": 2, "terreni": 1, "fabbricati": 1, "disponibilita_finanziarie": 1, "passivita": 2}
 
 
+def test_spazi_ripetuti_nelle_descrizioni_segnalati(sv):
+    """formati.an riduce gli spazi ripetuti in riesportazione (DatoAN_Type li ammetterebbe): l'importazione lo dice."""
+    originale = esporta_xml(caso_a10(), CTX).xml
+    xml = originale.replace(b"CONTO CORRENTE N. 123", b"CONTO  CORRENTE N. 123", 1)
+    assert xml != originale
+    r, dati, nuovo = _riesporta(sv, xml)
+    avvisi = [a for a in r["avvisi"] if "spazi ripetuti" in a]
+    assert len(avvisi) == 1 and "CONTO  CORRENTE" in avvisi[0] and "Descrizione" in avvisi[0]
+    assert any(b.get("descrizione", "").startswith("CONTO  CORRENTE") for b in dati["beni"])   # testo conservato in pratica
+    assert nuovo.xml == originale                                                             # riesportato con uno spazio
+    assert not [a for a in sv.importa_xml_telematico(originale)["avvisi"] if "spazi ripetuti" in a]
+
+
 def test_dati_nel_modello(sv):
     r = sv.importa_xml_telematico(esporta_xml(caso_a10(), CTX).xml)
     dati = sv.leggi(r["pratica_id"])["dati"]

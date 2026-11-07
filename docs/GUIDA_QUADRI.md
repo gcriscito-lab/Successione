@@ -1,5 +1,9 @@
 # Guida alla compilazione dei quadri
 
+> **Superato in parte (verificato il 07/11/2026).** Gli elenchi «Non supportato» sono fermi a una versione precedente e
+> indicano come assenti funzioni oggi coperte (per esempio cariche 2-8, legge estera, rinunce, EI, separazione,
+> unione civile, crediti, sanzioni). Per la copertura attuale vale `docs/MATRICE_COPERTURA.md`.
+
 Questa guida spiega, in modo sintetico, come compilare ogni quadro dell'interfaccia telematica per le dichiarazioni di successione. Ogni sezione indica: a cosa serve il quadro, quali campi del modello vanno compilati, un esempio pratico e cosa NON è supportato.
 
 ---
