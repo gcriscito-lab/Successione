@@ -250,8 +250,12 @@ async function renderProssime() {
   let c;
   try { c = await api("/api/cruscotto"); } catch (e) { if (gen === prossimeGen) box.replaceChildren(h("p", { class: "err" }, e.message)); return; }
   if (gen !== prossimeGen || S.P) return;
-  const termine = t => !t ? null : t.giorni < 0 ? h("span", { class: "scad er" }, "superato")
-    : h("span", { class: "scad" + (t.giorni <= 60 ? " am" : "") }, t.giorni === 0 ? "oggi" : "tra " + t.giorni + (t.giorni === 1 ? " giorno" : " giorni"));
+  // il termine conta dalla decorrenza indicata nel frontespizio, se c'e' (cruscotto.py): lo si dice nel testo
+  const daDec = t => t.base === "decorrenza" ? " dalla decorrenza" : "";
+  const titTermine = t => "Termine del " + dataIt(t.data) + (t.base === "decorrenza" ? ", dalla decorrenza del " + dataIt(t.dal) : ", dalla data del decesso");
+  const termine = t => !t ? null : t.giorni < 0 ? h("span", { class: "scad er", title: titTermine(t) }, "superato" + daDec(t))
+    : h("span", { class: "scad" + (t.giorni <= 60 ? " am" : ""), title: titTermine(t) },
+      (t.giorni === 0 ? "oggi" : "tra " + t.giorni + (t.giorni === 1 ? " giorno" : " giorni")) + daDec(t));
   const testoAzione = a => {
     if (!a) return "";
     const m = String((a.dove || {}).percorso || "").match(/^([a-z_]+)\[[^\]]+\]\.([a-z_]+)$/);
@@ -263,14 +267,15 @@ async function renderProssime() {
       const st = (v.tappe || {})[t.id] || "da_fare";
       return h("li", { class: "tappa " + st, "aria-current": st === "corrente" ? "step" : null },
         h("span", { class: "nodo", "aria-hidden": "true" }), h("span", { class: "nome-tappa" }, t.nome),
-        h("span", { class: "vh" }, st === "fatto" ? " (fatto)" : st === "corrente" ? " (in corso)" : " (da fare)"));
+        h("span", { class: "vh" }, st === "fatto" ? " (fatto)" : st === "corrente" ? " (in corso)" : st === "problema" ? " (da correggere)" : " (da fare)"));
     }));
     return h("article", { class: "card-azione" + (v.completata ? " completata" : "") },
       h("button", { type: "button", class: "card-tit", onclick: () => apri(v.pratica_id) }, v.titolo),
       tappe,
-      h("button", { type: "button", class: "azione", onclick: () => vaiAllAzione(v) },
+      h("button", { type: "button", class: "azione" + ((v.azione || {}).livello === "problema" ? " problema" : ""), onclick: () => vaiAllAzione(v) },
         h("span", { class: "freccia", "aria-hidden": "true" }), h("span", { class: "testo-az" }, testoAzione(v.azione)), termine(v.termine)));
-  }));
+  }), ...(c.altre ? [h("p", { class: "mut prossime-altre" }, "Altre " + c.altre + (c.altre === 1 ? " pratica" : " pratiche") + " con termine più lontano"
+    + (c.altre_da_lavorare ? " (" + c.altre_da_lavorare + " da lavorare)" : "") + ": sono nell'elenco delle pratiche.")] : []));
 }
 async function vaiAllAzione(v) {
   const dove = (v.azione || {}).dove || {};
@@ -858,9 +863,12 @@ const CAMPI_GRUPPO = { beni: ["diritto", "quota_defunto", "data_visura"], devolu
 function dialogo(id, titolo, corpo, conferma, onConferma) {
   const vecchio = document.getElementById(id); if (vecchio) vecchio.remove();
   const err = h("p", { class: "e", role: "alert", hidden: true });
-  const d = h("dialog", { id, class: "dlg-op", "aria-labelledby": id + "T" }, h("form", { method: "dialog" }, h("h2", { id: id + "T" }, titolo), corpo, err,
-    h("div", { class: "wiz-az" }, h("button", { class: "gh", value: "annulla" }, "Annulla"), h("span", { class: "sp" }),
-      h("button", { class: "pil", value: "ok", onclick: ev => { ev.preventDefault(); const e = onConferma(); if (e) { err.textContent = e; err.hidden = false; } else d.close(); } }, conferma))));
+  const ok = h("button", { class: "pil", value: "ok", onclick: ev => { ev.preventDefault(); const e = onConferma(); if (e) { err.textContent = e; err.hidden = false; } else d.close(); } }, conferma);
+  // Invio in un campo: il modulo lo tratterebbe come clic sul primo pulsante («Annulla») e chiuderebbe perdendo i dati;
+  // qui applica l'azione principale (i campi che usano Invio per conto loro lo fermano prima con preventDefault)
+  const invio = ev => { if (ev.key === "Enter" && !ev.defaultPrevented && !ev.isComposing && ev.target.tagName === "INPUT") { ev.preventDefault(); ok.click(); } };
+  const d = h("dialog", { id, class: "dlg-op", "aria-labelledby": id + "T" }, h("form", { method: "dialog", onkeydown: invio }, h("h2", { id: id + "T" }, titolo), corpo, err,
+    h("div", { class: "wiz-az" }, h("button", { class: "gh", value: "annulla" }, "Annulla"), h("span", { class: "sp" }), ok)));
   document.body.append(d); d.showModal(); return d;
 }
 function descriviRigaGruppo(q, r) {
@@ -874,21 +882,34 @@ function modificaDiGruppo(q) {
   if (!campi.length) return msg("La modifica di gruppo non è disponibile in questo quadro.", "e");
   if (righe.length < 2) return msg("Servono almeno due righe salvate per la modifica di gruppo.", "e");
   const tipoBene = q.coll === "beni" ? valRiga(righe[0], "tipo") : null;
-  const scelte = new Map(righe.map(r => [r.key, true])), valori = {}, attivi = new Set();
+  const scelte = new Map(righe.map(r => [r.key, true])), valori = {}, attivi = new Set(), svuota = new Set();
   const elenco = h("fieldset", { class: "gruppo-righe" }, h("legend", {}, "Righe da modificare"), righe.map(r => h("label", { class: "riga-sc" },
     h("input", { type: "checkbox", checked: true, "data-key": r.key, onchange: ev => scelte.set(r.key, ev.target.checked) }), " " + descriviRigaGruppo(q, r))));
   const blocchi = campi.map(c => {
-    const spunta = h("input", { type: "checkbox", "data-campo": c, onchange: ev => ev.target.checked ? attivi.add(c) : attivi.delete(c) });
+    const spunta = h("input", { type: "checkbox", "data-campo": c, onchange: ev => { if (ev.target.checked) attivi.add(c); else { attivi.delete(c); svuota.delete(c); vuotaSc.checked = false; } } });
+    // svuotare un campo in tutte le righe e' una scelta esplicita, mai l'effetto di una spunta senza valore
+    const vuotaSc = h("input", { type: "checkbox", "data-svuota": c, onchange: ev => { if (ev.target.checked) { svuota.add(c); attivi.add(c); spunta.checked = true; } else svuota.delete(c); } });
     const w = campoInput(q.coll, null, c, S.schema.collezioni[q.coll][c], null, (campo, v) => { valori[campo] = v; attivi.add(campo); spunta.checked = true; }, tipoBene);
-    return h("div", { class: "rg", "data-gruppo": c }, h("label", {}, spunta, " " + lbl(q.coll, c, q.id)), w);
+    return h("div", { class: "rg", "data-gruppo": c }, h("label", {}, spunta, " " + lbl(q.coll, c, q.id)), w,
+      h("label", { class: "gruppo-svuota" }, vuotaSc, " svuota il campo in tutte le righe scelte"));
   });
+  const vuoto = v => v === undefined || v === null || v === "";
   dialogo("dGruppo", "Modifica di gruppo · quadro " + q.id, h("div", {}, h("p", { class: "mut" }, "Spunta i campi da cambiare e le righe interessate. Le modifiche restano da salvare: controlla e premi «Salva»."), ...blocchi, elenco),
     "Applica alle righe", () => {
       const sel = righe.filter(r => scelte.get(r.key)), usati = [...attivi];
       if (!usati.length) return "Spunta almeno un campo da cambiare.";
       if (!sel.length) return "Spunta almeno una riga.";
+      const senza = usati.filter(c => !svuota.has(c) && vuoto(valori[c]));
+      if (senza.length) return "Nessuna modifica applicata: scegli un valore per " + senza.map(c => "«" + lbl(q.coll, c, q.id) + "»").join(", ")
+        + ", oppure togli la spunta o scegli «svuota il campo».";
+      const doppi = usati.filter(c => svuota.has(c) && !vuoto(valori[c]));
+      if (doppi.length) return "Per " + doppi.map(c => "«" + lbl(q.coll, c, q.id) + "»").join(", ") + " hai scelto sia un valore sia «svuota il campo»: tieni una sola delle due.";
+      const daSvuotare = usati.filter(c => svuota.has(c));
+      if (daSvuotare.length && !confirm("Svuotare " + daSvuotare.map(c => "«" + lbl(q.coll, c, q.id) + "»").join(", ") + " in " + sel.length
+        + (sel.length === 1 ? " riga" : " righe") + "? Il valore attuale viene cancellato; potrai controllare e poi premere «Salva»."))
+        return "Nessuna modifica applicata.";
       for (const r of sel) { const d = S.dirty.get(r.key) || { coll: q.coll, id: r.e.id, campi: {} };
-        for (const c of usati) d.campi[c] = valori[c] === undefined ? null : valori[c]; S.dirty.set(r.key, d); }
+        for (const c of usati) d.campi[c] = svuota.has(c) ? null : valori[c]; S.dirty.set(r.key, d); }
       render(); msg(usati.length + (usati.length === 1 ? " campo cambiato" : " campi cambiati") + " in " + sel.length + " righe: premi «Salva» per confermare (una sola revisione).", "o");
       return null;
     });
@@ -2238,7 +2259,8 @@ $('#bHome').onclick = () => {
   S.gen++; S.P = null; S.Q = null; S.dirty.clear(); S.nuove.clear(); S.dichDirty.clear(); S.supDirty.clear(); S.fornitoreDirty = {};
   S.sel = 'AN'; S.tab = 'dati'; $('#vista').scrollTop = 0; $('#titolo').textContent = 'Nessuna pratica aperta'; render(); caricaPratiche();
 };
-document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); salvaTutto(); } });
+// con una finestra aperta (Operazioni, procedura guidata, Calcolatrice, Guida...) Ctrl+S non salva la pratica: la finestra ha i suoi pulsanti
+document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && (ev.key === "s" || ev.key === "S")) { ev.preventDefault(); if (document.querySelector("dialog[open]")) return; salvaTutto(); } });
 /* Scorciatoie per chi inserisce dati tutto il giorno (report grafica 07/11/2026, punto 10). «?» mostra l'elenco. */
 const SCORCIATOIE = [["Ctrl+S", "Salva le modifiche"], ["Alt+N", "Nuova riga nel quadro"], ["Alt+D", "Duplica la riga selezionata"],
   ["Alt+PagGiù / Alt+PagSu", "Quadro successivo / precedente"], ["Ctrl+G", "Vai a un quadro (scrivi la sigla, es. EC)"],
@@ -2283,6 +2305,8 @@ const GUIDA = { dati: null, info: null };
 async function datiGuida() { if (!GUIDA.dati) GUIDA.dati = await api("/api/guida"); return GUIDA.dati; }
 function apriIstruzioni(doc, pagina) { window.open("/api/guida/" + doc + ".pdf#page=" + pagina, "_blank", "noopener"); }
 function argomentoDelQuadro(id) { return GUIDA.dati && GUIDA.dati.argomenti.find(a => a.quadro === id); }
+// Invio in un campo di Guida o Calcolatrice: il modulo lo tratterebbe come «Chiudi» e la finestra si chiuderebbe; qui non fa nulla
+function invioNonChiude(ev) { if (ev.key === "Enter" && ev.target.tagName === "INPUT" && !ev.isComposing) ev.preventDefault(); }
 async function apriGuida(scheda) {
   let d = $("#dGuida");
   if (!d) { d = h("dialog", { id: "dGuida", class: "guida", "aria-labelledby": "dGuidaT" }); document.body.append(d); }
@@ -2290,7 +2314,7 @@ async function apriGuida(scheda) {
   const att = scheda || "istruzioni";
   const corpo = h("div", { class: "guida-corpo" }, h("p", { class: "mut" }, "Caricamento…"));
   const seg = h("div", { class: "seg", role: "tablist" }, schede.map(([k, n]) => h("button", { type: "button", role: "tab", "aria-selected": att === k ? "true" : "false", onclick: () => apriGuida(k) }, n)));
-  d.replaceChildren(h("form", { method: "dialog" }, h("h2", { id: "dGuidaT" }, "Guida"), seg, corpo,
+  d.replaceChildren(h("form", { method: "dialog", onkeydown: invioNonChiude }, h("h2", { id: "dGuidaT" }, "Guida"), seg, corpo,
     h("div", { class: "wiz-az" }, h("span", { class: "sp" }), h("button", { class: "pil" }, "Chiudi"))));
   if (!d.open) d.showModal();
   try {
@@ -2452,7 +2476,7 @@ async function calcCreaPratica() {
 function apriCalcolatrice() {
   let d = $("#dCalc");
   if (!d) {
-    d = h("dialog", { id: "dCalc", class: "calc", "aria-labelledby": "dCalcT" }, h("form", { method: "dialog" },
+    d = h("dialog", { id: "dCalc", class: "calc", "aria-labelledby": "dCalcT" }, h("form", { method: "dialog", onkeydown: invioNonChiude },
       h("h2", { id: "dCalcT" }, "Calcolatrice rapida"),
       h("p", { class: "mut" }, "Stima delle imposte di successione con i motori di calcolo del programma. Non crea e non salva pratiche."),
       h("div", { class: "calc-corpo" }, h("div", { class: "calc-dati", id: "calcDati" }), h("div", { class: "calc-ris", id: "calcRis", "aria-live": "polite" })),
