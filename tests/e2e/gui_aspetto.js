@@ -36,7 +36,10 @@ const { chromium } = require('playwright');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.tema), 'scuro');
     await page.locator('#bImpost').click();
     await page.getByLabel('Tema', { exact: true }).selectOption('seppia');
+    // modifica non salvata: «Chiudi» chiede conferma (review 07/11/2026 sera); si conferma di scartarla
+    let domandaImp = ''; page.once('dialog', d => { domandaImp = d.message(); d.accept(); });
     await page.locator('#iChiudi').click();
+    assert.match(domandaImp, /modifiche non salvate/);
     await page.waitForFunction(() => document.documentElement.dataset.tema === 'scuro');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.tema), 'scuro');
     // Salvataggio tema chiaro, taglia normale per la verifica dei campi.

@@ -340,7 +340,6 @@ async function caricaPratiche() {
   for (const p of S.pratiche) ul.append(h("li", {}, h("button", { title: p.titolo + " (rev. " + p.revisione + ")", "aria-current": S.P && S.P.pratica_id === p.id ? "true" : "false", onclick: () => apri(p.id) }, h("span", { class: "tit-pratica" }, p.titolo))));
 }
 async function apri(id, sel) {
-  try { localStorage.setItem('successioni.ultima', id); } catch (_) { /* facoltativo */ }
   if (S.writeBusy) { msg("Salvataggio in corso: attendi prima di cambiare pratica.", "e"); return; }
   if (nMod() && !confirm("Ci sono modifiche non salvate: continuare senza salvarle?")) return;
   S.gen++;   // invalida le risposte asincrone (es. codice fiscale) richieste per la pratica precedente
@@ -348,6 +347,7 @@ async function apri(id, sel) {
   S.fornitoreDirty = {};
   try { await ricarica(id); }
   catch (e) { msg("Pratica non aperta. " + e.message, "e"); return; }
+  try { localStorage.setItem('successioni.ultima', id); } catch (_) { /* facoltativo */ }   // solo dopo conferma e apertura riuscita
   S.sel = sel || "AN"; $('#vista').scrollTop = 0; render(); await caricaPratiche();
 }
 async function ricarica(id) {
@@ -445,20 +445,22 @@ function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
   const err = path ? rilievi().filter(r => r.percorso === path) : [];
   let el;
   if (kind.startsWith("enum:")) {
-    el = h("select", { "aria-label": campo }, h("option", { value: "" }, ""), kind.slice(5).split("|").map(o => h("option", { value: o }, nomeVal(coll, campo, o))));
+    el = h("select", { name: campo, "aria-label": lbl(coll, campo) }, h("option", { value: "" }, ""), kind.slice(5).split("|").map(o => h("option", { value: o }, nomeVal(coll, campo, o))));
     el.value = val || "";
   } else if (kind.startsWith("ref:")) {
     const rc = kind.slice(4);
-    el = h("select", { "aria-label": campo }, h("option", { value: "" }, ""), (S.P.dati[rc] || []).map(e => h("option", { value: e.id }, etichetta(rc, e))));
+    el = h("select", { name: campo, "aria-label": lbl(coll, campo) }, h("option", { value: "" }, ""), (S.P.dati[rc] || []).map(e => h("option", { value: e.id }, etichetta(rc, e))));
     el.value = val || "";
   } else {
     const lista = listaSuggerimenti(coll + "." + campo);
-    el = h("input", { "aria-label": campo, autocomplete: "off", list: lista, maxlength: MAX_LUNGHEZZA[coll + "." + campo], class: kind === "cf" ? "mono cf" : (kind === "importo" || kind === "quota" ? "num" : ""), placeholder: kind === "quota" ? "1/2" : kind === "data" ? "GG/MM/AAAA" : "" });
+    el = h("input", { name: campo, "aria-label": lbl(coll, campo), autocomplete: "off", list: lista, maxlength: MAX_LUNGHEZZA[coll + "." + campo], class: kind === "cf" ? "mono cf" : (kind === "importo" || kind === "quota" ? "num" : ""), placeholder: kind === "quota" ? "1/2" : kind === "data" ? "GG/MM/AAAA" : "" });
     el.value = mostra(kind, val);
   }
   if (path) el.dataset.path = path;
   if (err.length) el.classList.add("bad");
-  const f = () => onMod(campo, leggi(kind, el.value));
+  // «change» puo' arrivare quando il campo con il focus viene tolto da un nuovo disegno (dopo Salva o cambiando pratica): il valore
+  // e' gia' arrivato con «input», e la riga potrebbe non essere piu' quella mostrata. Un campo staccato dal documento non scrive.
+  const f = () => { if (el.isConnected) onMod(campo, leggi(kind, el.value)); };
   el.addEventListener("input", f); el.addEventListener("change", f);
   return h("div", {}, el, err.map(r => h("div", { class: "e" }, r.messaggio)));
 }
@@ -615,41 +617,54 @@ async function impostaQuadro(id, on) {
   await salvaOps([{ op: "set", sezione: "opzioni", campi: { quadri_attivi: [...cur] } }]);
 }
 
+// colonne fisse: la prima (riconoscimento) a sinistra, valore/importo (ultima) a destra (report grafica 07/11/2026, punto 1)
+function classeColonna(q) {
+  const ultima = q.colonne.length - 1, fissaDx = ["valore", "importo"].includes(q.colonne[ultima]);
+  return (c, j) => [["quota", "importo", "rendita", "valore", "reddito_dominicale"].includes(c) ? "n" : "",
+    j === 0 ? "fissa-sx" : "", j === ultima && fissaDx ? "fissa-dx" : ""].filter(Boolean).join(" ");
+}
 function renderTabella(main, q) {
   const campi = S.schema.collezioni[q.coll];
   const righe = righeQuadro(q);
   const t = h("table", { role: "grid", "aria-label": q.titolo });
-  // colonne fisse: la prima (riconoscimento) a sinistra, valore/importo (ultima) a destra (report grafica 07/11/2026, punto 1)
-  const ultima = q.colonne.length - 1, fissaDx = ["valore", "importo"].includes(q.colonne[ultima]);
-  const clsCol = (c, j) => [["quota", "importo", "rendita", "valore", "reddito_dominicale"].includes(c) ? "n" : "",
-    j === 0 ? "fissa-sx" : "", j === ultima && fissaDx ? "fissa-dx" : ""].filter(Boolean).join(" ");
+  const clsCol = classeColonna(q);
   t.append(h("thead", {}, h("tr", {}, q.colonne.map((c, j) => h("th", { class: clsCol(c, j) }, lbl(q.coll, c, q.id))))));
   const tb = h("tbody"); t.append(tb);
-  righe.forEach((r, i) => {
-    const id = r.e && r.e.id; const base = id ? q.coll + "[" + id + "]" : null;
-    const rilRiga = base ? rilievi().filter(x => x.percorso === base || x.percorso.startsWith(base + ".")) : [];
-    const tr = h("tr", { tabindex: (S.riga && righe.some(x => x.key === S.riga) ? S.riga === r.key : i === 0) ? "0" : "-1", "aria-selected": S.riga === r.key ? "true" : "false", class: (r.nuova || S.dirty.has(r.key)) ? "mod" : "", "data-key": r.key,
-      onclick: () => selezionaRiga(r.key, "riga"),
-      onkeydown: ev => tastiTabella(ev, tr, r.key) });
-    q.colonne.forEach((c, j) => {
-      const kind = campi[c]; const v = valRiga(r, c);
-      let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v, true);
-      if (c === "grado_parentela" && typeof v === "string" && v) {   // il grado si legge per nome (menu dei codici), non come codice
-        const sdg = struttDi(q.coll, c, null), og = sdg && sdg.opzioni.find(x => x.valore === riconosciVoce(sdg, v));
-        if (og) txt = og.etichetta;
-      }
-      if (kind.startsWith("ref:") && v) { const e = (S.P.dati[kind.slice(4)] || []).find(x => x.id === v); if (e) txt = etichetta(kind.slice(4), e); }
-      if (q.coll === "documenti_ref" && c === "tipo_eg" && v) { const sd = struttDi(q.coll, c, null), o = sd && sd.opzioni.find(x => x.valore === v); if (o) txt = o.etichetta; }
-      if (q.coll === "documenti_ref" && c === "allegato_id" && v) txt = descriviFileEG(v);
-      const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
-      const td = h("td", { class: [clsCol(c, j), kind === "cf" ? "cf" : ""].filter(Boolean).join(" "), title: txt, "data-allegato": q.coll === "documenti_ref" && c === "allegato_id" ? (v || "") : null }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt,
-        j === 0 && q.coll === "persone" && id && id === presentatoreId() ? h("span", { class: "pz ok badge-dich", title: "Presentatore della dichiarazione" }, "dichiarante") : null);   // voce 33
-      tr.append(td);
-    });
-    tb.append(tr);
-  });
+  righe.forEach((r, i) => tb.append(rigaTabella(q, r, (S.riga && righe.some(x => x.key === S.riga) ? S.riga === r.key : i === 0))));
   if (!righe.length) tb.append(h("tr", {}, h("td", { colspan: q.colonne.length, class: "mut" }, "Nessuna riga. Usa «Aggiungi riga».")));
-  // riga dei totali per gli importi (report grafica 07/11/2026, punto 4): somma dei valori indicati, senza i dati non noti
+  const piede = piedeTabella(q, righe); if (piede) t.append(piede);
+  main.append(h("div", { class: "tab" }, t));
+  main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, "Aggiungi riga"),
+
+    h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
+}
+function rigaTabella(q, r, focalizzabile) {
+  const campi = S.schema.collezioni[q.coll], clsCol = classeColonna(q);
+  const id = r.e && r.e.id; const base = id ? q.coll + "[" + id + "]" : null;
+  const rilRiga = base ? rilievi().filter(x => x.percorso === base || x.percorso.startsWith(base + ".")) : [];
+  const tr = h("tr", { tabindex: focalizzabile ? "0" : "-1", "aria-selected": S.riga === r.key ? "true" : "false", class: (r.nuova || S.dirty.has(r.key)) ? "mod" : "", "data-key": r.key,
+    onclick: () => selezionaRiga(r.key, "riga"),
+    onkeydown: ev => tastiTabella(ev, tr, r.key) });
+  q.colonne.forEach((c, j) => {
+    const kind = campi[c]; const v = valRiga(r, c);
+    let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v, true);
+    if (c === "grado_parentela" && typeof v === "string" && v) {   // il grado si legge per nome (menu dei codici), non come codice
+      const sdg = struttDi(q.coll, c, null), og = sdg && sdg.opzioni.find(x => x.valore === riconosciVoce(sdg, v));
+      if (og) txt = og.etichetta;
+    }
+    if (kind.startsWith("ref:") && v) { const e = (S.P.dati[kind.slice(4)] || []).find(x => x.id === v); if (e) txt = etichetta(kind.slice(4), e); }
+    if (q.coll === "documenti_ref" && c === "tipo_eg" && v) { const sd = struttDi(q.coll, c, null), o = sd && sd.opzioni.find(x => x.valore === v); if (o) txt = o.etichetta; }
+    if (q.coll === "documenti_ref" && c === "allegato_id" && v) txt = descriviFileEG(v);
+    const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
+    const td = h("td", { class: [clsCol(c, j), kind === "cf" ? "cf" : ""].filter(Boolean).join(" "), title: txt, "data-allegato": q.coll === "documenti_ref" && c === "allegato_id" ? (v || "") : null }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt,
+      j === 0 && q.coll === "persone" && id && id === presentatoreId() ? h("span", { class: "pz ok badge-dich", title: "Presentatore della dichiarazione" }, "dichiarante") : null);   // voce 33
+    tr.append(td);
+  });
+  return tr;
+}
+// riga dei totali per gli importi (report grafica 07/11/2026, punto 4): somma dei valori indicati, senza i dati non noti
+function piedeTabella(q, righe) {
+  const campi = S.schema.collezioni[q.coll], clsCol = classeColonna(q);
   const daSommare = q.colonne.filter(c => campi[c] === "importo" && ["valore", "importo"].includes(c));
   if (righe.length > 1 && daSommare.length) {
     const tot = {}, mancano = {};
@@ -659,13 +674,22 @@ function renderTabella(main, q) {
         if (m) cent += (m[1] ? -1 : 1) * (Number(m[2]) * 100 + Number((m[3] || "").padEnd(2, "0"))); else nonNoti++; }
       tot[c] = cent; mancano[c] = nonNoti;
     }
-    t.append(h("tfoot", {}, h("tr", {}, q.colonne.map((c, j) => h("td", { class: clsCol(c, j) },
-      j === 0 ? "Totale (" + righe.length + " righe)" : c in tot ? (tot[c] / 100).toLocaleString("it-IT", { minimumFractionDigits: tot[c] % 100 ? 2 : 0, maximumFractionDigits: 2 }) + (mancano[c] ? " + " + mancano[c] + " da indicare" : "") : "")))));
+    return h("tfoot", {}, h("tr", {}, q.colonne.map((c, j) => h("td", { class: clsCol(c, j) },
+      j === 0 ? "Totale (" + righe.length + " righe)" : c in tot ? (tot[c] / 100).toLocaleString("it-IT", { minimumFractionDigits: tot[c] % 100 ? 2 : 0, maximumFractionDigits: 2 }) + (mancano[c] ? " + " + mancano[c] + " da indicare" : "") : ""))));
   }
-  main.append(h("div", { class: "tab" }, t));
-  main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, "Aggiungi riga"),
-
-    h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
+  return null;
+}
+/* Modifica di un campo nel pannello: si ridisegnano solo la riga della tabella e i totali, non tutta la vista (prima ~20-46 ms
+   a tasto con 150 righe). Se la riga non c'e' (cambia quadro, vista diversa) si ridisegna la vista intera. */
+function aggiornaRigaVista(key) {
+  const q = quadro(), vecchia = rigaDaFocalizzare(key);
+  const r = q && q.coll && vecchia ? righeQuadro(q).find(x => x.key === key) : null;
+  if (!r) return renderVista();
+  const nuova = rigaTabella(q, r, vecchia.tabIndex === 0);
+  const aveFocus = document.activeElement === vecchia;
+  vecchia.replaceWith(nuova); if (aveFocus) nuova.focus({ preventScroll: true });
+  const t = nuova.closest("table"), piede = piedeTabella(q, righeQuadro(q)), vecchio = t.querySelector("tfoot");
+  if (vecchio && piede) vecchio.replaceWith(piede); else if (vecchio) vecchio.remove(); else if (piede) t.append(piede);
 }
 /* Scheda dell'immobile a gruppi (report grafica 07/11/2026, punto 3): i campi collegati stanno vicini, su piu' colonne, e
    quelli meno usati restano ripiegati se vuoti. I campi non elencati finiscono in «Altri dati». */
@@ -706,9 +730,19 @@ function scriviValore(id, valore) {
   const key = "e:beni:" + id;   // stessa chiave di righeQuadro: la modifica resta da salvare come le altre
   const d = S.dirty.get(key) || { coll: "beni", id, campi: {} }; d.campi.valore = valore; S.dirty.set(key, d);
 }
+/* La risposta vale per la revisione salvata: si chiede di nuovo solo quando la pratica cambia (salvataggio o altra pratica). */
+const VALORI_CAT = { chiave: null, promessa: null };
+function valoriCatastali() {
+  const chiave = S.P.pratica_id + "@" + S.P.revisione;
+  if (VALORI_CAT.chiave !== chiave) {
+    VALORI_CAT.chiave = chiave;
+    VALORI_CAT.promessa = api("/api/pratiche/" + S.P.pratica_id + "/valori-catastali").catch(e => { if (VALORI_CAT.chiave === chiave) VALORI_CAT.chiave = null; throw e; });
+  }
+  return VALORI_CAT.promessa;
+}
 function boxValoreCatastale(q, r) {
   const box = h("div", { class: "vc", "aria-live": "polite" }, h("h4", {}, "Valore catastale"), h("p", { class: "mut" }, "Calcolo in corso…"));
-  api("/api/pratiche/" + S.P.pratica_id + "/valori-catastali").then(res => {
+  valoriCatastali().then(res => {
     const v = (res.beni || []).find(x => x.bene_id === r.e.id);
     box.replaceChildren(h("h4", {}, "Valore catastale"));
     if (!v) return box.append(h("p", { class: "mut" }, "Non disponibile per questa riga."));
@@ -725,7 +759,7 @@ function boxValoreCatastale(q, r) {
   return box;
 }
 async function ricalcolaValori(q) {
-  let res; try { res = await api("/api/pratiche/" + S.P.pratica_id + "/valori-catastali"); } catch (e) { return msg(e.message, "e"); }
+  let res; try { res = await valoriCatastali(); } catch (e) { return msg(e.message, "e"); }
   const ids = new Set(righeQuadro(q).filter(x => x.e).map(x => x.e.id));
   const da = (res.beni || []).filter(v => ids.has(v.bene_id) && v.calcolabile && (v.dichiarato === null || v.inferiore));
   const non = (res.beni || []).filter(v => ids.has(v.bene_id) && !v.calcolabile).length;
@@ -768,8 +802,18 @@ function menuOperazioni(q) {
   if (q.coll === "beni" || q.coll === "devoluzioni") voci.push(["Brogliaccio da stampare", "", () => window.open("/api/pratiche/" + S.P.pratica_id + "/brogliaccio", "_blank")],
     ["Brogliaccio in CSV", "", () => { const a = h("a", { href: "/api/pratiche/" + S.P.pratica_id + "/brogliaccio.csv", download: "" }); document.body.append(a); a.click(); a.remove(); }]);
   voci.push(["Elimina la riga selezionata", "", () => eliminaRigaSelezionata(q)]);
-  const d = h("details", { class: "operazioni" }, h("summary", { class: "gh" }, "Operazioni"));
-  d.append(h("div", { class: "menu-op", role: "menu" }, voci.map(([t, k, f]) => h("button", { role: "menuitem", onclick: () => { d.open = false; f(); } },
+  const d = h("details", { class: "operazioni" }, h("summary", { class: "gh", "aria-haspopup": "menu" }, "Operazioni"));
+  const voceMenu = n => { const v = [...d.querySelectorAll("[role=menuitem]")]; if (v.length) v[(n + v.length) % v.length].focus(); };
+  d.addEventListener("toggle", () => { if (d.open && document.activeElement === d.querySelector("summary")) voceMenu(0); });
+  d.addEventListener("keydown", ev => {
+    const v = [...d.querySelectorAll("[role=menuitem]")], i = v.indexOf(document.activeElement);
+    if (ev.target.tagName === "SUMMARY" && ev.key === "ArrowDown") { ev.preventDefault(); d.open = true; voceMenu(0); return; }
+    if (i < 0) return;
+    const n = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: v.length - 1 }[ev.key];
+    if (n !== undefined) { ev.preventDefault(); voceMenu(n); }
+    else if (ev.key === "Tab") d.open = false;
+  });
+  d.append(h("div", { class: "menu-op", role: "menu", "aria-label": "Operazioni del quadro " + q.id }, voci.map(([t, k, f]) => h("button", { role: "menuitem", tabindex: "-1", onclick: () => { d.open = false; f(); } },
     h("span", {}, t), k ? h("kbd", {}, k) : null))));
   return d;
 }
@@ -970,15 +1014,30 @@ function selettoreStato(q) {
   return s;
 }
 /* ---------- ispettore ---------- */
+/* Schede (role=tab): una sola tappa Tab sulla scheda attiva, frecce sinistra/destra, Home e Fine per cambiare scheda. Il
+   contenitore viene ridisegnato al cambio: dopo il clic il focus torna sulla scheda attiva del nuovo elenco (dove()). */
+function schedeTastiera(lista, pannelloId, dove) {
+  const schede = [...lista.querySelectorAll("[role=tab]")];
+  for (const s of schede) { s.tabIndex = s.getAttribute("aria-selected") === "true" ? 0 : -1; s.setAttribute("aria-controls", pannelloId); }
+  lista.addEventListener("keydown", ev => {
+    const i = schede.indexOf(document.activeElement); if (i < 0) return;
+    const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: schede.length - 1 }[ev.key]; if (n === undefined) return;
+    ev.preventDefault(); schede[(n + schede.length) % schede.length].click();
+    setTimeout(() => { const l = dove(); const s = l && l.querySelector("[role=tab][aria-selected=true]"); if (s) s.focus(); }, 0);
+  });
+}
 function renderIns() {
-  const ins = $("#ins"); ins.replaceChildren();
+  let ins = $("#ins"); ins.replaceChildren();
   if (!S.P) return;
   if (S.tab === 'file') { vaiFile(); return; } // compatibilita' con collegamenti precedenti
   if (S.sel === 'FILE') return;
   const nr = rilievi().length;
-  const seg = h("div", { class: "seg", role: "tablist" }, [["dati", "Dati"], ["controlli", "Controlli" + (nr ? " (" + nr + ")" : "")], ["cronologia", "Cronologia"]].map(([k, n]) =>
-    h("button", { role: "tab", "aria-selected": S.tab === k ? "true" : "false", onclick: () => { S.tab = k; render(); } }, n)));
-  ins.append(seg);
+  const seg = h("div", { class: "seg", role: "tablist", "aria-label": "Schede del pannello" }, [["dati", "Dati"], ["controlli", "Controlli" + (nr ? " (" + nr + ")" : "")], ["cronologia", "Cronologia"]].map(([k, n]) =>
+    h("button", { role: "tab", id: "insTab_" + k, "aria-selected": S.tab === k ? "true" : "false", onclick: () => { S.tab = k; render(); } }, n)));
+  const pannello = h("div", { id: "insPannello", role: "tabpanel", "aria-labelledby": "insTab_" + S.tab });
+  schedeTastiera(seg, "insPannello", () => $("#ins .seg"));
+  ins.append(seg, pannello);
+  ins = pannello;
   if (S.tab === "dati" && S.riga) ins.append(h("button", { class: "lk solo-mobile", onclick: tornaTabella }, "↑ Torna alla tabella"));
   if (S.tab === "dati") insDati(ins); else if (S.tab === "controlli") insControlli(ins); else if (S.tab === "file") insFile(ins); else insCronologia(ins);
 }
@@ -988,7 +1047,7 @@ function rigaSelezionata() {
   return righeQuadro(q).find(r => r.key === S.riga) || null;
 }
 function insDati(ins) {
-  const q = quadro(); const r = rigaSelezionata();
+  const q = quadro(); const r = rigaSelezionata(), gen = S.gen;   // gen: un evento tardivo di un campo non scrive in un'altra pratica
   if (!q || !q.coll) { ins.append(h("p", { class: "mut" }, q && q.vista === "frontespizio" ? "I dati del frontespizio si modificano nelle schede al centro." : "Questo quadro non ha righe da modificare.")); return; }
   if (!r) { ins.append(h("p", { class: "mut" }, "Seleziona una riga della tabella oppure aggiungine una.")); return; }
   const campi = S.schema.collezioni[q.coll]; const id = r.e ? r.e.id : r.nuova.id;   // anche le righe nuove hanno data-path (per evidenziare l'errore al salvataggio)
@@ -1017,9 +1076,16 @@ function insDati(ins) {
       : q.coll === "devoluzioni" ? ((S.P.dati.beni || []).find(b => b.id === valRiga(r, "bene_id")) || {}).tipo : null;
     const sd = struttDi(q.coll, c, tipoBene);
     const modificaCampo = (campo, v) => {
+      if (S.gen !== gen) return;
       const scrivi = (c2, x) => {
         if (r.nuova) r.nuova.campi[c2] = x;
-        else { const d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} }; d.campi[c2] = x; S.dirty.set(r.key, d); }
+        else {
+          // valore uguale a quello salvato (anche l'evento «change» che arriva quando il pannello si ridisegna dopo «Salva»):
+          // non e' una modifica, si toglie invece di lasciare «1 modifica non salvata»
+          const salvato = (S.P.dati[q.coll] || []).find(e => e.id === id), d = S.dirty.get(r.key) || { coll: q.coll, id, campi: {} };
+          if (salvato && uguale(salvato[c2] ?? null, x ?? null)) { delete d.campi[c2]; if (!Object.keys(d.campi).length) S.dirty.delete(r.key); }
+          else { d.campi[c2] = x; S.dirty.set(r.key, d); }
+        }
       };
       const gradoPrima = campo === "grado_parentela" ? String(valRiga(r, "grado_parentela") || "") : "";
       scrivi(campo, v);
@@ -1029,7 +1095,7 @@ function insDati(ins) {
         const rel = String(valRiga(r, "relazione_con_defunto") || "").trim();
         if (!rel || rel === gradoPrima) scrivi("relazione_con_defunto", v || null);
       }
-      renderVista(); aggiornaBottoni(); renderSb();
+      aggiornaRigaVista(r.key); aggiornaBottoni(); renderSb();
       if ((q.coll === "beni" && (campo === "tipo" || campo === "provincia")) || (q.coll === "devoluzioni" && campo === "bene_id")) renderIns();   // cambiano i diritti o i campi esteri
       if (q.coll === "persone" && campo === "codice_fiscale")
         suggerisciDaCF(v, r.e ? r.e.ruolo : (r.nuova && r.nuova.campi.ruolo), c2 => valRiga(r, c2), scrivi, () => String(valRiga(r, "codice_fiscale") || "").trim().toUpperCase() === v.trim().toUpperCase()).then(res => {
@@ -1410,13 +1476,13 @@ async function renderRicevute(ins, pid, tid) {
   const aggiorna = () => esito.replaceChildren(h('option', { value: '' }, '(senza esito)'), ...tipi[tipo.value].esiti.map(k => h('option', { value: k }, k)));
   tipo.addEventListener('change', aggiorna); aggiorna();
   const file = h('input', { type: 'file', 'aria-label': 'Documento ricevuto' });
-  ins.append(tipo, esito, file, h('button', { onclick: async () => {
+  ins.append(tipo, esito, file, h('button', { disabled: OCCUPATI.has('ricevuta'), onclick: occupato('ricevuta', async () => {
     const f = file.files[0]; if (!f) return msg('Scegli il documento ricevuto.', 'e');
     try {
       await api(url + '?' + new URLSearchParams({ tipo: tipo.value, esito: esito.value, nome: f.name }), { method: 'POST', body: await f.arrayBuffer() });
       msg('Ricevuta originale acquisita e associata al protocollo.', 'o'); renderVista();
     } catch (e) { msg(e.message, 'e'); }
-  } }, 'Acquisisci ricevuta'));
+  }) }, 'Acquisisci ricevuta'));
   for (const doc of stato.documenti) ins.append(h('p', { class: 'mut' }, h('a', { href: url + '/file/' + doc.job_id, download: '' }, doc.nome), ' · ' + doc.tipo + ' · ' + (doc.esito || '') + ' · SHA-256 ' + doc.sha256));
 }
 function vaiA(r) {
@@ -1812,8 +1878,8 @@ async function renderAllegati(main) {
   const daFare = [];
   for (const r of refs) {
     const x = a.find(y => y.id === r.allegato_id), st = statoFile(x);
-    if (st.convertibile) daFare.push(h("li", {}, (x.nome) + " — da convertire ", h("button", { class: "gh", onclick: async () => { try { const z = await convertiAllegato(x.id); await ricarica(); render(); msg("Convertito in PDF/A" + (z.originale_rimosso ? ": resta solo il PDF/A." : ". " + (z.motivo_originale_conservato || "")), z.originale_rimosso ? "o" : "e"); } catch (e) { msg(e.message, "e"); } } }, "Converti in PDF/A")));
-    if (x && x.bytes > 5000000) daFare.push(h("li", {}, x.nome + " supera 5 MB ", h("button", { class: "gh", onclick: async () => { try { const z = await api("/api/allegati/" + x.id + "/suddividi", { method: "POST" }); msg("Ridotto o suddiviso in " + ((z.parti || []).length || 1) + " file: collega le parti ai righi EG.", "o"); renderVista(); } catch (e) { msg(e.message, "e"); } } }, "Riduci o suddividi")));
+    if (st.convertibile) daFare.push(h("li", {}, (x.nome) + " — da convertire ", h("button", { class: "gh", disabled: OCCUPATI.has("converti_" + x.id), onclick: occupato("converti_" + x.id, async () => { try { const z = await convertiAllegato(x.id); await ricarica(); render(); msg("Convertito in PDF/A" + (z.originale_rimosso ? ": resta solo il PDF/A." : ". " + (z.motivo_originale_conservato || "")), z.originale_rimosso ? "o" : "e"); } catch (e) { msg(e.message, "e"); } }) }, "Converti in PDF/A")));
+    if (x && x.bytes > 5000000) daFare.push(h("li", {}, x.nome + " supera 5 MB ", h("button", { class: "gh", disabled: OCCUPATI.has("suddividi_" + x.id), onclick: occupato("suddividi_" + x.id, async () => { try { const z = await api("/api/allegati/" + x.id + "/suddividi", { method: "POST" }); msg("Ridotto o suddiviso in " + ((z.parti || []).length || 1) + " file: collega le parti ai righi EG.", "o"); renderVista(); } catch (e) { msg(e.message, "e"); } }) }, "Riduci o suddividi")));
   }
   if (daFare.length) main.append(h("section", { class: "grp" }, h("h2", {}, "Da completare"), h("ul", { class: "elenco-azioni" }, daFare)));
   main.append(sez);
@@ -2175,9 +2241,18 @@ function impRender(s) {
     h("div", { class: "mut testo-m" }, (v.a_posto ? "✓ " : "✗ ") + v.dettaglio + (v.valore ? " · origine: " + v.origine : "")),
     h("div", { class: "mut testo-m" }, v.nota))));
 }
+/* Impronta di cio' che si puo' modificare nelle Impostazioni: se alla chiusura e' diversa, ci sono modifiche non salvate. */
+function impFirma() {
+  const voci = (IMP.voci || []).filter(v => v.modificabile).map(v => { const el = document.getElementById("imp_" + v.chiave); return el ? el.value.trim() : ""; });
+  return JSON.stringify([IMP.aspetto, IMP.profilo, IMP.preferenze, voci]);
+}
+function impChiudi() {
+  if (IMP.firma && impFirma() !== IMP.firma && !confirm("Ci sono modifiche non salvate nelle Impostazioni. Chiudere senza salvarle?")) return false;
+  $("#imp").close(); return true;
+}
 async function impApri() {
   $("#impErr").textContent = "";
-  try { impRender(await api("/api/impostazioni")); $("#imp").showModal(); }
+  try { impRender(await api("/api/impostazioni")); IMP.firma = impFirma(); $("#imp").showModal(); }
   catch (e) { msg("Impostazioni non disponibili: " + e.message, "e"); }
 }
 async function impSalva() {
@@ -2188,7 +2263,7 @@ async function impSalva() {
     const s = await post("/api/impostazioni", { modifiche, interfaccia: IMP.aspetto, profilo, preferenze: IMP.preferenze });
     STUDIO.profilo = s.profilo || {};
     memorizzaAspetto(s.interfaccia);
-    impRender(s); $("#impErr").textContent = "";
+    impRender(s); IMP.firma = impFirma(); $("#impErr").textContent = "";
     msg("Impostazioni salvate." + (s.avvisi.length ? " " + s.avvisi.join(" ") : ""), "o");
     try { mostraInfo(await api("/api/info")); } catch (_) { /* riga informativa: aggiornata al prossimo caricamento */ }
   } catch (e) { $("#impErr").textContent = e.message; }
@@ -2201,7 +2276,8 @@ $("#impIndice").addEventListener("click", ev => {
   const dest = $(a.getAttribute("href")); if (dest) dest.scrollIntoView({ block: "start" });
   for (const x of $("#impIndice").querySelectorAll("a")) x.setAttribute("aria-current", String(x === a));
 });
-$("#iChiudi").onclick = () => $("#imp").close();
+$("#iChiudi").onclick = impChiudi;
+$("#imp").addEventListener("cancel", ev => { ev.preventDefault(); impChiudi(); });   // Esc: stessa conferma di «Chiudi»
 $("#iSalva").onclick = impSalva;
 $('#imp').addEventListener('close', () => applicaAspetto(preferenze));
 
@@ -2293,6 +2369,18 @@ function mostraScorciatoie() {
     h("div", { class: "wiz-az" }, h("span", { class: "sp" }), h("button", { class: "pil" }, "Chiudi")))); document.body.append(d); }
   d.showModal();
 }
+function vaiAlQuadro() {
+  const inp = h("input", { id: "vaiSigla", autocomplete: "off", list: "vaiQuadri", placeholder: "es. EC", class: "mono", maxlength: "4" });
+  const dl = h("datalist", { id: "vaiQuadri" }, S.Q.quadri.map(x => h("option", { value: x.id }, x.titolo)));
+  dialogo("dVai", "Vai al quadro", h("div", { class: "campo" }, h("label", { for: "vaiSigla" }, "Sigla del quadro"), inp, dl), "Vai", () => {
+    const sigla = inp.value.trim().toUpperCase();
+    if (!sigla) return "Scrivi la sigla del quadro, per esempio EC.";
+    if (!S.Q.quadri.some(x => x.id === sigla)) return "Quadro " + sigla + " non trovato.";
+    setTimeout(() => scegliQuadro(sigla), 0);
+    return null;
+  });
+  inp.focus();
+}
 function quadriNavigabili() { return S.Q ? S.Q.quadri.filter(x => x.gruppo !== "lavoro" || x.id === "DV") : []; }
 document.addEventListener("keydown", ev => {
   const inCampo = ev.target.closest && ev.target.closest("input, select, textarea, [contenteditable]");
@@ -2308,9 +2396,7 @@ document.addEventListener("keydown", ev => {
     ev.preventDefault(); scegliQuadro(l[(Math.max(0, i) + (ev.key === "PageDown" ? 1 : l.length - 1)) % l.length].id); return;
   }
   if ((ev.ctrlKey || ev.metaKey) && (ev.key === "g" || ev.key === "G")) {
-    ev.preventDefault();
-    const sigla = (prompt("Vai al quadro (sigla, es. EC):") || "").trim().toUpperCase();
-    if (sigla && S.Q.quadri.some(x => x.id === sigla)) scegliQuadro(sigla); else if (sigla) msg("Quadro " + sigla + " non trovato.", "e");
+    ev.preventDefault(); vaiAlQuadro();
   }
 });
 window.addEventListener("beforeunload", ev => { if (nMod()) { ev.preventDefault(); ev.returnValue = ""; } });
@@ -2333,8 +2419,9 @@ async function apriGuida(scheda) {
   if (!d) { d = h("dialog", { id: "dGuida", class: "guida", "aria-labelledby": "dGuidaT" }); document.body.append(d); }
   const schede = [["istruzioni", "Istruzioni ufficiali"], ["uso", "Uso del programma"], ["info", "Informazioni"]];
   const att = scheda || "istruzioni";
-  const corpo = h("div", { class: "guida-corpo" }, h("p", { class: "mut" }, "Caricamento…"));
-  const seg = h("div", { class: "seg", role: "tablist" }, schede.map(([k, n]) => h("button", { type: "button", role: "tab", "aria-selected": att === k ? "true" : "false", onclick: () => apriGuida(k) }, n)));
+  const corpo = h("div", { class: "guida-corpo", id: "guidaPannello", role: "tabpanel", "aria-labelledby": "guidaTab_" + att }, h("p", { class: "mut" }, "Caricamento…"));
+  const seg = h("div", { class: "seg", role: "tablist", "aria-label": "Sezioni della guida" }, schede.map(([k, n]) => h("button", { type: "button", role: "tab", id: "guidaTab_" + k, "aria-selected": att === k ? "true" : "false", onclick: () => apriGuida(k) }, n)));
+  schedeTastiera(seg, "guidaPannello", () => $("#dGuida .seg"));
   d.replaceChildren(h("form", { method: "dialog", onkeydown: invioNonChiude }, h("h2", { id: "dGuidaT" }, "Guida"), seg, corpo,
     h("div", { class: "wiz-az" }, h("span", { class: "sp" }), h("button", { class: "pil" }, "Chiudi"))));
   if (!d.open) d.showModal();
