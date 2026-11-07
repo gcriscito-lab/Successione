@@ -5,7 +5,9 @@
   Solo comportamento osservato: nessun codice, testo o tabella di DEAS (licenza proprietaria).
 - Lavoro su un ramo nuovo creato da `50117d6`, in una copia separata (`.claude/worktrees/miglioramenti-replica`): il ramo
   `claude/successioni-dichiarazioni-app-fhcwbe` e l'archivio reale non sono stati toccati. Nel frattempo il ramo principale e'
-  avanzato (`886ea2e`): prima dell'unione serve allineare.
+  avanzato (`886ea2e`). Unito nel ramo principale il 07/11/2026 su richiesta del committente (commit `9c1aff6`; unico
+  conflitto l'elenco delle prove in `tests/e2e/esegui_tutti.py`, tenute entrambe). Dopo l'unione: 1921 passati e 1 saltato,
+  prove interfaccia 10/10 (con `gui_albero`), XML di prova ancora valido e identico.
 - Fatte (commit `d490387`, `f1842cb`):
   - 19 rimedio («Come risolvere») per ogni rilievo e avviso di `verifica_pratica`/`stato_quadri` (`rimedi.py`);
   - 21 avvisi di qualita' non bloccanti (`qualita.py`): spazi doppi, CF duplicato, carattere di controllo errato, CF incoerente
