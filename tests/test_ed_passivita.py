@@ -77,6 +77,7 @@ def doc_quote_valore(es, n_righe, ns):
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or '')
 @pytest.mark.parametrize('n', [4, 5, 7])
+@pytest.mark.java
 def test_controllo_ufficiale_accetta_la_continuazione_ed(n, tmp_path):
     d, _ = caso_ed(n)
     es = esporta(d)
@@ -108,6 +109,7 @@ def test_ripartizione_per_stirpi_oltre_tre_soggetti():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or '')
+@pytest.mark.java
 def test_controllo_ufficiale_stirpi_con_continuazione(tmp_path):
     es = esporta(caso_stirpi_quattro()[0])
     stato, dgn, wri, _ = _esegui(es.xml, tmp_path)
@@ -158,6 +160,7 @@ def test_tipi_di_passivita_esportabili(tipo):
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or '')
 @pytest.mark.parametrize('tipo', ['2', '4', '5', '6', '7', '8', '9', '10', '11', '12'])
+@pytest.mark.java
 def test_controllo_ufficiale_accetta_ogni_tipo_di_passivita(tipo, tmp_path):
     stato, dgn, wri, _ = _esegui(esporta(caso_tipo(tipo)).xml, tmp_path)
     assert stato == 'positivo', (tipo, dgn['diagnostici'], wri[:600])

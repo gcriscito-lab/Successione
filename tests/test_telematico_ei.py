@@ -110,6 +110,7 @@ def test_le_caselle_sui_beni_tavolari_non_sono_previste():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale_ei(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es().xml, tmp_path)
     assert stato == "positivo", (stato, dgn["diagnostici"])
@@ -117,6 +118,7 @@ def test_reale_controllo_ufficiale_locale_ei(tmp_path):
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale_ei_due_immobili(tmp_path):
     def mod(d):
         next(b for b in d["beni"] if b["id"] == "b_terr0001")["discordanza_intestatario"] = "si"

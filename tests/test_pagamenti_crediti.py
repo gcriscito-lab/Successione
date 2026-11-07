@@ -82,7 +82,7 @@ def positivo(xml, tmp_path):
 
 
 def negativo(xml, tmp_path):
-    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    stato, dgn, _, _ = _esegui(xml, tmp_path, rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]
     return {x["codice"] for x in dgn["diagnostici"]}
 
@@ -268,6 +268,7 @@ def test_imposta_ipotecaria_versata_oltre_la_dovuta():
                                            {"data_riferimento": datetime.date(2026, 3, 1)})),
     ("ipotecaria_versata_oltre", lambda: (sostitutiva(caso(ipotecaria_versata="3000", catastale_versata="1410")), {})),
 ])
+@pytest.mark.java
 def test_controllo_ufficiale_locale_positivo(tmp_path, nome, costruisci):
     d, ctx = costruisci()
     es = esporta(d, **ctx)
@@ -281,6 +282,7 @@ def _d2024(**dich):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_respinge_il_credito_non_scalato_dall_imposta(tmp_path):
     es = esporta(caso(credito_ipotecaria="1000", **CREDITO_REGISTRO))
     positivo(es.xml, tmp_path / "ok")
@@ -289,6 +291,7 @@ def test_controllo_respinge_il_credito_non_scalato_dall_imposta(tmp_path):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_respinge_un_solo_rigo_di_acquisto_con_tipologia_1(tmp_path):
     es = esporta(caso(credito_ipotecaria="1000", **CREDITO_REGISTRO))
     codici_diag = negativo(alterato(es, "suc:QuadroEH/suc:Modulo/suc:SezioneIII_CreditoImposta", rimuovi=True), tmp_path)
@@ -296,6 +299,7 @@ def test_controllo_respinge_un_solo_rigo_di_acquisto_con_tipologia_1(tmp_path):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_respinge_importo_da_versare_senza_sanzioni(tmp_path):
     es = esporta(_d2024(sanzione_ipotecaria="150.50", interessi_ipotecaria="20.10"))
     positivo(es.xml, tmp_path / "ok")
@@ -304,6 +308,7 @@ def test_controllo_respinge_importo_da_versare_senza_sanzioni(tmp_path):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_respinge_totale_sanzioni_alterato(tmp_path):
     es = esporta(_d2024(sanzione_ipotecaria="150.50", sanzione_catastale="75.25"))
     negativo(alterato(es, "suc:QuadroEF/suc:SezioneVI_SanzioniInteressi/suc:TotaleDaVersare/suc:TotaleDaVersare_Sanzioni", "999,00"), tmp_path)

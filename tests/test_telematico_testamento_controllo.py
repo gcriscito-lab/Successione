@@ -48,6 +48,7 @@ def test_allegato_testamento_senza_devoluzione_per_testamento_e_incoerente():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale_testamento(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es().xml, tmp_path)
     # stesso esito del caso base A10: positivo, con la sola anomalia di entita' ridotta 3345 (gravita' 4)
@@ -81,6 +82,7 @@ def test_legatario_senza_testamento_e_incoerente():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale_legatario(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es_legatario().xml, tmp_path)
     assert stato == "positivo", (stato, dgn["diagnostici"])
@@ -111,6 +113,7 @@ def test_tipo_11_con_possesso_e_un_errore():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_locale_legato(tmp_path):
     stato, dgn, wri, dcm = _esegui(_es_legato().xml, tmp_path)
     assert stato == "positivo", (stato, dgn["diagnostici"])

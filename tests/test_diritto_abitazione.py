@@ -222,18 +222,20 @@ def test_riga_abitazione_per_legge_respinta():
                                         lambda: caso_rinunciatario("8"), lambda: caso_rinunciatario("5"), caso_riga_abitazione],
                          ids=["codice1", "codice4", "codice1_non_dichiarante", "rinunciatario8", "rinunciatario5",
                               "riga_abitazione"])
+@pytest.mark.java
 def test_controllo_ufficiale_positivo(costruisci, tmp_path):
     stato, dgn, wri, _ = _esegui(esporta_xml(costruisci(), CTX).xml, tmp_path)
     assert stato == "positivo", (dgn["diagnostici"], wri[:1500])
 
 
 @SALTO
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_prima_casa_alterata(tmp_path):
     """Senza l'estensione al figlio (valore dell'intero bene nel rigo EF4) il controllo respinge il file."""
     xml = esporta_xml(caso_da("1"), CTX).xml
     alterato = xml.replace(b"<suc:DirittoAbitazione>1</suc:DirittoAbitazione>", b"<suc:DirittoAbitazione>4</suc:DirittoAbitazione>")
     assert alterato != xml
-    stato, dgn, _, _ = _esegui(alterato, tmp_path)
+    stato, dgn, _, _ = _esegui(alterato, tmp_path, rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]
 
 
@@ -260,6 +262,7 @@ def test_imponibile_non_intero_arrotondato_con_avviso():
 
 
 @SALTO
+@pytest.mark.java
 def test_imponibile_non_intero_controllo_ufficiale(tmp_path):
     """Riscontro sul componente: arrotondamento per eccesso (141.001) accettato, troncamento (141.000) respinto."""
     xml = esporta_xml(caso_tre_eredi_centesimi(), CTX).xml
@@ -267,5 +270,5 @@ def test_imponibile_non_intero_controllo_ufficiale(tmp_path):
     assert stato == "positivo", (dgn["diagnostici"], wri[:1500])
     troncato = xml.replace(b">141001<", b">141000<")
     assert troncato != xml
-    stato, dgn, _, _ = _esegui(troncato, tmp_path / "b")
+    stato, dgn, _, _ = _esegui(troncato, tmp_path / "b", rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]

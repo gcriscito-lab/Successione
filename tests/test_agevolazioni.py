@@ -202,12 +202,14 @@ def test_l_esenzione_riguarda_solo_la_quota_che_la_richiede():
     ("c_con_imposta", lambda: con_imposta({"d_terranna": "C"}, {"riduzioni_art25": EH_FLAG})),
     ("m_con_imposta", lambda: con_imposta({"d_terranna": "M", "d_terrluca": "M"})),
 ])
+@pytest.mark.java
 def test_controllo_ufficiale_accetta(tmp_path, nome, costruisci):
     ctx = contesto_caso_a10(**CTX) if nome.endswith("imposta") else None
     controllo_positivo(esporta(costruisci(), ctx), tmp_path)
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_g_ed_d_in_en(tmp_path):
     cf = genera_cf_sintetico("Rossi", "Anna", "F", "1995-05-05", "H501")
     for cod in ("G", "D"):
@@ -223,9 +225,10 @@ def test_controllo_ufficiale_g_ed_d_in_en(tmp_path):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_una_base_sbagliata(tmp_path):
     es = esporta(caso({"d_terranna": "C"}, {"riduzioni_art25": EH_FLAG}))
     sbagliato = es.xml.replace(b">133500<", b">141000<")           # il rigo C rimesso nella base proporzionale
     assert sbagliato != es.xml
-    stato, dgn, _, _ = _esegui(sbagliato, tmp_path)
+    stato, dgn, _, _ = _esegui(sbagliato, tmp_path, rapporto=False)
     assert stato == "negativo" and any(x["gravita"] == 16 for x in dgn["diagnostici"]), dgn["diagnostici"]   # errore bloccante

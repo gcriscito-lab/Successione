@@ -72,11 +72,13 @@ def test_ei_continuazione_non_esprimibile_resta_bloccata(n_tr, n_rg):
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
 @pytest.mark.parametrize("n_tr,n_rg", [(4, 1), (2, 5), (6, 2), (4, 4), (7, 7)])
+@pytest.mark.java
 def test_ei_continuazione_controllo_ufficiale(tmp_path, n_tr, n_rg):
     positivo(completo(ei(n_tr, n_rg)), tmp_path)
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_ei_continuazione_senza_la_casella_e_respinta(tmp_path):
     """Negativo: tolta la casella Continuazione il controllo respinge gli estremi del modulo successivo."""
     es = completo(ei(4, 1))
@@ -85,7 +87,7 @@ def test_ei_continuazione_senza_la_casella_e_respinta(tmp_path):
         import re
         xml = re.sub(rb"<(?:\w+:)?Continuazione>1</(?:\w+:)?Continuazione>", b"", es.xml, count=1)
     assert xml != es.xml
-    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    stato, dgn, _, _ = _esegui(xml, tmp_path, rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]
 
 
@@ -134,6 +136,7 @@ def test_rendita_proposta_blocchi(rendita, categoria):
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
 @pytest.mark.parametrize("rendita,categoria", [("1500.00", None), ("890.45", "A/3"), ("2210.10", "A/7")])
+@pytest.mark.java
 def test_rendita_proposta_controllo_ufficiale(tmp_path, rendita, categoria):
     positivo(completo(rendita_proposta(rendita=rendita, categoria=categoria)), tmp_path)
 
@@ -186,6 +189,7 @@ def test_graffati_dati_mancanti():
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
 @pytest.mark.parametrize("voci,sezione", [([G1], None), ([G1, G2, G3, G4], None), ([{**G1, "sezione": "AB"}, {**G3, "sezione": "AB"}], "AB")])
+@pytest.mark.java
 def test_graffati_controllo_ufficiale(tmp_path, voci, sezione):
     positivo(completo(graffati(voci, sezione)), tmp_path)
 
@@ -252,18 +256,20 @@ def test_immobile_aziendale_con_agevolazione_non_ammessa():
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
 @pytest.mark.parametrize("immobili,valore_az", [(("b_casa0001",), "20000"), (("b_casa0001", "b_terr0001"), "20000"), (("b_casa0001",), "3000000")])
+@pytest.mark.java
 def test_immobile_aziendale_controllo_ufficiale(tmp_path, immobili, valore_az):
     positivo(completo(aziendale(immobili, valore_az)), tmp_path)
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_immobile_aziendale_imposta_alterata_respinta(tmp_path):
     """Con l'imposta di successione dovuta il controllo verifica il calcolo: un'imposta alterata viene respinta."""
     es = completo(aziendale(valore_az="3000000"))
     imposta = x(es, D + "/suc:QuadroEF//suc:ImpostaCalcolata/suc:Imposta/text()")[0]
     xml = es.xml.replace(f">{imposta}<".encode(), f">{int(imposta) + 100}<".encode())
     assert xml != es.xml
-    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    stato, dgn, _, _ = _esegui(xml, tmp_path, rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]
 
 

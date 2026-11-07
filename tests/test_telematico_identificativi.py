@@ -77,6 +77,7 @@ def test_iban_modulo_97_come_il_componente_registrato():
 
 @pytest.mark.skipif(not JAR or not Path(JAR).is_dir() or not shutil.which("java"),
                     reason="componenti ufficiali non configurati (SUCCESSIONI_CONTROLLI_SUC13)")
+@pytest.mark.java
 def test_reale_lotto_cf_rieseguito_con_il_componente(tmp_path):
     out = subprocess.run(["java", "-Dfile.encoding=UTF-8", "-cp", str(Path(JAR) / "*"),
                           str(FIX / "VerificaComponenti.java"), "lotto", str(FIX / "cf_lotto.tsv")],

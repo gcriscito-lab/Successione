@@ -1,5 +1,5 @@
 """Backup verificato, profilo dello studio e versioni registrate con l'export (preparazione prima pratica reale)."""
-import time
+from datetime import datetime
 
 import pytest
 
@@ -39,9 +39,18 @@ def test_backup_automatico_prima_dell_export_con_limite_di_frequenza(tmp_path):
 def test_potatura_dei_backup_automatici(tmp_path, monkeypatch):
     s, pid = pratica_con_allegati(tmp_path / "a")
     monkeypatch.setattr(BK, "MAX_AUTOMATICI", 2)
+    # orologio iniettato: il nome del backup ha la risoluzione del secondo, ogni copia "avviene" 1 s dopo la precedente
+    # (prima: time.sleep(1.05) reale fra una copia e l'altra)
+    istanti = iter(datetime(2026, 11, 7, 10, 0, i) for i in range(4))
+
+    class Orologio(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return next(istanti)
+    monkeypatch.setattr(BK, "datetime", Orologio)
     for i in range(4):
         BK.crea(s.arch, f"t{i}", automatico=True)
-        time.sleep(1.05)
+    monkeypatch.setattr(BK, "datetime", datetime)
     assert len([b for b in BK.elenco(s.arch) if b["automatico"]]) == 2
 
 

@@ -63,6 +63,7 @@ def test_integrativa_non_ammette_attestazione():
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_positivo_senza_avvisi(tmp_path):
     stato, dgn, wri, _ = _esegui(_esporta(True).xml, tmp_path)
     assert stato == "positivo", (dgn["diagnostici"], wri[:1200])
@@ -70,9 +71,10 @@ def test_controllo_ufficiale_positivo_senza_avvisi(tmp_path):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_il_bollo_senza_32(tmp_path):
     xml = _esporta(True).xml.replace(b"<suc:Circoscrizioni_Imposta>117</suc:Circoscrizioni_Imposta>",
                                      b"<suc:Circoscrizioni_Imposta>85</suc:Circoscrizioni_Imposta>")
     assert b">85</suc:Circoscrizioni_Imposta>" in xml
-    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    stato, dgn, _, _ = _esegui(xml, tmp_path, rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]

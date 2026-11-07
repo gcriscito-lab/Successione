@@ -112,6 +112,7 @@ def test_export_completo_e_valido(nome):
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or '')
 @pytest.mark.parametrize('nome', sorted(CONFIGURAZIONI))
+@pytest.mark.java
 def test_controllo_ufficiale_accetta_le_quote_di_legge(nome, tmp_path):
     es, quote = genera(*CONFIGURAZIONI[nome])
     assert es.xml is not None, [e.asdict() for e in es.errori]
@@ -142,10 +143,11 @@ def altera_quote(xml: bytes) -> bytes:
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or '')
 @pytest.mark.parametrize('nome', ['coniuge_genitore', 'due_genitori_unilaterale', 'coniuge_due_fratelli'])
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_quote_sbagliate(nome, tmp_path):
     es, quote = genera(*CONFIGURAZIONI[nome])
     assert es.xml is not None
-    assert _esegui(es.xml, tmp_path / 'ok')[0] == 'positivo'
+    assert _esegui(es.xml, tmp_path / 'ok', rapporto=False)[0] == 'positivo'
     stato, dgn, wri, _ = _esegui(altera_quote(es.xml), tmp_path / 'alterato')
     assert stato == 'negativo', (nome, dgn['diagnostici'])
     assert 'Dati di devoluzione non coerenti' in wri and {d['codice'] for d in dgn['diagnostici']} == {'3117', '3345'}, wri[-1500:]
@@ -206,10 +208,11 @@ def scambia_minima_con_massima(xml: bytes) -> bytes:
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or '')
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_scambio_fra_nipote_e_nipote_unico(tmp_path):
     es, quote = genera(*CONFIGURAZIONI['rapp_A_ministeriale'])
     assert es.xml is not None
-    assert _esegui(es.xml, tmp_path / 'ok')[0] == 'positivo'
+    assert _esegui(es.xml, tmp_path / 'ok', rapporto=False)[0] == 'positivo'
     # scambio fra il primo nipote (1/6) e il nipote unico dell'altro figlio (1/2)
     stato, dgn, wri, _ = _esegui(scambia_minima_con_massima(es.xml), tmp_path / 'alterato')
     assert stato == 'negativo', dgn['diagnostici']

@@ -45,6 +45,7 @@ def test_sopra_la_fissa_invariato():
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_controllo_ufficiale_locale(tmp_path):
     es = esporta_xml(piccolo(), contesto_caso_a10())
     stato, dgn, wri, _ = _esegui(es.xml, tmp_path)
@@ -52,5 +53,5 @@ def test_controllo_ufficiale_locale(tmp_path):
     # variante secondo la lettura del Fascicolo (200 nella colonna 2): il controllo la respinge
     xml = es.xml.replace(b">140<", b">200<", 1)
     assert xml != es.xml
-    stato2, dgn2, _, _ = _esegui(xml, tmp_path / "ko")
+    stato2, dgn2, _, _ = _esegui(xml, tmp_path / "ko", rapporto=False)
     assert stato2 == "negativo" and any(x["codice"] == "3076" for x in dgn2["diagnostici"]), dgn2["diagnostici"]
