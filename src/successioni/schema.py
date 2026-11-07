@@ -71,7 +71,11 @@ AIUTI: dict[str, str] = {
     "beni.quota_defunto": "Frazione del bene posseduta dal defunto (es. 1/2). Non è la quota dell'erede.",
     "beni.rendita": "Rendita catastale in euro, con il punto decimale (es. 1240.50).",
     "beni.graffati": "Immobili graffati al fabbricato (fino a 4 per rigo): sezione urbana, foglio, particella, subalterno. Nei dati principali si indica la sola prima particella.",
-    "devoluzioni.quota": "Quota dell'erede sul diritto del defunto (es. 1/3). È un dato diverso dalla quota del defunto sul bene.",
+    "devoluzioni.quota": "Quota dell'erede sul diritto del defunto (es. 1/3). È un dato diverso dalla quota del defunto sul bene. "
+                         "Usufrutto (08) e nuda proprietà (02): chi riceve l'intero diritto indica 1/1 (Fascicolo I p. 24).",
+    "devoluzioni.diritto": "Diritto ricevuto dall'erede. Se il defunto aveva la piena proprietà (1) di un fabbricato o terreno, si "
+                           "possono indicare usufrutto (08) e nuda proprietà (02): il programma calcola il valore quota con "
+                           "l'età dell'usufruttuario al decesso (serve la sua data di nascita) e i coefficienti di legge.",
     "persone.sesso": "M o F, come richiesto dal file telematico.",
     "beni.data_visura": "Data della visura catastale da cui hai ricavato i dati dell'immobile. Il Fascicolo I chiede visure di non piu' di tre mesi prima della presentazione: il programma avvisa se e' piu' vecchia. Non entra nel file XML.",
     "beni.bene_estero": "Solo per aziende, titoli, aeromobili, navi e altri beni (EN, EO, EP, EQ, ER): 1 se il bene e' sito all'estero. Per gli immobili esteri si indica invece la provincia EE.",

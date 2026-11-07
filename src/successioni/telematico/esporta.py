@@ -50,6 +50,7 @@ from . import quadri_efgh as EFGH
 from . import frontespizio as FR
 from . import sostitutiva as SO
 from . import supplemento as SUP
+from . import usufrutto as USU
 from . import xsd as X
 
 PERIMETRO = {
@@ -1444,6 +1445,59 @@ class _Export:
                          "dell'emittente non va indicato", fonte_cf)
         return riga
 
+    def _valori_diritti_distinti(self, b: dict, el: str, valore, righe: list) -> dict | None:
+        """Valore quota per usufrutto (08) e nuda proprieta' (02): eta' dell'usufruttuario alla data del decesso,
+        coefficiente dell'allegato 4 al D.Lgs. 123/2025 e saggio del 2,5% (telematico/usufrutto.py)."""
+        perc = f"beni[{b['id']}]"
+        dec = self.data_decesso
+        if dec is None:     # i quadri dei beni si compilano prima di EH, dove si fissa self.data_decesso
+            dd = next((p.get("data_decesso") for p in self.d.get("persone", []) if p.get("ruolo") == "defunto"), None)
+            try:
+                dec = date.fromisoformat(dd) if isinstance(dd, str) else None
+            except ValueError:
+                dec = None
+        if dec is None or dec < USU.DECORRENZA:
+            self.ns.append(f"{perc}: usufrutto e nuda proprieta' calcolati solo per le successioni aperte dal 2025 "
+                           "(prospetto dei coefficienti esteso alle successioni dal D.Lgs. 139/2024): non supportato")
+            return {}
+        if valore is None:
+            return {}
+        persone = {p.get("id"): p for p in self.d.get("persone", [])}
+        info, ok = [], True
+        for (_m, _r), dir_r, did, n, den in righe:
+            coef = None
+            if dir_r == USU.USUFRUTTO:
+                pid = self.persona_dev.get(did)
+                nasc = (persone.get(pid) or {}).get("data_nascita")
+                try:
+                    anni = USU.eta(date.fromisoformat(nasc), dec) if isinstance(nasc, str) else None
+                except ValueError:
+                    anni = None
+                if anni is None:
+                    self.err("DATO_MANCANTE", f"persone[{pid}].data_nascita", "per il valore dell'usufrutto serve la data di "
+                             "nascita dell'usufruttuario (eta' alla data del decesso)", USU.FONTE)
+                    ok = False
+                    continue
+                coef = USU.coefficiente(anni)
+                if coef is None:
+                    self.ns.append(f"devoluzioni[{did}]: usufruttuario di {anni} anni, oltre il prospetto dei coefficienti "
+                                   "(fino a 99 anni): non supportato")
+                    ok = False
+                    continue
+            info.append({"id": did, "diritto": dir_r, "quota": Fraction(n, den), "coefficiente": coef})
+        if not ok:
+            return {}
+        r = USU.valori(int(valore), info)
+        for e in r["errori"]:
+            self.err("QUOTE_DEVOLUZIONE", perc, e, USU.FONTE)
+        if r["errori"]:
+            return {}
+        if dec > USU.VERIFICATO_FINO:
+            self.avv("SAGGIO_USUFRUTTO_DA_VERIFICARE", perc, "usufrutto valutato con il saggio del 2,5% e il prospetto "
+                     "dell'allegato 4: verificare che per l'anno del decesso il tasso legale non superi il 2,5% e che il "
+                     "prospetto non sia stato aggiornato con decreto (art. 102 c. 2-3 D.Lgs. 123/2025)", USU.FONTE)
+        return r["valori"]
+
     def devoluzioni_bene(self, b: dict, quadro: str) -> list[dict]:
         """Righe della sezione devoluzione del bene, ordinate per posizione EA (annotazione IdentificazioneSoggetto:
         'in ordine progressivo')."""
@@ -1451,6 +1505,7 @@ class _Export:
         el = f"Quadro{quadro}/Modulo/{_RIGA[quadro]}/Devoluzione{quadro}/Devoluzione"
         devs = [d for d in self.d.get("devoluzioni", []) if d.get("bene_id") == b["id"]]
         righe, somma, persone_viste = [], Fraction(0), set()
+        distinti = False
         dir_def = self.diritto_bene.get(b["id"])
         valore = self.valore_beni.get(b["id"])
         if not devs:
@@ -1470,10 +1525,10 @@ class _Export:
                          "beneficiario di una devoluzione (annotazione XSD di IdentificazioneSoggetto)",
                          FO.fonte_annotazione(el + "/IdentificazioneSoggetto"))
                 continue
-            if pid in persone_viste:
+            if (pid, str(d.get("diritto") or "")) in persone_viste:
                 self.err("DEVOLUZIONE_DUPLICATA", perc, "lo stesso beneficiario compare piu' volte sullo stesso bene con "
                          "lo stesso diritto", FO.fonte_annotazione(el + "/IdentificazioneSoggetto"))
-            persone_viste.add(pid)
+            persone_viste.add((pid, str(d.get("diritto") or "")))
             try:
                 n, den = F.quota_grezza(d.get("quota"))
             except (F.ValoreXml, V.ValoreNonValido, AttributeError) as e:
@@ -1484,7 +1539,9 @@ class _Export:
             except F.ValoreXml as e:
                 self.err("VALORE_NON_VALIDO", perc + ".diritto", str(e), FO.fonte_xsd(el + "/CodiceDiritto_Rip"))
                 continue
-            if dir_def is not None and dir_r != dir_def:
+            if dir_def is not None and dir_r != dir_def and USU.supportato(dir_def, dir_r) and quadro in ("EB", "EC"):
+                distinti = True      # usufrutto (08) / nuda proprieta' (02) su piena proprieta': valore quota da usufrutto.py
+            elif dir_def is not None and dir_r != dir_def:
                 self.ns.append(f"{perc}: diritto devoluto {dir_r} diverso dal diritto del defunto {dir_def} (il valore "
                                "quota richiede le regole di valutazione dei diritti, Fascicolo I p. PDF 24): non supportato")
                 continue
@@ -1505,7 +1562,10 @@ class _Export:
             somma += Fraction(n, den)
             self.persona_dev[d["id"]] = pid
             righe.append((self.pos_ea[pid], dir_r, d["id"], n, den))
-        if righe and somma != 1:
+        valori_dist = None
+        if distinti and righe:
+            valori_dist = self._valori_diritti_distinti(b, el, valore, righe)
+        elif righe and somma != 1:
             self.err("QUOTE_DEVOLUZIONE", f"beni[{b['id']}]", f"la somma delle quote di devoluzione e' "
                      f"{somma.numerator}/{somma.denominator}, deve essere 1/1",
                      FO.fonte_annotazione(el + "/Quota/QuotaElementi"))
@@ -1519,8 +1579,9 @@ class _Export:
         out = []
         for (m, r), dir_r, did, n, den in righe:
             qv = None
-            if valore is not None:
-                cent, esatto = F.frazione_a_centesimi(Fraction(valore) * Fraction(n, den))
+            if valore is not None and (valori_dist is None or did in valori_dist):
+                cent, esatto = F.frazione_a_centesimi(valori_dist[did] if valori_dist is not None
+                                                      else Fraction(valore) * Fraction(n, den))
                 qv = F.euro_centesimi(cent)
                 self.quota_valore[did] = cent
                 self.righe_dev[did] = {"quadro": quadro, "bene_id": b["id"], "persona_id": self.persona_dev[did],

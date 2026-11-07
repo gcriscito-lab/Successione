@@ -138,7 +138,7 @@ def test_casi_non_supportati_non_esportano():
     d["persone"][2]["ruolo"] = "legatario"
     casi["legatario"] = d
     d = caso_completo()
-    d["devoluzioni"][0]["diritto"] = "8"  # usufrutto devoluto da piena proprieta'
+    d["devoluzioni"][0]["diritto"] = "7"  # uso devoluto da piena proprieta' (usufrutto e nuda proprieta' ora gestiti: test_usufrutto.py)
     casi["diritto diverso"] = d
     d = caso_completo()
     d["opzioni"]["telematico"]["beni"]["b_casa0001"]["provincia"] = "BZ"
