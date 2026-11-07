@@ -10,16 +10,17 @@
 <body>
 <header class="tb">
   <button id="bNav" class="gh solo-mobile" aria-label="Apri o chiudi pratiche e quadri" aria-controls="lat" aria-expanded="false">&#9776;</button>
-  <button class="brand" id="bHome" title="Pagina iniziale"><img src="/static/logo.svg" alt="" width="30" height="30">Successioni</button>
+  <button class="brand" id="bHome" title="Pagina iniziale"><img src="/static/logo.svg" alt="" width="32" height="32"><span class="marchio"><span class="marchio-nome">Successioni</span><span class="marchio-sub">Dichiarazioni telematiche</span></span></button>
   <div class="titolo" id="titolo">Nessuna pratica aperta</div>
   <div class="azioni" id="azioni">
-    <button id="bSalva" class="gh" disabled>Salva</button>
-    <button id="bControlla" class="gh" disabled>Controlla</button>
-    <button id="bGenera" class="gh" disabled>File e invio</button>
+    <button id="bSalva" data-ic="salva" class="gh" disabled>Salva</button>
+    <button id="bControlla" data-ic="controlla" class="gh" disabled>Controlla</button>
+    <button id="bGenera" data-ic="invio" class="gh" disabled>File e invio</button>
     <button id="bMenu" class="gh solo-mobile" aria-label="Altre azioni" aria-controls="azioni" aria-expanded="false">&#8943;</button>
-    <button id="bNuova" class="gh">Nuova dichiarazione</button>
-    <button id="bImporta" class="gh" title="Riprendi una dichiarazione da un file telematico XML">Importa XML</button>
-    <button id="bImpost" class="gh" title="Aspetto, caratteri e strumenti del programma">Impostazioni</button>
+    <button id="bNuova" data-ic="nuova" class="gh">Nuova dichiarazione</button>
+    <button id="bImporta" data-ic="importa" class="gh" title="Riprendi una dichiarazione da un file telematico XML">Importa XML</button>
+    <button id="bImpost" data-ic="impost" class="gh" title="Aspetto, caratteri e strumenti del programma">Impostazioni</button>
+    <button id="bGuida" data-ic="guida" class="gh" title="Istruzioni ufficiali, uso del programma e informazioni sulla versione (F1)">Guida</button>
     <input type="file" id="fImporta" accept=".xml,.suc,text/xml,application/xml" hidden>
   </div>
 </header>
@@ -40,7 +41,7 @@
       <div class="home-testa">
         <h1 id="homeTitolo">Riprendi il lavoro</h1>
         <p class="intro" id="homeIntro">Apri una pratica recente oppure inizia una nuova dichiarazione di successione.</p>
-        <div class="home-actions"><button class="pil" id="homeNuova">Nuova dichiarazione</button><button class="gh" id="homeImporta">Importa da file XML</button></div>
+        <div class="home-actions"><button class="pil" id="homeNuova" data-ic="nuova">Nuova dichiarazione</button><button class="gh" id="homeImporta" data-ic="importa">Importa da file XML</button></div>
       </div>
       <div class="home-corpo">
         <section class="home-main" aria-labelledby="homeElencoT">
@@ -52,6 +53,7 @@
             <li><span class="n">3</span><div><b>Allega e genera il file</b><span>In «File e invio»: allegati in PDF/A, file telematico e controllo ufficiale sul tuo PC.</span></div></li>
             <li><span class="n">4</span><div><b>Rileggi e invia</b><span>Stampa il modello, confrontalo con le visure, poi invia con Desktop Telematico.</span></div></li>
           </ol>
+          <div class="home-stato" id="homeStato" hidden aria-label="Stato del programma"></div>
           <p class="home-nota" id="homeNota" hidden>Il termine indicato è quello ordinario: dodici mesi dalla data del decesso. Le istruzioni del modello prevedono casi in cui decorre da un’altra data, per esempio dopo una rinuncia o con il beneficio d’inventario.</p>
         </section>
         <aside class="home-lato" aria-labelledby="homeTavoloT">

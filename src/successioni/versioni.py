@@ -4,7 +4,7 @@ from __future__ import annotations
 from . import __version__
 
 # Aggiornare a ogni modifica delle regole fiscali o del tracciato; la data e' quella dell'ultima modifica verificata.
-VERSIONE_REGOLE = "2026-11-05"
+VERSIONE_REGOLE = "2026-11-07"
 
 
 def versioni() -> dict:

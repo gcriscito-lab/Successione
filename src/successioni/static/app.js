@@ -36,7 +36,8 @@ function applicaAspetto(valori) {
   if (acc) { const col = acc[root.dataset.tema === 'scuro' ? 1 : 0]; root.style.setProperty('--blu', col); root.style.setProperty('--blu-t', hexRgba(col, 0.14)); }
   else { root.style.removeProperty('--blu'); root.style.removeProperty('--blu-t'); }
   root.dataset.densita = p.densita; root.dataset.contrasto = p.contrasto; root.dataset.movimento = p.movimento;
-  const brand = $('#bHome'); if (brand) { brand.lastChild.textContent = 'Successioni' + (p.nome_studio ? ' · ' + p.nome_studio : ''); document.title = 'Successioni' + (p.nome_studio ? ' · ' + p.nome_studio : ''); }
+  const sub = $('#bHome .marchio-sub'); if (sub) sub.textContent = p.nome_studio || 'Dichiarazioni telematiche';   // il nome dello studio sotto il marchio
+  document.title = 'Successioni' + (p.nome_studio ? ' · ' + p.nome_studio : '');
   root.style.setProperty('--dimensione-base', Math.max(12, Math.min(22, Number(p.dimensione) || 14)) + 'px');
   root.style.setProperty('--interlinea', ({ compatta: 1.3, normale: 1.5, ampia: 1.8 })[p.interlinea] || 1.5);
   const nav = limiteNav() ? Math.min(limiteNav(), Math.max(180, Number(p.larghezza_nav) || 240)) : 240;
@@ -215,11 +216,35 @@ function renderHome() {
     const term = !t ? h("span", { class: "term mut" }, "Data del decesso da indicare")
       : t.giorni < 0 ? h("span", { class: "term scaduto" }, "Termine ordinario superato il " + dataBreve(t.data))
       : h("span", { class: "term" + (t.giorni <= 60 ? " vicino" : "") }, "Termine ordinario " + dataBreve(t.data) + (t.giorni <= 60 ? ", tra " + t.giorni + (t.giorni === 1 ? " giorno" : " giorni") : ""));
-    ul.append(h("li", {}, h("button", { type: "button", onclick: () => apri(p.id) },
-      h("span", { class: "tit" }, p.titolo),
-      h("span", { class: "dett" }, "Aggiornata il " + dataIt(String(p.aggiornata || "").slice(0, 10)) + ", revisione " + p.revisione), term)));
+    // pagina iniziale «premium» (proposta Canva del 07/11/2026): iniziali della pratica in casella, stato del termine in chiaro, «Riprendi»
+    const iniz = String(p.titolo || "?").replace(/^(successione|eredit[aà]|dichiarazione)\s+/i, "").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase() || "?";
+    const badge = t && t.giorni < 0 ? h("span", { class: "badge er" }, "Termine superato") : t && t.giorni <= 60 ? h("span", { class: "badge am" }, "In scadenza") : null;
+    ul.append(h("li", {}, h("button", { type: "button", onclick: () => apri(p.id), "aria-label": "Riprendi " + p.titolo },
+      h("span", { class: "iniz", "aria-hidden": "true" }, iniz),
+      h("span", { class: "tit" }, p.titolo, badge ? " " : null, badge),
+      h("span", { class: "dett" }, "Aggiornata il " + dataIt(String(p.aggiornata || "").slice(0, 10)) + " · revisione " + p.revisione), term,
+      h("span", { class: "riprendi", "aria-hidden": "true" }, "Riprendi"))));
   }
   $("#homeNota").hidden = !conTermine;
+  statoHome();
+}
+/* Striscia di stato della pagina iniziale: archivio, versione e componenti (una richiesta, solo quando serve). */
+let statoHomeCaricato = false;
+async function statoHome() {
+  const el = $("#homeStato"); if (!el) return;
+  const n = S.pratiche.length;
+  const voce = (tit, val, cls) => h("div", { class: "stato-voce" }, h("span", { class: "stato-tit" }, tit), h("span", { class: "stato-val " + (cls || "") }, val));
+  el.replaceChildren(voce("Archivio", n + (n === 1 ? " pratica" : " pratiche")), voce("Versione", "…"), voce("Controllo ufficiale", "…"));
+  el.hidden = false;
+  if (statoHomeCaricato && GUIDA.info) return disegnaStato();
+  try { GUIDA.info = GUIDA.info || await api("/api/informazioni"); statoHomeCaricato = true; disegnaStato(); } catch (_) { /* resta il conteggio */ }
+  function disegnaStato() {
+    const i = GUIDA.info, ctl = (i.componenti || []).find(c => /controllo/i.test(c.nome || ""));
+    const ok = ctl && ctl.esito === "ok";
+    el.replaceChildren(voce("Archivio", n + (n === 1 ? " pratica" : " pratiche")),
+      voce("Versione", i.versione + " · regole " + dataIt(i.versioni.regole)),
+      voce("Controllo ufficiale", ctl ? (ok ? "Disponibile su questo computer" : "Da configurare (vedi Impostazioni)") : "Non verificato", ok ? "ok" : "am"));
+  }
 }
 async function caricaPratiche() {
   S.pratiche = await api("/api/pratiche");
@@ -426,7 +451,9 @@ function renderVista() {
   const q = quadro();
   if (!q) return;
   const titoloQ = h("h1", {}, (q.id === "AN" || q.id === "DV" ? "" : q.id + " — ") + q.titolo);
-  main.append(q.coll && (q.vista === "tabella" || q.vista === "documenti") && q.supportato ? h("div", { class: "testa-quadro" }, titoloQ, menuOperazioni(q)) : titoloQ);
+  const arg = typeof argomentoDelQuadro === "function" ? argomentoDelQuadro(q.id) : null;
+  const linkIstr = arg ? h("button", { class: "lk istr-quadro", title: "Apre le istruzioni ufficiali alla pagina " + arg.pagina, onclick: () => apriIstruzioni(arg.documento, arg.pagina) }, "Istruzioni del quadro") : null;
+  main.append(h("div", { class: "testa-quadro" }, titoloQ, linkIstr, q.coll && (q.vista === "tabella" || q.vista === "documenti") && q.supportato ? menuOperazioni(q) : null));
   main.append(h("div", { class: "sottotitolo" }, q.nota || (q.vista === "tabella" || q.vista === "documenti" ? (q.righe + (q.righe === 1 ? " riga" : " righe")) : "")));
   if (!q.attivo && q.supportato) main.append(h("div", { class: "nota" }, "Questo quadro non è selezionato per la dichiarazione. ", h("button", { class: "lk", onclick: () => impostaQuadro(q.id, true) }, "Seleziona il quadro")));
   if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { class: "cresce" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
@@ -1962,7 +1989,7 @@ document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && e
 /* Scorciatoie per chi inserisce dati tutto il giorno (report grafica 07/11/2026, punto 10). «?» mostra l'elenco. */
 const SCORCIATOIE = [["Ctrl+S", "Salva le modifiche"], ["Alt+N", "Nuova riga nel quadro"], ["Alt+D", "Duplica la riga selezionata"],
   ["Alt+PagGiù / Alt+PagSu", "Quadro successivo / precedente"], ["Ctrl+G", "Vai a un quadro (scrivi la sigla, es. EC)"],
-  ["Alt+C", "Controlla la pratica"], ["Frecce, Home, Fine", "Righe della tabella"], ["Invio", "Apri la riga nel pannello"], ["Esc", "Dal pannello torna alla tabella"], ["?", "Questo elenco"]];
+  ["Alt+C", "Controlla la pratica"], ["Frecce, Home, Fine", "Righe della tabella"], ["Invio", "Apri la riga nel pannello"], ["Esc", "Dal pannello torna alla tabella"], ["F1", "Guida e istruzioni ufficiali"], ["?", "Questo elenco"]];
 function mostraScorciatoie() {
   let d = $("#dScorciatoie");
   if (!d) { d = h("dialog", { id: "dScorciatoie", "aria-labelledby": "dScT" }, h("form", { method: "dialog" }, h("h2", { id: "dScT" }, "Scorciatoie da tastiera"),
@@ -1995,3 +2022,69 @@ init();
 /* il menu Operazioni si chiude cliccando fuori o con Esc */
 document.addEventListener("click", ev => { for (const d of document.querySelectorAll("details.operazioni[open]")) if (!d.contains(ev.target)) d.open = false; });
 document.addEventListener("keydown", ev => { if (ev.key === "Escape") for (const d of document.querySelectorAll("details.operazioni[open]")) { d.open = false; d.querySelector("summary").focus(); } });
+
+/* ---------- Guida e Informazioni (come in ogni programma) ----------
+   Istruzioni ufficiali dell'Agenzia (copie in fonti/, server: guida.py) aperte alla pagina dell'argomento; uso del programma;
+   versione, componenti e novita'. Si apre con il pulsante «Guida» o con F1. */
+const GUIDA = { dati: null, info: null };
+async function datiGuida() { if (!GUIDA.dati) GUIDA.dati = await api("/api/guida"); return GUIDA.dati; }
+function apriIstruzioni(doc, pagina) { window.open("/api/guida/" + doc + ".pdf#page=" + pagina, "_blank", "noopener"); }
+function argomentoDelQuadro(id) { return GUIDA.dati && GUIDA.dati.argomenti.find(a => a.quadro === id); }
+async function apriGuida(scheda) {
+  let d = $("#dGuida");
+  if (!d) { d = h("dialog", { id: "dGuida", class: "guida", "aria-labelledby": "dGuidaT" }); document.body.append(d); }
+  const schede = [["istruzioni", "Istruzioni ufficiali"], ["uso", "Uso del programma"], ["info", "Informazioni"]];
+  const att = scheda || "istruzioni";
+  const corpo = h("div", { class: "guida-corpo" }, h("p", { class: "mut" }, "Caricamento…"));
+  const seg = h("div", { class: "seg", role: "tablist" }, schede.map(([k, n]) => h("button", { type: "button", role: "tab", "aria-selected": att === k ? "true" : "false", onclick: () => apriGuida(k) }, n)));
+  d.replaceChildren(h("form", { method: "dialog" }, h("h2", { id: "dGuidaT" }, "Guida"), seg, corpo,
+    h("div", { class: "wiz-az" }, h("span", { class: "sp" }), h("button", { class: "pil" }, "Chiudi"))));
+  if (!d.open) d.showModal();
+  try {
+    if (att === "istruzioni") {
+      const g = await datiGuida();
+      const cerca = h("input", { type: "search", placeholder: "Cerca un argomento (es. prima casa, EF, rateale)", "aria-label": "Cerca nelle istruzioni" });
+      const lista = h("ul", { class: "guida-lista" });
+      const nomeDoc = id => (g.documenti.find(x => x.id === id) || {}).titolo || id;
+      const disegna = () => {
+        const q = cerca.value.trim().toLowerCase();
+        lista.replaceChildren(...g.argomenti.filter(a => !q || a.titolo.toLowerCase().includes(q) || (a.quadro || "").toLowerCase() === q)
+          .map(a => h("li", {}, h("button", { type: "button", class: "lk", onclick: () => apriIstruzioni(a.documento, a.pagina) }, a.titolo),
+            h("span", { class: "mut" }, " — " + nomeDoc(a.documento) + ", pagina " + a.pagina))));
+      };
+      cerca.addEventListener("input", disegna); disegna();
+      corpo.replaceChildren(cerca, lista, h("h3", {}, "Documenti completi"),
+        h("ul", { class: "guida-lista" }, g.documenti.map(x => h("li", {}, x.disponibile
+          ? h("button", { type: "button", class: "lk", onclick: () => apriIstruzioni(x.id, 1) }, x.titolo)
+          : h("span", { class: "mut" }, x.titolo + " (non presente)"), h("span", { class: "mut" }, " — " + x.descrizione)))),
+        h("p", { class: "mut piccolo" }, g.nota));
+      cerca.focus();
+    } else if (att === "uso") {
+      corpo.replaceChildren(h("ol", { class: "guida-lista" },
+        h("li", {}, h("b", {}, "Crea la pratica: "), "«Nuova dichiarazione» chiede defunto e quadri; «Importa XML» riprende un file .suc già inviato."),
+        h("li", {}, h("b", {}, "Compila i quadri: "), "eredi in EA, terreni in EB, fabbricati in EC, passività in ED, gli altri beni negli altri quadri. «Controlla» dice cosa manca; il valore catastale è proposto nella scheda dell'immobile."),
+        h("li", {}, h("b", {}, "Allegati: "), "nel quadro EG carichi i documenti (convertiti in PDF/A) e generi l'albero genealogico dai dati."),
+        h("li", {}, h("b", {}, "File e invio: "), "genera il file, esegui il controllo ufficiale sul tuo computer, stampa e rileggi, prepara la copia da inviare con Desktop Telematico, poi registra protocollo e ricevute.")),
+        h("h3", {}, "Scorciatoie da tastiera"),
+        h("table", { class: "scorciatoie" }, h("tbody", {}, SCORCIATOIE.map(([k, t]) => h("tr", { class: "fisso" }, h("td", {}, h("kbd", {}, k)), h("td", {}, t))))),
+        h("p", { class: "mut piccolo" }, "Dati non noti: scrivi «?» (da confermare), «assente», «zero» o «non applicabile». Importi all'italiana: 150.000 oppure 1.234,50."));
+    } else {
+      if (!GUIDA.info) GUIDA.info = await api("/api/informazioni");
+      const i = GUIDA.info, v = i.versioni || {};
+      const riga = (k, x) => h("tr", { class: "fisso" }, h("td", {}, k), h("td", {}, x || "—"));
+      corpo.replaceChildren(h("table", { class: "info-versione" }, h("tbody", {},
+        riga("Programma", i.programma + " " + i.versione + (i.build ? " (build " + i.build.commit + " del " + dataIt(i.build.data) + ")" : "")),
+        riga("Regole fiscali aggiornate al", v.regole ? dataIt(v.regole) : null), riga("Specifiche del file telematico", v.specifiche_suc),
+        riga("Modulo di esportazione", v.modulo_esportazione), riga("Archivio in uso", i.archivio), riga("Sistema", i.sistema + " · Python " + i.python))),
+        h("h3", {}, "Componenti"),
+        h("ul", { class: "guida-lista" }, (i.componenti || []).map(c => h("li", {},
+          h("span", { class: "pz " + (c.esito === "ok" ? "ok" : c.esito === "avviso" ? "am" : "er") }, c.esito || "?"), " ", h("b", {}, c.nome),
+          h("span", { class: "mut" }, " — " + (c.dettaglio || ""))))),
+        h("h3", {}, "Novità"), h("pre", { class: "novita" }, i.novita || "—"),
+        h("p", { class: "mut piccolo" }, i.avvertenza));
+    }
+  } catch (e) { corpo.replaceChildren(h("p", { class: "err" }, e.message)); }
+}
+$("#bGuida").onclick = () => apriGuida();
+document.addEventListener("keydown", ev => { if (ev.key === "F1") { ev.preventDefault(); apriGuida(); } });
+datiGuida().then(() => { if (S.P && S.sel !== "FILE") renderVista(); }).catch(() => { /* la guida resta raggiungibile dal pulsante */ });
