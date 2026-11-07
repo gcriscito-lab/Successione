@@ -21,6 +21,9 @@ allegati e codici fiscali, ma gli strumenti che modificano o producono qualcosa 
 `suddividi_allegato`, `importa_xml_telematico`, `esporta_xml`, `controllo_ufficiale`, `stampa_modello`, `backup_archivio`, `invio_prepara`) rispondono con l'errore
 `SOLA_LETTURA` senza eseguire nulla. `successioni_capacita` riporta `sola_lettura: true/false`. La classificazione e' in `STRUMENTI_LETTURA`/`STRUMENTI_SCRITTURA`
 (`mcp_server.py`): uno strumento non elencato come lettura e' trattato come scrittura (fail-closed) e un test impedisce strumenti non classificati.
+`invio_stato` e `stato_elaborati` possono allineare lo stato di una copia d'invio (copia resa obsoleta da una modifica, esito finale di un tentativo):
+in sola lettura girano in consultazione, il risultato mostra lo stato aggiornato ma la modifica viene annullata e l'archivio non cambia.
+Interfaccia e server MCP avviati dall'avviatore leggono lo stesso `configurazione.json` accanto al programma (vedi `INSTALLAZIONE_WINDOWS.md`).
 
 ## Se il client si chiude
 Lo stato è nella cartella dati: la stessa pratica si riapre da GUI o da MCP.

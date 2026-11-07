@@ -6,6 +6,7 @@ non nel processo del client. Le credenziali non transitano da qui.
 from __future__ import annotations
 
 import functools
+import sqlite3
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
@@ -25,6 +26,8 @@ COPERTURA_NON_DISPONIBILE = [
 # Classificazione degli strumenti, in UN solo posto. Con la preferenza «Claude in sola lettura» (Impostazioni -> Operativita' e
 # sicurezza; variabile SUCCESSIONI_MCP_SOLA_LETTURA=1) si eseguono solo gli strumenti di lettura. Fail-closed: uno strumento non
 # elencato in STRUMENTI_LETTURA e' trattato come scrittura; un test verifica che ogni strumento registrato sia classificato.
+# invio_stato e stato_elaborati restano di lettura ma possono allineare lo stato di una copia d'invio (obsoleta, esito finale
+# di un tentativo): in sola lettura girano in consultazione (Archivio.sessione_letture) e quegli aggiornamenti si annullano.
 STRUMENTI_LETTURA = frozenset({
     "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
     "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
@@ -75,14 +78,27 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
 
         @functools.wraps(fn)
         def w(*a, **k):
-            if scrittura:
-                attiva, motivo = stato_sola_lettura()
-                if attiva:
-                    raise ToolError("SOLA_LETTURA: " + MESSAGGIO_SOLA_LETTURA + (f" Motivo: {motivo}." if motivo else ""))
+            attiva, motivo = stato_sola_lettura()
+            if scrittura and attiva:
+                raise ToolError("SOLA_LETTURA: " + MESSAGGIO_SOLA_LETTURA + (f" Motivo: {motivo}." if motivo else ""))
             try:
-                return fn(*a, **k)
+                # Una sola connessione di lettura per la chiamata, chiusa alla fine (a riposo nessun file aperto). In sola
+                # lettura gli strumenti di lettura girano in CONSULTAZIONE: gli aggiornamenti interni dello stato (copia
+                # d'invio diventata obsoleta, esito finale di un tentativo: invio_stato, stato_elaborati) si vedono nel
+                # risultato ma vengono annullati, e l'archivio non cambia.
+                with sv.arch.sessione_letture(consultazione=attiva):
+                    return fn(*a, **k)
             except ErroreServizio as e:
                 raise ToolError(f"{e.codice}: {e.messaggio} | {e.asdict()}") from None
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() or "busy" in str(e).lower():
+                    raise ToolError("ARCHIVIO_OCCUPATO: l'archivio e' occupato da un'altra operazione (interfaccia, backup): "
+                                    "lo strumento non e' stato completato; riprovare tra qualche secondo.") from None
+                raise ToolError(f"ARCHIVIO_NON_DISPONIBILE: archivio non accessibile ({str(e)[:200]}); eseguire diagnosi.") from None
+            except OSError as e:
+                raise ToolError(f"ERRORE_FILE: operazione su file non riuscita ({e.strerror or type(e).__name__}"
+                                f"{': ' + str(e.filename) if getattr(e, 'filename', None) else ''}); file in uso in un altro "
+                                "programma o cartella non accessibile.") from None
         return w
 
     LETTURA = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)

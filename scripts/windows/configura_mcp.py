@@ -35,7 +35,9 @@ def eseguibile_python() -> Path:
 
 
 def voce_server(cartella_dati: str | None = None) -> dict:
-    v = {"command": str(eseguibile_python()), "args": ["-s", str(A.QUI / "avvia_successioni.py"), "mcp"]}
+    # Nessun SUCCESSIONI_CONFIG nella voce: l'avviatore in modo «mcp» lo imposta da se' sul file accanto al programma, lo
+    # stesso dell'interfaccia (fissa_file_configurazione), e resta giusto anche se il pacchetto viene spostato.
+    v ={"command": str(eseguibile_python()), "args": ["-s", str(A.QUI / "avvia_successioni.py"), "mcp"]}
     if cartella_dati:
         v["env"] = {"SUCCESSIONI_DATA": cartella_dati}
     return v

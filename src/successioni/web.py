@@ -1,12 +1,16 @@
 """Interfaccia locale: API JSON + pagina unica. Solo 127.0.0.1, token di sessione, controllo Host/Origin."""
 from __future__ import annotations
 
+import asyncio
 import secrets
 import os
+import sqlite3
 import tempfile
+import threading
 from pathlib import Path
 
 from starlette.applications import Starlette
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
@@ -98,6 +102,37 @@ def richiesta_limitata(request: Request, massimo: int, cosa: str) -> Request:
     return Request(request.scope, receive)
 
 
+_CICLI = threading.local()
+
+
+async def _attendi(ricevi):
+    return await ricevi()
+
+
+def errore_archivio(e: sqlite3.OperationalError) -> JSONResponse:
+    """Errore di SQLite come errore di servizio comprensibile: archivio occupato (503, riprovabile) o non disponibile."""
+    testo = str(e).lower()
+    if "locked" in testo or "busy" in testo:
+        return JSONResponse({"codice": "ARCHIVIO_OCCUPATO", "messaggio": "L'archivio e' occupato da un'altra operazione (per "
+                             "esempio Claude, un backup o un'altra finestra): l'operazione non e' stata completata. Riprova "
+                             "tra qualche secondo."}, status_code=503, headers={"Retry-After": "5"})
+    return JSONResponse({"codice": "ARCHIVIO_NON_DISPONIBILE", "messaggio": "L'archivio non e' accessibile in questo "
+                         f"momento ({str(e)[:200]}): controlla che la cartella dei dati sia raggiungibile e riprova; se il "
+                         "problema resta, esegui la Diagnosi."}, status_code=503)
+
+
+def errore_file(e: OSError) -> JSONResponse:
+    """Errore del sistema operativo su un file (aperto in un altro programma, disco pieno, cartella non accessibile)."""
+    dove = f" ({e.filename})" if getattr(e, "filename", None) else ""
+    causa = e.strerror or type(e).__name__
+    if isinstance(e, PermissionError):
+        return JSONResponse({"codice": "FILE_IN_USO", "messaggio": f"Un file necessario e' in uso o non accessibile{dove}: "
+                             f"{causa}. Chiudi il programma che lo tiene aperto (per esempio il lettore PDF) e riprova."},
+                            status_code=409)
+    return JSONResponse({"codice": "ERRORE_FILE", "messaggio": f"Operazione su file non riuscita{dove}: {causa}. Controlla "
+                         "lo spazio su disco e la cartella dei dati, poi riprova."}, status_code=503)
+
+
 def strutturati_completi() -> dict:
     """Campi a scelta guidata: i codici ufficiali generati dagli XSD (`codici.py`) e, con precedenza, le voci scritte a mano."""
     from . import codici
@@ -143,8 +178,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
             if (r := controllo(request, query_ammessa)) is not None:
                 return r
             try:
-                out = await fn(request)
-                return out if hasattr(out, "status_code") else JSONResponse(out)
+                return await in_thread(fn, request)
             except RichiestaRifiutata as e:
                 return JSONResponse({"codice": e.codice, "messaggio": e.messaggio}, status_code=e.stato)
             except NonTrovato as e:
@@ -153,7 +187,30 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                 return JSONResponse(e.asdict(), status_code=409 if e.codice == "CONFLITTO_REVISIONE" else 422)
             except (ValueError, KeyError, TypeError, AttributeError) as e:   # JSON malformato, campo mancante o di tipo errato
                 return JSONResponse({"codice": "RICHIESTA_NON_VALIDA", "messaggio": "richiesta non valida: " + (str(e) or type(e).__name__)[:200]}, status_code=422)
+            except sqlite3.OperationalError as e:
+                return errore_archivio(e)
+            except OSError as e:
+                return errore_file(e)
         return w
+
+    async def in_thread(fn, request: Request):
+        """Esegue l'endpoint (async, ma con chiamate sincrone al servizio: Ghostscript, Java, backup, PDF/A, SQLite) in un
+        thread di lavoro, con un proprio ciclo di eventi: il ciclo principale resta libero e le altre richieste
+        dell'interfaccia non aspettano. La lettura del corpo della richiesta (anche a blocchi, con i limiti di dimensione)
+        passa dal ciclo principale; tutta l'operazione usa una sola connessione di lettura (``sessione_letture``)."""
+        principale = asyncio.get_running_loop()
+        originale = request.receive
+
+        async def ricevi():
+            return await asyncio.wrap_future(asyncio.run_coroutine_threadsafe(_attendi(originale), principale))
+
+        def esegui():
+            with sv.arch.sessione_letture():
+                if (ciclo := getattr(_CICLI, "runner", None)) is None:   # un ciclo per thread di lavoro, riusato (~3 ms)
+                    ciclo = _CICLI.runner = asyncio.Runner()
+                out = ciclo.run(fn(Request(request.scope, ricevi)))
+                return out if hasattr(out, "status_code") else JSONResponse(out)
+        return await run_in_threadpool(esegui)
 
     def imposta_cookie(resp):
         resp.set_cookie(cookie, token, httponly=True, samesite="strict", path="/")

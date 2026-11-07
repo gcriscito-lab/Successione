@@ -51,7 +51,7 @@ _ISTANZE: "weakref.WeakSet[Archivio]" = weakref.WeakSet()
 
 
 def chiudi_connessioni(base: Path | str | None = None) -> None:
-    """Chiude le connessioni di lettura riusate degli archivi aperti in questo processo (tutti, o quelli nella cartella
+    """Chiude le connessioni di sessione ancora aperte degli archivi aperti in questo processo (tutti, o quelli nella cartella
     ``base``): da chiamare prima di spostare, rinominare o cancellare la cartella dei dati."""
     radice = Path(base).resolve() if base else None
     for a in list(_ISTANZE):
@@ -62,18 +62,30 @@ def chiudi_connessioni(base: Path | str | None = None) -> None:
             pass
 
 
+class _StatoThread(threading.local):
+    """Stato per thread della sessione di letture: connessione condivisa, profondita' e modalita' di consultazione."""
+    c: sqlite3.Connection | None = None
+    n: int = 0
+    consultazione: bool = False
+    punti: int = 0
+
+
 class Archivio:
+    #: limite del file WAL dopo un checkpoint (byte): un WAL cresciuto per una scrittura grande torna a questa misura
+    LIMITE_WAL = 4 * 1024 * 1024
+
     def __init__(self, base: Path | str | None = None):
         self.base = Path(base) if base else cartella_dati()
         self.base.mkdir(parents=True, exist_ok=True)
         (self.base / "allegati").mkdir(exist_ok=True)
         self.db_path = self.base / "archivio.sqlite3"
-        self._locale, self._aperte, self._aperte_lock = threading.local(), [], threading.Lock()
+        self._locale, self._aperte, self._aperte_lock = _StatoThread(), [], threading.Lock()
         _ISTANZE.add(self)
         self._migra()
 
-    def _apri(self) -> sqlite3.Connection:
-        c = sqlite3.connect(self.db_path, timeout=10, isolation_level=None)
+    def _apri(self, condivisa: bool = False) -> sqlite3.Connection:
+        # check_same_thread=False solo per le connessioni di sessione: chiudi() puo' chiuderle anche da un altro thread
+        c = sqlite3.connect(self.db_path, timeout=10, isolation_level=None, check_same_thread=not condivisa)
         c.row_factory = sqlite3.Row
         # Il passaggio a WAL di un file nuovo puo' restituire "database is locked" senza attendere il busy_timeout se un
         # altro processo (GUI e MCP avviati insieme) lo sta facendo nello stesso istante: si riprova per un tempo limitato.
@@ -88,11 +100,11 @@ class Archivio:
                 time.sleep(0.05)
         c.execute("PRAGMA foreign_keys=ON")
         c.execute("PRAGMA busy_timeout=10000")
-        # Prestazioni: ogni lettura apre e chiude una connessione; senza questa opzione la chiusura dell'ultima connessione
-        # esegue un checkpoint completo del WAL (circa 7 ms su Windows, il 65% del tempo della pagina iniziale con 11 pratiche).
-        # Il checkpoint resta automatico durante le scritture (wal_autocheckpoint); i dati sono comunque durevoli nel WAL.
-        if hasattr(c, "setconfig") and hasattr(sqlite3, "SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE"):
-            c.setconfig(sqlite3.SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, True)
+        c.execute(f"PRAGMA journal_size_limit={self.LIMITE_WAL}")
+        # Il checkpoint alla chiusura resta ATTIVO: chiudendo l'ultima connessione (di qualunque processo) SQLite riporta
+        # tutto nel file principale e rimuove il WAL. Cosi' una cartella dati chiusa e' autosufficiente (copiabile,
+        # verificabile con immutable=1, ripristinabile) e a riposo nessun file del database resta aperto. Il costo
+        # dell'apertura si paga una volta per operazione grazie a sessione_letture().
         return c
 
     def _migra(self):
@@ -119,34 +131,99 @@ class Archivio:
             c.close()
 
     @contextmanager
-    def lettura(self):
-        """Connessione di sola lettura riusata per thread: aprire e chiudere una connessione SQLite costa alcuni millisecondi
-        su Windows (mappatura del WAL), moltiplicati per decine di letture a ogni pagina. In modalita' autocommit ogni
-        istruzione legge l'ultimo stato confermato, anche se scritto da un'altra connessione o dal server MCP."""
-        c = getattr(self._locale, "c", None)
-        if c is None:
-            c = self._apri()
-            self._locale.c = c
+    def sessione_letture(self, consultazione: bool = False):
+        """Una sola connessione di lettura per tutta un'operazione (una richiesta HTTP, una chiamata di strumento MCP),
+        chiusa alla fine. Aprire e chiudere una connessione costa alcuni millisecondi su Windows, moltiplicati per decine di
+        letture a ogni pagina; fuori dalle operazioni nessun file del database resta aperto. Le sessioni si annidano
+        (contatore per thread: la connessione si chiude quando torna a zero). In autocommit ogni istruzione legge l'ultimo
+        stato confermato, anche se scritto da un'altra connessione o da un altro processo.
+
+        ``consultazione=True`` (strumenti MCP di lettura con «Claude in sola lettura»): le scritture interne
+        (``transazione()``, per esempio l'allineamento dello stato di una copia d'invio) avvengono sulla stessa connessione,
+        in una transazione ANNULLATA a fine sessione. Il risultato riflette lo stato aggiornato, l'archivio non cambia."""
+        st = self._locale
+        if st.n == 0:
+            st.c, st.consultazione, st.punti = None, consultazione, 0     # connessione aperta alla prima lettura
+        elif consultazione and not st.consultazione:
+            raise RuntimeError("consultazione richiesta dentro una sessione ordinaria gia' aperta")
+        st.n += 1
+        try:
+            yield self
+        finally:
+            st.n -= 1
+            if st.n == 0:
+                c, st.c, st.consultazione = st.c, None, False
+                if c is not None:
+                    self._chiudi_connessione(c)
+
+    def _connessione_sessione(self) -> sqlite3.Connection:
+        """Connessione della sessione in corso nel thread (aperta ora se serve, o riaperta se chiudi() l'ha chiusa)."""
+        st = self._locale
+        with self._aperte_lock:
+            valida = st.c is not None and st.c in self._aperte
+        if not valida:
+            if st.c is not None and st.consultazione:
+                raise sqlite3.OperationalError("connessione di consultazione chiusa durante l'operazione")
+            st.c = self._apri(condivisa=True)
             with self._aperte_lock:
-                self._aperte.append(c)
-        if c.in_transaction:          # non dovrebbe accadere (solo letture): si riparte da uno stato pulito
-            c.execute("ROLLBACK")
-        yield c
+                self._aperte.append(st.c)
+        return st.c
+
+    def _chiudi_connessione(self, c: sqlite3.Connection) -> None:
+        with self._aperte_lock:
+            if c in self._aperte:
+                self._aperte.remove(c)
+        try:
+            if c.in_transaction:          # consultazione (o lettura interrotta): nulla viene confermato
+                c.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        try:
+            c.close()
+        except sqlite3.Error:
+            pass
+
+    @contextmanager
+    def lettura(self):
+        """Connessione di lettura: quella della sessione in corso nel thread, altrimenti una aperta e chiusa per l'occasione."""
+        with self.sessione_letture():
+            c = self._connessione_sessione()
+            if c.in_transaction and not self._locale.consultazione:   # non dovrebbe accadere (solo letture)
+                c.execute("ROLLBACK")
+            yield c
 
     def chiudi(self) -> None:
-        """Chiude le connessioni di lettura riusate (per esempio prima di spostare o cancellare la cartella dei dati)."""
+        """Chiude le connessioni di sessione ancora aperte, anche di altri thread (per esempio prima di spostare o
+        cancellare la cartella dei dati). A riposo non ce ne sono: le sessioni si chiudono da sole a fine operazione."""
         with self._aperte_lock:
-            for c in self._aperte:
-                try:
-                    c.close()
-                except sqlite3.Error:
-                    pass
-            self._aperte.clear()
-        self._locale = threading.local()
+            aperte, self._aperte = list(self._aperte), []
+        for c in aperte:
+            try:
+                c.close()
+            except sqlite3.Error:
+                pass
 
     @contextmanager
     def transazione(self):
-        """Scrittura atomica: tutto o niente."""
+        """Scrittura atomica: tutto o niente. In una sessione di consultazione la scrittura resta provvisoria (annullata a
+        fine sessione, vedi ``sessione_letture``)."""
+        st = self._locale
+        if st.n and st.consultazione:
+            c = self._connessione_sessione()
+            if not c.in_transaction:
+                c.execute("BEGIN IMMEDIATE")
+            st.punti += 1
+            nome = f"consultazione_{st.punti}"
+            c.execute(f"SAVEPOINT {nome}")
+            try:
+                yield c
+            except BaseException:
+                c.execute(f"ROLLBACK TO {nome}")
+                c.execute(f"RELEASE {nome}")
+                raise
+            else:
+                c.execute(f"RELEASE {nome}")
+            return
         c = self._apri()
         try:
             c.execute("BEGIN IMMEDIATE")

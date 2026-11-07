@@ -9,6 +9,8 @@ Uso (dal pacchetto installato, con il Python incorporato):
 Cosa aggiunge al comando `successioni` (src/successioni/cli.py), senza modificarne il comportamento:
 - legge `configurazione.json` accanto al programma (solo variabili SUCCESSIONI_* note; quelle gia' presenti
   nell'ambiente prevalgono) e cerca gli strumenti esterni nelle cartelle standard di Windows;
+- in tutti i modi (anche `mcp`, avviato da Claude Desktop) indica a `successioni.impostazioni` lo STESSO file
+  (SUCCESSIONI_CONFIG): preferenze come «Claude in sola lettura» e profilo dello studio valgono per interfaccia e Claude;
 - con pythonw.exe (nessuna console) reindirizza stdout/stderr su un file di log: uvicorn altrimenti fallisce
   (`sys.stdout.isatty()` su None, provato il 2026-11-01);
 - se l'interfaccia e' gia' aperta riapre il browser sulla stessa sessione invece di fallire per porta occupata;
@@ -46,6 +48,17 @@ NOME_SESSIONE = "sessione_gui.json"
 
 def file_configurazione() -> Path:
     return Path(os.environ.get("SUCCESSIONI_CONFIG") or (RADICE / "configurazione.json"))
+
+
+def fissa_file_configurazione(env: dict | None = None) -> str:
+    """Indica a ``successioni.impostazioni`` (variabile SUCCESSIONI_CONFIG) il file di configurazione dell'avviatore, in
+    TUTTI i modi (gui, mcp, backup, info): l'interfaccia vi salva preferenze («Claude in sola lettura», visura bloccante),
+    profilo dello studio e percorsi, e il server MCP avviato da Claude Desktop deve leggere lo stesso file. Senza, il server
+    MCP leggerebbe ``configurazione.json`` nella cartella dei dati e ignorerebbe le scelte fatte nell'interfaccia. Un valore
+    gia' presente nell'ambiente prevale."""
+    env = os.environ if env is None else env
+    env.setdefault("SUCCESSIONI_CONFIG", str(file_configurazione()))
+    return env["SUCCESSIONI_CONFIG"]
 
 
 def leggi_configurazione(percorso: Path | None = None) -> dict:
@@ -230,6 +243,7 @@ def main(argv=None) -> int:
     b.add_argument("destinazione")
     sub.add_parser("info")
     a = ap.parse_args(argv)
+    fissa_file_configurazione()
     origini = prepara_ambiente()
     cmd = a.cmd or "gui"
     if cmd == "mcp":

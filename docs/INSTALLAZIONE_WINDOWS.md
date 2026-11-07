@@ -50,6 +50,7 @@ Variabili d'ambiente reali utilizzate dal server MCP:
 ```powershell
 claude mcp add successioni --transport stdio --scope user -e "SUCCESSIONI_DATA=<cartella_dati>" -- "<percorso_python>\python.exe" -s "<percorso_repo>\scripts\windows\avvia_successioni.py" mcp
 ```
+- **Stesso file di impostazioni per interfaccia e Claude (dal 7/11/2026)**: l'avviatore indica a interfaccia e server MCP lo stesso `configurazione.json` accanto al programma, in tutti i modi (`gui`, `mcp`, `backup`, `info`). Così «Claude in sola lettura», il profilo dello studio e la visura bloccante scelti nelle Impostazioni valgono anche per Claude. **Non serve riconfigurare Claude Desktop** se la voce avvia `avvia_successioni.py mcp` (quella scritta da `Configura-MCP.cmd`): basta chiudere completamente Claude Desktop, anche dall'area di notifica, e riaprirlo, così riparte con il programma aggiornato. Va invece rifatta la voce se avvia direttamente `successioni mcp` o `python -m successioni.mcp_server`: in quel caso aggiungere `SUCCESSIONI_CONFIG=<radice del programma>\configurazione.json` in `env`. Verifica: `successioni_capacita` deve riportare `sola_lettura: true` dopo aver attivato la preferenza nell'interfaccia.
 
 ### Verifica degli strumenti MCP
 Il server MCP espone 20 strumenti con prefisso `successioni_`:
