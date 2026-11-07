@@ -66,3 +66,49 @@ def test_api_csv_html_e_mcp(tmp_path):
     r = c.get(f"/api/pratiche/{pid}/brogliaccio")
     assert r.status_code == 200 and "Brogliaccio" in r.text
     assert c.get("/api/pratiche/inesistente/brogliaccio.csv").status_code == 404
+
+
+def test_dati_in_opzioni_telematico():
+    # review del 07/11/2026 sera: provincia, codice comune, classe e consistenza salvati in opzioni.telematico (come nel
+    # caso di riferimento) devono comparire nel brogliaccio, letti come fanno esportazione e albero
+    d = caso_completo()
+    casa = next(r for r in B.righe(d)["beni"] if r["particella"] == "200")
+    assert (casa["provincia"], casa["codice_comune"], casa["classe"], casa["consistenza"]) == ("RM", "H501", "3", "5.5")
+    terreno = next(r for r in B.righe(d)["beni"] if r["particella"] == "20")
+    assert terreno["reddito_dominicale"] == "12.34"
+    # il valore sull'entita' ha la precedenza
+    d = copia(d)
+    d["beni"][0]["provincia"] = "LT"
+    assert B.righe(d)["beni"][0]["provincia"] == "LT"
+
+
+def test_diritti_equivalenti_non_segnalano_manca():
+    # lo stesso diritto scritto «1» e «proprieta» (l'esportazione li accetta entrambi, codice_enum con alias_descrizione)
+    d = copia(caso_completo())
+    d["devoluzioni"][0]["diritto"], d["devoluzioni"][1]["diritto"] = "1", "proprieta"
+    q = [r for r in B.righe(d)["quote"] if r["bene"].startswith("Roma fg. 100")]
+    assert len(q) == 2 and all(r["esito"] == "completa" and r["somma_quote_bene_diritto"] == "1/1" for r in q), q
+    assert {r["diritto"] for r in q} == {"1", "proprieta"}          # il testo resta quello inserito
+    assert B.codice_diritto("nuda proprieta") == "2" and B.codice_diritto("usufrutto") == "8"
+    assert B.codice_diritto("xyz") == "xyz"
+    # diritti diversi restano separati
+    d["devoluzioni"][1]["diritto"] = "8"
+    assert {r["esito"] for r in B.righe(d)["quote"] if r["bene"].startswith("Roma fg. 100")} == {"manca 1/2"}
+
+
+def test_csv_neutralizza_le_formule_ma_non_i_numeri():
+    d = copia(caso_completo())
+    b = d["beni"][0]
+    b["comune"], b["foglio"], b["valore"], b["rendita"] = '=HYPERLINK("x")', "-1+1", "-12", "+3,50"
+    b["categoria"] = "@A2"
+    next(x for x in d["persone"] if x["ruolo"] != "defunto")["cognome"] = "-SOMMA(A1)"
+    righe = list(csv.reader(io.StringIO(B.csv_testo(d)[1:]), delimiter=";"))
+    col = {c: i for i, c in enumerate(B.COLONNE_BENI)}
+    r = righe[2]
+    assert r[col["comune"]] == "'=HYPERLINK(\"x\")" and r[col["foglio"]] == "'-1+1" and r[col["categoria"]] == "'@A2"
+    assert r[col["bene"]].startswith("'=")
+    assert r[col["valore"]] == "-12" and r[col["rendita"]] == "+3,50"      # numeri veri delle colonne numeriche
+    celle = [c for riga in righe for c in riga]
+    assert any(c.startswith("'-SOMMA") for c in celle)
+    assert not [c for c in celle if c[:1] in ("=", "+", "-", "@") and c not in ("-12", "+3,50")]
+    assert B._cella("foglio", "-12") == "'-12" and B._cella("valore", "-12x") == "'-12x" and B._cella("valore", "12") == "12"

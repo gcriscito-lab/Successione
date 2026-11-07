@@ -26,6 +26,27 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   assert.match(ris, /Stima: non sostituisce la dichiarazione né il controllo ufficiale/);
   // la quota di legge e' proposta come segnaposto
   assert.equal(await page.getAttribute(".calc-erede >> nth=0 >> input.q", "placeholder"), "1/2");
+  // il campo quota contiene per intero il segnaposto «di legge» (review del 07/11/2026 sera)
+  assert.ok(await page.evaluate(() => {
+    const el = document.querySelector(".calc-erede input.q"), c = document.createElement("canvas").getContext("2d");
+    c.font = getComputedStyle(el).font; return c.measureText("di legge").width + 8 <= el.clientWidth;
+  }), "campo quota abbastanza largo per «di legge»");
+  // passivita': predefinita 12 (nessun bene di riferimento); il mutuo (3) chiede l'immobile; importi con i centesimi
+  await page.click("#calcDati button:has-text('Aggiungi passività')");
+  assert.equal(await page.inputValue(".calc-passivita >> nth=0 >> select"), "12");
+  assert.equal(await page.locator(".calc-passivita select.calc-cespite").count(), 0);
+  await page.fill(".calc-passivita >> nth=0 >> input[aria-label=Importo]", "1.234,56");
+  await page.fill(".calc-immobile >> nth=0 >> input[aria-label=Valore]", "300.000,50");
+  await page.waitForFunction(() => /Importi arrotondati/.test(document.querySelector("#calcRis").textContent), null, { timeout: 30000 });
+  assert.doesNotMatch(await page.textContent("#calcRis"), /DatoNP|non stimabile/);
+  await page.selectOption(".calc-passivita >> nth=0 >> select", "3");
+  await page.waitForSelector(".calc-passivita select.calc-cespite");
+  await page.waitForFunction(() => /immobile del mutuo/.test((document.querySelector("#calcErrore") || {}).textContent || ""), null, { timeout: 30000 });
+  await page.selectOption(".calc-passivita select.calc-cespite", "i1");
+  await page.waitForFunction(() => document.querySelector("#calcTotale") && /Importi arrotondati/.test(document.querySelector("#calcRis").textContent), null, { timeout: 30000 });
+  await page.click(".calc-passivita >> nth=0 >> button.x");
+  await page.fill(".calc-immobile >> nth=0 >> input[aria-label=Valore]", "300.000");
+  await page.waitForFunction(() => (document.querySelector("#calcTotale") || {}).textContent === "15.805 €", null, { timeout: 30000 });
   // decesso prima del 2025: imposta di successione «non stimabile» con il motivo
   await page.fill("#calcData", "2024-05-01");
   await page.waitForFunction(() => /non stimabile: imposta di successione/.test(document.querySelector("#calcRis").textContent), null, { timeout: 30000 });

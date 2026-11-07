@@ -556,3 +556,6 @@ table.calc-imp tr.tot td { font-weight:700; border-top:2px solid var(--sep-f); }
 .prossime-altre { margin:8px 2px 0; font-size:var(--fs-s); }
 /* Modifica di gruppo: scelta esplicita per svuotare un campo */
 .gruppo-svuota { display:block; margin-top:4px; font-size:var(--fs-s); color:var(--t2); }
+/* Calcolatrice: il campo quota mostra per intero il segnaposto «di legge» o una quota come 1/12; menu del bene della passività */
+.calc-riga input.q { width:6.5em; }
+.calc-riga select.calc-cespite { max-width:11em; }

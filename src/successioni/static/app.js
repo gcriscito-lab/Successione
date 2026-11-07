@@ -2439,9 +2439,28 @@ function calcDisegnaDati() {
     ...sez("Altri beni", d.altri_beni, () => ({ tipo: "CR", valore: "" }), (o, i) => h("div", { class: "calc-riga calc-altro" },
       calcSelect(o.tipo, CALC_ALTRI, v => { o.tipo = v; calcPianifica(); }, "Tipo di bene"),
       calcInput(o, "valore", { class: "n", placeholder: "valore €", "aria-label": "Valore", inputmode: "decimal" }), calcTogli(d.altri_beni, i)), "+ Aggiungi conto, titolo o altro bene"),
-    ...sez("Passività", d.passivita, () => ({ tipo: "3", importo: "" }), (o, i) => h("div", { class: "calc-riga calc-passivita" },
-      calcSelect(o.tipo, tipiPass, v => { o.tipo = v; calcPianifica(); }, "Tipo di passività"),
-      calcInput(o, "importo", { class: "n", placeholder: "importo €", "aria-label": "Importo", inputmode: "decimal" }), calcTogli(d.passivita, i)), "+ Aggiungi passività")].filter(Boolean));
+    // predefinita «12 — Altre passività», che non richiede il bene di riferimento; per i tipi 3, 4, 5, 7 si sceglie il bene
+    // (annotazione XSD di ProgressivoCespite: per il mutuo, tipo 3, solo un immobile)
+    ...sez("Passività", d.passivita, () => ({ tipo: "12", importo: "" }), (o, i) => h("div", { class: "calc-riga calc-passivita" },
+      calcSelect(o.tipo, tipiPass, v => { o.tipo = v; calcDisegnaDati(); calcPianifica(); }, "Tipo di passività"),
+      calcInput(o, "importo", { class: "n", placeholder: "importo €", "aria-label": "Importo", inputmode: "decimal" }),
+      calcCespite(o, d), calcTogli(d.passivita, i)), "+ Aggiungi passività")].filter(Boolean));
+}
+const CALC_CON_CESPITE = ["3", "4", "5", "7"];
+function calcCespite(o, d) {
+  if (!CALC_CON_CESPITE.includes(String(o.tipo))) { delete o.immobile; delete o.altro_bene; return null; }
+  const voci = [["", o.tipo === "3" ? "immobile del mutuo…" : "bene di riferimento…"],
+    ...d.immobili.map((b, k) => ["i" + (k + 1), "Immobile " + (k + 1) + " (" + (b.tipo === "terreno" ? "terreno" : "fabbricato") + ")"]),
+    ...(o.tipo === "3" ? [] : d.altri_beni.map((b, k) => ["a" + (k + 1), "Altro bene " + (k + 1)]))];
+  const att = o.immobile ? "i" + o.immobile : (o.altro_bene && o.tipo !== "3") ? "a" + o.altro_bene : "";
+  if (att && !voci.some(v => v[0] === att)) { delete o.immobile; delete o.altro_bene; }   // bene tolto nel frattempo
+  const s = calcSelect(voci.some(v => v[0] === att) ? att : "", voci, v => {
+    delete o.immobile; delete o.altro_bene;
+    if (v[0] === "i") o.immobile = +v.slice(1); else if (v[0] === "a") o.altro_bene = +v.slice(1);
+    calcPianifica();
+  }, o.tipo === "3" ? "Immobile a cui si riferisce il mutuo" : "Bene a cui si riferisce la passività");
+  s.classList.add("calc-cespite");
+  return s;
 }
 function calcPianifica() { clearTimeout(CALC.timer); CALC.timer = setTimeout(calcEsegui, 450); }
 async function calcEsegui() {
