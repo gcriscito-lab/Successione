@@ -29,7 +29,8 @@ def test_ambiente_e_controllo_manuale_riprendibile(tmp_path, capsys):
     assert r["esito"] == "da_collaudare" and r["stato"] == "attesa_diagnostico"
     r2 = esegui(capsys, "--archivio", a, "registra-diagnostico", "--job", r["job_id"], "--dgn",
                 str(FIX / "frontespizio.dgn"), "--log", str(FIX / "frontespizio_logSchema.xml"), "--wri",
-                str(FIX / "frontespizio.wri"))
+                str(FIX / "frontespizio.wri"), "--non-prima-di", "2026-11-01T09:00:00+00:00",
+                "--conferma-associazione")   # registrazione del 2026-11-01, nome di un controllo di un altro archivio
     assert r2["esito"] == "fallito" and r2["stato_controllo"] == "negativo" and r2["versione_controllo"] == "2.3.1"
     st = esegui(capsys, "--archivio", a, "stato", "--job", r["job_id"])
     assert st["stato"] == "completato"

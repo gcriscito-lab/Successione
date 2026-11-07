@@ -98,8 +98,12 @@ class InvioMixin:
         return out
 
     def invio_stato(self, pratica_id: str) -> dict:
-        """Copie congelate della pratica con i tentativi (dal piu' recente)."""
-        from .collegamenti.invio import TIPO_COPIA
+        """Tutte le copie congelate della pratica (dal piu' recente), ognuna con il proprio stato e i tentativi.
+
+        `copia_attiva`: la copia con un invio non concluso o gia' trasmessa (quella da mostrare anche se non e' la piu'
+        recente); `tentativo_aperto`: il suo tentativo da riconciliare (creato, in trasmissione, in attesa dell'invio
+        manuale, esito incerto), altrimenti None; `elenco_copie`: riepilogo compatto di ogni copia."""
+        from .collegamenti.invio import DA_RICONCILIARE, IN_INVIO, TIPO_COPIA
         ad = self._adattatore_invio("manuale")
         copie = []
         for j in reversed(ad.job.elenca(TIPO_COPIA, pratica_id)):
@@ -110,7 +114,25 @@ class InvioMixin:
             # prove simulate: elenco separato, non sono tentativi della copia reale
             copia["prove"] = [ad.leggi_tentativo(tid).asdict() for tid in copia["dettaglio"].get("prove", [])]
             copie.append(copia)
-        return {"pratica_id": pratica_id, "copie": copie}
+        aperta, t = ad.invio_aperto(pratica_id)
+        tentativo_aperto = None
+        if aperta is not None and aperta["stato"] == IN_INVIO:
+            stato_t = t["stato"] if t else None
+            tentativo_aperto = {"job_id": t["job_id"] if t else None, "stato": stato_t, "copia_id": aperta["job_id"],
+                                "da_riconciliare": stato_t in DA_RICONCILIARE,
+                                "modalita": ad._modalita_tentativo(t) if t else None}
+        elenco = []
+        for c in copie:
+            d = c["dettaglio"]
+            corr = next((x for x in c["tentativi"] if x["dettaglio"].get("job_id") == d.get("tentativo_corrente")), None)
+            elenco.append({"copia_id": c["job_id"], "stato": c["stato"], "revisione": d.get("revisione"),
+                           "tentativo_corrente": d.get("tentativo_corrente"),
+                           "stato_tentativo": corr["dettaglio"].get("stato") if corr else None,
+                           "protocollo": corr["dettaglio"].get("protocollo") if corr else None,
+                           "attiva": aperta is not None and c["job_id"] == aperta["job_id"]})
+        return {"pratica_id": pratica_id, "copie": copie,
+                "copia_attiva": aperta["job_id"] if aperta is not None else None,
+                "tentativo_aperto": tentativo_aperto, "elenco_copie": elenco}
 
     def ricevuta_acquisisci(self, pratica_id: str, tentativo_id: str, contenuto: bytes, *, nome: str,
                            tipo: str, esito: str | None = None) -> dict:

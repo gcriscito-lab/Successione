@@ -206,10 +206,14 @@ def test_rifiuto_definitivo_conservato(ctx):
         ad.trasmetti(c.job_id, chiave_richiesta="r2")
 
 
-def test_seconda_copia_della_stessa_pratica_non_si_invia(ctx):
+def test_seconda_copia_della_stessa_pratica_non_si_invia(ctx, monkeypatch):
     ad = I.InvioAdattatore(ctx["arch"], I.TrasportoSimulato())
     a = confermata(ctx, ad, chiave="a")
     assert ad.trasmetti(a.job_id, chiave_richiesta="ta").stato == I.TRASMESSO
+    with pytest.raises(ReinvioNonAmmesso, match="gia' trasmessa"):     # review 3: rifiutata gia' alla preparazione
+        confermata(ctx, ad, chiave="b")
+    # seconda difesa (preparazione concorrente che ha superato il controllo): l'invio resta comunque bloccato
+    monkeypatch.setattr(ad, "_blocco_nuova_copia", lambda *a, **k: None)
     b = confermata(ctx, ad, chiave="b")
     with pytest.raises(ReinvioNonAmmesso):
         ad.trasmetti(b.job_id, chiave_richiesta="tb")
@@ -265,9 +269,8 @@ def test_a19_ricevute_ed_esiti_separati_associati_al_protocollo(ctx):
         ad.associa(protocollo=prot, tipo="seconda", contenuto=b"y", nome="y")  # tipo mai dedotto dall'ordine
     orfano = ad.associa(protocollo="999", tipo="da_classificare", contenuto=b"z", nome="z.pdf", pratica_id="pr_x")
     assert ad.job.leggi(orfano.job_id)["risultato"]["associazione"].startswith("solo protocollo")
-    s = I.stati_pratica(ctx["arch"], ctx["pid"])
+    s = ctx["sv"].stato_elaborati(ctx["pid"])           # stato della pratica (stati_pratica rimossa, review 3)
     assert s["trasmissione"]["stato"] == I.TRASMESSA and s["trasmissione"]["protocollo"] == prot
-    assert s["controllo_ufficiale"]["stato"] == "positivo"  # doppio di test
 
 
 # --------------------------------------------------------------------------------- Entratel-Multifile

@@ -114,8 +114,8 @@ def test_2_prova_simulata_non_consuma_la_copia_reale(ctx):
     assert c.dettaglio["prove"] == [t.job_id] and c.dettaglio["tentativi"] == []
     with pytest.raises(ReinvioNonAmmesso):                 # fra le prove: nessuna seconda prova dopo un'accettata
         prova.trasmetti(cid, chiave_richiesta="prova-2")
-    st = I.stati_pratica(ctx["arch"], ctx["pid"])
-    assert st["trasmissione"]["stato"] == I.CONFERMATA and "protocollo" not in st["trasmissione"]
+    st = ctx["sv"].stato_elaborati(ctx["pid"])
+    assert st["trasmissione"]["stato"] == I.CONFERMATA and not st["trasmissione"].get("protocollo")
     assert st["trasmissione"]["prova_simulata"]["protocollo_fittizio"].startswith("SIM")
     # l'invio reale (manuale tracciato) resta possibile
     m = reale.trasmetti(cid, chiave_richiesta="reale-1")
@@ -142,7 +142,7 @@ def test_2_archivio_precedente_con_copia_reale_consumata_viene_riparato(ctx):
     assert sim.leggi_copia(c.job_id).stato == I.TRASMESSA
     # come le copie della versione precedente: create dal servizio (reali), consumate da una prova simulata
     RegistroJob(ctx["arch"]).annota(c.job_id, {"modalita_copia": "manuale"})
-    assert I.stati_pratica(ctx["arch"], ctx["pid"])["trasmissione"]["stato"] == I.CONFERMATA   # gia' in lettura
+    assert ctx["sv"].stato_elaborati(ctx["pid"])["trasmissione"]["stato"] == I.CONFERMATA   # riparata in lettura
     reale = I.InvioAdattatore(ctx["arch"])
     r = reale.verifica_validita(c.job_id)
     assert r.stato == I.CONFERMATA and r.dettaglio["prove"] == [t.job_id] and r.dettaglio["tentativi"] == []

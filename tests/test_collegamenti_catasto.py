@@ -195,7 +195,9 @@ def test_trasporto_reale_da_collaudare_e_registrazione_originale(arch):
     corpo = json.dumps({"formato": K.FORMATO_INTERNO, "completo": True,
                         "immobili": FIXTURE["passi"][1]["immobili"]}).encode()
     r = ad.registra_originale(r.job_id, corpo, formato=K.FORMATO_INTERNO, fonte="conversione manuale")
-    assert r.esito is Esito.DA_COLLAUDARE and r.stato == K.COMPLETATO and r.dettaglio["immobili"] == 2
+    # review 3: «completo» dichiarato dal file caricato a mano non vale come completezza confermata da Entratel
+    assert r.esito is Esito.DA_COLLAUDARE and r.stato == K.CARICATO_MANUALMENTE and r.dettaglio["immobili"] == 2
+    assert r.dettaglio["completezza"]["completo"] is False and r.dettaglio["completezza"]["dichiarato_dal_file"]
 
 
 def test_errori_ambito_e_servizio(arch):

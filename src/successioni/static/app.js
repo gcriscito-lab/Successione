@@ -1299,17 +1299,27 @@ function descriviImporti(m) {
 async function renderInvio(ins, ex, ct) {
   const pid = S.P.pratica_id; const base = "/api/pratiche/" + pid + "/invio";
   ins.append(h("div", { class: "nota stretta" }, "PROVA SIMULATA: il programma non trasmette nulla all'Agenzia delle Entrate. L'invio reale si esegue con gli strumenti ufficiali (modalità manuale) e si registra qui."));
-  let copie = [];
-  try { copie = (await api(base)).copie; } catch (e) { ins.append(h("p", { class: "err" }, e.message)); return; }
+  let copie = [], sti = {};
+  try { sti = await api(base); copie = sti.copie || []; } catch (e) { ins.append(h("p", { class: "err" }, e.message)); return; }
+  // invio in corso / da riconciliare o gia' trasmesso: nessuna nuova copia finche' l'esito non e' registrato (review 3)
+  const bloccoPrep = sti.copia_attiva ? (sti.tentativo_aperto
+    ? "C'è un invio in corso o da riconciliare: registra prima l'esito (protocollo, .esi o invio non avvenuto)."
+    : "La dichiarazione risulta già trasmessa: non si prepara un'altra copia.") : "";
   const ricarica = () => { if (S.sel === "FILE") renderVista(); };
   // ogni azione e' «occupata» finche' la richiesta non finisce: un secondo clic non parte (revisione 2, punto 2)
   const chiama = (nome, url, corpo, ok) => occupato(nome, async () => { try { const r = await post(url, corpo); msg(ok(r), "o"); } catch (e) { msg(e.message, "e"); } ricarica(); });
   // stessa chiave finche' non cambiano revisione, file generato e controllo: ripetere «Prepara invio» restituisce la stessa copia
   const chiavePrep = ["prep", pid, "r" + S.P.revisione, ex.job_id || "", (ct || {}).job_adattatore || (ct || {}).stato || ""].join("-");
-  ins.append(h("div", { class: "az" }, h("button", { class: "pil", disabled: ex.stato !== "aggiornato" || !ex.completo || OCCUPATI.has("prepara"), title: "Congela il file XML completo con il controllo ufficiale associato",
+  ins.append(h("div", { class: "az" }, h("button", { class: "pil", disabled: ex.stato !== "aggiornato" || !ex.completo || !!bloccoPrep || OCCUPATI.has("prepara"), title: bloccoPrep || "Congela il file XML completo con il controllo ufficiale associato",
     onclick: chiama("prepara", base + "/prepara", { chiave_richiesta: chiavePrep }, r => "Copia preparata. " + (r.azione_richiesta || "")) }, "Prepara invio")));
-  const c = copie[0];
+  if (bloccoPrep) ins.append(h("div", { class: "nota stretta" }, bloccoPrep));
+  // la copia mostrata e' quella con il tentativo aperto o trasmessa, non la piu' recente: il tentativo non sparisce mai
+  const c = copie.find(x => x.job_id === sti.copia_attiva) || copie[0];
   if (!c) { ins.append(h("p", { class: "mut testo-m" }, "Nessuna copia preparata. Serve un file completo e un controllo ufficiale positivo.")); return; }
+  const altre = (sti.elenco_copie || []).filter(x => x.copia_id !== c.job_id);
+  if (altre.length) ins.append(h("details", {}, h("summary", {}, "Altre copie della pratica (" + altre.length + ")"),
+    ...altre.map(x => h("div", { class: "mut testo-m" }, "Copia " + x.copia_id + " · rev. " + (x.revisione ?? "–") + " · " + String(x.stato).replaceAll("_", " ")
+      + (x.stato_tentativo ? " · tentativo " + String(x.stato_tentativo).replaceAll("_", " ") : "") + (x.protocollo ? " · protocollo " + x.protocollo : "")))));
   const d = c.dettaglio || {};
   ins.append(h("a", { href: "/api/invio/" + c.job_id + "/file", download: "" }, "Scarica la copia congelata"));
   ins.append(h("p", { class: "mut" }, "Fornitore: " + descriviFornitore(d.profilo) + " · Importi: " + descriviImporti(d.importi)));
@@ -1343,9 +1353,20 @@ async function renderInvio(ins, ex, ct) {
         const evidenze = { verificato_su: fonte.value.trim(), ...(nonInviato ? { non_trasmesso: true } : { protocollo: protocollo.value.trim() }) };
         return chiama("riconcilia", url, { evidenze }, r => "Esito registrato: " + r.stato)();
       };
+      // file .esi di Entratel-Multifile / Desktop Telematico: abbinato per nome del file e data, mai per ordine d'arrivo
+      const esi = h("input", { type: "file", accept: ".esi,.json,.txt", "aria-label": "File .esi dell'invio" });
+      const registraEsi = async () => {
+        const f = esi.files && esi.files[0];
+        if (!f) return msg("Scegli il file .esi prodotto dall'invio.", "e");
+        if (f.size > 2000000) return msg("File .esi troppo grande.", "e");
+        const testo = await f.text();
+        return chiama("riconcilia", url, { evidenze: { esi: testo } }, r => "Esito dal file .esi: " + String(r.stato).replaceAll("_", " ")
+          + (r.dettaglio && r.dettaglio.protocollo ? " · protocollo " + r.dettaglio.protocollo : "") + (r.azione_richiesta && r.stato !== "trasmesso" ? " — " + r.azione_richiesta : ""))();
+      };
       ins.append(protocollo, fonte, h("div", { class: "az" },
         h("button", { onclick: () => registra(false) }, "Registra protocollo"),
-        h("button", { onclick: () => { if (confirm("Hai verificato che questo invio non è avvenuto?")) registra(true); } }, "Registra invio non avvenuto")));
+        h("button", { onclick: () => { if (confirm("Hai verificato che questo invio non è avvenuto?")) registra(true); } }, "Registra invio non avvenuto")),
+        h("div", { class: "az" }, esi, h("button", { class: "gh", disabled: OCCUPATI.has("riconcilia"), onclick: registraEsi }, "Registra file .esi")));
     }
   }
   // le prove simulate sono separate: non consumano la copia confermata (revisione 2)

@@ -34,6 +34,7 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -269,18 +270,31 @@ def leggi_wri(testo: str) -> dict:
             elif riga.strip():
                 corrente["testo"].append(riga.strip())
     v = re.search(r"Versione\s+(\d+\.\d+\.\d+)\s+del\s+(\d{2}/\d{2}/\d{4})", testo)
+    # "Data: G/M/AAAA" nella prima riga del rapporto (VisualXml): giorno dell'elaborazione, senza ora
+    dt = re.search(r"^\s*Data:\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$", testo[:400], re.MULTILINE)
+    data_el = None
+    if dt:
+        try:
+            data_el = date(int(dt.group(3)), int(dt.group(2)), int(dt.group(1))).isoformat()
+        except ValueError:
+            data_el = None
     return {"riepilogo": rp if any(x is not None for x in rp.values()) else None,
             "blocchi": [{"simbolo": b["simbolo"], "testo": " ".join(b["testo"])} for b in blocchi],
-            "versione_controllo": v.group(1) if v else None, "data_versione": v.group(2) if v else None}
+            "versione_controllo": v.group(1) if v else None, "data_versione": v.group(2) if v else None,
+            "data_elaborazione": data_el}
 
 
 # ------------------------------------------------------------------------------------ valutazione
+_CONTATORI_DECISIVI = ("elaborate", "scartate_errori_bloccanti", "scartate_non_rispondenza")
+
+
 def valuta(dgn: dict | None, esito_fornitura: dict | None) -> tuple[str, list[str]]:
     """Stato del controllo (specifica §10) dai soli diagnostici originali:
     positivo | negativo | da_verificare | non_verificabile.
 
-    `da_verificare`: nessun motivo di scarto, ma il .dgn contiene righe non riconosciute o diagnostici con gravita'
-    illeggibile/non decodificata: il programma non puo' concludere che il controllo sia positivo."""
+    `da_verificare`: nessun motivo di scarto, ma il .dgn contiene righe non riconosciute, diagnostici con gravita'
+    illeggibile/non decodificata o contatori del riepilogo (elaborate, scartate) illeggibili, mai letti come zero: il
+    programma non puo' concludere che il controllo sia positivo."""
     motivi: list[str] = []
     if not dgn and not esito_fornitura:
         return "non_verificabile", ["nessun diagnostico prodotto"]
@@ -294,7 +308,7 @@ def valuta(dgn: dict | None, esito_fornitura: dict | None) -> tuple[str, list[st
         if rp is None:
             motivi.append("diagnostico senza record di riepilogo (tipo 9)")
         else:
-            if not rp.get("elaborate"):
+            if rp.get("elaborate") == 0:
                 motivi.append("nessuna dichiarazione elaborata")
             if rp.get("scartate_errori_bloccanti"):
                 motivi.append(f"dichiarazioni scartate per errori bloccanti: {rp['scartate_errori_bloccanti']}")
@@ -314,6 +328,10 @@ def valuta(dgn: dict | None, esito_fornitura: dict | None) -> tuple[str, list[st
         illeggibili = [d for d in dgn.get("diagnostici", []) if not d.get("simbolo")]
         if illeggibili:
             dubbi.append(f"diagnostici con gravita' illeggibile o non decodificata: {len(illeggibili)}")
+        # contatori del riepilogo illeggibili: mai trattati come zero (uno «scartate» non leggibile non e' «0 scartate»)
+        contatori = [k for k in _CONTATORI_DECISIVI if (dgn.get("riepilogo") or {}).get(k) is None]
+        if contatori:
+            dubbi.append("contatori del riepilogo (record 9) illeggibili: " + ", ".join(contatori))
     if dubbi:
         return "da_verificare", dubbi + ["verificare il rapporto .wri originale: esito non dichiarabile positivo"]
     return "positivo", []
@@ -411,7 +429,9 @@ ISTRUZIONI_MANUALI = (
     "3. Registrare nel programma i file prodotti dal controllo: <nome>.dgn e <nome>_logSchema.xml (obbligatori) e "
     "<nome>.wri se generato con 'Visualizza diagnostici'.\n"
     "4. Indicare versione del controllo e ambiente (Windows, Desktop Telematico/Java). Il programma verifica che il "
-    "diagnostico si riferisca alla stessa dichiarazione (codice fiscale del defunto e identificativo).\n"
+    "diagnostico si riferisca allo stesso file: nome del file nel .dgn fra quelli riconosciuti (sotto), codice fiscale "
+    "del defunto, identificativo, numero di dichiarazioni e data del rapporto .wri non anteriore all'esportazione. "
+    "Codice fiscale e identificativo sono uguali in ogni revisione: con un nome diverso serve la conferma esplicita.\n"
     "Requisito di automazione: resta aperto finche' il componente non e' configurato per l'esecuzione diretta "
     f"({ENV_JAVA}, {ENV_JAR})."
 )
@@ -472,6 +492,26 @@ def confronta_nome(nome: str, job: dict, registro: RegistroJob | None = None) ->
     return "sconosciuto", f"{n}: nome non riconducibile a questo file"
 
 
+def _istruzioni_manuali(job: dict) -> str:
+    """Istruzioni del passaggio manuale con nome, SHA-256 e nomi riconosciuti del file (uguali per entrambi gli
+    adattatori)."""
+    inp = job.get("input", {})
+    return (ISTRUZIONI_MANUALI + f"\nFile: {inp.get('xml_nome')} — SHA-256 {inp.get('xml_sha256')}"
+            + "\nNomi del file riconosciuti nel .dgn: " + ", ".join(sorted(nomi_noti(job)))
+            + "\nNon rinominare il file: con un altro nome il programma chiede la conferma esplicita dell'associazione.")
+
+
+def _giorno_locale(iso: str | None) -> str | None:
+    """Giorno (AAAA-MM-GG, ora locale della postazione, come la data del .wri) di un istante ISO dell'archivio."""
+    try:
+        d = datetime.fromisoformat(str(iso))
+    except (TypeError, ValueError):
+        return None
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone().date().isoformat()
+
+
 # ------------------------------------------------------------------------------------- adattatori
 class _BaseControllo:
     def __init__(self, archivio: Archivio):
@@ -504,7 +544,8 @@ class _BaseControllo:
         """Ultimo job manuale in attesa del diagnostico per lo stesso file (impronta) e gli stessi dati dichiarativi."""
         for j in reversed(self.job.elenca(TIPO_JOB, inp.get("pratica_id"), stati=["attesa_diagnostico"])):
             i = j["input"]
-            if (i.get("xml_sha256") == inp["xml_sha256"] and i.get("modalita") == "manuale_tracciato"
+            manuale = "manuale_tracciato" in (i.get("modalita"), j["risultato"].get("modalita"))
+            if (i.get("xml_sha256") == inp["xml_sha256"] and manuale
                     and i.get("impronta_dichiarativa") == inp.get("impronta_dichiarativa")
                     and i.get("pratica_id") == inp.get("pratica_id")):
                 return j
@@ -512,13 +553,17 @@ class _BaseControllo:
 
     def registra_diagnostico(self, job_id: str, *, dgn: bytes, log_schema: bytes, wri: bytes | None = None,
                              ambiente_dichiarato: dict | None = None,
-                             conferma_associazione: bool = False) -> RisultatoAdattatore:
+                             conferma_associazione: bool = False,
+                             non_prima_di: str | None = None) -> RisultatoAdattatore:
         """Registra i file originali del controllo eseguito dall'utente e ne verifica il riferimento al file.
 
-        Il riferimento si verifica su codice fiscale del defunto e identificativi dei record diagnostici, sul numero di
-        dichiarazioni elaborate e sul nome del file nell'intestazione del .dgn. Un diagnostico senza record (es.
-        positivo) e con nome diverso non e' verificabile: serve `conferma_associazione=True`, registrata come
-        dichiarazione dell'utente."""
+        Incoerenze di codice fiscale del defunto, identificativi o numero di dichiarazioni elaborate: rifiuto. Nome nel
+        .dgn che indica un altro file/revisione, o rapporto .wri datato prima di `non_prima_di` (esportazione del file
+        corrente; predefinito: creazione del job): rifiuto anche con la conferma. Il codice fiscale e l'identificativo
+        (00001) sono uguali in tutte le revisioni: provano solo la coerenza, non che sia lo STESSO file. Solo un nome fra
+        quelli noti verifica l'associazione; altrimenti serve `conferma_associazione=True` (registrata come
+        dichiarazione dell'utente). Con la conferma e un contenuto coerente l'esito segue il diagnostico; con la sola
+        conferma e nessun riscontro nel contenuto resta 'da_collaudare' (non sblocca l'invio)."""
         j = self.job.leggi(job_id, TIPO_JOB)
         if j["stato"] != "attesa_diagnostico":
             return self.leggi(job_id)
@@ -552,11 +597,32 @@ class _BaseControllo:
         if esito_nome == "diverso":   # mai accettato, nemmeno con la conferma: e' il diagnostico di un altro file
             raise DatiNonValidi("il diagnostico riguarda un altro file o un'altra revisione: non registrato",
                                 incoerenze=[spiega_nome], nomi_attesi=sorted(nomi_noti(j)))
-        verificata = bool((sogg and cf) or (id_dgn and ids)) or esito_nome == "coincide"
+        # Data del rapporto .wri (se fornito): un'elaborazione anteriore all'esportazione del file corrente e'
+        # necessariamente il controllo di un altro file (revisione precedente), anche con la conferma.
+        soglia = _giorno_locale(non_prima_di or j.get("creato"))
+        data_wri = None
+        if wri:
+            try:
+                data_wri = leggi_wri(decodifica(wri)).get("data_elaborazione")
+            except Exception:   # il .wri e' facoltativo: se illeggibile lo segnala _completa_con_diagnostici
+                data_wri = None
+        if data_wri and soglia and data_wri < soglia:
+            raise DatiNonValidi("il rapporto .wri e' di un controllo eseguito prima dell'esportazione del file corrente: "
+                                "e' il diagnostico di un altro file o di una revisione precedente. Non registrato: "
+                                "controllare il file attuale e registrare i file nuovi",
+                                data_rapporto=data_wri, file_corrente_dal=soglia)
+        # CF del defunto e identificativo (sempre 00001) NON provano che sia lo STESSO file: sono uguali in tutte le
+        # revisioni della pratica. Senza un nome del file fra quelli noti serve la conferma esplicita dell'utente.
+        contenuto_coerente = bool((sogg and cf) or (id_dgn and ids))
+        verificata = esito_nome == "coincide"
         if not verificata and not conferma_associazione:
-            raise DatiNonValidi("associazione del diagnostico al file non verificabile (nessun record con codice "
-                                "fiscale e nome file non riconosciuto): confermarla esplicitamente",
-                                nome_nel_dgn=nome_dgn, nomi_attesi=sorted(nomi_noti(j)))
+            raise DatiNonValidi(
+                f"il nome del file nel .dgn ({nome_dgn or 'assente'}) non e' fra i nomi del file corrente: il codice "
+                "fiscale del defunto e l'identificativo non bastano a provare che sia il controllo di QUESTO file (sono "
+                "uguali in ogni revisione). Se il .dgn e' del controllo appena eseguito sul file attuale, confermalo "
+                "esplicitamente (conferma_associazione); altrimenti ricontrolla il file corrente",
+                nome_nel_dgn=nome_dgn, nomi_attesi=sorted(nomi_noti(j)), contenuto_coerente=contenuto_coerente,
+                serve_conferma=True)
         artefatti = list(j["risultato"].get("artefatti", []))
         for b, nome, ruolo in ((dgn, "diagnostico.dgn", "diagnostico_dgn"),
                                (log_schema, "diagnostico_logSchema.xml", "esito_schema"),
@@ -566,13 +632,23 @@ class _BaseControllo:
         extra = {"modalita": "manuale_tracciato", "requisito_automazione": "aperto",
                  "ambiente_dichiarato": ambiente_dichiarato or {},
                  "associazione": {"cf_defunto": cf, "identificativi": sorted(ids), "nome_nel_dgn": nome_dgn,
-                                  "confronto_nome": spiega_nome,
-                                  "metodo": ("codice fiscale, identificativi, numero di dichiarazioni e nome del file "
-                                             "confrontati con il file conservato") if verificata else
+                                  "confronto_nome": spiega_nome, "data_rapporto_wri": data_wri,
+                                  "file_corrente_dal": soglia,
+                                  "conferma_utente": bool(conferma_associazione and not verificata),
+                                  "metodo": ("nome del file fra quelli noti; codice fiscale, identificativi e numero di "
+                                             "dichiarazioni confrontati con il file conservato") if verificata else
+                                  ("confermata esplicitamente dall'utente (nome del file non riconosciuto); codice "
+                                   "fiscale, identificativi e numero di dichiarazioni coerenti col file conservato")
+                                  if contenuto_coerente else
                                   "dichiarata dall'utente (non verificabile dal contenuto)"}}
+        avv: list[str] = []
+        if not verificata and contenuto_coerente:
+            avv.append("nome del file nel .dgn non riconosciuto: associazione confermata dall'utente (codice fiscale e "
+                       "identificativo coerenti, ma uguali in ogni revisione)")
         patch = self._completa_con_diagnostici(j, dgn_b=dgn, log_b=log_schema, wri_b=wri, reale=True, extra=extra,
-                                               artefatti=artefatti, avvertenze=[])
-        if not verificata:  # mai 'passato' su un'associazione solo dichiarata: non sblocca la conferma dell'invio
+                                               artefatti=artefatti, avvertenze=avv)
+        if not verificata and not contenuto_coerente:
+            # mai 'passato' su un'associazione solo dichiarata e senza riscontri: non sblocca la conferma dell'invio
             patch["esito"] = Esito.DA_COLLAUDARE.value
             patch["avvertenze"].append("associazione al file dichiarata dall'utente: esito non verificato")
         self.job.transizione(job_id, ["attesa_diagnostico"], "completato", patch=patch, nota=patch["stato_controllo"])
@@ -642,6 +718,12 @@ class ControlloJar(_BaseControllo):
                rapporto_wri: bool = True, **kw) -> RisultatoAdattatore:
         dati, inp = self._input(xml_path, kw, "esecuzione_jar")
         inp["produci_dcm"] = bool(produci_dcm)
+        if chiave is None:
+            # Ripiego manuale gia' aperto per lo stesso file (componente non eseguibile): come ControlloManuale si
+            # riprende quello, senza un job nuovo a ogni clic. Se ora il componente e' pronto si esegue davvero.
+            aperto = self.aperto_per(inp)
+            if aperto is not None and not self.diagnostica()["pronto"]:
+                return self.leggi(aperto["job_id"])
         j, nuovo = self.job.crea(TIPO_JOB, kw.get("pratica_id"), inp, stato="creato", chiave=chiave)
         return self._esegui_job(j["job_id"], dati, rapporto_wri)
 
@@ -685,7 +767,7 @@ class ControlloJar(_BaseControllo):
         amb = self.diagnostica()
         if not amb["pronto"]:
             az = ("Componente di controllo non eseguibile qui: " + "; ".join(amb["problemi"]) + ".\n"
-                  + ISTRUZIONI_MANUALI)
+                  + _istruzioni_manuali(j))
             j = self.job.transizione(j["job_id"], ["creato", "interrotto"], "attesa_diagnostico", patch={
                 "esito": Esito.DA_COLLAUDARE.value, "stato_controllo": "non_eseguito", "ambiente": amb,
                 "artefatti": [art_in], "azione_richiesta": az, "modalita": "manuale_tracciato",
@@ -803,8 +885,7 @@ class ControlloManuale(_BaseControllo):
         art = self.deposito.salva_bytes(dati, inp["xml_nome"], "input_controllo")
         j = self.job.transizione(j["job_id"], ["creato"], "attesa_diagnostico", patch={
             "esito": Esito.DA_COLLAUDARE.value, "stato_controllo": "non_eseguito", "artefatti": [art],
-            "azione_richiesta": ISTRUZIONI_MANUALI + f"\nFile: {inp['xml_nome']} — SHA-256 {inp['xml_sha256']}"
-                                + "\nNomi del file riconosciuti nel .dgn: " + ", ".join(sorted(nomi_noti(j))),
+            "azione_richiesta": _istruzioni_manuali(j),
             "modalita": "manuale_tracciato", "requisito_automazione": "aperto"}, nota="in attesa del diagnostico")
         return self.leggi(j["job_id"])
 

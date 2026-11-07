@@ -64,13 +64,15 @@ def test_consultazione_guasta_solleva_errore_di_connessione():
 def test_stati_iniziali_di_una_pratica_senza_copie(tmp_path):
     s = Servizio(Archivio(tmp_path / "dati"))
     pid = s.crea_pratica("Prova")["pratica_id"]
-    st = I.stati_pratica(s.arch, pid)
+    st = s.stato_elaborati(pid)              # stati_pratica (solo test) rimossa: vale lo stato del servizio
     assert st["pratica_id"] == pid
     assert st["controllo_ufficiale"] == {"stato": "non_eseguito"}
-    assert st["trasmissione"] == {"stato": "non_preparata"}
+    assert st["trasmissione"]["stato"] == "non_preparata" and "tentativo_aperto" not in st["trasmissione"]
+    assert I.InvioAdattatore(s.arch).invio_aperto(pid) == (None, None)
 
 
 def test_invio_stato_del_servizio_senza_copie(tmp_path):
     s = Servizio(Archivio(tmp_path / "dati"))
     pid = s.crea_pratica("Prova")["pratica_id"]
-    assert s.invio_stato(pid) == {"pratica_id": pid, "copie": []}
+    assert s.invio_stato(pid) == {"pratica_id": pid, "copie": [], "copia_attiva": None, "tentativo_aperto": None,
+                                  "elenco_copie": []}

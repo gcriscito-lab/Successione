@@ -186,9 +186,20 @@ def test_componente_assente_passaggio_manuale_tracciato(arch, tmp_path):
     assert r.esito is Esito.DA_COLLAUDARE and r.stato == "attesa_diagnostico"
     assert C.ENV_JAR in r.azione_richiesta and "Requisito di automazione" in r.azione_richiesta
     assert r.dettaglio["stato_controllo"] == "non_eseguito"
-    # l'utente esegue il controllo ufficiale e registra i file originali prodotti (qui: la registrazione reale)
+    # l'utente esegue il controllo ufficiale e registra i file originali prodotti (qui: la registrazione reale del
+    # 2026-11-01: il .wri e' datato prima del job di oggi e viene rifiutato come esito di un'esportazione precedente)
+    with pytest.raises(DatiNonValidi, match="prima dell'esportazione"):
+        ctl.registra_diagnostico(r.job_id, dgn=leggi("frontespizio.dgn"), log_schema=leggi(
+            "frontespizio_logSchema.xml"), wri=leggi("frontespizio.wri"), ambiente_dichiarato={"os": "Windows 11"})
+    # il .dgn registrato nomina la copia di lavoro di un controllo di un altro archivio: nome non riconosciuto, il CF
+    # del defunto da solo non basta -> serve la conferma esplicita
+    with pytest.raises(DatiNonValidi, match="conferma"):
+        ctl.registra_diagnostico(r.job_id, dgn=leggi("frontespizio.dgn"), log_schema=leggi(
+            "frontespizio_logSchema.xml"), wri=leggi("frontespizio.wri"), non_prima_di="2026-11-01T09:00:00+00:00")
     r2 = ctl.registra_diagnostico(r.job_id, dgn=leggi("frontespizio.dgn"), log_schema=leggi(
-        "frontespizio_logSchema.xml"), wri=leggi("frontespizio.wri"), ambiente_dichiarato={"os": "Windows 11"})
+        "frontespizio_logSchema.xml"), wri=leggi("frontespizio.wri"), ambiente_dichiarato={"os": "Windows 11"},
+        non_prima_di="2026-11-01T09:00:00+00:00",   # file corrente esportato il giorno del controllo
+        conferma_associazione=True)
     assert r2.stato == "completato" and r2.esito is Esito.FALLITO and r2.dettaglio["stato_controllo"] == "negativo"
     j = ctl.job.leggi(r.job_id)["risultato"]
     assert j["modalita"] == "manuale_tracciato" and j["requisito_automazione"] == "aperto"

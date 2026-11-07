@@ -272,9 +272,10 @@ class ElaboratiMixin:
                                        job_adattatore: str | None = None) -> dict:
         """Chiude il passaggio manuale del controllo ufficiale con i file ORIGINALI prodotti dall'utente (Desktop Telematico
         o ControlliSUC13): `.dgn` e `_logSchema.xml` obbligatori, `.wri` facoltativo. Il diagnostico e' accettato solo se
-        riferibile al file controllato (codice fiscale, identificativi, nome del file fra quelli noti); un nome che indica
-        un altro file o un'altra revisione e' rifiutato. `conferma_associazione` registra la dichiarazione dell'utente quando
-        il contenuto non permette la verifica: l'esito resta 'da_collaudare' e non sblocca l'invio."""
+        riferibile al file controllato; un nome che indica un altro file o un'altra revisione, o un rapporto .wri datato
+        prima della prima esportazione di questi byte, e' rifiutato. Codice fiscale e identificativo non bastano: se il nome
+        nel .dgn non e' fra quelli noti serve `conferma_associazione` (dichiarazione dell'utente); senza alcun riscontro nel
+        contenuto l'esito resta 'da_collaudare' e non sblocca l'invio."""
         from .collegamenti.base import RegistroJob
         from .collegamenti.controllo import TIPO_JOB, ControlloManuale
         st = self.stato_elaborati(pratica_id)
@@ -295,8 +296,19 @@ class ElaboratiMixin:
             raise DatiNonValidi(f"il controllo {jid} non e' in attesa del diagnostico (stato {j['stato']})")
         ControlloManuale(self.arch).registra_diagnostico(
             jid, dgn=dgn, log_schema=log_schema, wri=wri, ambiente_dichiarato=ambiente_dichiarato,
-            conferma_associazione=conferma_associazione)
+            conferma_associazione=conferma_associazione,
+            non_prima_di=self._prima_esportazione(pratica_id, exp.get("xml_sha256")) or j.get("creato"))
         return {"pratica_id": pratica_id, **self.stato_elaborati(pratica_id)["controllo_ufficiale"]}
+
+    def _prima_esportazione(self, pratica_id: str, sha: str | None) -> str | None:
+        """Istante della prima esportazione che ha prodotto esattamente questi byte (stessa impronta)."""
+        if not sha:
+            return None
+        with self.arch.lettura() as c:
+            righe = c.execute("SELECT creato, risultato FROM job WHERE tipo=? AND pratica_id=?",
+                              (TIPO_EXPORT, pratica_id)).fetchall()
+        date = [r["creato"] for r in righe if json.loads(r["risultato"] or "{}").get("xml_sha256") == sha]
+        return min(date) if date else None
 
     def file_controllato_dcm(self, pratica_id: str) -> tuple[bytes, dict]:
         """File controllato (.dcm) prodotto dal componente ufficiale per l'export corrente, se il controllo e' positivo."""
@@ -407,11 +419,25 @@ class ElaboratiMixin:
             stampa = {"stato": "aggiornata" if corrente else "obsoleta", "job_id": s["id"], "pagine": s["risultato"].get("pagine"),
                       "pdf_sha256": s["risultato"].get("pdf_sha256")}
         ver = self.verifica(pratica_id)
-        invio = self.invio_stato(pratica_id)["copie"]
+        stato_invio = self.invio_stato(pratica_id)
+        invio = stato_invio["copie"]
         trasmissione = {"stato": "non_preparata", "nota": "invio reale manuale con strumenti ufficiali"}
         if invio:
-            copia = invio[0]
-            trasmissione.update(stato=copia["stato"], modalita=copia["dettaglio"].get("modalita"))
+            # La copia da mostrare e' quella con un invio aperto o gia' trasmesso (anche se non e' la piu' recente):
+            # un tentativo in corso non deve mai sparire dalla vista.
+            copia = next((x for x in invio if x["job_id"] == stato_invio.get("copia_attiva")), invio[0])
+            trasmissione.update(stato=copia["stato"], modalita=copia["dettaglio"].get("modalita"),
+                                copia_id=copia["job_id"], copie=len(invio),
+                                tentativo_aperto=stato_invio.get("tentativo_aperto"))
+            corr = next((t for t in copia.get("tentativi", [])
+                         if t["dettaglio"].get("job_id") == copia["dettaglio"].get("tentativo_corrente")), None)
+            if corr is not None:
+                trasmissione.update(tentativo=corr["dettaglio"].get("job_id"), tentativo_stato=corr["dettaglio"].get("stato"),
+                                    protocollo=corr["dettaglio"].get("protocollo"))
+            if stato_invio.get("tentativo_aperto"):
+                ta = stato_invio["tentativo_aperto"]
+                trasmissione["nota"] = (f"invio da riconciliare (tentativo {ta['job_id']}, stato {ta['stato']}): "
+                                        "registra l'esito prima di qualunque altra copia")
             if trasmissione["modalita"] == "simulata":
                 trasmissione["nota"] = "PROVA SIMULATA: nessun invio all'Agenzia"
             if copia.get("prove"):   # prove simulate sulla copia reale: separate, non cambiano lo stato della copia

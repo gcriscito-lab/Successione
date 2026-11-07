@@ -34,8 +34,10 @@ SERVIZIO = "Risultanze catastali (Entratel)"
 # Stati della lavorazione (persistiti nella colonna job.stato)
 AVVIATO, ATTESA_UTENTE, SESSIONE_SCADUTA = "avviato", "attesa_utente", "sessione_scaduta"
 COMPLETATO, PARZIALE, ERRORE, ANNULLATO = "completato", "parziale", "errore", "annullato"
+# File nel formato interno inserito a mano che si dichiara completo: la completezza la afferma il file, non Entratel.
+CARICATO_MANUALMENTE = "caricato_manualmente"
 APERTI = (AVVIATO, ATTESA_UTENTE, SESSIONE_SCADUTA)
-TERMINALI = (COMPLETATO, PARZIALE, ERRORE, ANNULLATO)
+TERMINALI = (COMPLETATO, PARZIALE, ERRORE, ANNULLATO, CARICATO_MANUALMENTE)
 
 CAMPI_IDENTIFICATIVI = ("tipo", "comune", "codice_comune", "sezione", "foglio", "particella", "subalterno")
 CAMPI_NOTI = {"catasto", "comune", "codice_comune", "sezione", "foglio", "particella", "subalterno", "graffati",
@@ -413,6 +415,8 @@ class CatastoEntratelAdattatore:
         fine = not resp.pagina_successiva
         completo = fine and resp.completo and not limiti
         stato = (COMPLETATO if completo else PARZIALE) if fine else AVVIATO  # avviato = acquisizione in corso
+        if modalita == "registrazione_manuale" and stato == COMPLETATO:
+            stato = CARICATO_MANUALMENTE   # mai «completato» come se l'avesse confermato il servizio
         prov = {"servizio": SERVIZIO if self.trasporto.reale else "simulazione", "modalita": modalita,
                 "acquisito_il": ora(), **resp.provenienza}
         patch = {"immobili": imm, "grezzi": grezzi, "segnalazioni_normalizzazione": segn, "originali": r.get("originali", []) + [art],
@@ -421,6 +425,9 @@ class CatastoEntratelAdattatore:
                  "completezza": {"completo": completo, "motivo": None if completo else
                                  ("in corso" if not fine else "; ".join(limiti) or "il servizio non conferma la "
                                   "completezza dei risultati")}}
+        if stato == CARICATO_MANUALMENTE:
+            patch["completezza"] = {"completo": False, "dichiarato_dal_file": True,
+                                    "motivo": "completezza dichiarata dal file inserito a mano, non confermata da Entratel"}
         self.job.transizione(job_id, APERTI, stato, patch=patch, nota=f"pagina {patch['pagine']} acquisita")
 
     def registra_originale(self, job_id: str, contenuto: bytes, *, formato: str, fonte: str) -> RisultatoAdattatore:
@@ -436,9 +443,20 @@ class CatastoEntratelAdattatore:
                                     "convertibile: fornire un esempio per scrivere il convertitore (A13)."},
                 nota="originale conservato, formato non supportato")
             return self.leggi(job_id)
-        corpo = json.loads(contenuto.decode("utf-8"))
-        resp = RispostaCatasto("risultati", immobili=corpo.get("immobili", []), originale=contenuto,
-                               formato=formato, completo=bool(corpo.get("completo")), limiti=corpo.get("limiti", []),
+        try:
+            corpo = json.loads(contenuto.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError) as e:
+            raise DatiNonValidi(f"file nel formato {FORMATO_INTERNO} non leggibile (JSON non valido): non registrato",
+                                dettaglio=str(e)[:200]) from None
+        if not isinstance(corpo, dict):
+            raise DatiNonValidi(f"file nel formato {FORMATO_INTERNO}: atteso un oggetto JSON con 'immobili'")
+        immobili, limiti = corpo.get("immobili", []), corpo.get("limiti", [])
+        if not isinstance(immobili, list) or not all(isinstance(x, dict) for x in immobili):
+            raise DatiNonValidi("'immobili' deve essere un elenco di oggetti")
+        if not isinstance(limiti, list) or not all(isinstance(x, str) for x in limiti):
+            raise DatiNonValidi("'limiti' deve essere un elenco di testi")
+        resp = RispostaCatasto("risultati", immobili=immobili, originale=contenuto,
+                               formato=formato, completo=corpo.get("completo") is True, limiti=limiti,
                                provenienza={"fonte": fonte})
         self._registra_pagina(job_id, resp, modalita="registrazione_manuale")
         return self.leggi(job_id)
@@ -465,7 +483,11 @@ class CatastoEntratelAdattatore:
         j = self.job.leggi(job_id, TIPO_JOB)
         prop = proponi_importazione(j["risultato"].get("immobili", []), dati_pratica, cf_defunto=cf_defunto,
                                     selezione=selezione)
-        if j["stato"] != COMPLETATO:
+        if j["stato"] == CARICATO_MANUALMENTE:
+            prop["segnalazioni"].insert(0, {"codice": "CARICATO_MANUALMENTE", "messaggio":
+                                            "risultanze caricate a mano: la completezza e' dichiarata dal file, non "
+                                            "confermata da Entratel; verificare con la visura"})
+        elif j["stato"] != COMPLETATO:
             prop["segnalazioni"].insert(0, {"codice": "ACQUISIZIONE_NON_COMPLETA", "messaggio":
                                             f"lavorazione in stato '{j['stato']}': i risultati possono essere "
                                             "incompleti"})
