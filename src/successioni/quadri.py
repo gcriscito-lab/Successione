@@ -15,19 +15,19 @@ QUADRI: list[dict] = [
     {"id": "AN", "titolo": "Dati generali", "gruppo": "frontespizio", "vista": "frontespizio", "supportato": True},
     {"id": "EA", "titolo": "Eredi, chiamati, legatari e altri soggetti", "gruppo": "quadri", "vista": "tabella",
      "coll": "persone", "preset": {"ruolo": "erede"},
-     "colonne": ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "provincia_nascita", "ruolo", "grado_parentela"],
+     "colonne": ["cognome", "nome", "codice_fiscale", "data_nascita", "ruolo", "grado_parentela"],
      "supportato": True},
     {"id": "EB", "titolo": "Attivo ereditario catasto terreni", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
      "preset": {"tipo": "terreno"},
-     "colonne": ["comune", "sezione", "foglio", "particella", "subalterno", "diritto", "quota_defunto", "valore", "rendita", "provenienza"],
+     "colonne": ["comune", "foglio", "particella", "subalterno", "diritto", "quota_defunto", "reddito_dominicale", "valore"],
      "supportato": True},
     {"id": "EC", "titolo": "Attivo ereditario catasto fabbricati", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
      "preset": {"tipo": "fabbricato"},
-     "colonne": ["comune", "sezione", "foglio", "particella", "subalterno", "categoria", "diritto", "quota_defunto", "rendita", "valore", "provenienza"],
+     "colonne": ["comune", "foglio", "particella", "subalterno", "categoria", "diritto", "quota_defunto", "rendita", "valore"],
      "supportato": True},
     {"id": "ER", "titolo": "Rendite, crediti e altri beni", "gruppo": "quadri", "vista": "tabella", "coll": "beni",
      "preset": {"tipo": "disponibilita_finanziaria"},
-     "colonne": ["tipo", "descrizione", "valore", "quota_defunto", "provenienza"], "supportato": True},
+     "colonne": ["tipo", "descrizione", "quota_defunto", "valore"], "supportato": True},
     {"id": "ED", "titolo": "Passività ed altri oneri", "gruppo": "quadri", "vista": "tabella", "coll": "passivita",
      "preset": {}, "colonne": ["descrizione", "importo", "persona_id"], "supportato": True},
     {"id": "EF", "titolo": "Liquidazione delle imposte e altri tributi", "gruppo": "quadri", "vista": "non_supportato",
@@ -89,6 +89,11 @@ for _q in QUADRI:
         _q["campi"] = CAMPI_BENI[_q["id"]]
     if _q.get("colonne"):   # colonne e campi nell'ordine dei moduli ufficiali (etichette.ORDINE)
         _q["colonne"] = ordina(_q["id"], _q["colonne"])
+        # il valore (o l'importo) e' la colonna che si controlla di piu': sempre l'ultima, fissata a destra nell'interfaccia
+        # (report grafica 07/11/2026, punto 1); sezione urbana e provenienza restano nella scheda della riga
+        for _fin in ("valore", "importo"):
+            if _fin in _q["colonne"]:
+                _q["colonne"] = [c for c in _q["colonne"] if c != _fin] + [_fin]
     if _q.get("campi"):
         _q["campi"] = ordina(_q["id"], _q["campi"])
 

@@ -193,7 +193,7 @@ async function caricaPratiche() {
   renderHome();
   const ul = $("#lista"); ul.replaceChildren();
   if (!S.pratiche.length) ul.append(h("li", { class: "mut" }, "Nessuna pratica."));
-  for (const p of S.pratiche) ul.append(h("li", {}, h("button", { title: p.titolo + " (rev. " + p.revisione + ")", "aria-current": S.P && S.P.pratica_id === p.id ? "true" : "false", onclick: () => apri(p.id) }, h("span", {}, p.titolo), h("span", { class: "mut" }, "rev. " + p.revisione))));
+  for (const p of S.pratiche) ul.append(h("li", {}, h("button", { title: p.titolo + " (rev. " + p.revisione + ")", "aria-current": S.P && S.P.pratica_id === p.id ? "true" : "false", onclick: () => apri(p.id) }, h("span", { class: "tit-pratica" }, p.titolo))));
 }
 async function apri(id, sel) {
   try { localStorage.setItem('successioni.ultima', id); } catch (_) { /* facoltativo */ }
@@ -214,7 +214,13 @@ async function ricarica(id) {
 function render() {
   const aperta = !!S.P;
   $("#vuoto") && ($("#vuoto").hidden = aperta);
-  const pannello = aperta && S.sel !== 'FILE' && (S.sel !== 'AN' || S.tab !== 'dati');
+  const q = aperta ? quadro() : null;
+  // quadro con una sola riga: si apre gia' selezionata (report grafica 07/11/2026, punto 2)
+  if (q && q.coll && !S.riga && S.tab === "dati" && S.chiuso !== q.id) { const rr = righeQuadro(q); if (rr.length === 1) S.riga = rr[0].key; }
+  // il pannello di destra resta chiuso finche' non c'e' una riga selezionata (o una scheda Controlli/Cronologia aperta):
+  // senza selezione occupava un quarto dello schermo per dire «Seleziona una riga»
+  const conTabella = q && q.coll;
+  const pannello = aperta && S.sel !== 'FILE' && (S.tab !== 'dati' || (conTabella && !!S.riga));
   $("#app").classList.toggle("conIns", pannello); $("#ins").hidden = !pannello; $('#ridimensiona').hidden = !pannello;
   renderAlbero(); renderVista(); renderIns(); renderSb(); aggiornaBottoni();
 }
@@ -240,9 +246,14 @@ function renderSb() {
     h("span", {}, "Controllo ufficiale: vedi File e invio")].filter(Boolean));
 }
 function vaiFile() { if (!S.P) return; S.sel = 'FILE'; S.riga = null; S.tab = 'dati'; $('#vista').scrollTop = 0; render(); }
-function scegliQuadro(id) { S.sel = id; S.riga = null; S.tab = 'dati'; $('#vista').scrollTop = 0; render(); }
+function scegliQuadro(id) { S.sel = id; S.riga = null; S.chiuso = null; S.tab = 'dati'; $('#vista').scrollTop = 0; render(); }
+function chiudiPannello() { const q = quadro(); S.chiuso = q ? q.id : null; S.riga = null; S.tab = "dati"; render(); tornaTabella(); }
 
 /* ---------- albero dei quadri ---------- */
+/* Titoli brevi nell'elenco (report grafica 07/11/2026, punto 5): il titolo ufficiale resta nel suggerimento e in testa al quadro. */
+const TITOLI_BREVI = { EA: "Eredi e altri soggetti", EB: "Terreni", EC: "Fabbricati", ER: "Rendite, crediti, altri beni", ED: "Passività",
+  EF: "Liquidazione imposte", EG: "Documenti allegati", EI: "Dichiarazioni per la voltura", EL: "Terreni tavolari", EM: "Fabbricati tavolari",
+  EO: "Titoli e quote sociali", EQ: "Navi e imbarcazioni", EH: "Dichiarazioni sostitutive", EE: "Riepilogo dell'asse" };
 function renderAlbero() {
   const nav = $("#albero"); nav.replaceChildren();
   if (!S.Q) return;
@@ -254,7 +265,7 @@ function renderAlbero() {
       const st = q.stato;
       const testo = st === "rilievi" ? q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi") : (q.righe && st === "compilato" ? q.righe + (q.righe === 1 ? " riga" : " righe") : STATI[st]);
       nav.append(h("button", { class: "voce", "data-stato": st, "data-q": q.id, title: q.id + " — " + q.titolo + (testo ? " (" + testo + ")" : ""), "aria-current": S.sel === q.id ? "true" : "false", onclick: () => scegliQuadro(q.id) },
-        h("span", { class: "sigla" }, q.id), h("span", { class: "testi" }, h("span", { class: "nome" }, q.titolo), h("span", { class: "st" }, testo))));
+        h("span", { class: "sigla" }, q.id), h("span", { class: "testi" }, h("span", { class: "nome" }, TITOLI_BREVI[q.id] || q.titolo), h("span", { class: "st" }, testo))));
     }
   }
 }
@@ -319,7 +330,9 @@ function riconosciVoce(sd, attuale) {
   if (/^\d+$/.test(attuale) && sd.opzioni.some(o => o.valore === attuale.replace(/^0+/, ""))) return attuale.replace(/^0+/, "");
   return attuale;
 }
-const testoVoce = (sd, o) => sd.senza_codice ? o.etichetta : o.valore + " — " + o.etichetta;
+// «RM — RM»: quando l'etichetta ripete il codice si mostra una volta sola (report grafica 07/11/2026, punto 7)
+const testoVoce = (sd, o) => sd.senza_codice || !o.etichetta ? (o.etichetta || o.valore)
+  : String(o.etichetta).trim().toUpperCase() === String(o.valore).trim().toUpperCase() ? o.valore : o.valore + " — " + o.etichetta;
 
 /* Campo a scelta guidata (S.schema.strutturati, definito in schema.py): menu con etichette e aiuto della voce scelta.
    Un valore gia' presente ma non nell'elenco (o uno stato come [da_confermare]) resta visibile e non viene perso.
@@ -378,7 +391,8 @@ function renderVista() {
   }
   const q = quadro();
   if (!q) return;
-  main.append(h("h1", {}, (q.id === "AN" || q.id === "DV" ? "" : q.id + " — ") + q.titolo));
+  const titoloQ = h("h1", {}, (q.id === "AN" || q.id === "DV" ? "" : q.id + " — ") + q.titolo);
+  main.append(q.coll && (q.vista === "tabella" || q.vista === "documenti") && q.supportato ? h("div", { class: "testa-quadro" }, titoloQ, menuOperazioni(q)) : titoloQ);
   main.append(h("div", { class: "sottotitolo" }, q.nota || (q.vista === "tabella" || q.vista === "documenti" ? (q.righe + (q.righe === 1 ? " riga" : " righe")) : "")));
   if (!q.attivo && q.supportato) main.append(h("div", { class: "nota" }, "Questo quadro non è selezionato per la dichiarazione. ", h("button", { class: "lk", onclick: () => impostaQuadro(q.id, true) }, "Seleziona il quadro")));
   if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { class: "cresce" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
@@ -455,7 +469,11 @@ function renderTabella(main, q) {
   const campi = S.schema.collezioni[q.coll];
   const righe = righeQuadro(q);
   const t = h("table", { role: "grid", "aria-label": q.titolo });
-  t.append(h("thead", {}, h("tr", {}, q.colonne.map(c => h("th", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : "" }, lbl(q.coll, c, q.id))))));
+  // colonne fisse: la prima (riconoscimento) a sinistra, valore/importo (ultima) a destra (report grafica 07/11/2026, punto 1)
+  const ultima = q.colonne.length - 1, fissaDx = ["valore", "importo"].includes(q.colonne[ultima]);
+  const clsCol = (c, j) => [["quota", "importo", "rendita", "valore", "reddito_dominicale"].includes(c) ? "n" : "",
+    j === 0 ? "fissa-sx" : "", j === ultima && fissaDx ? "fissa-dx" : ""].filter(Boolean).join(" ");
+  t.append(h("thead", {}, h("tr", {}, q.colonne.map((c, j) => h("th", { class: clsCol(c, j) }, lbl(q.coll, c, q.id))))));
   const tb = h("tbody"); t.append(tb);
   righe.forEach((r, i) => {
     const id = r.e && r.e.id; const base = id ? q.coll + "[" + id + "]" : null;
@@ -474,16 +492,62 @@ function renderTabella(main, q) {
       if (q.coll === "documenti_ref" && c === "tipo_eg" && v) { const sd = struttDi(q.coll, c, null), o = sd && sd.opzioni.find(x => x.valore === v); if (o) txt = o.etichetta; }
       if (q.coll === "documenti_ref" && c === "allegato_id" && v) txt = descriviFileEG(v);
       const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
-      const td = h("td", { class: ["quota", "importo", "rendita", "valore"].includes(c) ? "n" : (kind === "cf" ? "cf" : ""), title: txt, "data-allegato": q.coll === "documenti_ref" && c === "allegato_id" ? (v || "") : null }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
+      const td = h("td", { class: [clsCol(c, j), kind === "cf" ? "cf" : ""].filter(Boolean).join(" "), title: txt, "data-allegato": q.coll === "documenti_ref" && c === "allegato_id" ? (v || "") : null }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt);
       tr.append(td);
     });
     tb.append(tr);
   });
   if (!righe.length) tb.append(h("tr", {}, h("td", { colspan: q.colonne.length, class: "mut" }, "Nessuna riga. Usa «Aggiungi riga».")));
+  // riga dei totali per gli importi (report grafica 07/11/2026, punto 4): somma dei valori indicati, senza i dati non noti
+  const daSommare = q.colonne.filter(c => campi[c] === "importo" && ["valore", "importo"].includes(c));
+  if (righe.length > 1 && daSommare.length) {
+    const tot = {}, mancano = {};
+    for (const c of daSommare) {
+      let cent = 0, nonNoti = 0;
+      for (const r of righe) { const v = valRiga(r, c); const m = typeof v === "string" && v.match(/^(-?)(\d+)(?:\.(\d{1,2}))?$/);
+        if (m) cent += (m[1] ? -1 : 1) * (Number(m[2]) * 100 + Number((m[3] || "").padEnd(2, "0"))); else nonNoti++; }
+      tot[c] = cent; mancano[c] = nonNoti;
+    }
+    t.append(h("tfoot", {}, h("tr", {}, q.colonne.map((c, j) => h("td", { class: clsCol(c, j) },
+      j === 0 ? "Totale (" + righe.length + " righe)" : c in tot ? (tot[c] / 100).toLocaleString("it-IT", { minimumFractionDigits: tot[c] % 100 ? 2 : 0, maximumFractionDigits: 2 }) + (mancano[c] ? " + " + mancano[c] + " da indicare" : "") : "")))));
+  }
   main.append(h("div", { class: "tab" }, t));
   main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, "Aggiungi riga"),
-    q.coll === "beni" && ["EB", "EC"].includes(q.id) && righe.some(x => x.e) ? h("button", { class: "gh", onclick: () => ricalcolaValori(q) }, "Ricalcola valori catastali") : null,
+
     h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
+}
+/* Scheda dell'immobile a gruppi (report grafica 07/11/2026, punto 3): i campi collegati stanno vicini, su piu' colonne, e
+   quelli meno usati restano ripiegati se vuoti. I campi non elencati finiscono in «Altri dati». */
+const G_IDENT = ["provincia", "comune", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo", "sezione", "foglio", "particella", "subalterno", "indirizzo"];
+const G_TAV = ["comune_catastale", "codice_comune_catastale", "partita_tavolare", "corpo_tavolare", "porzione_materiale", "particella_denominatore", "sistema_tavolare"];
+const GRUPPI_SCHEDA = {
+  EC: [["Identificazione catastale", G_IDENT], ["Classamento", ["categoria", "classe", "zona_censuaria", "consistenza", "rendita", "rendita_proposta"]],
+       ["Diritto e valore", ["diritto", "quota_defunto", "valore", "diritto_abitazione"]]],
+  EB: [["Identificazione catastale", G_IDENT], ["Terreno", ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"]],
+       ["Diritto e valore", ["diritto", "quota_defunto", "valore"]]],
+  EL: [["Identificazione tavolare", [...G_IDENT, ...G_TAV]], ["Terreno", ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"]], ["Diritto e valore", ["diritto", "quota_defunto", "valore"]]],
+  EM: [["Identificazione tavolare", [...G_IDENT, ...G_TAV]], ["Classamento", ["categoria", "classe", "zona_censuaria", "consistenza", "rendita", "rendita_proposta"]], ["Diritto e valore", ["diritto", "quota_defunto", "valore"]]],
+};
+/* Dati da riportare «con gli estremi presenti in catasto» (Fascicolo I p. PDF 20 per EB, p. PDF 28 per EC): etichetta in grassetto. */
+const OBBLIGATORI = {
+  EB: ["provincia", "comune", "codice_comune", "foglio", "particella", "reddito_dominicale", "quota_defunto", "diritto", "valore"],
+  EC: ["provincia", "comune", "codice_comune", "foglio", "particella", "categoria", "rendita", "quota_defunto", "diritto", "valore"],
+  EA: ["codice_fiscale", "cognome", "nome", "grado_parentela"],
+};
+function schedaAGruppi(gruppi, righe) {
+  const usati = new Set(), out = [];
+  for (const [titolo, campi] of gruppi) {
+    const qui = righe.filter(([c]) => campi.includes(c)); if (!qui.length) continue;
+    qui.forEach(([c]) => usati.add(c));
+    out.push(h("section", { class: "gruppo-scheda" }, h("h4", {}, titolo), h("div", { class: "campi-scheda" }, qui.map(([, el]) => el))));
+  }
+  const resto = righe.filter(([c]) => !usati.has(c));
+  if (resto.length) {
+    const d = h("details", { class: "gruppo-scheda altri-dati" }, h("summary", {}, "Altri dati (" + resto.length + ")"), h("div", { class: "campi-scheda" }, resto.map(([, el]) => el)));
+    if (resto.some(([, el, vuoto]) => !vuoto || el.querySelector(".bad, .e"))) d.open = true;
+    out.push(d);
+  }
+  return out;
 }
 /* ---------- valore catastale (valore_catastale.py): il programma propone, il professionista decide e salva ---------- */
 function euroIntero(v) { return Number(v).toLocaleString("it-IT") + " €"; }
@@ -524,9 +588,35 @@ async function ricalcolaValori(q) {
 function aggiungiRiga(q) {
   const key = "n:" + crypto.randomUUID();
   S.nuove.set(key, { q: q.id, coll: q.coll, id: nuovoId(q.coll), campi: { ...q.preset } });
-  S.riga = key; S.tab = "dati"; renderVista(); renderIns(); aggiornaBottoni(); renderSb();
+  S.riga = key; S.tab = "dati"; render();
   if (!q.attivo && q.supportato) msg("Il quadro " + q.id + " non è selezionato: si seleziona da solo quando salvi la nuova riga.", "o");
   const primo = $("#ins .rg input, #ins .rg select"); if (primo) primo.focus();
+}
+function duplicaRiga(q) {
+  const r = rigaSelezionata(); if (!q || !q.coll || !r) return msg("Seleziona prima la riga da duplicare.", "e");
+  const campi = {};
+  for (const c of Object.keys(S.schema.collezioni[q.coll])) { const v = valRiga(r, c); if (v !== undefined && v !== null && v !== "") campi[c] = JSON.parse(JSON.stringify(v)); }
+  const key = "n:" + crypto.randomUUID();
+  S.nuove.set(key, { q: q.id, coll: q.coll, id: nuovoId(q.coll), campi });
+  S.riga = key; S.tab = "dati"; render();
+  msg("Riga duplicata: modifica i dati diversi e premi «Salva»" + (q.coll === "beni" ? ". Le devoluzioni del bene non vengono copiate." : "."), "o");
+}
+async function eliminaRigaSelezionata(q) {
+  const r = rigaSelezionata(); if (!q || !r) return msg("Seleziona prima la riga da eliminare.", "e");
+  if (r.nuova) { S.nuove.delete(r.key); S.riga = null; return render(); }
+  if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di eliminare la riga.", "e");
+  if (confirm("Eliminare dal quadro " + q.id + " la riga «" + etichetta(q.coll, r.e) + "»?")) await salvaOps([{ op: "remove", coll: q.coll, id: r.e.id }], () => {
+    S.dirty.delete(r.key); S.riga = null; });
+}
+/* Menu «Operazioni» del quadro (report grafica 07/11/2026, punto 9): i comandi che valgono solo in questo quadro, con la scorciatoia. */
+function menuOperazioni(q) {
+  const voci = [["Aggiungi riga", "Alt+N", () => aggiungiRiga(q)], ["Duplica la riga selezionata", "Alt+D", () => duplicaRiga(q)]];
+  if (q.coll === "beni" && ["EB", "EC"].includes(q.id)) voci.push(["Ricalcola valori catastali", "", () => ricalcolaValori(q)]);
+  voci.push(["Elimina la riga selezionata", "", () => eliminaRigaSelezionata(q)]);
+  const d = h("details", { class: "operazioni" }, h("summary", { class: "gh" }, "Operazioni"));
+  d.append(h("div", { class: "menu-op", role: "menu" }, voci.map(([t, k, f]) => h("button", { role: "menuitem", onclick: () => { d.open = false; f(); } },
+    h("span", {}, t), k ? h("kbd", {}, k) : null))));
+  return d;
 }
 /* Tastiera nella tabella (roving tabindex: una sola tappa Tab per tabella). Frecce su/giu, Home e Fine spostano il focus tra le
    righe; Invio o Spazio aprono la riga e portano il focus al primo campo del pannello (Esc, gestito in layout.js, torna alla riga). */
@@ -540,7 +630,7 @@ function tastiTabella(ev, tr, key) {
 }
 function rigaDaFocalizzare(key) { return document.querySelector('tr[data-key="' + CSS.escape(key) + '"]'); }
 function selezionaRiga(key, dove) {
-  S.riga = key; S.tab = "dati"; renderVista(); renderIns();
+  S.riga = key; S.tab = "dati"; render();
   if (dove === "pannello") { const primo = $("#ins .rg input, #ins .rg select, #ins .rg textarea"); if (primo) { primo.focus(); return; } }
   if (dove) { const tr = rigaDaFocalizzare(key); if (tr) tr.focus({ preventScroll: true }); }
   if (window.innerWidth <= 960) $("#ins").scrollIntoView({ block: "start" });   // su schermo stretto il pannello sta sotto la tabella
@@ -573,10 +663,12 @@ function insDati(ins) {
   if (!q || !q.coll) { ins.append(h("p", { class: "mut" }, q && q.vista === "frontespizio" ? "I dati del frontespizio si modificano nelle schede al centro." : "Questo quadro non ha righe da modificare.")); return; }
   if (!r) { ins.append(h("p", { class: "mut" }, "Seleziona una riga della tabella oppure aggiungine una.")); return; }
   const campi = S.schema.collezioni[q.coll]; const id = r.e ? r.e.id : r.nuova.id;   // anche le righe nuove hanno data-path (per evidenziare l'errore al salvataggio)
-  ins.append(h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)));
+  ins.append(h("div", { class: "ins-testa" }, h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)),
+    h("button", { class: "lk chiudi-ins", title: "Chiudi il pannello (Esc dalla tabella)", "aria-label": "Chiudi il pannello", onclick: chiudiPannello }, "Chiudi")));
   for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e e-riga" }, x.messaggio));
   const visibili = q.campi ? new Set(q.campi) : (((S.schema.ordine || {})[q.id]) ? new Set(S.schema.ordine[q.id]) : null);   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
   const ordine = ordinati(q.id, Object.keys(campi));
+  const gruppi = q.coll === "beni" ? GRUPPI_SCHEDA[q.id] : null, righeCampi = [];
   for (const [comune, provincia] of [['comune', 'provincia'], ['luogo_nascita', 'provincia_nascita']]) {
     void comune; void provincia;   // provincia e comune seguono gia' l'ordine ufficiale (provincia prima del comune)
   }
@@ -620,8 +712,11 @@ function insDati(ins) {
       : campoInput(q.coll, id, c, kind, valRiga(r, c), modificaCampo);
     const aiuto = (S.schema.aiuti || {})[q.coll + "." + c];
     if (aiuto) w.append(h("div", { class: "mut aiuto-voce" }, aiuto));
-    ins.append(h("div", { class: "rg" }, h("label", {}, lbl(q.coll, c, q.id)), w));
+    const obbl = (OBBLIGATORI[q.id] || []).includes(c);
+    const rg = h("div", { class: "rg" + (obbl ? " obbl" : ""), "data-campo": c }, h("label", { title: obbl ? "Dato richiesto nel quadro " + q.id : null }, lbl(q.coll, c, q.id)), w);
+    if (gruppi) righeCampi.push([c, rg, vuoto]); else ins.append(rg);
   }
+  if (gruppi) ins.append(...schedaAGruppi(gruppi, righeCampi));
   if (nascostiEstero) ins.append(h("p", { class: "mut nota-campi" }, "Per un immobile all'estero scegli la provincia EE: compaiono i campi dello Stato estero."));
   renderStrutturati(ins, q, r);
   if (q.coll === "beni" && r.e && ["fabbricato", "terreno"].includes(valRiga(r, "tipo"))) ins.append(boxValoreCatastale(q, r));
@@ -1191,7 +1286,29 @@ function renderFront(main) {
     cb.addEventListener('change', () => impostaQuadro(q.id, cb.checked));
     box.append(h('label', { class: 'chk', for: 'qa_' + q.id }, cb, h('span', {}, q.id + ' — ' + q.titolo + (q.supportato ? '' : q.generato ? ' (generato dal programma: scelta precedente da togliere)' : ' (copertura limitata: blocca la finalizzazione)'))));
   }
-  main.append(box, h('div', { class: 'barra' }, h('button', { class: 'pil', id: 'dd_salva', onclick: salvaTutto }, 'Salva dati generali')));
+  main.append(box, documentiPratica(), h('div', { class: 'barra' }, h('button', { class: 'pil', id: 'dd_salva', onclick: salvaTutto }, 'Salva dati generali')));
+}
+/* Documenti da preparare per QUESTA pratica (report grafica 07/11/2026, punto 12): voci dedotte dai dati gia' inseriti, ciascuna
+   col riferimento del Fascicolo I (p. PDF 6 «Quali documenti occorrono», quadri EB/EC p. 20 e 28 per le visure). */
+function documentiPratica() {
+  const d = S.P.dati, dich = ((d.opzioni || {}).telematico || {}).dichiarazione || {};
+  const beni = d.beni || [], persone = (d.persone || []).filter(p => !['defunto', 'presentatore'].includes(p.ruolo));
+  const voci = [];
+  if (persone.length) voci.push("Albero genealogico in PDF (quadro EG, rigo EG6)");
+  if (beni.some(b => ['fabbricato', 'terreno'].includes(b.tipo))) voci.push("Visure catastali di non più di tre mesi per " + beni.filter(b => ['fabbricato', 'terreno'].includes(b.tipo)).length + " immobili");
+  if (dich.devoluzione_per_testamento || dich.testamento) voci.push("Copia del testamento pubblicato (rigo EG2)");
+  if ((d.passivita || []).length) voci.push("Documenti delle " + d.passivita.length + " passività (rigo EG5)");
+  if (beni.some(b => ['disponibilita_finanziaria', 'credito', 'altro'].includes(b.tipo) || quadroBene(b) === 'ER')) voci.push("Saldi di conti e crediti alla data del decesso");
+  if (beni.some(b => b.tipo === 'titolo')) voci.push("Estratti dei titoli con il valore alla data del decesso");
+  if (beni.some(b => b.tipo === 'azienda')) voci.push("Ultimo bilancio o inventario dell'azienda");
+  if (beni.some(b => b.imposta_estera)) voci.push("Certificazione dell'imposta pagata all'estero (rigo EG4)");
+  if ((d.devoluzioni || []).some(x => ['P', 'X', 'Z', 'Y'].includes(String(x.agevolazioni || '').toUpperCase())) || dich.prima_casa) voci.push("Dichiarazione sostitutiva per la prima casa (rigo EG9)");
+  if (persone.some(p => p.ruolo === 'rinunciatario')) voci.push("Atti di rinuncia all'eredità");
+  if (beni.some(b => String(b.rendita_proposta || '').toLowerCase().startsWith('s'))) voci.push("Dichiarazione per la rendita proposta DOCFA (rigo EG8)");
+  return h('section', { class: 'grp documenti-pratica' }, h('h2', {}, 'Documenti da avere per questa pratica'),
+    voci.length ? h('ul', { class: 'spunte dentro-testo' }, voci.map(v => h('li', {}, v)))
+      : h('p', { class: 'mut dentro-testo' }, 'Inserisci eredi e beni: l’elenco si compone da solo.'),
+    h('p', { class: 'mut dentro-testo piccolo' }, 'Elenco ricavato dai dati inseriti (Fascicolo I, «Quali documenti occorrono»): non sostituisce il controllo del professionista.'));
 }
 
 /* ---------- documenti ---------- */
@@ -1691,5 +1808,39 @@ $('#bHome').onclick = () => {
   S.sel = 'AN'; S.tab = 'dati'; $('#vista').scrollTop = 0; $('#titolo').textContent = 'Nessuna pratica aperta'; render(); caricaPratiche();
 };
 document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); salvaTutto(); } });
+/* Scorciatoie per chi inserisce dati tutto il giorno (report grafica 07/11/2026, punto 10). «?» mostra l'elenco. */
+const SCORCIATOIE = [["Ctrl+S", "Salva le modifiche"], ["Alt+N", "Nuova riga nel quadro"], ["Alt+D", "Duplica la riga selezionata"],
+  ["Alt+PagGiù / Alt+PagSu", "Quadro successivo / precedente"], ["Ctrl+G", "Vai a un quadro (scrivi la sigla, es. EC)"],
+  ["Alt+C", "Controlla la pratica"], ["Frecce, Home, Fine", "Righe della tabella"], ["Invio", "Apri la riga nel pannello"], ["Esc", "Dal pannello torna alla tabella"], ["?", "Questo elenco"]];
+function mostraScorciatoie() {
+  let d = $("#dScorciatoie");
+  if (!d) { d = h("dialog", { id: "dScorciatoie", "aria-labelledby": "dScT" }, h("form", { method: "dialog" }, h("h2", { id: "dScT" }, "Scorciatoie da tastiera"),
+    h("table", { class: "scorciatoie" }, h("tbody", {}, SCORCIATOIE.map(([k, t]) => h("tr", { class: "fisso" }, h("td", {}, h("kbd", {}, k)), h("td", {}, t))))),
+    h("div", { class: "wiz-az" }, h("span", { class: "sp" }), h("button", { class: "pil" }, "Chiudi")))); document.body.append(d); }
+  d.showModal();
+}
+function quadriNavigabili() { return S.Q ? S.Q.quadri.filter(x => x.gruppo !== "lavoro" || x.id === "DV") : []; }
+document.addEventListener("keydown", ev => {
+  const inCampo = ev.target.closest && ev.target.closest("input, select, textarea, [contenteditable]");
+  if (document.querySelector("dialog[open]")) return;
+  if (ev.key === "?" && !inCampo && !ev.ctrlKey && !ev.altKey) { ev.preventDefault(); return mostraScorciatoie(); }
+  if (!S.P) return;
+  const q = quadro();
+  if (ev.altKey && !ev.ctrlKey && (ev.key === "n" || ev.key === "N")) { if (q && q.coll && q.supportato) { ev.preventDefault(); aggiungiRiga(q); } return; }
+  if (ev.altKey && !ev.ctrlKey && (ev.key === "d" || ev.key === "D")) { if (q && q.coll) { ev.preventDefault(); duplicaRiga(q); } return; }
+  if (ev.altKey && !ev.ctrlKey && (ev.key === "c" || ev.key === "C")) { ev.preventDefault(); $("#bControlla").click(); return; }
+  if (ev.altKey && (ev.key === "PageDown" || ev.key === "PageUp")) {
+    const l = quadriNavigabili(), i = l.findIndex(x => x.id === S.sel); if (!l.length) return;
+    ev.preventDefault(); scegliQuadro(l[(Math.max(0, i) + (ev.key === "PageDown" ? 1 : l.length - 1)) % l.length].id); return;
+  }
+  if ((ev.ctrlKey || ev.metaKey) && (ev.key === "g" || ev.key === "G")) {
+    ev.preventDefault();
+    const sigla = (prompt("Vai al quadro (sigla, es. EC):") || "").trim().toUpperCase();
+    if (sigla && S.Q.quadri.some(x => x.id === sigla)) scegliQuadro(sigla); else if (sigla) msg("Quadro " + sigla + " non trovato.", "e");
+  }
+});
 window.addEventListener("beforeunload", ev => { if (nMod()) { ev.preventDefault(); ev.returnValue = ""; } });
 init();
+/* il menu Operazioni si chiude cliccando fuori o con Esc */
+document.addEventListener("click", ev => { for (const d of document.querySelectorAll("details.operazioni[open]")) if (!d.contains(ev.target)) d.open = false; });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape") for (const d of document.querySelectorAll("details.operazioni[open]")) { d.open = false; d.querySelector("summary").focus(); } });

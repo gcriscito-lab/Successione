@@ -60,7 +60,9 @@ def test_quadri_ordinati_come_ordine():
     for q in Q.QUADRI:
         for chiave in ("colonne", "campi"):
             if q.get(chiave):
-                pos = [E.ORDINE[q["id"]].index(c) for c in q[chiave]]
+                # eccezione voluta (report grafica 07/11/2026): nella tabella valore/importo e' l'ultima colonna, fissata a destra
+                el = q[chiave][:-1] if chiave == "colonne" and q[chiave][-1] in ("valore", "importo") else q[chiave]
+                pos = [E.ORDINE[q["id"]].index(c) for c in el]
                 assert pos == sorted(pos), (q["id"], chiave)
     assert E.ordina("EA", ["nome", "codice_fiscale", "zzz", "cognome"]) == ["codice_fiscale", "cognome", "nome", "zzz"]
     # il codice fiscale apre il quadro EA, come nel modulo; provincia prima del comune

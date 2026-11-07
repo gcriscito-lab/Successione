@@ -27,6 +27,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   const salvato = await page.evaluate(async id => (await api("/api/pratiche/" + id)).dati.beni.find(b => b.id === "b_fab1").valore, pid);
   assert.equal(salvato, "100000", "il valore non deve essere salvato senza «Salva»");
   page.once("dialog", d => d.accept());
+  await page.click(".operazioni > summary");
   await page.click("text=Ricalcola valori catastali");
   await page.waitForFunction(() => S.dirty.has("e:beni:b_fab2"));
   const campi = await page.evaluate(() => ({ b2: S.dirty.get("e:beni:b_fab2").campi.valore, b3: S.dirty.has("e:beni:b_fab3") }));
