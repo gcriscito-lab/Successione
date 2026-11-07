@@ -252,6 +252,10 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         return sv.riordina_allegati(request.path_params["pid"])
 
     @api
+    async def valori_catastali_api(request):
+        return sv.valori_catastali(request.path_params["pid"])
+
+    @api
     async def anteprima_quadri_api(request):
         return sv.anteprima_quadri(request.path_params["pid"])
 
@@ -363,6 +367,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route("/api/allegati/{aid}/elimina", elimina_allegato_api, methods=["POST"]),
         Route(P + "/allegati/riordina", riordina_allegati_api, methods=["POST"]),
         Route(P + "/anteprima-quadri", anteprima_quadri_api),
+        Route(P + "/valori-catastali", valori_catastali_api),
         Route("/api/allegati/{aid}/suddividi", suddividi, methods=["POST"]),
     ])
 

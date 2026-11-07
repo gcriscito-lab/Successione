@@ -482,7 +482,44 @@ function renderTabella(main, q) {
   if (!righe.length) tb.append(h("tr", {}, h("td", { colspan: q.colonne.length, class: "mut" }, "Nessuna riga. Usa «Aggiungi riga».")));
   main.append(h("div", { class: "tab" }, t));
   main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, "Aggiungi riga"),
+    q.coll === "beni" && ["EB", "EC"].includes(q.id) && righe.some(x => x.e) ? h("button", { class: "gh", onclick: () => ricalcolaValori(q) }, "Ricalcola valori catastali") : null,
     h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
+}
+/* ---------- valore catastale (valore_catastale.py): il programma propone, il professionista decide e salva ---------- */
+function euroIntero(v) { return Number(v).toLocaleString("it-IT") + " €"; }
+function scriviValore(id, valore) {
+  const key = "e:beni:" + id;   // stessa chiave di righeQuadro: la modifica resta da salvare come le altre
+  const d = S.dirty.get(key) || { coll: "beni", id, campi: {} }; d.campi.valore = valore; S.dirty.set(key, d);
+}
+function boxValoreCatastale(q, r) {
+  const box = h("div", { class: "vc", "aria-live": "polite" }, h("h4", {}, "Valore catastale"), h("p", { class: "mut" }, "Calcolo in corso…"));
+  api("/api/pratiche/" + S.P.pratica_id + "/valori-catastali").then(res => {
+    const v = (res.beni || []).find(x => x.bene_id === r.e.id);
+    box.replaceChildren(h("h4", {}, "Valore catastale"));
+    if (!v) return box.append(h("p", { class: "mut" }, "Non disponibile per questa riga."));
+    if (!v.calcolabile) return box.append(h("p", { class: "mut" }, "Non calcolato: " + v.motivo + "."));
+    box.append(h("p", {}, h("strong", {}, euroIntero(v.valore)), " — minimo che l'ufficio non può rettificare."),
+      h("p", { class: "mut" }, v.formula), h("p", { class: "mut fonte-vc" }, "Fonti: " + v.fonti.join("; ")));
+    if (v.avviso) box.append(h("p", { class: "avv" }, v.avviso));
+    if (S.dirty.has(r.key)) box.append(h("p", { class: "mut" }, "Il calcolo usa i dati salvati: salva le modifiche per aggiornarlo."));
+    if (v.inferiore) box.append(h("p", { class: "avv" }, "Il valore dichiarato (" + euroIntero(v.dichiarato) + ") è inferiore."));
+    if (v.dichiarato === null || v.inferiore || Number(v.dichiarato) !== Number(v.valore))
+      box.append(h("button", { class: "gh", onclick: () => { scriviValore(r.e.id, v.valore); renderVista(); renderIns(); aggiornaBottoni(); renderSb();
+        msg("Valore " + euroIntero(v.valore) + " inserito nella riga: premi «Salva» per confermarlo.", "o"); } }, "Usa il valore catastale"));
+  }).catch(e => box.replaceChildren(h("h4", {}, "Valore catastale"), h("p", { class: "avv" }, "Valore catastale non calcolabile: " + e.message)));
+  return box;
+}
+async function ricalcolaValori(q) {
+  let res; try { res = await api("/api/pratiche/" + S.P.pratica_id + "/valori-catastali"); } catch (e) { return msg(e.message, "e"); }
+  const ids = new Set(righeQuadro(q).filter(x => x.e).map(x => x.e.id));
+  const da = (res.beni || []).filter(v => ids.has(v.bene_id) && v.calcolabile && (v.dichiarato === null || v.inferiore));
+  const non = (res.beni || []).filter(v => ids.has(v.bene_id) && !v.calcolabile).length;
+  if (!da.length) return msg("Nessun valore da aggiornare: tutti i valori sono già pari o superiori al valore catastale" + (non ? " (" + non + " righe non calcolabili, vedi il pannello della riga)." : "."), "o");
+  if (!confirm("Inserire il valore catastale in " + da.length + " righe senza valore o con valore inferiore? I valori più alti restano come sono. Potrai controllare e poi premere «Salva»."))
+    return;
+  da.forEach(v => scriviValore(v.bene_id, v.valore));
+  renderVista(); renderIns(); aggiornaBottoni(); renderSb();
+  msg(da.length + " valori inseriti" + (non ? "; " + non + " righe non calcolabili" : "") + ": premi «Salva» per confermarli.", "o");
 }
 function aggiungiRiga(q) {
   const key = "n:" + crypto.randomUUID();
@@ -587,6 +624,7 @@ function insDati(ins) {
   }
   if (nascostiEstero) ins.append(h("p", { class: "mut nota-campi" }, "Per un immobile all'estero scegli la provincia EE: compaiono i campi dello Stato estero."));
   renderStrutturati(ins, q, r);
+  if (q.coll === "beni" && r.e && ["fabbricato", "terreno"].includes(valRiga(r, "tipo"))) ins.append(boxValoreCatastale(q, r));
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
   const supKey = q.coll + ':' + (r.e ? r.e.id : r.nuova.id);
   if (r.nuova || S.dirty.has(r.key) || S.supDirty.has(supKey)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); S.supDirty.delete(supKey); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));

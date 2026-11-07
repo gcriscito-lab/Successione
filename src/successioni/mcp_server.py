@@ -28,7 +28,7 @@ COPERTURA_NON_DISPONIBILE = [
 STRUMENTI_LETTURA = frozenset({
     "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
     "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
-    "file_in_ingresso", "elenca_allegati", "diagnosi",
+    "file_in_ingresso", "elenca_allegati", "diagnosi", "valori_catastali",
 })
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "backup_archivio", "stampa_modello",
@@ -146,6 +146,11 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
     def stato_quadri(pratica_id: str) -> dict:
         """Stato di ogni quadro (vuoto, compilato, rilievi, non supportato, non selezionato) con i rilievi e il quadro di appartenenza. Dice se la pratica è finalizzabile nel perimetro supportato; non è il controllo ufficiale."""
         return sv.quadri(pratica_id)
+
+    @tool
+    def valori_catastali(pratica_id: str) -> dict:
+        """Valore catastale proposto per ogni fabbricato e terreno: minimo non soggetto a rettifica (rendita +5% o reddito dominicale +25%, per il moltiplicatore della categoria, per la quota del defunto), con formula, fonti e il confronto con il valore dichiarato. Non modifica la pratica: per usarlo aggiornare beni.valore con aggiorna_pratica."""
+        return sv.valori_catastali(pratica_id)
 
     @tool(ann=LOCALE)
     def esporta_xml(pratica_id: str, cf_fornitore: str | None = None, scopo: str = "completo") -> dict:

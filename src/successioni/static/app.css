@@ -360,3 +360,8 @@ tbody tr.fisso { cursor:default; } tbody tr.fisso:hover td { background:none; }
 .generali-griglia .grp { padding-bottom:8px; }
 @container (max-width:820px) { .generali-griglia .grp.intera { grid-template-columns:1fr; } }
 label > input.cf { display:block; margin-top:4px; }
+/* valore catastale proposto nel pannello della riga (EB/EC) */
+.vc { border:1px solid var(--sep); border-left:3px solid var(--blu); border-radius:var(--r1); padding:10px 12px; margin:12px 0; background:var(--blu-t); }
+.vc h4 { margin:0 0 6px; font-size:.95em; }
+.vc p { margin:4px 0; }
+.vc .fonte-vc { font-size:.85em; }

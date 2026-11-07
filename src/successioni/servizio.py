@@ -230,6 +230,8 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
             errori = errori + visure          # visura vecchia o senza data: rilievo bloccante
         else:
             avvisi = [x.asdict() for x in visure]   # solo avviso: non impedisce la finalizzazione
+        from . import valore_catastale as VC
+        avvisi += VC.avvisi(d["dati"], Q.attivi(d["dati"]))   # valore sotto il minimo catastale: solo avviso
         blocchi = []
         e = self._job_ultimo("esporta_xml", pratica_id)
         if not (e and e["input"].get("impronta_dichiarativa") == d["impronta_dichiarativa"] and e["risultato"].get("completo")):
@@ -242,6 +244,13 @@ class Servizio(AllegatiMixin, ElaboratiMixin, InvioMixin):
                 "ambito": "controlli interni di forma e coerenza; NON e' il controllo ufficiale",
                 "esito": "ok" if not errori else "rilievi", "finalizzabile": not errori and not blocchi,
                 "blocchi_finalizzazione": blocchi, "rilievi": [x.asdict() for x in errori], "avvisi": avvisi}
+
+    def valori_catastali(self, pratica_id: str) -> dict:
+        """Valore catastale proposto per ogni fabbricato e terreno (minimo non rettificabile), con formula e fonti."""
+        from . import valore_catastale as VC
+        d = self.leggi(pratica_id)
+        return {"pratica_id": pratica_id, "revisione": d["revisione"], "beni": VC.calcola_pratica(d["dati"]),
+                "ambito": "proposta del programma: il valore dichiarato resta quello inserito dal professionista"}
 
     def quadri(self, pratica_id: str) -> dict:
         """Stato di ciascun quadro (vuoto/compilato/rilievi/non supportato/inattivo) e rilievi per il pannello controlli."""
