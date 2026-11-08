@@ -1,5 +1,17 @@
 # Stato dei lavori (aggiornato 2026-11-08)
 
+## Versione 0.3 in prova: densita' e velocita' di inserimento (ramo `versione-0.3`)
+- Proposte 1, 2, 5, 6 del report grafico DEAS (`Report_grafica_DEAS_rea_20261108.md`). Predefiniti invariati: si attivano con
+  le preferenze `disposizione` (`destra`/`sotto`, con `altezza_pannello` 200-900) e `densita` = `compatta`.
+- Misure a 1366x768 (dati sintetici, `scratchpad/e2e_porta/foto4.js`): fabbricato 2402 px -> 753 px con pannello sotto e scheda
+  compatta (campi visibili senza scorrere 10/28 -> 23/28); erede 1418 -> 589 px (13/13). Solo pannello sotto: 1229 px; solo
+  compatta a destra: 1499 px.
+- Vista unica degli immobili (EB, EC, EL, EM) solo nell'interfaccia; Alt+1…9 sulle voci dell'elenco (Alt+lettera scartato:
+  Alt+D/E/F del browser, Alt+Maiusc cambia lingua della tastiera su Windows); Invio al campo successivo nella scheda.
+- Verifiche: suite Python 2064 passati e 1 saltato (pacchetto); prove interfaccia 16/16 con `tests/e2e/gui_versione_03.js`.
+- **Da fare prima di rilasciarla**: prova del professionista su una pratica reale con pannello sotto e scheda compatta; poi
+  decidere se diventano i predefiniti, versione 0.3.0 e pacchetto.
+
 ## Versione 0.2.0 (2026-11-08, commit `e3c2d6c`, etichetta `v0.2.0`)
 - Novita' per lo studio in `docs/NOVITA.md`; nessuna regola di calcolo nuova (regole 2026-11-07).
 - Verifiche: suite Python 2060 passati e 1 saltato; con il pacchetto costruito `tests/test_installazione.py` 18/18 (anche il

@@ -1,5 +1,18 @@
 Novità del programma (le più recenti in alto)
 
+In preparazione — versione 0.3: densità e velocità di inserimento (da provare su una pratica reale)
+Si attivano dalle Impostazioni: chi non le sceglie vede il programma come prima. Nessuna regola di calcolo nuova.
+- Pannello della riga sotto la tabella, a tutta larghezza (Impostazioni > Pannello della riga selezionata > Sotto la
+  tabella): la barra che lo separa dalla tabella si trascina o si regola con Freccia su e Freccia giù e la misura resta.
+- Scheda compatta (Impostazioni > Densità > Compatta): etichette a sinistra su una riga, campi affiancati, gruppi in
+  colonne; l'aiuto di un campo compare quando ci entri (un «?» accanto all'etichetta lo segnala). A 1366×768, con pannello
+  sotto e scheda compatta, un fabbricato passa da 2.400 a 750 pixel di altezza: 23 campi su 28 visibili senza scorrere
+  (prima 10); un erede da 1.420 a 590 pixel, tutti i campi visibili.
+- Immobili in una tabella sola: linguette «Tutti gli immobili / Fabbricati / Terreni / tavolari» sopra i quadri EB, EC,
+  EL, EM, con la sigla del quadro in prima colonna e il totale complessivo. Il file telematico non cambia.
+- Tastiera: Alt+1 … Alt+9 portano alle voci dell'elenco dei quadri (l'indicazione è nel suggerimento di ogni voce); nella
+  scheda Invio passa al campo successivo e, dopo l'ultimo, al pulsante Salva.
+
 8 novembre 2026 — versione 0.2.0
 Nessuna regola di calcolo nuova: imposte, quote e file telematico restano quelli delle regole 2026-11-07.
 - Valori calcolati dal programma riconoscibili: tinta propria e scritta «calcolato» per il valore catastale proposto, i quadri

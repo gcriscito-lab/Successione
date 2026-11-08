@@ -55,17 +55,21 @@ INTERFACCIA_DEFAULT = {"tema": "sistema", "font": "sistema", "dimensione": 14,
                        "interlinea": "normale", "larghezza_pannello": 360, "larghezza_nav": 240,
                        # personalizzazione dell'app
                        "accento": "predefinito", "densita": "normale", "contrasto": "normale", "movimento": "normale",
-                       "avvio": "elenco", "nome_studio": "", "quadri_predefiniti": []}
+                       "avvio": "elenco", "nome_studio": "", "quadri_predefiniti": [],
+                       # versione 0.3: pannello della riga a destra (come prima) o sotto l'elenco, a tutta larghezza
+                       "disposizione": "destra", "altezza_pannello": 380}
 LUNGHEZZA_NOME_STUDIO = 60
 QUADRI_SCEGLIBILI = ("EA", "EB", "EC", "ER", "ED", "EF", "EG", "EH", "EI", "EL", "EM", "EN", "EO", "EP", "EQ")
 # Intervalli (minimo, massimo) in pixel dei valori numerici; "dimensione" e' la grandezza del carattere.
-INTERVALLI_INTERFACCIA = {"dimensione": (12, 22), "larghezza_pannello": (280, 760), "larghezza_nav": (180, 480)}
+INTERVALLI_INTERFACCIA = {"dimensione": (12, 22), "larghezza_pannello": (280, 760), "larghezza_nav": (180, 480),
+                          "altezza_pannello": (200, 900)}
 SCELTE_INTERFACCIA = {"tema": ("sistema", "chiaro", "scuro", "seppia"),
                       "font": ("sistema", "segoe", "arial", "verdana", "georgia", "consolas"),
                       "interlinea": ("compatta", "normale", "ampia"),
                       "accento": ("predefinito", "blu", "verde", "viola", "arancio", "rosso", "grafite"),
                       "densita": ("compatta", "normale", "ampia"), "contrasto": ("normale", "alto"),
-                      "movimento": ("normale", "ridotto"), "avvio": ("elenco", "ultima")}
+                      "movimento": ("normale", "ridotto"), "avvio": ("elenco", "ultima"),
+                      "disposizione": ("destra", "sotto")}
 
 
 def _valida_interfaccia(valori: dict) -> dict:

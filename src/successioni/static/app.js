@@ -20,7 +20,8 @@ const nMod = () => S.dirty.size + S.nuove.size + S.dichDirty.size + S.supDirty.s
 const nuovoId = coll => ({ persone: "p", beni: "b", devoluzioni: "d", passivita: "ps", documenti_ref: "dr" }[coll]) + "_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const uguale = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 14, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240,
-  accento: 'predefinito', densita: 'normale', contrasto: 'normale', movimento: 'normale', avvio: 'elenco', nome_studio: '', quadri_predefiniti: [] };
+  accento: 'predefinito', densita: 'normale', contrasto: 'normale', movimento: 'normale', avvio: 'elenco', nome_studio: '', quadri_predefiniti: [],
+  disposizione: 'destra', altezza_pannello: 380 };
 const ACCENTI = { blu: ['#0a74ff', '#6cb0ff'], verde: ['#1e7a37', '#6fd18a'], viola: ['#6e3fd1', '#b79cff'], arancio: ['#b25e00', '#ffb454'], rosso: ['#c4001a', '#ff8a92'], grafite: ['#3a3f4a', '#c4c9d4'] };
 const hexRgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
 const FONT_UI = { sistema: '"Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif', segoe: '"Segoe UI", system-ui, sans-serif',
@@ -44,14 +45,27 @@ function applicaAspetto(valori) {
   root.style.setProperty('--larghezza-nav', nav + 'px');
   const limite = limitePannello(nav);
   root.style.setProperty('--larghezza-ins', Math.min(limite, Math.max(280, Number(p.larghezza_pannello) || 360)) + 'px');
+  // versione 0.3: pannello della riga sotto l'elenco, a tutta larghezza (separatore orizzontale) oppure a destra
+  const sotto = p.disposizione === 'sotto';
+  root.dataset.disposizione = sotto ? 'sotto' : 'destra';
+  const altezza = Math.min(limiteAltezza(), Math.max(200, Number(p.altezza_pannello) || 380));
+  root.style.setProperty('--altezza-ins', altezza + 'px');
   const separatore = $('#ridimensiona');
-  if (separatore) separatore.setAttribute('aria-valuenow', String(Math.round(Math.min(limite, p.larghezza_pannello))));
+  if (separatore) {
+    separatore.setAttribute('aria-orientation', sotto ? 'horizontal' : 'vertical');
+    separatore.setAttribute('aria-label', sotto ? 'Altezza pannello dati' : 'Larghezza pannello dati');
+    separatore.setAttribute('aria-valuemin', sotto ? '200' : '280');
+    separatore.setAttribute('aria-valuemax', String(sotto ? limiteAltezza() : 760));
+    separatore.setAttribute('aria-valuenow', String(sotto ? altezza : Math.round(Math.min(limite, p.larghezza_pannello))));
+  }
   const sepNav = $('#ridimensionaNav');
   if (sepNav) { sepNav.setAttribute('aria-valuenow', String(nav)); sepNav.setAttribute('aria-valuemax', String(limiteNav() || 480)); }
 }
 /* Limiti delle larghezze: la vista centrale deve restare di almeno 340 px; il menu dei quadri puo' crescere fino a 480 px. */
 function limiteNav() { return window.innerWidth <= 960 ? 0 : Math.max(180, Math.min(480, window.innerWidth - 340 - 280)); }
 function limitePannello(nav) { return Math.max(280, Math.min(760, window.innerWidth - (nav || preferenze.larghezza_nav || 240) - 340)); }
+/* Pannello sotto: l'elenco sopra deve restare di almeno 200 px (titolo, linguette e qualche riga). */
+function limiteAltezza() { return Math.max(200, Math.min(900, window.innerHeight - 140 - 200)); }
 const quadriPredefiniti = () => (preferenze.quadri_predefiniti && preferenze.quadri_predefiniti.length ? ['AN', ...preferenze.quadri_predefiniti.filter(q => q !== 'AN')] : S.schema.predefiniti);
 function memorizzaAspetto(p) {
   preferenze = { ...ASPETTO_DEFAULT, ...p }; applicaAspetto(preferenze);
@@ -394,7 +408,7 @@ function renderSb() {
     h("span", {}, "Controllo ufficiale: vedi File e invio")].filter(Boolean));
 }
 function vaiFile() { if (!S.P) return; S.sel = 'FILE'; S.riga = null; S.tab = 'dati'; $('#vista').scrollTop = 0; render(); }
-function scegliQuadro(id) { S.sel = id; S.riga = null; S.chiuso = null; S.tab = 'dati'; $('#vista').scrollTop = 0; render(); }
+function scegliQuadro(id, tuttiImmobili = false) { S.sel = id; S.riga = null; S.chiuso = null; S.tab = 'dati'; S.immobiliTutti = tuttiImmobili; $('#vista').scrollTop = 0; render(); }
 function chiudiPannello() { const q = quadro(); S.chiuso = q ? q.id : null; S.riga = null; S.tab = "dati"; render(); tornaTabella(); }
 
 /* ---------- albero dei quadri ---------- */
@@ -414,7 +428,7 @@ function renderAlbero() {
       const lav = statoLavoro(q.id);   // stato di lavorazione scelto dallo studio (voce 10), dopo lo stato calcolato
       const testo = [st === "rilievi" ? q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi") : (q.righe && st === "compilato" ? q.righe + (q.righe === 1 ? " riga" : " righe") : STATI[st]),
         lav && STATI_LAVORO[lav]].filter(Boolean).join(" · ");
-      nav.append(h("button", { class: "voce", "data-stato": st, "data-lavoro": lav || null, "data-q": q.id, title: q.id + " — " + q.titolo + (testo ? " (" + testo + ")" : ""), "aria-current": S.sel === q.id ? "true" : "false", onclick: () => scegliQuadro(q.id) },
+      nav.append(h("button", { class: "voce", "data-stato": st, "data-lavoro": lav || null, "data-q": q.id, title: q.id + " — " + q.titolo + (testo ? " (" + testo + ")" : "") + tastoVoce(q.id), "aria-current": S.sel === q.id ? "true" : "false", onclick: () => scegliQuadro(q.id) },
         h("span", { class: "sigla" }, q.id), h("span", { class: "testi" }, h("span", { class: "nome" }, TITOLI_BREVI[q.id] || q.titolo), h("span", { class: "st" }, testo))));
     }
   }
@@ -633,7 +647,8 @@ function renderTabella(main, q) {
   const righe = ordinaRigheVista(q, righeQuadro(q));
   const t = h("table", { role: "grid", "aria-label": q.titolo });
   const clsCol = classeColonna(q);
-  t.append(h("thead", {}, h("tr", {}, colonne.map((c, j) => h("th", { class: clsCol(c, j) }, lbl(q.coll, c, q.id))))));
+  t.append(h("thead", {}, h("tr", {}, colonne.map((c, j) => h("th", { class: clsCol(c, j) }, LBL_VISTA[c] || lbl(q.coll, c, q.id))))));
+  const lg = linguetteImmobili(q); if (lg) main.append(lg);
   const tb = h("tbody"); t.append(tb);
   const vere = righe.filter(r => !r.subtotale);   // le righe di somma delle devoluzioni non sono righe di dati
   righe.forEach(r => tb.append(r.subtotale ? rigaSubtotaleDV(r, colonne)
@@ -641,7 +656,7 @@ function renderTabella(main, q) {
   if (!righe.length) tb.append(h("tr", { class: "vuota" }, h("td", { colspan: colonne.length, class: "mut" }, testoVuoto(q))));
   const piede = piedeTabella(q, vere); if (piede) t.append(piede);
   main.append(h("div", { class: "tab" }, t));
-  main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, "Aggiungi riga"),
+  main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, vistaImmobili(q) ? "Aggiungi riga in " + q.id : "Aggiungi riga"),
 
     h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
 }
@@ -653,6 +668,15 @@ function rigaTabella(q, r, focalizzabile) {
     onclick: () => selezionaRiga(r.key, "riga"),
     onkeydown: ev => tastiTabella(ev, tr, r.key) });
   colonneVista(q).forEach((c, j) => {
+    if (c === "_quadro") {   // vista unica degli immobili: sigla del quadro della riga
+      const qid = r.quadroId || q.id;
+      tr.append(h("td", { class: clsCol(c, j), title: NOMI_IMMOBILI[qid] || qid }, rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, h("span", { class: "sigla-mini" }, qid)));
+      return;
+    }
+    if (c === "_rendita") {   // fabbricati: rendita; terreni: reddito dominicale
+      const v = valRiga(r, "rendita") ?? valRiga(r, "reddito_dominicale"), txt = mostra("importo", v, true);
+      tr.append(h("td", { class: "n", title: txt }, txt)); return;
+    }
     const kind = campi[c]; const v = valRiga(r, c);
     let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v, true);
     if (q.coll === "devoluzioni" && c === "diritto" && typeof v === "string" && v) {   // il diritto per nome («Proprieta'»), non il codice
@@ -694,7 +718,7 @@ function piedeTabella(q, righe) {
 function aggiornaRigaVista(key) {
   const q = quadro(), vecchia = rigaDaFocalizzare(key);
   const r = q && q.coll && vecchia ? righeQuadro(q).find(x => x.key === key) : null;
-  if (!r || q.coll === "devoluzioni") return renderVista();   // DV: le righe di somma per bene cambiano con la riga
+  if (!r || q.coll === "devoluzioni" || vistaImmobili(q)) return renderVista();   // somme per bene / totale di tutti gli immobili   // DV: le righe di somma per bene cambiano con la riga
   const nuova = rigaTabella(q, r, vecchia.tabIndex === 0);
   const aveFocus = document.activeElement === vecchia;
   vecchia.replaceWith(nuova); if (aveFocus) nuova.focus({ preventScroll: true });
@@ -757,6 +781,7 @@ function boxValoreCatastale(q, r) {
     box.replaceChildren(h("h4", {}, "Valore catastale ", h("span", { class: "etich-calc" }, "calcolato")));
     if (!v) return box.append(h("p", { class: "mut" }, "Non disponibile per questa riga."));
     if (!v.calcolabile) return box.append(h("p", { class: "mut" }, "Non calcolato: " + v.motivo + "."));
+    box.title = "Fonti: " + v.fonti.join("; ");   // scheda compatta: le fonti restano consultabili nel suggerimento
     box.append(h("p", {}, h("strong", {}, euroIntero(v.valore)), " — minimo che l'ufficio non può rettificare."),
       h("p", { class: "mut" }, v.formula), h("p", { class: "mut fonte-vc" }, "Fonti: " + v.fonti.join("; ")));
     if (v.avviso) box.append(h("p", { class: "avv" }, v.avviso));
@@ -839,6 +864,8 @@ function tastiTabella(ev, tr, key) {
 }
 function rigaDaFocalizzare(key) { return document.querySelector('tr[data-key="' + CSS.escape(key) + '"]'); }
 function selezionaRiga(key, dove) {
+  // vista unica degli immobili: la riga puo' appartenere a un altro quadro (EB, EC, EL, EM): il pannello segue quel quadro
+  if (S.immobiliTutti) { const qr = quadroDellaRiga(key); if (qr && qr !== S.sel) S.sel = qr; }
   S.riga = key; S.tab = "dati"; render();
   if (dove === "pannello") { const primo = $("#ins .rg input, #ins .rg select, #ins .rg textarea"); if (primo) { primo.focus(); return; } }
   if (dove) { const tr = rigaDaFocalizzare(key); if (tr) tr.focus({ preventScroll: true }); }
@@ -894,11 +921,30 @@ function boxDevoluzioniBene(r) {
    - EA: prima chi e' (cognome, nome, parentela, ruolo), poi codice fiscale e nascita;
    - DV: righe raggruppate per bene, con sotto ogni bene la somma delle quote per diritto. */
 const PRIMA_EA = ["cognome", "nome", "grado_parentela", "ruolo"];
+/* Versione 0.3 (report grafico DEAS, proposta 5): vista unica degli immobili. I quadri EB, EC, EL, EM restano distinti nei
+   dati e nel file telematico; qui si guardano insieme, con la sigla del quadro come prima colonna. */
+const IMMOBILI = ["EC", "EB", "EM", "EL"];
+const NOMI_IMMOBILI = { EC: "Fabbricati", EB: "Terreni", EM: "Fabbricati tavolari", EL: "Terreni tavolari" };
+const COLONNE_IMMOBILI = ["_quadro", "comune", "foglio", "particella", "subalterno", "categoria", "_rendita", "diritto", "quota_defunto", "valore"];
+const LBL_VISTA = { _quadro: "Quadro", _rendita: "Rendita / reddito dom." };
+const vistaImmobili = q => !!(S.immobiliTutti && q && IMMOBILI.includes(q.id));
+function quadriImmobili() { return IMMOBILI.map(id => S.Q && S.Q.quadri.find(x => x.id === id)).filter(x => x && x.supportato && (x.attivo || righeQuadro(x).length)); }
+function quadroDellaRiga(key) { for (const q of quadriImmobili()) if (righeQuadro(q).some(r => r.key === key)) return q.id; return null; }
 function colonneVista(q) {
+  if (vistaImmobili(q)) return COLONNE_IMMOBILI.filter(c => c.startsWith("_") || c in S.schema.collezioni.beni);
   if (q.id !== "EA") return q.colonne;
   return [...PRIMA_EA.filter(c => q.colonne.includes(c)), ...q.colonne.filter(c => !PRIMA_EA.includes(c))];
 }
+function linguetteImmobili(q) {
+  const qs = quadriImmobili(); if (!IMMOBILI.includes(q.id) || qs.length < 1) return null;
+  const n = qq => righeQuadro(qq).length, tot = qs.reduce((s, qq) => s + n(qq), 0);
+  const tab = (testo, attiva, f, titolo) => h("button", { type: "button", role: "tab", "aria-selected": attiva ? "true" : "false", title: titolo || null, onclick: f }, testo);
+  return h("div", { class: "linguette-immobili", role: "tablist", "aria-label": "Immobili" },
+    tab("Tutti gli immobili (" + tot + ")", !!S.immobiliTutti, () => scegliQuadro(S.sel, true), "Fabbricati e terreni di tutti i quadri in una tabella"),
+    qs.map(qq => tab(NOMI_IMMOBILI[qq.id] + " " + qq.id + " (" + n(qq) + ")", !S.immobiliTutti && S.sel === qq.id, () => scegliQuadro(qq.id), qq.titolo)));
+}
 function ordinaRigheVista(q, righe) {
+  if (vistaImmobili(q)) return quadriImmobili().flatMap(qq => righeQuadro(qq).map(r => ({ ...r, quadroId: qq.id })));
   if (q.coll !== "devoluzioni" || righe.length < 2) return righe;
   const ordineBeni = new Map((S.P.dati.beni || []).map((b, i) => [b.id, i]));
   const pos = r => { const b = valRiga(r, "bene_id"); return ordineBeni.has(b) ? ordineBeni.get(b) : 1e9; };
@@ -1161,6 +1207,7 @@ function insDati(ins) {
   const visibili = q.campi ? new Set(q.campi) : (((S.schema.ordine || {})[q.id]) ? new Set(S.schema.ordine[q.id]) : null);   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
   const ordine = ordinati(q.id, Object.keys(campi));
   const gruppi = q.coll === "beni" ? GRUPPI_SCHEDA[q.id] : null, righeCampi = [];
+  let lista = null;   // campi delle schede senza gruppi: un contenitore, impaginato su piu' colonne con il pannello sotto
   for (const [comune, provincia] of [['comune', 'provincia'], ['luogo_nascita', 'provincia_nascita']]) {
     void comune; void provincia;   // provincia e comune seguono gia' l'ordine ufficiale (provincia prima del comune)
   }
@@ -1210,12 +1257,19 @@ function insDati(ins) {
     const w = sd && sd.opzioni ? campoStrutturato(sd, valRiga(r, c), v => modificaCampo(c, v), id ? q.coll + "[" + id + "]." + c : null)
       : campoInput(q.coll, id, c, kind, valRiga(r, c), modificaCampo);
     const aiuto = (S.schema.aiuti || {})[q.coll + "." + c];
-    if (aiuto) w.append(h("div", { class: "mut aiuto-voce" }, aiuto));
+    if (aiuto) {   // nella scheda compatta l'aiuto compare entrando nel campo; resta sempre la descrizione accessibile del campo
+      const idA = "aiuto_" + q.coll + "_" + c;
+      w.append(h("div", { class: "mut aiuto-voce", id: idA }, aiuto));
+      const f = w.querySelector("input, select, textarea"); if (f) f.setAttribute("aria-describedby", idA);
+    }
     const obbl = (OBBLIGATORI[q.id] || []).includes(c);
-    const rg = h("div", { class: "rg" + (obbl ? " obbl" : ""), "data-campo": c }, h("label", { title: obbl ? "Dato richiesto nel quadro " + q.id : null }, lbl(q.coll, c, q.id)), w);
-    if (gruppi) righeCampi.push([c, rg, vuoto]); else ins.append(rg);
+    // il suggerimento dell'etichetta riporta sempre il nome intero (nella scheda compatta l'etichetta si accorcia su una riga)
+    const titoloEt = [lbl(q.coll, c, q.id), obbl ? "dato richiesto nel quadro " + q.id : "", aiuto || ""].filter(Boolean).join(". ");
+    const rg = h("div", { class: "rg" + (obbl ? " obbl" : "") + (aiuto ? " con-aiuto" : ""), "data-campo": c }, h("label", { title: titoloEt }, lbl(q.coll, c, q.id)), w);
+    if (gruppi) righeCampi.push([c, rg, vuoto]);
+    else { if (!lista) { lista = h("div", { class: "campi-lista" }); ins.append(lista); } lista.append(rg); }
   }
-  if (gruppi) ins.append(...schedaAGruppi(gruppi, righeCampi));
+  if (gruppi) ins.append(h("div", { class: "gruppi-scheda" }, ...schedaAGruppi(gruppi, righeCampi)));   // con il pannello sotto: gruppi affiancati
   if (q.coll === "beni" && ["EB", "EC"].includes(q.id)) {   // codice comune calcolato dal nome (report grafico DEAS 08/11/2026, proposta 4)
     propostaCodiceComune(q, r, ins);
     for (const c of ["comune", "provincia"]) { const el = ins.querySelector('.rg[data-campo="' + c + '"] input, .rg[data-campo="' + c + '"] select');
@@ -1223,10 +1277,13 @@ function insDati(ins) {
   }
   if (nascostiEstero) ins.append(h("p", { class: "mut nota-campi" }, "Per un immobile all'estero scegli la provincia EE: compaiono i campi dello Stato estero."));
   renderStrutturati(ins, q, r);
-  if (q.coll === "beni" && r.e && ["fabbricato", "terreno"].includes(valRiga(r, "tipo"))) ins.append(boxValoreCatastale(q, r));
-  if (q.coll === "beni" && r.e) ins.append(boxDevoluzioniBene(r));            // voce 22: somma delle quote del bene
-  if (q.coll === "persone" && r.e && valRiga(r, "ruolo") !== "defunto") ins.append(boxRiepilogoSoggetto(r));   // voce 33
-  if (r.e) ins.append(boxAppunti(q, r));                                        // voce 10: nota interna della riga
+  // riquadri della riga: con il pannello sotto stanno affiancati invece che uno sotto l'altro (versione 0.3)
+  const extra = h("div", { class: "extra-scheda" });
+  if (q.coll === "beni" && r.e && ["fabbricato", "terreno"].includes(valRiga(r, "tipo"))) extra.append(boxValoreCatastale(q, r));
+  if (q.coll === "beni" && r.e) extra.append(boxDevoluzioniBene(r));            // voce 22: somma delle quote del bene
+  if (q.coll === "persone" && r.e && valRiga(r, "ruolo") !== "defunto") extra.append(boxRiepilogoSoggetto(r));   // voce 33
+  if (r.e) extra.append(boxAppunti(q, r));                                        // voce 10: nota interna della riga
+  if (extra.childElementCount) ins.append(extra);
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
   const supKey = q.coll + ':' + (r.e ? r.e.id : r.nuova.id);
   if (r.nuova || S.dirty.has(r.key) || S.supDirty.has(supKey)) az.append(h("button", { class: "gh", onclick: () => { r.nuova ? S.nuove.delete(r.key) : S.dirty.delete(r.key); S.supDirty.delete(supKey); if (r.nuova) S.riga = null; render(); } }, "Annulla modifiche"));
@@ -2251,7 +2308,8 @@ function impAspettoRender(p) {
   scelte('dimensione', 'Dimensione del testo', Array.from({ length: 11 }, (_, i) => [String(i + 12), (i + 12) + ' px']));
   scelte('interlinea', 'Spaziatura delle righe', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
   scelte('accento', 'Colore di accento', [['predefinito', 'Verde modello (predefinito)'], ['blu', 'Blu'], ['verde', 'Verde'], ['viola', 'Viola'], ['arancio', 'Arancio'], ['rosso', 'Rosso'], ['grafite', 'Grafite']]);
-  scelte('densita', 'Densità delle tabelle', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
+  scelte('densita', 'Densità di tabelle e schede', [['compatta', 'Compatta (schede con etichette a sinistra, aiuto quando entri nel campo)'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
+  scelte('disposizione', 'Pannello della riga selezionata', [['destra', 'A destra della tabella'], ['sotto', 'Sotto la tabella, a tutta larghezza']]);
   scelte('contrasto', 'Contrasto', [['normale', 'Normale'], ['alto', 'Alto (bordi e testi più marcati)']]);
   scelte('movimento', 'Animazioni', [['normale', 'Normali'], ['ridotto', 'Ridotte']]);
   scelte('avvio', 'All’avvio', [['elenco', 'Mostra l’elenco delle pratiche'], ['ultima', 'Riapri l’ultima pratica']]);
@@ -2400,39 +2458,46 @@ async function salvaLarghezza(larghezza, chiave = 'larghezza_pannello') {
   try {
     const r = await post('/api/impostazioni', { interfaccia: { [chiave]: larghezza } });
     memorizzaAspetto(r.interfaccia);
-  } catch (e) { memorizzaAspetto(precedente); msg('Larghezza non salvata: ' + e.message, 'e'); }
+  } catch (e) { memorizzaAspetto(precedente); msg('Misura del pannello non salvata: ' + e.message, 'e'); }
 }
 /* Separatore ridimensionabile: cfg = { chiave, pannello (selettore), verso (+1 se il pannello e' a sinistra del separatore),
    min, max() }. Trascinamento con pointer capture, tastiera con frecce/Home/End, doppio clic per il valore predefinito. */
-function collegaSeparatore(sep, cfg) {
+function collegaSeparatore(sep, base) {
+  // cfg puo' dipendere dalla disposizione (pannello a destra: larghezza sull'asse x; pannello sotto: altezza sull'asse y)
+  const conf = () => (typeof base === 'function' ? base() : base);
   let tr = null;
   sep.addEventListener('pointerdown', ev => {
     if (ev.button !== 0 || window.innerWidth <= 960) return;
-    tr = { id: ev.pointerId, x: ev.clientX, larghezza: $(cfg.pannello).getBoundingClientRect().width, nuova: preferenze[cfg.chiave] };
+    const cfg = conf(), r = $(cfg.pannello).getBoundingClientRect();
+    tr = { cfg, id: ev.pointerId, p: cfg.asse === 'y' ? ev.clientY : ev.clientX, misura: cfg.asse === 'y' ? r.height : r.width, nuova: preferenze[cfg.chiave] };
     sep.setPointerCapture(ev.pointerId); document.body.classList.add('ridimensionando'); ev.preventDefault();
   });
   sep.addEventListener('pointermove', ev => {
     if (!tr || ev.pointerId !== tr.id) return;
-    tr.nuova = Math.round(Math.max(cfg.min, Math.min(cfg.max(), tr.larghezza + cfg.verso * (ev.clientX - tr.x))));
+    const cfg = tr.cfg, p = cfg.asse === 'y' ? ev.clientY : ev.clientX;
+    tr.nuova = Math.round(Math.max(cfg.min, Math.min(cfg.max(), tr.misura + cfg.verso * (p - tr.p))));
     applicaAspetto({ ...preferenze, [cfg.chiave]: tr.nuova });
   });
   const fine = ev => {
     if (!tr || ev.pointerId !== tr.id) return;
-    const larghezza = tr.nuova; tr = null; document.body.classList.remove('ridimensionando');
+    const valore = tr.nuova, chiave = tr.cfg.chiave; tr = null; document.body.classList.remove('ridimensionando');
     if (sep.hasPointerCapture(ev.pointerId)) sep.releasePointerCapture(ev.pointerId);
-    if (ev.type === 'pointercancel') applicaAspetto(preferenze); else salvaLarghezza(larghezza, cfg.chiave);
+    if (ev.type === 'pointercancel') applicaAspetto(preferenze); else salvaLarghezza(valore, chiave);
   };
   sep.addEventListener('pointerup', fine); sep.addEventListener('pointercancel', fine);
   sep.addEventListener('keydown', ev => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
+    const cfg = conf(), tasti = cfg.asse === 'y' ? ['ArrowUp', 'ArrowDown'] : ['ArrowLeft', 'ArrowRight'];
+    if (![...tasti, 'Home', 'End'].includes(ev.key)) return;
     ev.preventDefault();
-    const piu = cfg.verso > 0 ? 'ArrowRight' : 'ArrowLeft';
+    const piu = cfg.verso > 0 ? tasti[1] : tasti[0];
     const l = ev.key === 'Home' ? cfg.min : ev.key === 'End' ? cfg.max() : preferenze[cfg.chiave] + (ev.key === piu ? 16 : -16);
     salvaLarghezza(Math.max(cfg.min, Math.min(cfg.max(), l)), cfg.chiave);
   });
-  sep.addEventListener('dblclick', () => salvaLarghezza(ASPETTO_DEFAULT[cfg.chiave], cfg.chiave));
+  sep.addEventListener('dblclick', () => { const cfg = conf(); salvaLarghezza(ASPETTO_DEFAULT[cfg.chiave], cfg.chiave); });
 }
-collegaSeparatore($('#ridimensiona'), { chiave: 'larghezza_pannello', pannello: '#ins', verso: -1, min: 280, max: () => limitePannello() });
+collegaSeparatore($('#ridimensiona'), () => preferenze.disposizione === 'sotto'
+  ? { chiave: 'altezza_pannello', pannello: '#ins', asse: 'y', verso: -1, min: 200, max: () => limiteAltezza() }
+  : { chiave: 'larghezza_pannello', pannello: '#ins', asse: 'x', verso: -1, min: 280, max: () => limitePannello() });
 collegaSeparatore($('#ridimensionaNav'), { chiave: 'larghezza_nav', pannello: '#lat', verso: 1, min: 180, max: () => limiteNav() || 480 });
 
 /* Importa un file telematico SUC13 (XML) come nuova pratica: importa solo cio' che il programma sa riprodurre e dice il resto. */
@@ -2473,7 +2538,9 @@ document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && (
 /* Scorciatoie per chi inserisce dati tutto il giorno (report grafica 07/11/2026, punto 10). «?» mostra l'elenco. */
 const SCORCIATOIE = [["Ctrl+S", "Salva le modifiche"], ["Alt+N", "Nuova riga nel quadro"], ["Alt+D", "Duplica la riga selezionata"],
   ["Alt+PagGiù / Alt+PagSu", "Quadro successivo / precedente"], ["Ctrl+G", "Vai a un quadro (scrivi la sigla, es. EC)"],
-  ["Alt+C", "Controlla la pratica"], ["Frecce, Home, Fine", "Righe della tabella"], ["Invio", "Apri la riga nel pannello"], ["Esc", "Dal pannello torna alla tabella"], ["F1", "Guida e istruzioni ufficiali"], ["?", "Questo elenco"]];
+  ["Alt+1 … Alt+9", "Vai alla 1ª … 9ª voce dell'elenco dei quadri (Dati generali, Eredi, …)"],
+  ["Alt+C", "Controlla la pratica"], ["Frecce, Home, Fine", "Righe della tabella"], ["Invio", "Apri la riga nel pannello"],
+  ["Invio (nella scheda)", "Campo successivo; dopo l'ultimo campo porta a «Salva»"], ["Esc", "Dal pannello torna alla tabella"], ["F1", "Guida e istruzioni ufficiali"], ["?", "Questo elenco"]];
 function mostraScorciatoie() {
   let d = $("#dScorciatoie");
   if (!d) { d = h("dialog", { id: "dScorciatoie", "aria-labelledby": "dScT" }, h("form", { method: "dialog" }, h("h2", { id: "dScT" }, "Scorciatoie da tastiera"),
@@ -2494,6 +2561,26 @@ function vaiAlQuadro() {
   inp.focus();
 }
 function quadriNavigabili() { return S.Q ? S.Q.quadri.filter(x => x.gruppo !== "lavoro" || x.id === "DV") : []; }
+/* Versione 0.3: le voci nell'ordine dell'elenco a sinistra (Alt+1 … Alt+9). Stesso ordine di renderAlbero. */
+const GRUPPI_ELENCO = ["frontespizio", "quadri", "riepiloghi", "lavoro"];
+function vociElenco() { return S.Q ? GRUPPI_ELENCO.flatMap(g => S.Q.quadri.filter(x => x.gruppo === g)) : []; }
+function tastoVoce(id) { const i = vociElenco().findIndex(x => x.id === id); return i >= 0 && i < 9 ? " · Alt+" + (i + 1) : ""; }
+/* Invio in un campo della scheda: passa al campo successivo (come nei programmi da tavolo); dopo l'ultimo, al pulsante Salva.
+   Non vale per aree di testo, caselle, pulsanti e finestre aperte (lì Invio conserva il suo significato). */
+function campoSuccessivo(ev) {
+  if (ev.key !== "Enter" || ev.ctrlKey || ev.altKey || ev.shiftKey || ev.metaKey || ev.isComposing || ev.defaultPrevented) return;
+  const ins = $("#ins"), t = ev.target;
+  if (!ins || !ins.contains(t) || document.querySelector("dialog[open]")) return;
+  if (!(t.tagName === "SELECT" || (t.tagName === "INPUT" && !["checkbox", "radio", "file", "button", "submit", "reset"].includes(t.type)))) return;
+  const campi = [...ins.querySelectorAll('input:not([type=hidden]):not([type=file]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled])')]
+    .filter(x => x.getClientRects().length && !x.closest("details:not([open]) > :not(summary)"));
+  const i = campi.indexOf(t); if (i < 0) return;
+  ev.preventDefault();
+  const dopo = campi[i + 1];
+  if (dopo) { dopo.focus(); if (dopo.tagName === "INPUT" && dopo.select) dopo.select(); }
+  else { const salva = ins.querySelector(".az .pil"); if (salva) salva.focus(); }
+}
+document.addEventListener("keydown", campoSuccessivo);
 document.addEventListener("keydown", ev => {
   const inCampo = ev.target.closest && ev.target.closest("input, select, textarea, [contenteditable]");
   if (document.querySelector("dialog[open]")) return;
@@ -2503,6 +2590,15 @@ document.addEventListener("keydown", ev => {
   if (ev.altKey && !ev.ctrlKey && (ev.key === "n" || ev.key === "N")) { if (q && q.coll && q.supportato) { ev.preventDefault(); aggiungiRiga(q); } return; }
   if (ev.altKey && !ev.ctrlKey && (ev.key === "d" || ev.key === "D")) { if (q && q.coll) { ev.preventDefault(); duplicaRiga(q); } return; }
   if (ev.altKey && !ev.ctrlKey && (ev.key === "c" || ev.key === "C")) { ev.preventDefault(); $("#bControlla").click(); return; }
+  // Alt+1 … Alt+9: voce dell'elenco dei quadri (ev.code: indipendente dalla tastiera italiana o da Maiusc)
+  const cifra = /^Digit([1-9])$/.exec(ev.code || "");
+  if (ev.altKey && !ev.ctrlKey && !ev.metaKey && cifra) {
+    const v = vociElenco()[Number(cifra[1]) - 1]; if (!v) return;
+    ev.preventDefault(); scegliQuadro(v.id);
+    // il fuoco va dove si lavora: la prima riga della tabella, altrimenti la voce dell'elenco
+    const dove = document.querySelector('#vista tbody tr[tabindex="0"]') || document.querySelector('.voce[data-q="' + v.id + '"]');
+    if (dove) dove.focus({ preventScroll: true }); return;
+  }
   if (ev.altKey && (ev.key === "PageDown" || ev.key === "PageUp")) {
     const l = quadriNavigabili(), i = l.findIndex(x => x.id === S.sel); if (!l.length) return;
     ev.preventDefault(); scegliQuadro(l[(Math.max(0, i) + (ev.key === "PageDown" ? 1 : l.length - 1)) % l.length].id); return;

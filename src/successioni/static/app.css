@@ -578,3 +578,44 @@ body[data-barra=icone] .tb :is(#bNuova, #bImporta, #bCalc, #bImpost, #bGuida),
 body[data-barra=minima] .tb :is(#bNuova, #bImporta, #bCalc, #bImpost, #bGuida, #bControlla, #bGenera) { font-size:0; padding:6px 9px; }
 body[data-barra=icone] .tb :is(#bNuova, #bImporta, #bCalc, #bImpost, #bGuida)::before,
 body[data-barra=minima] .tb :is(#bNuova, #bImporta, #bCalc, #bImpost, #bGuida, #bControlla, #bGenera)::before { width:1.15rem; height:1.15rem; margin:0; }
+
+/* ---------- versione 0.3: densita' e velocita' di inserimento (report grafico DEAS 08/11/2026, proposte 1 e 2) ---------- */
+/* Pannello della riga sotto l'elenco, a tutta larghezza, con separatore orizzontale (solo schermi larghi). */
+@media (min-width:961px) {
+  :root[data-disposizione="sotto"] .app.conIns { grid-template-columns:var(--larghezza-nav,240px) 10px minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr) 10px var(--altezza-ins,380px); }
+  :root[data-disposizione="sotto"] .app.conIns > .lat { grid-column:1; grid-row:1 / span 3; }
+  :root[data-disposizione="sotto"] .app.conIns > #ridimensionaNav { grid-column:2; grid-row:1 / span 3; }
+  :root[data-disposizione="sotto"] .app.conIns > main { grid-column:3; grid-row:1; min-height:0; }
+  :root[data-disposizione="sotto"] .app.conIns > #ridimensiona { grid-column:3; grid-row:2; cursor:row-resize; }
+  :root[data-disposizione="sotto"] .app.conIns > #ridimensiona::after { width:42px; height:3px; }
+  :root[data-disposizione="sotto"] .app.conIns > .ins { grid-column:3; grid-row:3; min-height:0; }
+  /* colonne «a giornale»: i gruppi corti riempiono lo spazio accanto a quelli lunghi (una griglia allineerebbe le righe) */
+  :root[data-disposizione="sotto"] .ins .gruppi-scheda { column-width:22rem; column-gap:20px; }
+  :root[data-disposizione="sotto"] .ins .gruppi-scheda > .gruppo-scheda { break-inside:avoid; margin-top:0; padding-bottom:6px; }
+  :root[data-disposizione="sotto"] .ins .campi-lista { display:grid; grid-template-columns:repeat(auto-fill,minmax(24rem,1fr)); column-gap:20px; }
+  :root[data-disposizione="sotto"] .ins .extra-scheda { display:grid; grid-template-columns:repeat(auto-fit,minmax(20rem,1fr)); gap:0 20px; align-items:start; }
+  :root[data-disposizione="sotto"] .ins > .seg { max-width:30rem; }
+}
+/* Vista unica degli immobili: linguette sopra la tabella e sigla del quadro nella prima colonna. */
+.linguette-immobili { display:flex; flex-wrap:wrap; gap:4px; margin:0 0 8px; border-bottom:1px solid var(--sep); }
+.linguette-immobili button { border:0; background:none; padding:5px 10px; border-radius:var(--r1) var(--r1) 0 0; color:var(--t2); font-size:var(--fs-m); }
+.linguette-immobili button:hover { background:var(--grigio); }
+.linguette-immobili button[aria-selected=true] { color:var(--t); font-weight:700; box-shadow:inset 0 -2px 0 var(--blu); background:var(--blu-t); }
+.sigla-mini { font-family:var(--f-mono); font-size:var(--fs-s); font-weight:700; color:var(--blu); border:1px solid var(--sep-f); border-radius:3px; padding:0 4px; }
+/* Scheda compatta: etichetta a sinistra del campo, righe basse, coppie affiancate; l'aiuto compare entrando nel campo
+   (resta comunque descrizione accessibile del campo e suggerimento dell'etichetta). */
+:root[data-densita="compatta"] .ins .rg { padding:1px 2px; gap:8px; align-items:center; }
+:root[data-densita="compatta"] .ins :is(input, select) { padding-top:1px; padding-bottom:1px; }
+:root[data-densita="compatta"] .ins .campi-scheda { grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); gap:0 14px; }
+:root[data-densita="compatta"] .ins .campi-scheda .rg { display:grid; grid-template-columns:7.5rem minmax(0,1fr); padding:1px 0; }
+:root[data-densita="compatta"] .ins .campi-scheda .rg > label { margin:0; text-align:left; font-size:var(--fs-s); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+:root[data-densita="compatta"] .ins .rg > label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+:root[data-densita="compatta"] .ins .campi-scheda .rg > .calcolato { grid-column:1 / -1; margin-top:2px; }
+:root[data-densita="compatta"] .vc .fonte-vc { display:none; }   /* le fonti restano nel suggerimento del titolo */
+:root[data-densita="compatta"] .vc { padding:6px 10px; margin:6px 0; }
+:root[data-densita="compatta"] .ins .aiuto-voce { display:none; }
+:root[data-densita="compatta"] .ins .rg:focus-within .aiuto-voce { display:block; }
+:root[data-densita="compatta"] .ins .rg.con-aiuto > label::after { content:" ?"; color:var(--blu); font-weight:700; }
+:root[data-densita="compatta"] .gruppo-scheda { margin:6px 0 2px; }
+:root[data-densita="compatta"] .gruppo-scheda > h4, :root[data-densita="compatta"] .gruppo-scheda > summary { padding:1px 8px; margin-bottom:2px; }
