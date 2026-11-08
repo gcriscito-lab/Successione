@@ -67,7 +67,7 @@ def _importo(v, cosa: str) -> Decimal | None:
     try:
         d = V.parse_importo(s)
     except (V.ValoreNonValido, InvalidOperation, ValueError):
-        raise DatiNonValidi(f"{cosa}: importo non valido ({v!r})")
+        raise DatiNonValidi(f"{cosa}: importo non valido ({v!r})") from None
     if d < 0:
         raise DatiNonValidi(f"{cosa}: importo negativo")
     return d
@@ -125,7 +125,7 @@ def _indice(v, cosa: str, n: int) -> int | None:
     try:
         i = int(str(v).strip())
     except ValueError:
-        raise DatiNonValidi(f"{cosa}: numero non valido ({v!r})")
+        raise DatiNonValidi(f"{cosa}: numero non valido ({v!r})") from None
     if not 1 <= i <= n:
         raise DatiNonValidi(f"{cosa}: non esiste il numero {i}" + (f" (da 1 a {n})" if n else " (nessuno inserito)"))
     return i - 1
@@ -139,7 +139,7 @@ def _quota(v, cosa: str) -> Fraction | None:
     try:
         q = V.parse_quota(v)
     except (V.ValoreNonValido, ValueError):
-        raise DatiNonValidi(f"{cosa}: quota non valida ({v!r}); scrivere ad esempio 1/2")
+        raise DatiNonValidi(f"{cosa}: quota non valida ({v!r}); scrivere ad esempio 1/2") from None
     if not 0 < q <= 1:
         raise DatiNonValidi(f"{cosa}: la quota deve essere maggiore di zero e al massimo 1")
     return q
@@ -186,7 +186,7 @@ def leggi_richiesta(r: dict, oggi: date | None = None) -> dict:
     try:
         dd = date.fromisoformat(str(r.get("data_decesso") or ""))
     except ValueError:
-        raise DatiNonValidi("indicare la data del decesso (AAAA-MM-GG)")
+        raise DatiNonValidi("indicare la data del decesso (AAAA-MM-GG)") from None
     if dd > oggi:
         raise DatiNonValidi("la data del decesso è nel futuro")
     # numero e tipo degli elenchi controllati prima di ogni elaborazione
@@ -267,7 +267,7 @@ def leggi_richiesta(r: dict, oggi: date | None = None) -> dict:
     try:
         circ = int(r.get("circoscrizioni") or 1)
     except (TypeError, ValueError):
-        raise DatiNonValidi("numero di circoscrizioni non valido")
+        raise DatiNonValidi("numero di circoscrizioni non valido") from None
     if not 1 <= circ <= 50:
         raise DatiNonValidi("numero di circoscrizioni fra 1 e 50")
     return {"data_decesso": dd, "eredi": eredi, "immobili": immobili, "altri_beni": altri, "passivita": passivita,

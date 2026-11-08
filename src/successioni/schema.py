@@ -345,7 +345,7 @@ def valida_campo(kind: str, valore, percorso: str, riferimenti: dict[str, set[st
             try:
                 datetime.date.fromisoformat(valore)
             except ValueError:
-                raise V.ValoreNonValido("data inesistente nel calendario: controllare giorno e mese (formato GG/MM/AAAA)")
+                raise V.ValoreNonValido("data inesistente nel calendario: controllare giorno e mese (formato GG/MM/AAAA)") from None
         elif kind == "quota":
             V.parse_quota(valore)
         elif kind == "importo":

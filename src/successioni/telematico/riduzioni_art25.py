@@ -242,10 +242,6 @@ def valida(x) -> None:
             x.ra_altro = True
 
 
-def _flag_ok(v) -> bool:
-    return v is True or str(v).strip().lower() in ("1", "si", "true")
-
-
 def _tipo_ufficio(x, v, perc, fonte, nome):
     from .esporta import codice_enum
     try:

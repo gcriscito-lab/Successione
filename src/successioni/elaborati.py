@@ -228,7 +228,7 @@ class ElaboratiMixin:
     def controllo_ufficiale_pratica(self, pratica_id: str, *, chiave: str | None = None) -> dict:
         """Esegue il controllo ufficiale sul file esportato corrente (se Java e componenti sono configurati; altrimenti
         passaggio manuale tracciato). Un esito su file di bozza tecnica resta marcato come tale."""
-        from .collegamenti.controllo import TIPO_JOB, controllo_ufficiale
+        from .collegamenti.controllo import controllo_ufficiale
         st = self.stato_elaborati(pratica_id)
         exp = st["export"]
         if exp["stato"] != "aggiornato" or not exp.get("percorso"):

@@ -665,7 +665,6 @@ class InvioAdattatore:
 
     def _applica_risposta(self, tid: str, resp: RispostaInvio, *, da, prova: dict | None = None) -> None:
         t = self.job.leggi(tid, TIPO_TENTATIVO)
-        copia_id = t["input"]["copia_id"]
         patch: dict = {"ultima_risposta": {"tipo": resp.tipo, "motivo": resp.motivo, "ts": ora()}}
         if prova:
             patch["prova"] = prova

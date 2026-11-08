@@ -79,7 +79,7 @@ def unisci_claude_desktop(percorso: Path, voce: dict, nome: str = NOME) -> dict:
             try:
                 attuale = json.loads(testo)
             except ValueError as e:
-                raise SystemExit(f"{percorso} non e' JSON valido ({e}): correggerlo prima, il file non e' stato toccato")
+                raise SystemExit(f"{percorso} non e' JSON valido ({e}): correggerlo prima, il file non e' stato toccato") from e
         if not isinstance(attuale, dict):
             raise SystemExit(f"{percorso}: contenuto inatteso (non e' un oggetto JSON); file non modificato")
     server = attuale.get("mcpServers")

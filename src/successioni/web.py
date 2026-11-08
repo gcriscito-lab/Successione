@@ -439,6 +439,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def scarica_dcm(request):
+        from urllib.parse import quote
         dcm, m = sv.file_controllato_dcm(request.path_params["pid"])
         return Response(dcm, media_type="application/octet-stream", headers={"Content-Disposition":
                         "attachment; filename*=UTF-8''" + quote(m["nome"] or "file_controllato.dcm", safe=""),

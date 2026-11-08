@@ -32,7 +32,7 @@ def parse_importo(v) -> Decimal:
     try:
         return Decimal(s)
     except InvalidOperation as e:  # pragma: no cover
-        raise ValoreNonValido(str(e))
+        raise ValoreNonValido(str(e)) from e
 
 
 def parse_quota(v) -> Fraction:
@@ -52,6 +52,3 @@ def parse_quota(v) -> Fraction:
         raise ValoreNonValido("quota maggiore di 1 non ammessa (esempio 1/2)")
     return f
 
-
-def quota_json(f: Fraction) -> dict:
-    return {"num": f.numerator, "den": f.denominator}

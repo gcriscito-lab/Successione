@@ -178,3 +178,21 @@ def test_copia_anonima_toglie_nomi_anche_dai_testi_liberi_e_dagli_estremi():
     assert cf_persona_fisica_valido(anon["opzioni"]["telematico"]["dichiarazione"]["versamento"]["cf_titolare"])
     # la relazione resta leggibile («figlia di ...») ma senza il nome
     assert anon["persone"][1]["relazione_con_defunto"].startswith("figlia di ")
+
+
+def test_scaricamento_dcm_con_nome_non_ascii_e_virgolette(tmp_path, monkeypatch):
+    sv = Servizio(Archivio(tmp_path / "d"))
+    pid = sv.crea_pratica("Prova")["pratica_id"]
+    monkeypatch.setattr(sv, "file_controllato_dcm", lambda p: (b"DCM", {"nome": 'Pratica "Società".dcm'}))
+    r = _client(sv).get(f"/api/pratiche/{pid}/file.dcm")
+    assert r.status_code == 200 and r.content == b"DCM"
+    assert r.headers["content-disposition"] == "attachment; filename*=UTF-8''Pratica%20%22Societ%C3%A0%22.dcm"
+
+
+def test_copia_senza_file_telematico_e_404(tmp_path, monkeypatch):
+    sv = Servizio(Archivio(tmp_path / "d"))
+    ad = sv._adattatore_invio("manuale")
+    monkeypatch.setattr(sv, "_adattatore_invio", lambda m: ad)
+    monkeypatch.setattr(ad.job, "leggi", lambda cid, tipo: {"risultato": {"artefatti": [{}]}, "input": {"manifest": [{"ruolo": "stampa"}]}})
+    r = _client(sv).get("/api/invio/cpc_x/file")
+    assert r.status_code == 404
