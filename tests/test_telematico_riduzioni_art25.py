@@ -170,6 +170,7 @@ def test_l_dichiarante_export_e_calcolo_a_mano():
 
 
 @SALTO
+@pytest.mark.java
 def test_reale_l_dichiarante(tmp_path):
     verifica_controllo(_es(caso_l()), tmp_path, 13384)
 
@@ -232,6 +233,7 @@ def test_art25_codici_1_5_a_mano(codice, coeff):
 
 
 @SALTO
+@pytest.mark.java
 def test_reale_art25_codice_2(tmp_path):
     verifica_controllo(_es(caso_art25("2")), tmp_path, 15984)
 
@@ -342,6 +344,7 @@ def test_art25_negli_altri_quadri_a_mano(quadro):
 
 @SALTO
 @pytest.mark.parametrize("quadro", sorted(QUADRI_ART25))
+@pytest.mark.java
 def test_reale_art25_negli_altri_quadri(quadro, tmp_path):
     caso, bene, coeff, prec = QUADRI_ART25[quadro]
     d, valore_cespite, qv, qe = caso()
@@ -377,6 +380,7 @@ def test_art25_tavolari(quadro):
 
 @SALTO
 @pytest.mark.parametrize("quadro", ["EL", "EM"])
+@pytest.mark.java
 def test_reale_art25_tavolari(quadro, tmp_path):
     d = _caso_el_em("b_terrtav1", "d_terrt", 8000, "1", "4000") if quadro == "EL" else \
         _caso_el_em("b_fabbtav1", "d_fabbt", 2_400_000, "3", "100000")
@@ -416,6 +420,7 @@ def test_q_azienda_a_mano():
 
 
 @SALTO
+@pytest.mark.java
 def test_reale_q_azienda(tmp_path):
     verifica_controllo(_es(caso_q()), tmp_path, 54543)
 
@@ -459,6 +464,7 @@ def test_r_sotto_soglia_a_mano():
 
 @SALTO
 @pytest.mark.parametrize("terreno", ["400000", "150000"])
+@pytest.mark.java
 def test_reale_r(terreno, tmp_path):
     es = _es(caso_r(terreno))
     verifica_controllo(es, tmp_path, calcola_da_xml(es.xml).imposta_ef18bis)
@@ -498,6 +504,7 @@ def test_f_sotto_soglia_a_mano():
 
 @SALTO
 @pytest.mark.parametrize("sopra", [True, False])
+@pytest.mark.java
 def test_reale_f(sopra, tmp_path):
     es = _es(caso_f(sopra))
     _ok(es)
@@ -519,6 +526,7 @@ def test_l_di_beneficiario_diverso_dal_dichiarante_usa_eg11():
 
 
 @SALTO
+@pytest.mark.java
 def test_reale_l_altro_beneficiario(tmp_path):
     d = base()
     rid(d, "d_casaluca", agevolazioni="L")
@@ -805,6 +813,7 @@ def _vps_testo(d, v):
     ("senza_sezione_eh", lambda d: _rm(d, D + "/suc:QuadroEH/suc:PrimoModulo/suc:SezioneIV_AltreAgevRiduz"), "3248",
      "deve essere compilata"),
 ])
+@pytest.mark.java
 def test_reale_art25_negativi(nome, mod, codice, testo, tmp_path):
     es = _es(caso_art25())
     stato, codici, wri = _mut_reale(es, mod, tmp_path, nome)
@@ -813,6 +822,7 @@ def test_reale_art25_negativi(nome, mod, codice, testo, tmp_path):
 
 
 @SALTO
+@pytest.mark.java
 def test_reale_l_senza_sezione_eh_e_senza_eg11(tmp_path):
     es = _es(caso_l())
     stato, codici, wri = _mut_reale(es, lambda d: _rm(d, D + "/suc:QuadroEH/suc:PrimoModulo/suc:SezioneIV_AltreAgevRiduz"),
@@ -822,6 +832,7 @@ def test_reale_l_senza_sezione_eh_e_senza_eg11(tmp_path):
 
 
 @SALTO
+@pytest.mark.java
 def test_reale_l_con_p_su_altro_rigo_dello_stesso_bene(tmp_path):
     es = _es(caso_l())
 
@@ -836,6 +847,7 @@ def test_reale_l_con_p_su_altro_rigo_dello_stesso_bene(tmp_path):
 
 
 @SALTO
+@pytest.mark.java
 def test_reale_q_su_fabbricato_non_aziendale_e_protocollo_l_corto(tmp_path):
     # l'export rifiuta Q su un fabbricato (non supportato): si cambia il codice nel file valido del caso L e si verifica lo
     # scarto del componente ufficiale

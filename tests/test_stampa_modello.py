@@ -22,6 +22,7 @@ def test_stampa_richiede_file_completo_e_aggiornato(tmp_path):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_stampa_modello_dallo_stesso_xml(tmp_path):
     s, pid = pratica_con_allegati(tmp_path)
     assert s.esporta(pid)['completo']
@@ -49,6 +50,7 @@ def test_stampa_modello_dallo_stesso_xml(tmp_path):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_dal_servizio_produce_dcm(tmp_path):
     """Prova generale 2026-11-05: il servizio deve chiedere il .dcm, altrimenti il componente cancella la copia di lavoro e un
     controllo positivo sembra un input alterato."""

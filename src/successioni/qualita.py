@@ -16,6 +16,7 @@ import re
 from . import codice_fiscale as CF
 from .schema import Errore
 from .telematico import identificativi as ID
+from .telematico import supplemento as SUP
 
 _SPAZI = re.compile(r"^\s|\s$|\s{2,}")
 _TESTI_PERSONA = ("cognome", "nome", "luogo_nascita", "comune_decesso")
@@ -24,6 +25,13 @@ _TESTI_BENE = ("comune", "indirizzo", "comune_amministrativo")
 
 def _iso(v) -> str | None:
     return v if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) else None
+
+
+def _campo(dati: dict, coll: str, ent: dict, campo: str):
+    """Valore sull'entita' oppure, se assente, in ``opzioni.telematico`` (sesso, provincia, codice comune, comune del
+    decesso...): stessa lettura dell'esportazione (``telematico.supplemento.attr``)."""
+    v = ent.get(campo)
+    return v if v is not None else SUP.attr(dati, coll, ent, campo)
 
 
 def _nome(p: dict) -> str:
@@ -40,7 +48,7 @@ def avvisi(dati: dict) -> list[Errore]:
     for p in persone:
         base = f"persone[{p['id']}]"
         for c in _TESTI_PERSONA:
-            v = p.get(c)
+            v = _campo(dati, "persone", p, c)
             if isinstance(v, str) and _SPAZI.search(v):
                 out.append(Errore("SPAZI_ANOMALI", f"{base}.{c}", f"«{v}»: spazi doppi, iniziali o finali"))
         cf = p.get("codice_fiscale")
@@ -52,7 +60,7 @@ def avvisi(dati: dict) -> list[Errore]:
                                   "controllare il codice sul documento"))
             else:
                 campi = d["campi"]
-                sesso = p.get("sesso")
+                sesso = _campo(dati, "persone", p, "sesso")
                 if sesso in ("M", "F") and campi.get("sesso") and campi["sesso"] != sesso:
                     out.append(Errore("CF_INCOERENTE", f"{base}.sesso",
                                       f"il codice fiscale indica sesso {campi['sesso']}, nella scheda {sesso}"))
@@ -86,10 +94,10 @@ def avvisi(dati: dict) -> list[Errore]:
     for b in dati.get("beni", []):
         base = f"beni[{b['id']}]"
         for c in _TESTI_BENE:
-            v = b.get(c)
+            v = _campo(dati, "beni", b, c)
             if isinstance(v, str) and _SPAZI.search(v):
                 out.append(Errore("SPAZI_ANOMALI", f"{base}.{c}", f"«{v}»: spazi doppi, iniziali o finali"))
-        cod, prov = b.get("codice_comune"), b.get("provincia")
+        cod, prov = _campo(dati, "beni", b, "codice_comune"), _campo(dati, "beni", b, "provincia")
         if isinstance(cod, str) and isinstance(prov, str) and cod.strip() and prov.strip() and prov.strip().upper() != "EE":
             com = CF.cerca_comune(cod.strip().upper())
             if com and com.get("provincia") and com["provincia"].upper() != prov.strip().upper():

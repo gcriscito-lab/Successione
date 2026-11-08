@@ -24,10 +24,15 @@ e' considerato validato), ``divergenza_aperta`` se l'importo intero cambia, ``no
 non riesce. ``esito_collaudo`` resta sempre ``da_collaudare``: nessun confronto eseguito con il software ufficiale.
 
 Perimetro: QE, QDN, QP, AN, FR, QN, PR, QTI, AL, ISL, RID (riduzioni art. 25 c. 1 con i codici 1-5 e agevolazioni L, Q, R, F:
-guida pp. 5-7, regole in ``riduzioni_art25.py`` e docs/regole/riduzioni_art25.md), ISN e totale. NON supportati (stato
-``non_supportato``): detrazione dell'imposta estera, trust, stesso soggetto su piu' righi EA (franchigia unica da ripartire),
-agevolazioni diverse da P, X, Y, Z, L, Q, R, F, codici 1-5 insieme a un'agevolazione sulla stessa riga, riduzioni su cespiti DN o
-su titoli esenti, piu' righe R/F per lo stesso beneficiario, dichiarazioni sostitutive, decessi anteriori al 2025-01-01.
+guida pp. 5-7, regole in ``riduzioni_art25.py`` e docs/regole/riduzioni_art25.md), DET (detrazione dell'imposta versata
+all'estero, guida pp. 7-8), ISN e totale; righi esenti A, C, D, E, G, H, N esclusi dalla QE (guida p. 1); codici prima casa
+P, X, Y, Z senza effetto sull'imposta di successione; stesso soggetto su piu' righi EA quando il totale non dipende
+dall'ordine di scomputo della franchigia unica (guida p. 3); dichiarazioni sostitutive con codice 1 o 2.
+NON supportati (stato ``non_supportato``, con il motivo): trust (carica 9 o tipo soggetto 5), integrativa con codice 3,
+gradi senza aliquota nell'appendice, agevolazioni fuori dagli elenchi sopra, immobile aziendale con agevolazione diversa da D,
+agevolazione L, Q, R, F e riduzione art. 25 sulla stessa riga, riduzioni su cespiti DN o su titoli esenti, valore precedenti
+successioni senza codice art. 25, piu' righe R/F per lo stesso beneficiario, stesso soggetto su piu' righi con totale che
+dipende dall'ordine; decessi anteriori al 2025-01-01 (``CALCOLO_NON_APPLICABILE``: l'imposta la liquida l'ufficio).
 """
 from __future__ import annotations
 

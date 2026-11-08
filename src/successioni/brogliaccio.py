@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from fractions import Fraction
 from html import escape
 
 from . import valori as V
 from . import quadri as Q
+from .telematico import supplemento as SUP
 
 COLONNE_BENI = ["quadro", "bene", "tipo", "provincia", "comune", "codice_comune", "sezione", "foglio", "particella",
                 "subalterno", "categoria", "classe", "consistenza", "rendita", "reddito_dominicale", "diritto",
@@ -52,23 +54,46 @@ def _nome_persona(p: dict | None) -> str:
     return " ".join(str(p.get(k) or "") for k in ("cognome", "nome")).strip() or p["id"]
 
 
+def _campo(dati: dict, coll: str, ent: dict, campo: str):
+    """Valore del campo sull'entita' oppure, se assente, in ``opzioni.telematico`` (provincia, codice comune, classe,
+    consistenza...: ``telematico.supplemento.attr``, come l'esportazione e l'albero genealogico)."""
+    v = ent.get(campo)
+    return v if v is not None else SUP.attr(dati, coll, ent, campo)
+
+
+def codice_diritto(v) -> str:
+    """Codice diritto normalizzato come nell'esportazione (``codice_enum`` con ``alias_descrizione``: '1' e 'proprieta'
+    sono lo stesso diritto). Un valore non riconosciuto resta com'e' (lo segnalano i controlli interni)."""
+    if v is None or isinstance(v, dict):
+        return ""
+    from .telematico.esporta import codice_enum
+    try:
+        return codice_enum(v, "CodiciDiritto_Type", alias_descrizione=True)
+    except Exception:
+        return str(v).strip()
+
+
 def righe(dati: dict) -> dict:
     """{'beni': [...], 'quote': [...], 'soggetti': [...]} con valori in testo, pronti per CSV o stampa."""
     persone = {p["id"]: p for p in dati.get("persone", [])}
     beni = []
     for b in dati.get("beni", []):
-        r = {c: _testo(b.get(c)) for c in COLONNE_BENI if c not in ("quadro", "bene")}
+        r = {c: _testo(_campo(dati, "beni", b, c)) for c in COLONNE_BENI if c not in ("quadro", "bene")}
         beni.append({"quadro": Q.quadro_di("beni", b) or "", "bene": _nome_bene(b), **r, "_id": b["id"]})
     nomi_beni = {b["_id"]: (b["quadro"], b["bene"]) for b in beni}
     somme: dict[tuple[str, str], tuple[Fraction, int]] = {}
+
+    def chiave(d):
+        return (d.get("bene_id", "") or "", codice_diritto(d.get("diritto")))
     for d in dati.get("devoluzioni", []):
-        k = (d.get("bene_id", ""), d.get("diritto", "") or "")
+        k = chiave(d)
         s, n = somme.get(k, (Fraction(0), 0))
         q = _quota(d.get("quota"))
         somme[k] = (s + q, n) if q is not None else (s, n + 1)
     quote = []
-    for d in sorted(dati.get("devoluzioni", []), key=lambda x: (x.get("bene_id", ""), x.get("diritto", "") or "")):
-        k = (d.get("bene_id", ""), d.get("diritto", "") or "")
+    ordinate = sorted(dati.get("devoluzioni", []), key=chiave)
+    for d in ordinate:
+        k = chiave(d)
         s, non_note = somme[k]
         esito = (f"{non_note} {'quota' if non_note == 1 else 'quote'} da indicare" if non_note else "completa" if s == 1 else
                  "supera 1/1" if s > 1 else f"manca {1 - s}")
@@ -81,14 +106,29 @@ def righe(dati: dict) -> dict:
     for p in dati.get("persone", []):
         if p.get("ruolo") == "defunto":
             continue
-        ricevuti = [q for q, d in zip(quote, sorted(dati.get("devoluzioni", []), key=lambda x: (x.get("bene_id", ""), x.get("diritto", "") or "")))
-                    if d.get("persona_id") == p["id"]]
+        ricevuti = [q for q, d in zip(quote, ordinate) if d.get("persona_id") == p["id"]]
         soggetti.append({"soggetto": _nome_persona(p), "codice_fiscale": _testo(p.get("codice_fiscale")),
                          "ruolo": _testo(p.get("ruolo")), "beni": len(ricevuti),
                          "dettaglio": "; ".join(f"{r['bene']} {r['quota']} ({r['diritto'] or 'diritto non indicato'})" for r in ricevuti)})
     for b in beni:
         b.pop("_id")
     return {"beni": beni, "quote": quote, "soggetti": soggetti}
+
+
+#: colonne con importi o numeri, dove un segno meno iniziale seguito da sole cifre e' un numero negativo vero
+COLONNE_NUMERICHE = {"rendita", "reddito_dominicale", "valore", "classe", "consistenza", "beni"}
+_INIZIO_FORMULA = ("=", "+", "-", "@", "\t", "\r")
+_NUMERO = re.compile(r"[+-]?\d+(?:[.,]\d+)*")
+
+
+def _cella(colonna: str, v) -> str:
+    """Testo della cella neutralizzato contro le formule (CSV injection): una cella che inizia con =, +, -, @, tabulazione o
+    ritorno a capo e' preceduta da un apostrofo, che Excel mostra come testo. I numeri veri delle colonne numeriche (es.
+    -12,50) restano invariati."""
+    s = "" if v is None else str(v)
+    if s.startswith(_INIZIO_FORMULA) and not (colonna in COLONNE_NUMERICHE and _NUMERO.fullmatch(s)):
+        return "'" + s
+    return s
 
 
 def csv_testo(dati: dict) -> str:
@@ -101,7 +141,7 @@ def csv_testo(dati: dict) -> str:
         w.writerow([titolo])
         w.writerow(colonne)
         for x in dati_sez:
-            w.writerow([x.get(c, "") for c in colonne])
+            w.writerow([_cella(c, x.get(c, "")) for c in colonne])
         w.writerow([])
     return "﻿" + out.getvalue()      # BOM: Excel riconosce l'UTF-8 (lettere accentate)
 

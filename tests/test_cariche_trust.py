@@ -88,6 +88,7 @@ def carica_8(in_ea=True, testamento=False):
     pytest.param(lambda: carica_8(False), id="8_dichiarante_fuori_ea"),
     pytest.param(lambda: carica_8(True, testamento=True), id="8_testamento"),
 ])
+@pytest.mark.java
 def test_cariche_accettate_dal_controllo(caso, tmp_path):
     es = ok(esporta(caso()))
     controllo(es, tmp_path)
@@ -222,6 +223,7 @@ def respinto(es, tmp_path, xml, codice):
 
 
 @SALTA
+@pytest.mark.java
 def test_negativo_carica_6_senza_casi_particolari(tmp_path):
     es = ok(esporta(carica_6()))
     xml = re.sub(rb"<(\w+:)?CasiParticolari>1</(\w+:)?CasiParticolari>", b"", es.xml)    # solo la casella interna
@@ -230,6 +232,7 @@ def test_negativo_carica_6_senza_casi_particolari(tmp_path):
 
 
 @SALTA
+@pytest.mark.java
 def test_negativo_carica_5_senza_dichiarazione_sostitutiva(tmp_path):
     es = ok(esporta(carica_5()))
     # carica 5 senza dichiarazione sostitutiva EG1: l'esportazione la richiede; per provare il controllo si toglie il blocco DichSost
@@ -239,6 +242,7 @@ def test_negativo_carica_5_senza_dichiarazione_sostitutiva(tmp_path):
 
 
 @SALTA
+@pytest.mark.java
 def test_negativo_carica_8_assenza_con_dichiarante_in_ea(tmp_path):
     es = ok(esporta(carica_8(True)))
     xml = es.xml.replace(b"PresenzaDichiarante", b"FlagAssenzaDichiarante")          # apertura e chiusura dell'elemento

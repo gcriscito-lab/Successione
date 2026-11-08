@@ -13,7 +13,7 @@ dependencies = [
   "uvicorn>=0.30",
 ]
 [project.optional-dependencies]
-test = ["pytest", "httpx"]
+test = ["pytest", "httpx", "pytest-xdist"]
 [project.scripts]
 successioni = "successioni.cli:main"
 successioni-mcp = "successioni.mcp_server:main"
@@ -25,5 +25,10 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# -rs: il motivo di ogni test saltato (Java, Ghostscript, veraPDF non configurati) resta visibile nel riepilogo
+addopts = "-rs"
+markers = [
+  "java: avvia il componente Java ufficiale (controllo SUC13, stampa); giro rapido: pytest -m \"not java\"",
+]
 [tool.setuptools.package-data]
 successioni = ["static/*", "collegamenti/java/*"]

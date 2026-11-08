@@ -119,6 +119,24 @@ def test_provincia_incoerente_solo_con_le_tabelle_dei_comuni(monkeypatch):
     assert not [x for x in QA.avvisi(d) if x.codice == "PROVINCIA_INCOERENTE"]
 
 
+def test_avvisi_leggono_anche_opzioni_telematico(monkeypatch):
+    # review del 07/11/2026 sera: sesso delle persone e provincia/codice comune dei beni salvati in opzioni.telematico
+    d = copia(caso_completo())
+    p = next(x for x in d["persone"] if x["id"] == "p_anna0001")
+    assert "sesso" not in p and d["opzioni"]["telematico"]["persone"]["p_anna0001"]["sesso"] == "F"
+    p["codice_fiscale"] = _cf_con_controllo("RSSMRA80A01H501")    # maschio
+    a = [x for x in QA.avvisi(d) if x.codice == "CF_INCOERENTE" and x.percorso.endswith(".sesso")]
+    assert a and a[0].percorso == "persone[p_anna0001].sesso"
+    b = d["beni"][0]
+    assert "codice_comune" not in b and "provincia" not in b
+    d["opzioni"]["telematico"]["beni"][b["id"]]["provincia"] = "MI"
+    monkeypatch.setattr(QA.CF, "cerca_comune", lambda c: {"nome": "ROMA", "provincia": "RM"} if c == "H501" else None)
+    a = [x for x in QA.avvisi(d) if x.codice == "PROVINCIA_INCOERENTE"]
+    assert [x.percorso for x in a] == [f"beni[{b['id']}].provincia"]
+    d["opzioni"]["telematico"]["beni"][b["id"]]["indirizzo"] = "Via  Esempio 1"
+    assert any(x.codice == "SPAZI_ANOMALI" and x.percorso == f"beni[{b['id']}].indirizzo" for x in QA.avvisi(d))
+
+
 def test_avvisi_di_qualita_non_bloccano_e_non_cambiano_l_xml(tmp_path):
     sv = _servizio(tmp_path)
     d = caso_completo()

@@ -70,6 +70,16 @@ def data_iso(valore) -> date:
         raise ValoreXml(f"{valore!r}: {e}") from None
 
 
+def data_decesso_defunto(dati: dict) -> date | None:
+    """Data del decesso del (primo) defunto della pratica, oppure None se manca o non e' una data ISO valida.
+    Punto unico usato dall'esportazione (valori di usufrutto e nuda proprieta') e dal valore catastale."""
+    d = next((p.get("data_decesso") for p in (dati or {}).get("persone", []) if p.get("ruolo") == "defunto"), None)
+    try:
+        return date.fromisoformat(d) if isinstance(d, str) else None
+    except ValueError:
+        return None
+
+
 def data(valore, *, non_oltre: date | None = None) -> str:
     """ISO AAAA-MM-GG -> ggmmaaaa (DatoDT_Type). ``non_oltre``: 'La data indicata non deve essere successiva alla
     data corrente' (documentazione di DatoDT_Type in typesDati_v2.xsd)."""

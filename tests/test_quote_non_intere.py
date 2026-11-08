@@ -92,6 +92,7 @@ def test_regola_di_arrotondamento(somma, atteso):
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_controllo_ufficiale_locale_positivo(tmp_path):
     es = _esporta()
     stato, dgn, wri, dcm = _esegui(es.xml, tmp_path)
@@ -102,9 +103,10 @@ def test_controllo_ufficiale_locale_positivo(tmp_path):
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_controllo_ufficiale_locale_rifiuta_l_imponibile_troncato(tmp_path):
     """Il componente vuole l'imponibile arrotondato (30001): la somma troncata dei centesimi (30000) e' scartata (3120)."""
     xml = _esporta().xml.replace(b"ImpostaProporzionale_Imponibile>30001<", b"ImpostaProporzionale_Imponibile>30000<")
-    stato, dgn, _, _ = _esegui(xml, tmp_path)
+    stato, dgn, _, _ = _esegui(xml, tmp_path, rapporto=False)
     assert stato == "negativo"
     assert "3120" in {d["codice"] for d in dgn["diagnostici"]}, dgn["diagnostici"]

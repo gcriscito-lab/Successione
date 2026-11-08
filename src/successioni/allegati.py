@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 
 from . import pdfa
-from .errori import DatiNonValidi, NonTrovato, ora
+from .errori import ConflittoRevisione, DatiNonValidi, NonTrovato, ora
 
 
 class AllegatiMixin:
@@ -151,18 +151,27 @@ class AllegatiMixin:
                 return d, rap
         return None, None
 
-    def _riferimenti(self, pratica_id: str, allegato_id: str) -> list[dict]:
-        return [r for r in self.leggi(pratica_id)["dati"].get("documenti_ref", []) if r.get("allegato_id") == allegato_id]
-
     def _sposta_riferimenti(self, pratica_id: str, da: str, a: str, canale: str) -> int:
-        """I righi del quadro EG che puntano a ``da`` passano ad ``a`` (nuova revisione della pratica)."""
-        refs = self._riferimenti(pratica_id, da)
-        if not refs:
-            return 0
-        rev = self.leggi(pratica_id)["revisione"]
-        self.aggiorna(pratica_id, rev, [{"op": "upsert", "coll": "documenti_ref", "id": r["id"], "campi": {"allegato_id": a}}
-                                        for r in refs], autore="programma", canale=canale)
-        return len(refs)
+        """I righi del quadro EG che puntano a ``da`` passano ad ``a`` (nuova revisione della pratica).
+
+        Righi e revisione si leggono insieme e, se la pratica cambia fra lettura e scrittura (GUI e MCP lavorano in
+        parallelo, la conversione richiede tempo), si rileggono e si riprova, come ``_collega_eg6`` dell'albero
+        genealogico: un ``ConflittoRevisione`` non interrompe riordino o conversione a meta'."""
+        for tentativo in range(5):
+            p = self.leggi(pratica_id)
+            refs = [r for r in p["dati"].get("documenti_ref", []) if r.get("allegato_id") == da]
+            if not refs:
+                return 0
+            try:
+                self.aggiorna(pratica_id, p["revisione"],
+                              [{"op": "upsert", "coll": "documenti_ref", "id": r["id"], "campi": {"allegato_id": a}}
+                               for r in refs], autore="programma", canale=canale)
+            except ConflittoRevisione:
+                if tentativo == 4:
+                    raise
+                continue
+            return len(refs)
+        raise AssertionError("non raggiungibile")
 
     @staticmethod
     def _usi_in(c, allegato_id: str, pratica_id: str | None) -> list[dict]:

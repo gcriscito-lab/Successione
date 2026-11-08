@@ -5,10 +5,14 @@ calcoli fatti a memoria. Esito: controllo locale; il confronto con il software u
 """
 from __future__ import annotations
 
+from datetime import date
+from fractions import Fraction
+
 from successioni.telematico.calcolo import calcola, calcola_da_xml
 from successioni.telematico.esporta import esporta_xml
 
 from telematico_casi import CF_ANNA, CF_LUCA, caso_completo, contesto
+from test_beni_esteri import con_imposta_dovuta, esporta, immobile_estero, ok
 
 
 def _fratelli() -> dict:
@@ -114,6 +118,39 @@ def test_agevolazioni_nel_file_non_supportate():
                          b"<suc:CodiceDiritto_Rip>1</suc:CodiceDiritto_Rip><suc:Agevolazioni>K</suc:Agevolazioni>", 1)   # codice inesistente
     r = calcola_da_xml(xml)
     assert r.stato == "non_supportato"
+
+
+def _det_estera(imposta_estera: str):
+    """Caso di tests/test_beni_esteri.py: A10 con imposta dovuta + fabbricato in Francia da 400.000 devoluto 1/2 e 1/2,
+    con imposta versata all'estero e certificazione EG."""
+    d = con_imposta_dovuta()
+    immobile_estero(d, "EC", valore="400000", imposta=imposta_estera)
+    r = calcola_da_xml(ok(esporta(d, data_riferimento=date(2026, 3, 9))).xml)
+    assert r.stato == "completato", [m.messaggio for m in r.motivi]
+    return r, [{p.sigla: p.valore for p in b.passaggi} for b in r.beneficiari]
+
+
+def test_detrazione_imposta_estera_nel_calcolo():
+    """DET.estero (guida pp. 7-8): DET = min(IE x quota, e) con e = QV estero x ISL / QE, poi ISN = ISL - RID - DET.
+
+    Prima questa riga della matrice era coperta qui solo da un codice di agevolazione inesistente (sopra)."""
+    # 1) imposta estera piccola: limita l'imposta estera ridotta alla quota (3.000 x 1/2 = 1.500 < e)
+    r, vv = _det_estera("3000")
+    for v in vv:
+        e = Fraction(200000) * Fraction(v["ISL"]) / Fraction(v["QE"])          # QV estero = 400.000 x 1/2
+        assert e > 1500 and Fraction(v["DET"]) == 1500
+        assert Fraction(v["ISN"]) == Fraction(v["ISL"]) - Fraction(v["RID"]) - 1500
+    assert r.imposta_ef18bis == round(sum(Fraction(v["ISN"]) for v in vv))
+    # 2) imposta estera grande: la detrazione e' limitata alla quota d'imposta italiana sui beni esteri (e)
+    r2, vv2 = _det_estera("20000")
+    for v in vv2:
+        e = Fraction(200000) * Fraction(v["ISL"]) / Fraction(v["QE"])
+        assert e < 10000 and Fraction(v["DET"]) == e
+        assert Fraction(v["ISN"]) == Fraction(v["ISL"]) - Fraction(v["RID"]) - e
+    assert r2.imposta_ef18bis < r.imposta_ef18bis
+    # senza bene estero nessuna detrazione
+    r0 = calcola_da_xml(ok(esporta(con_imposta_dovuta(), data_riferimento=date(2026, 3, 9))).xml)
+    assert all(Fraction(p.valore) == 0 for b in r0.beneficiari for p in b.passaggi if p.sigla == "DET")
 
 
 def test_dati_incompleti():

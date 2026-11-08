@@ -247,6 +247,7 @@ def test_registrazione_reale_documentata():
 # ----------------------------------------------------------------------------- prova reale facoltativa
 @pytest.mark.skipif(not os.environ.get(C.ENV_JAR) or not shutil.which(os.environ.get(C.ENV_JAVA) or "java"),
                     reason="JAR del controllo SUC13 non configurati (SUCCESSIONI_CONTROLLI_SUC13)")
+@pytest.mark.java
 def test_reale_controllo_ufficiale_su_file_sintetico(arch):
     ctl = C.ControlloJar(arch)
     assert ctl.diagnostica()["pronto"], ctl.diagnostica()["problemi"]

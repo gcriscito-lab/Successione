@@ -13,12 +13,10 @@ EFFETTI (Fascicolo I p. PDF 57, quadro sinottico; I = ipotecaria, C = catastale,
 """
 from __future__ import annotations
 
-from fractions import Fraction
-
 from . import fonti as FO
-from . import formati as F
 from .. import valori as V
 from . import supplemento as SUP
+from . import usufrutto as USU
 
 CODICI = ("A", "C", "D", "E", "G", "H", "M", "N")
 #: codici che esentano dall'imposta di successione (guida p. 1: QE «con esclusione delle quote con agevolazione A, D, C, G, N, E, H»)
@@ -164,7 +162,7 @@ def _controlla_eta_g(x, r: dict) -> None:
         x.err("DATO_MANCANTE", perc, "agevolazione G: servono la data di nascita del beneficiario e la data del decesso per "
               "verificare il limite dei 40 anni", FO.fonte_annotazione(EL_AGEV))
         return
-    anni = decesso.year - nascita.year - ((decesso.month, decesso.day) < (nascita.month, nascita.day))
+    anni = USU.eta(nascita, decesso)
     if anni >= 40:
         x.err("REGOLA_AGEVOLAZIONE_G_ETA", perc, f"l'agevolazione G non puo' essere richiesta da chi ha compiuto 40 anni alla "
               f"data del decesso (il beneficiario ne aveva {anni})", FO.fonte_annotazione(EL_AGEV))

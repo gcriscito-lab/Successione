@@ -8,7 +8,7 @@ Non trasmette nulla all'Agenzia: le prove sono locali, su dati sintetici. Colleg
 fiscale non sono completi. **Indice della documentazione: `docs/README.md`.** Per una pratica reale: `docs/GUIDA_PRIMA_PRATICA_REALE.md`.
 
 Avvio: `Avvia-pratica-reale.cmd`, l'unico lanciatore, con lo stesso archivio usato da Claude (`%USERPROFILE%\Successioni-reale`).
-Usa i sorgenti dell'ambiente `.venv` e non aggiornano un'eventuale installazione autonoma precedente.
+Usa i sorgenti dell'ambiente `.venv` e non aggiorna un'eventuale installazione autonoma precedente.
 
 ## Inizia qui
 

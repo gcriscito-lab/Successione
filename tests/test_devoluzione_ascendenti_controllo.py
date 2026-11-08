@@ -39,6 +39,7 @@ def test_export_completo_e_valido(nome):
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("nome", sorted(CONFIGURAZIONI))
+@pytest.mark.java
 def test_controllo_ufficiale_accetta_le_quote(nome, tmp_path):
     es, quote = T.genera(*CONFIGURAZIONI[nome])
     assert es.xml is not None, [e.asdict() for e in es.errori]
@@ -49,9 +50,10 @@ def test_controllo_ufficiale_accetta_le_quote(nome, tmp_path):
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
 @pytest.mark.parametrize("nome", ["tre_nonni_uno_materno", "coniuge_e_nonni", "nonno_e_unilaterale"])
+@pytest.mark.java
 def test_controllo_ufficiale_respinge_quote_alterate(nome, tmp_path):
     es, _ = T.genera(*CONFIGURAZIONI[nome])
-    stato, dgn, _, _ = _esegui(T.altera_quote(es.xml), tmp_path)
+    stato, dgn, _, _ = _esegui(T.altera_quote(es.xml), tmp_path, rapporto=False)
     assert stato == "negativo", (nome, dgn["diagnostici"])
     assert any(d["codice"] in ("3117", "3118") for d in dgn["diagnostici"]), dgn["diagnostici"]
 
@@ -90,12 +92,13 @@ def _altera_un_terzo_due_terzi(xml: bytes) -> bytes:
 
 
 @pytest.mark.skipif(_motivo_salto() is not None, reason=_motivo_salto() or "")
+@pytest.mark.java
 def test_rinunciatario_le_quote_dei_restanti_seguono_i_soli_beneficiari(tmp_path):
     import test_soggetti_ea as TS
     d = TS.caso_chiamato_rinunciatario()            # due figli beneficiari + un figlio rinunciatario (tipo 3)
     es = TS.esporta(d)
     assert es.completo, [e.messaggio for e in es.errori]
-    stato, dgn, _, _ = _esegui(es.xml, tmp_path / "ok")
+    stato, dgn, _, _ = _esegui(es.xml, tmp_path / "ok", rapporto=False)
     assert stato == "positivo", dgn["diagnostici"]                       # 1/2 + 1/2: il rinunciatario non conta
     stato2, dgn2, wri2, _ = _esegui(_altera_un_terzo_due_terzi(es.xml), tmp_path / "ko")
     assert stato2 == "negativo" and any(x["codice"] == "3117" for x in dgn2["diagnostici"])

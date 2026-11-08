@@ -1,5 +1,8 @@
 # Piano dei moduli mancanti (ramo `sviluppo-moduli`)
 
+> **Superato (07/11/2026).** Piano di lavoro del 05/11/2026: molti dei moduli elencati sono stati poi realizzati
+> e uniti (verificare caso per caso). Lo stato attuale e' in `docs/STATO_LAVORI.md` e `docs/MATRICE_COPERTURA.md`.
+
 Creato il 2026-11-05. Il ramo stabile per la pratica reale di sabato e' il tag `stabile-pratica-reale-20261105` (ramo
 `claude/successioni-dichiarazioni-app-fhcwbe`): **non si tocca fino a dopo la pratica**. Qui si sviluppa tutto il resto.
 

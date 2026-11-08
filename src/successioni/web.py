@@ -541,6 +541,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         import json
         from . import calcolatrice
         b = json.loads(await corpo_limitato(request, 200_000, "dati della calcolatrice") or b"{}")
+        if not isinstance(b, dict):
+            raise DatiNonValidi("i dati della calcolatrice devono essere un oggetto con data del decesso, eredi e beni")
         if b.get("azione") == "pratica_iniziale":
             return calcolatrice.pratica_iniziale(b)
         return calcolatrice.stima(b)

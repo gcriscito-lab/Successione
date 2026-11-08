@@ -133,3 +133,14 @@ def test_servizio_mcp_e_avviso_in_verifica(tmp_path):
     assert any(x["bene_id"] == b["id"] and x["inferiore"] for x in vc["beni"])
     assert any(a["codice"] == "VALORE_SOTTO_CATASTALE" for a in sv.verifica(pid)["avvisi"])
     assert sv.leggi(pid)["dati"]["beni"][[x["id"] for x in sv.leggi(pid)["dati"]["beni"]].index(b["id"])]["valore"] == "1000"
+
+
+def test_data_del_decesso_letta_in_un_solo_punto():
+    """Export (usufrutto) e valore catastale leggono la data del decesso da ``formati.data_decesso_defunto``."""
+    from datetime import date
+    from successioni.telematico import formati as F
+    assert F.data_decesso_defunto({"persone": [{"ruolo": "erede", "data_decesso": "2020-01-01"},
+                                               {"ruolo": "defunto", "data_decesso": "2025-03-10"}]}) == date(2025, 3, 10)
+    for dd in (None, "", "10/03/2025", "2025-02-30", {"stato": "da_confermare"}):
+        assert F.data_decesso_defunto({"persone": [{"ruolo": "defunto", "data_decesso": dd}]}) is None
+    assert F.data_decesso_defunto({}) is None

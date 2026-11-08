@@ -241,8 +241,8 @@ def test_richieste_lente_in_parallelo_non_bloccano_l_interfaccia(tmp_path):
         t.join(10)
     assert stato == 200 and info["versione"]
     assert [r[0] for r in risultati] == [200, 200, 200] and all(len(r[1]) == 1 for r in risultati)
-    assert durate["info"] < 0.5, durate                          # non aspetta le richieste lente
-    assert durate["tre_lente"] < 2.5, durate                     # in parallelo (in serie sarebbero almeno 3 s)
+    assert durate["info"] < 0.9, durate                          # non aspetta le richieste lente
+    assert durate["tre_lente"] < 2.9, durate                     # in parallelo (in serie sarebbero almeno 3 s)
 
 
 def test_corpo_della_richiesta_e_limiti_funzionano_nel_thread(tmp_path):

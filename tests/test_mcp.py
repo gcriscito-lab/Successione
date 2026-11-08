@@ -134,12 +134,16 @@ def test_mcp_suddividi_allegato_oltre_limite(tmp_path):
     ingresso = base / "ingresso"; ingresso.mkdir(parents=True)
     f = ingresso / "grande.pdf"
     c = canvas.Canvas(str(f))
-    for i in range(6):
+    # Dati ridotti (prima: 6 pagine da 1400x1400 oltre il limite di 5 MB, ~57 s di Ghostscript): 3 pagine da 600x600 e
+    # un limite passato allo strumento. Il percorso MCP -> servizio -> riduci_o_suddividi e' lo stesso; il valore
+    # predefinito del limite (5 MB delle specifiche) e' verificato in tests/test_documenti_dimensioni.py.
+    LIMITE = 900_000
+    for i in range(3):
         c.drawString(72, 750, f"pagina {i + 1}")
-        c.drawInlineImage(__import__("PIL.Image", fromlist=["x"]).frombytes("RGB", (1400, 1400), os.urandom(1400 * 1400 * 3)), 20, 20, 500, 500)
+        c.drawInlineImage(__import__("PIL.Image", fromlist=["x"]).frombytes("RGB", (600, 600), os.urandom(600 * 600 * 3)), 20, 20, 500, 500)
         c.showPage()
     c.save()
-    assert f.stat().st_size > 5_000_000
+    assert f.stat().st_size > LIMITE
     param = StdioServerParameters(command=sys.executable, args=["-m", "successioni.mcp_server"],
                                   env={"SUCCESSIONI_DATA": str(base), "PATH": os.environ.get('PATH', ''),
                                        "SUCCESSIONI_GS": pdfa.trova_gs(), "SUCCESSIONI_ICC": pdfa._icc()})
@@ -151,11 +155,13 @@ def test_mcp_suddividi_allegato_oltre_limite(tmp_path):
                 await s.initialize()
                 pid = dati(await s.call_tool("successioni_crea_pratica", {"titolo": "X", "chiave_richiesta": "k"}))["pratica_id"]
                 a = dati(await s.call_tool("successioni_acquisisci_allegato", {"pratica_id": pid, "nome_file": "grande.pdf"}))
-                res = await s.call_tool("successioni_suddividi_allegato", {"allegato_id": a["allegato_id"]})
+                res = await s.call_tool("successioni_suddividi_allegato", {"allegato_id": a["allegato_id"],
+                                                                           "limite_byte": LIMITE})
                 assert not res.is_error, res.content[0].text[:300]
+                assert dati(res)["azione"] != "nessuna"
                 lista = dati(await s.call_tool("successioni_elenca_allegati", {"pratica_id": pid}))
                 derivati = [x for x in lista if x["ruolo"] == "derivato"]
-                assert derivati and all(x["bytes"] <= 5_000_000 for x in derivati)
+                assert derivati and all(x["bytes"] <= LIMITE for x in derivati)
                 orig = [x for x in lista if x["ruolo"] == "originale"][0]
                 assert orig["bytes"] == f.stat().st_size
     anyio.run(scenario)

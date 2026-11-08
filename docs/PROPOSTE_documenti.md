@@ -1,5 +1,8 @@
 # Proposte di modifica comune (area 2: documenti, allegati, PDF/A)
 
+> **Documento storico (07/11/2026).** Proposte del 01/11/2026, poi integrate in buona parte (per esempio lo
+> strumento MCP `successioni_suddividi_allegato`). Lo stato attuale degli allegati e' in `docs/PDFA.md`.
+
 Data: 2026-11-01. Nessuna di queste modifiche è stata applicata ai file del coordinatore. Formato: campo, motivo, fonte.
 
 | # | File / campo | Proposta | Motivo | Fonte |

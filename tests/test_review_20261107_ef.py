@@ -103,6 +103,7 @@ def test_unico_immobile_agevolato_niente_sezione_iv():
 
 @pytest.mark.skipif(SALTO is not None or SALTO_CO, reason=SALTO or "elenco delle conservatorie non disponibile")
 @pytest.mark.parametrize("codice", ["C", "E"])
+@pytest.mark.java
 def test_controllo_ufficiale_ef16_con_terreno_agevolato(tmp_path, codice):
     es = esporta(caso_terreno_agevolato(codice))
     positivo(es, tmp_path / "ok")
@@ -110,12 +111,13 @@ def test_controllo_ufficiale_ef16_con_terreno_agevolato(tmp_path, codice):
     sbagliato, n = re.subn(rb"(<suc:SezioneIV_ImpostaBollo>\s*<suc:Circoscrizioni_Numero>)1<", rb"\g<1>2<", es.xml)
     sbagliato = sbagliato.replace(b"<suc:Circoscrizioni_Imposta>85<", b"<suc:Circoscrizioni_Imposta>170<")
     assert n == 1
-    stato, dgn, _, _ = _esegui(sbagliato, tmp_path / "ko")
+    stato, dgn, _, _ = _esegui(sbagliato, tmp_path / "ko", rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]
     assert "3078" in {x["codice"] for x in dgn["diagnostici"]}, dgn["diagnostici"]
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_unico_immobile_agevolato(tmp_path):
     d =copy.deepcopy(caso_a10())
     tel = d["opzioni"]["telematico"]
@@ -150,6 +152,7 @@ def test_circoscrizioni_degli_enti(grado, bollo):
 
 @pytest.mark.skipif(SALTO is not None or SALTO_CO, reason=SALTO or "elenco delle conservatorie non disponibile")
 @pytest.mark.parametrize("grado", ["37", "38"])
+@pytest.mark.java
 def test_controllo_ufficiale_circoscrizioni_degli_enti(tmp_path, grado):
     positivo(esporta(caso_ente_altrove(grado)), tmp_path)
 
@@ -197,12 +200,13 @@ def test_agevolazione_m_misura_fissa_per_data(data, fissa):
 
 
 @pytest.mark.skipif(SALTO is not None, reason=SALTO or "")
+@pytest.mark.java
 def test_controllo_ufficiale_m_nel_2010(tmp_path):
     es = esporta(caso_m("2010-03-10"))
     positivo(es, tmp_path / "ok")
     sbagliato = es.xml.replace(b"<suc:AgevolazioneM_Imposta>168<", b"<suc:AgevolazioneM_Imposta>200<")
     assert sbagliato != es.xml
-    stato, dgn, _, _ = _esegui(sbagliato, tmp_path / "ko")
+    stato, dgn, _, _ = _esegui(sbagliato, tmp_path / "ko", rapporto=False)
     assert stato == "negativo", dgn["diagnostici"]
 
 

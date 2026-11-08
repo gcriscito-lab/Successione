@@ -115,8 +115,10 @@ async function apriPratica(page, q) {
   await apriPratica(page, 'EC');
   let m = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth, h: document.querySelector('.tb').getBoundingClientRect().height, sb: document.querySelector('.sb').getBoundingClientRect().height,
     latVis: getComputedStyle(document.querySelector('#lat')).visibility, mainH: document.querySelector('main').getBoundingClientRect().height }));
-  assert.equal(m.sw, m.iw); assert.ok(m.h < 60 && m.sb < 36, JSON.stringify(m)); assert.equal(m.latVis, 'hidden');
-  ok('375: nessun overflow orizzontale, barra alta ' + Math.round(m.h) + ' px, barra di stato ' + Math.round(m.sb) + ' px (una riga), cassetto chiuso');
+  // la barra di stato a schermo stretto va a capo (al massimo due righe) invece di scorrere di lato (review 07/11/2026 sera)
+  const sbScorre = await page.evaluate(() => { const s = document.querySelector('.sb'); return s.scrollWidth > s.clientWidth + 1; });
+  assert.equal(m.sw, m.iw); assert.ok(m.h < 60 && m.sb < 56 && !sbScorre, JSON.stringify(m)); assert.equal(m.latVis, 'hidden');
+  ok('375: nessun overflow orizzontale, barra alta ' + Math.round(m.h) + ' px, barra di stato ' + Math.round(m.sb) + ' px (a capo, senza scorrimento), cassetto chiuso');
   const scr = await page.evaluate(() => [...document.querySelectorAll('*')].filter(e => { const c = getComputedStyle(e); return /(auto|scroll)/.test(c.overflowY) && e.scrollHeight > e.clientHeight + 1 && c.visibility !== 'hidden' && e.offsetParent !== null; }).map(e => e.tagName + '.' + e.className));
   assert.equal(scr.length, 0); ok('375: nessuno scroll verticale annidato');
   await page.screenshot({ path: 'C:/sx/g1_375_EC_dopo.png' });
