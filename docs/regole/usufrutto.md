@@ -9,10 +9,12 @@ Il defunto aveva il bene (EB o EC) in **piena proprietà** (codice 1). I benefic
 | Regola | Fonte |
 |---|---|
 | Chi riceve l'intero usufrutto o l'intera nuda proprietà indica quota 1/1; codici 08 e 02 | Fascicolo I, p. PDF 24 |
-| Valore quota dell'usufrutto = valore quota del defunto × quota devoluzione × saggio legale × coefficiente per età | Fascicolo I, p. PDF 25 (esempio 2025); D.Lgs. 123/2025, art. 99 c. 1 lett. c e art. 102 c. 1 lett. c |
+| Valore quota dell'usufrutto = valore quota del defunto × quota devoluzione × saggio legale × coefficiente per età | Fascicolo I, pp. PDF 22 e 25 (esempio 2025), che rinvia all'art. 14 c. 1 lett. b-c D.Lgs. 346/1990 (TUS); stessa regola nel D.Lgs. 123/2025, art. 99 c. 1 lett. c e art. 102 c. 1 lett. c |
 | Valore quota della nuda proprietà = valore × quota − valore dell'usufrutto che la grava | Fascicolo I, p. PDF 25; art. 99 c. 1 lett. b |
-| Saggio non inferiore al 2,5%; per il 2025 il Fascicolo indica 2,5% | art. 102 c. 3; Fascicolo I, p. PDF 25 |
-| Coefficienti per età: da 0 a 20 anni 38 … da 93 a 99 anni 4 | D.Lgs. 123/2025, allegato 4 (GU n. 186 del 12/8/2025, S.O. n. 29), esteso alle successioni dal D.Lgs. 139/2024 |
+| Saggio non inferiore al 2,5%; per il 2025 il Fascicolo indica 2,5% | Fascicolo I, pp. PDF 25 e 34 (D.Lgs. 139/2024); D.Lgs. 123/2025, art. 102 c. 3 |
+| Coefficienti per età: da 0 a 20 anni 38 … da 93 a 99 anni 4 | Prospetto allegato al TUS (D.Lgs. 346/1990), esteso alle successioni dal D.Lgs. 139/2024 (Fascicolo I pp. PDF 22, 25, 30 e 34); lo stesso prospetto è l'allegato 4 al D.Lgs. 123/2025 (GU n. 186 del 12/8/2025, S.O. n. 29) |
+
+**Norma citata.** Per i decessi del 2025 la norma è il TUS (D.Lgs. 346/1990) come modificato dal D.Lgs. 139/2024: è quella a cui rinvia il Fascicolo I. Il D.Lgs. 123/2025 riporta gli stessi coefficienti e lo stesso saggio minimo ed è citato come conferma (revisione dell'8/11/2026).
 
 **Età.** È l'età compiuta dell'usufruttuario alla data del decesso. Per questo serve la sua **data di nascita** nel quadro EA; senza, l'export si blocca e dice cosa manca.
 
@@ -35,7 +37,7 @@ Il defunto aveva il bene (EB o EC) in **piena proprietà** (codice 1). I benefic
 ## Limiti
 
 - **Decessi prima del 2025:** non supportati (prospetti e saggi diversi).
-- **Decessi dal 2026:** il calcolo usa 2,5% e lo stesso prospetto, con l'avviso `SAGGIO_USUFRUTTO_DA_VERIFICARE`. Il decreto sul tasso legale 2026 non è stato trovato: se il tasso supera il 2,5%, un decreto aggiorna il prospetto (art. 102 c. 2).
+- **Decessi dal 2026:** il calcolo usa 2,5% e lo stesso prospetto, con l'avviso `SAGGIO_USUFRUTTO_DA_VERIFICARE`. Il decreto MEF sul tasso legale 2026 non è nelle fonti del progetto: se il tasso supera il 2,5% il saggio e il prospetto cambiano. **Da confermare con il professionista** prima di usare il programma per decessi del 2026; finché non c'è, l'avviso resta.
 - **Diritti non gestiti:** uso, abitazione (anche il legato ex lege del coniuge), enfiteusi, superficie, usufrutto a termine o congiunto. Restano «non supportato».
 - **Quadri:** ER e i beni non immobiliari non sono gestiti.
 - **Defunto titolare della sola nuda proprietà:** non gestito, e il valore catastale non è calcolato (serve l'età di un usufruttuario estraneo alla successione).

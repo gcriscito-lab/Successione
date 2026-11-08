@@ -144,3 +144,20 @@ def test_data_del_decesso_letta_in_un_solo_punto():
     for dd in (None, "", "10/03/2025", "2025-02-30", {"stato": "da_confermare"}):
         assert F.data_decesso_defunto({"persone": [{"ruolo": "defunto", "data_decesso": dd}]}) is None
     assert F.data_decesso_defunto({}) is None
+
+@pytest.mark.parametrize("cat", ["A/1", "A/8", "A/9", "A/11"])
+def test_categorie_senza_prima_casa_moltiplicatore_ordinario(cat):
+    m, _ = VC.moltiplicatore_fabbricato(cat, prima_casa=True)
+    assert m == VC.MOLT_ALTRI
+
+
+def test_fonte_moltiplicatori_cita_prima_la_norma_vigente():
+    assert VC.FONTE_MOLTIPLICATORI.startswith("art. 34 c. 5 D.Lgs. 346/1990")
+    assert "applicabile dal 1/1/2027" in VC.FONTE_MOLTIPLICATORI
+
+
+def test_calcolatrice_dice_quando_la_categoria_e_ipotizzata():
+    from successioni import calcolatrice as CA
+    r = CA.stima({"data_decesso": "2025-03-01", "eredi": [{"grado": "02"}],
+                  "immobili": [{"tipo": "fabbricato", "rendita": "1000"}]})
+    assert any("Categoria non indicata" in n for n in r["note"]), r["note"]

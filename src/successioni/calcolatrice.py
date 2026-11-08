@@ -221,6 +221,7 @@ def leggi_richiesta(r: dict, oggi: date | None = None) -> dict:
                          "rendita": _importo(b.get("rendita"), f"immobile {i}, rendita"),
                          "reddito_dominicale": _importo(b.get("reddito_dominicale"), f"immobile {i}, reddito dominicale"),
                          "categoria": str(b.get("categoria") or "A/2").strip().upper()[:5],
+                         "categoria_ipotizzata": not str(b.get("categoria") or "").strip() and tipo == "fabbricato",
                          "prima_casa": _booleano(b.get("prima_casa"), f"immobile {i}, prima casa") and tipo == "fabbricato",
                          "quota_defunto": _quota(b.get("quota_defunto"), f"immobile {i}, quota del defunto") or Fraction(1)})
     altri, pos_altri = [], {}
@@ -476,7 +477,9 @@ def stima(richiesta: dict, oggi: date | None = None) -> dict:
                                              " oppure la rendita (fabbricati) o il reddito dominicale (terreni)"))
                 continue
             im["valore"] = Decimal(voce["valore_catastale"])
-            out["note"].append(f"Immobile {k + 1}: usato il valore catastale proposto, {_euro(im['valore'])} ({vc['formula']}).")
+            out["note"].append(f"Immobile {k + 1}: usato il valore catastale proposto, {_euro(im['valore'])} ({vc['formula']})."
+                               + (" Categoria non indicata: calcolato come abitazione A/2, verificare la categoria nella visura."
+                                  if im.get("categoria_ipotizzata") else ""))
         elif vc and vc["inferiore"]:
             out["note"].append(f"Immobile {k + 1}: il valore indicato è inferiore al valore catastale ({_euro(vc['valore'])}): "
                                "l'ufficio potrebbe rettificarlo.")

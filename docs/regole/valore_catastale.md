@@ -19,7 +19,8 @@ Codice: `src/successioni/valore_catastale.py`. Test: `tests/test_valore_catastal
 | Rendite catastali urbane rivalutate del 5% | L. 662/1996, art. 3, c. 48 (Normattiva, vigente al 07/11/2026) |
 | Redditi dominicali rivalutati del 25% | L. 662/1996, art. 3, c. 51 |
 | Le rivalutazioni valgono per le successioni aperte dal 1/1/1997 | L. 662/1996, art. 3, c. 52, lett. b |
-| Moltiplicatori: terreni 90; gruppo B 168; C/1 e gruppo E 40,80; A/10 e gruppo D 60; abitazioni prima casa 110; altre abitazioni e altre categorie 120 | D.Lgs. 5/8/2026 n. 141, art. 309, c. 6 (GU n. 181 del 6/8/2026, S.O. n. 28, p. 267) |
+| Moltiplicatori: terreni 90; gruppo B 168; C/1 e gruppo E 40,80; A/10 e gruppo D 60; abitazioni prima casa 110; altre abitazioni e altre categorie 120 | Per i decessi fino al 2026: art. 34 c. 5 D.Lgs. 346/1990 e art. 52 c. 4 DPR 131/1986 con le rivalutazioni elencate sotto. Dal 1/1/2027: D.Lgs. 5/8/2026 n. 141, art. 309, c. 6 (GU n. 181 del 6/8/2026, S.O. n. 28, p. 267), che li riunisce senza modifiche |
+| Prima casa (110) solo per le categorie del gruppo A diverse da A/1, A/8, A/9 (escluse dall'agevolazione, come in `telematico/prima_casa.py`) e A/11; A/10 ha già il suo moltiplicatore (60) | revisione dell'8/11/2026 |
 | Esclusi i terreni con destinazione edificatoria | art. 309, c. 8 |
 | La prima casa chiesta da un beneficiario si estende agli altri | Fascicolo I, p. PDF 26 |
 | Anche la casella «Diritto di abitazione» del fabbricato con i codici 1, 2, 5, 6 (prima casa sull'immobile principale o contiguo) vale come prima casa per il bene: «L'agevolazione, qualora richiesta, si estende anche alle quote dell'immobile spettanti agli altri beneficiari» | Fascicolo I, pp. PDF 31-32, «Diritto di abitazione», N.B. |
@@ -37,7 +38,8 @@ Le note di Normattiva sull'art. 52 DPR 131/1986 confermano queste rivalutazioni 
 
 ## Casi non calcolati (con il motivo mostrato)
 
-- **Diritto diverso dalla piena proprietà** (codice 1). Per nuda proprietà e diritti reali l'art. 309 c. 7 rinvia all'art. 99 del testo unico registro (D.Lgs. 123/2025), da implementare con il modulo usufrutto.
+- **Diritto diverso dalla piena proprietà** (codice 1). Per nuda proprietà e diritti reali l'art. 309 c. 7 rinvia all'art. 99 del testo unico registro (D.Lgs. 123/2025), da implementare con il modulo usufrutto. Per questi beni il valore dichiarato non è confrontato con un minimo.
+- **Pertinenze della prima casa** (C/2, C/6, C/7 con agevolazione X): oggi moltiplicatore 120. L'estensione del 110 alle pertinenze non è nelle fonti del progetto: **da confermare con il professionista** prima di cambiarla.
 - **Categorie del gruppo F** o categoria mancante: nessuna rendita.
 - **Terreni edificabili o parzialmente edificabili** (tipologia 1 o 2), nature diverse da T/R.
   - Se la tipologia manca, il valore si calcola con l'avviso di verificare che il terreno non sia edificabile.

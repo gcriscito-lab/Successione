@@ -1510,9 +1510,10 @@ class _Export:
         if r["errori"]:
             return {}
         if dec > USU.VERIFICATO_FINO:
-            self.avv("SAGGIO_USUFRUTTO_DA_VERIFICARE", perc, "usufrutto valutato con il saggio del 2,5% e il prospetto "
-                     "dell'allegato 4: verificare che per l'anno del decesso il tasso legale non superi il 2,5% e che il "
-                     "prospetto non sia stato aggiornato con decreto (art. 102 c. 2-3 D.Lgs. 123/2025)", USU.FONTE)
+            self.avv("SAGGIO_USUFRUTTO_DA_VERIFICARE", perc, ("diritto di abitazione" if abitazione else "usufrutto")
+                     + " valutato con il saggio del 2,5% e il prospetto dei coefficienti: verificare che per l'anno del "
+                     "decesso il tasso legale non superi il 2,5% (decreto MEF) e che il prospetto non sia stato aggiornato "
+                     "(art. 14 D.Lgs. 346/1990; Fascicolo I p. PDF 34)", USU.FONTE)
         return r["valori"]
 
     def devoluzioni_bene(self, b: dict, quadro: str) -> list[dict]:

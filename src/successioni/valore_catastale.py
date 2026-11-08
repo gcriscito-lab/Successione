@@ -29,8 +29,9 @@ from .telematico import formati as F
 from .telematico import supplemento as SUP
 
 FONTE_RIVALUTAZIONE = "L. 662/1996 art. 3 c. 48 (rendite +5%) e c. 51 (redditi dominicali +25%)"
-FONTE_MOLTIPLICATORI = ("D.Lgs. 141/2026 art. 309 c. 6 (GU 6-8-2026 S.O. 28 p. 267), che riprende art. 34 D.Lgs. 346/1990 e "
-                        "art. 52 c. 4 DPR 131/1986 con le rivalutazioni di L. 350/2003, D.L. 168/2004 e D.L. 262/2006")
+FONTE_MOLTIPLICATORI = ("art. 34 c. 5 D.Lgs. 346/1990 e art. 52 c. 4 DPR 131/1986, con le rivalutazioni di art. 2 c. 63 "
+                        "L. 350/2003, art. 1-bis c. 7 D.L. 168/2004 e art. 2 c. 45 D.L. 262/2006; riuniti senza modifiche "
+                        "nel D.Lgs. 141/2026 art. 309 c. 6 (GU 6-8-2026 S.O. 28 p. 267), applicabile dal 1/1/2027")
 FONTE_PRIMA_CASA = "Succ_FASCICOLO_I_Nov_23.pdf p. PDF 26 (la prima casa si estende agli altri beneficiari)"
 DECORRENZA = date(2007, 1, 1)
 RIV_RENDITA = Decimal("1.05")
@@ -43,6 +44,9 @@ MOLT_A10_D = Decimal("60")
 MOLT_PRIMA_CASA = Decimal("110")
 MOLT_ALTRI = Decimal("120")
 CODICI_PRIMA_CASA = ("P", "Z")
+#: categorie per cui l'agevolazione prima casa non si applica (A/1, A/8, A/9 come telematico/prima_casa.CAT_ESCLUSE; A/10 e
+#: A/11 non sono case di abitazione ai fini della lettera e): moltiplicatore ordinario
+CATEGORIE_SENZA_PRIMA_CASA = ("A1", "A8", "A9", "A11")
 #: casella «Diritto di abitazione» del fabbricato: codici con prima casa sull'immobile principale o contiguo (1, 2; 5, 6 per il
 #: coniuge rinunciatario che mantiene il legato ex lege); 3 e 7 riguardano la pertinenza (cod. X), 4 e 8 sono senza prima casa
 CODICI_DA_PRIMA_CASA = ("1", "2", "5", "6")
@@ -95,7 +99,7 @@ def moltiplicatore_fabbricato(categoria: str, prima_casa: bool) -> tuple[Decimal
         return MOLT_C1_E, "categoria C/1 o gruppo E (lettera c)"
     if c == "A10" or c.startswith("D"):
         return MOLT_A10_D, "categoria A/10 o gruppo D (lettera d)"
-    if c.startswith("A") and prima_casa:
+    if c.startswith("A") and prima_casa and c not in CATEGORIE_SENZA_PRIMA_CASA:
         return MOLT_PRIMA_CASA, "casa di abitazione con agevolazione prima casa (lettera e)"
     return MOLT_ALTRI, "altre case di abitazione e altre categorie (lettera f)"
 

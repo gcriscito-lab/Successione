@@ -31,8 +31,9 @@ NUDA = "2"
 PROSPETTO = ((0, 20, 38), (21, 30, 36), (31, 40, 34), (41, 45, 32), (46, 50, 30), (51, 53, 28), (54, 56, 26),
              (57, 60, 24), (61, 63, 22), (64, 66, 20), (67, 69, 18), (70, 72, 16), (73, 75, 14), (76, 78, 12),
              (79, 82, 10), (83, 86, 8), (87, 92, 6), (93, 99, 4))
-FONTE = ("D.Lgs. 123/2025 artt. 99 c. 1 lett. c e 102 c. 1 lett. c e c. 3, allegato 4 (GU 12-8-2025 S.O. 29); "
-         "Succ_FASCICOLO_I_Nov_23.pdf pp. PDF 24-25")
+FONTE = ("art. 14 c. 1 lett. b-c D.Lgs. 346/1990 e prospetto dei coefficienti allegato, come modificato dal D.Lgs. "
+         "139/2024 (Succ_FASCICOLO_I_Nov_23.pdf pp. PDF 22-25 e 34); stessi coefficienti e saggio minimo nel D.Lgs. 123/2025, "
+         "artt. 99 e 102, allegato 4 (GU 12-8-2025 S.O. 29)")
 
 
 def supportato(dir_defunto: str | None, dir_devoluto: str) -> bool:
