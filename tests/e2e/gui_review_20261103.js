@@ -74,13 +74,14 @@ const fixture = JSON.parse(require('node:fs').readFileSync('build/gui_review_fix
 
     await page.evaluate(async pid => { await apri(pid); S.tab = 'file'; renderIns(); }, fixture.export);
     await page.getByRole('link', { name: 'Prospetto tecnico del file', exact: true }).waitFor();
-    const popup = page.waitForEvent('popup');
+    // versione 0.4: il prospetto si apre nell'anteprima interna
     await page.getByRole('link', { name: 'Prospetto tecnico del file', exact: true }).click();
-    const stampa = await popup; await stampa.waitForLoadState();
+    await page.waitForSelector('#dAnteprima[open] iframe.anteprima-doc');
+    const stampa = page.frameLocator('#dAnteprima iframe');
+    await stampa.locator('section').first().waitFor();
     assert.ok((await stampa.locator('body').innerText()).includes(fixture.sha256));
     assert.equal(await stampa.locator('section').count() > 5, true);
-    await stampa.screenshot({ path: 'build/stampa_review_20261103.png', fullPage: true });
-    await stampa.close();
+    await page.click("#dAnteprima button:has-text('Chiudi')");
     assert.deepEqual(errori, []);
     await page.screenshot({ path: 'build/gui_review_20261103.png', fullPage: true });
     console.log(JSON.stringify({ esito: 'passato', casi: ['frontespizio condiviso', 'cambio quadro', 'Ctrl+S', 'digitazione durante HTTP', 'superficie', 'istruzioni manuali', 'protocollo', 'ricevute', 'download originale', 'stampa stessa impronta XML'], errori }));

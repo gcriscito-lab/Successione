@@ -881,7 +881,7 @@ function menuOperazioni(q) {
   if (q.coll === "beni" && ["EB", "EC"].includes(q.id)) voci.push(["Ricalcola valori catastali", "", () => ricalcolaValori(q)]);
   if (CAMPI_GRUPPO[q.coll]) voci.push(["Modifica di gruppo…", "", () => modificaDiGruppo(q)]);
   if (q.vista === "tabella" && colonneIncolla(q).length) voci.push(["Incolla da Excel…", "", () => incollaRighe(q)]);
-  if (q.coll === "beni" || q.coll === "devoluzioni") voci.push(["Brogliaccio da stampare", "", () => window.open("/api/pratiche/" + S.P.pratica_id + "/brogliaccio", "_blank")],
+  if (q.coll === "beni" || q.coll === "devoluzioni") voci.push(["Brogliaccio da stampare", "", () => anteprima("/api/pratiche/" + S.P.pratica_id + "/brogliaccio", "Brogliaccio beni e quote")],
     ["Brogliaccio in CSV", "", () => { const a = h("a", { href: "/api/pratiche/" + S.P.pratica_id + "/brogliaccio.csv", download: "" }); document.body.append(a); a.click(); a.remove(); }]);
   voci.push(["Elimina la riga selezionata", "", () => eliminaRigaSelezionata(q)]);
   const d = h("details", { class: "operazioni" }, h("summary", { class: "gh", "aria-haspopup": "menu" }, "Operazioni"));
@@ -1573,14 +1573,14 @@ async function insFile(dest) {
   stampa.append(h('p', { class: 'mut' }, 'Rileggi il modello stampato prima di inviare: confronta immobili, eredi, quote e imposte con i documenti.'),
     h('div', { class: 'az' }, h('button', { class: 'gh', disabled: !fileOk || OCCUPATI.has('stampa'), onclick: occupato('stampa', async () => {
       if (nMod()) return msg('Salva le modifiche e rigenera il file prima della stampa.', 'e');
-      try { const r = await post('/api/pratiche/' + pid + '/stampa-modello', {}); msg('Modello ministeriale generato (' + r.pagine + ' pagine). Prova locale: controllane il contenuto prima di usarlo.', 'o'); window.open('/api/pratiche/' + pid + '/stampa-modello.pdf', '_blank', 'noopener'); }
+      try { const r = await post('/api/pratiche/' + pid + '/stampa-modello', {}); msg('Modello ministeriale generato (' + r.pagine + ' pagine). Prova locale: controllane il contenuto prima di usarlo.', 'o'); anteprima('/api/pratiche/' + pid + '/stampa-modello.pdf', 'Modello ministeriale'); }
       catch (e) { msg(e.message, 'e'); }
     }) }, 'Stampa modello ministeriale'),
-      ex.generato ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/prospetto-cliente', target: '_blank', rel: 'noopener',
-        title: 'Riepilogo per gli eredi: beni, quote, passività e imposte, con gli stessi importi del file' }, 'Prospetto per il cliente') : null,
-      ex.generato ? h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/stampa?job=' + ex.job_id, target: '_blank', rel: 'noopener' }, 'Prospetto tecnico del file') : null));
+      ex.generato ? linkAnteprima('/api/pratiche/' + pid + '/prospetto-cliente', 'Prospetto per il cliente',
+        'Riepilogo per gli eredi: beni, quote, passività e imposte, con gli stessi importi del file') : null,
+      ex.generato ? linkAnteprima('/api/pratiche/' + pid + '/stampa?job=' + ex.job_id, 'Prospetto tecnico del file') : null));
   const invio = passo(5, 'Invio e ricevute', st.trasmissione.stato === 'trasmessa' && st.trasmissione.modalita !== 'simulata', { id: 'invioPratica' });
-  griglia.append(stato, fornitore, elaborati, controllo, stampa, invio);
+  griglia.append(stato, fornitore, elaborati, controllo, stampa, invio, strumentiStudio(pid));
   await renderInvio(invio, ex, ct);
 }
 /* Profilo e importi della copia congelata in parole, non in JSON (revisione 2, punto 6). */
@@ -2046,7 +2046,8 @@ async function sezioneAlbero(pid) {
   const att = r6.find(x => x.file_presente);
   if (att) {
     const url = "/api/allegati/" + att.allegato_id + "/file";
-    sez.append(h("p", { class: "dentro-testo" }, h("a", { href: url, target: "_blank", rel: "noopener", id: "albero_apri" }, "Apri l'anteprima di " + att.nome)),
+    sez.append(h("p", { class: "dentro-testo" }, h("a", { href: url, target: "_blank", rel: "noopener", id: "albero_apri",
+      onclick: ev => { ev.preventDefault(); anteprima(url, "Albero genealogico — " + att.nome); } }, "Apri l'anteprima di " + att.nome)),
       h("iframe", { src: url, title: "Anteprima dell'albero genealogico", id: "albero_anteprima", class: "anteprima-albero" }));
   }
   sez.append(h("p", { class: "mut dentro-testo piccolo" }, "L'albero riporta solo i dati inseriti (Fascicolo I, «Quali documenti occorrono»: nome, cognome, luogo e data di nascita del coniuge e dei beneficiari parenti). Puoi sostituirlo caricando un file sul rigo EG6."));
@@ -2665,14 +2666,103 @@ document.addEventListener("keydown", ev => { if (ev.key === "Escape") for (const
    versione, componenti e novita'. Si apre con il pulsante «Guida» o con F1. */
 const GUIDA = { dati: null, info: null };
 async function datiGuida() { if (!GUIDA.dati) GUIDA.dati = await api("/api/guida"); return GUIDA.dati; }
-function apriIstruzioni(doc, pagina) { window.open("/api/guida/" + doc + ".pdf#page=" + pagina, "_blank", "noopener"); }
+function apriIstruzioni(doc, pagina) { anteprima("/api/guida/" + doc + ".pdf#page=" + pagina, "Istruzioni ufficiali — pagina " + pagina); }
+/* Versione 0.4: anteprima interna dei documenti (modello, prospetti, brogliaccio, albero, istruzioni): si legge senza cambiare
+   scheda del browser. «Apri in una nuova scheda» resta disponibile; «Stampa» per le pagine HTML (i PDF hanno i loro comandi). */
+function anteprima(url, titolo) {
+  const vecchio = document.getElementById("dAnteprima"); if (vecchio) vecchio.remove();
+  const pdf = /\.pdf(\b|#|\?|$)/i.test(url);
+  const fr = h("iframe", { src: url, title: titolo, class: "anteprima-doc" });
+  const d = h("dialog", { id: "dAnteprima", class: "anteprima", "aria-label": "Anteprima: " + titolo },
+    h("div", { class: "anteprima-barra" }, h("h2", {}, titolo), h("span", { class: "sp" }),
+      h("a", { class: "gh", href: url, target: "_blank", rel: "noopener" }, "Apri in una nuova scheda"),
+      pdf ? null : h("button", { type: "button", class: "gh", onclick: () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (_) { window.open(url, "_blank", "noopener"); } } }, "Stampa"),
+      h("button", { type: "button", class: "pil", onclick: () => d.close() }, "Chiudi")),
+    fr);
+  d.addEventListener("close", () => d.remove());
+  document.body.append(d); d.showModal();
+  return d;
+}
+function linkAnteprima(url, testo, titolo) {
+  return h("a", { class: "gh", href: url, title: titolo || null, onclick: ev => { ev.preventDefault(); anteprima(url, testo); } }, testo);
+}
+/* Versione 0.4: strumenti di studio della pratica (fascicolo per il cliente, copia anonima, preventivo e parcella). */
+function strumentiStudio(pid) {
+  return h('section', { class: 'grp strumenti-studio', id: 'strumentiStudio' }, h('h2', {}, 'Strumenti di studio'),
+    h('p', { class: 'mut' }, 'Documenti per il cliente e per lo studio: non cambiano la dichiarazione.'),
+    h('div', { class: 'az' },
+      linkAnteprima('/api/pratiche/' + pid + '/fascicolo.pdf', 'Fascicolo per il cliente',
+        'Un solo PDF con indice: modello stampato, documenti del quadro EG e ricevute presenti nella pratica'),
+      h('button', { type: 'button', class: 'gh', id: 'bPreventivo', onclick: () => apriPreventivo() }, 'Preventivo e parcella'),
+      h('button', { type: 'button', class: 'gh', id: 'bCopiaAnonima', disabled: OCCUPATI.has('anonima'), onclick: occupato('anonima', () => copiaAnonima(pid)) }, 'Copia anonima')));
+}
+async function copiaAnonima(pid) {
+  if (nMod()) return msg('Salva prima le modifiche: la copia parte dai dati salvati.', 'e');
+  if (!confirm('Creare una NUOVA pratica con nomi, codici fiscali, indirizzi e riferimenti catastali di fantasia? Questa pratica non cambia; gli allegati non vengono copiati.')) return;
+  try {
+    const r = await post('/api/pratiche/' + pid + '/copia-anonima', { chiave: crypto.randomUUID() });
+    await caricaPratiche();
+    msg('Creata «' + r.titolo + '»: ' + r.modifiche.join('; ') + '. Date e importi restano: trattala comunque come dato riservato.', 'o');
+  } catch (e) { msg(e.message, 'e'); }
+}
+function apriPreventivo() {
+  if (!S.P) return;
+  let d = $('#dPreventivo');
+  if (!d) { d = h('dialog', { id: 'dPreventivo', class: 'preventivo', 'aria-labelledby': 'dPreventivoT' }); document.body.append(d); }
+  const prev = structuredClone(noteP().preventivo || {});
+  const voci = (prev.voci && prev.voci.length ? prev.voci : [{ descrizione: '', importo: '' }]).map(v => ({ ...v }));
+  const corpoVoci = h('tbody');
+  const campo = (id, et, val, attrs) => { const i = h('input', { id, ...(attrs || {}) }); i.value = val == null ? '' : String(val); return [h('label', { for: id }, et), i]; };
+  const disegna = () => corpoVoci.replaceChildren(...voci.map((v, i) => {
+    const de = h('input', { 'aria-label': 'Descrizione della voce ' + (i + 1), placeholder: 'es. Predisposizione e invio della dichiarazione' }); de.value = v.descrizione || '';
+    const im = h('input', { 'aria-label': 'Importo della voce ' + (i + 1), inputmode: 'decimal', class: 'num', placeholder: '0,00' }); im.value = v.importo == null ? '' : String(v.importo).replace('.', ',');
+    de.oninput = () => { v.descrizione = de.value; }; im.oninput = () => { v.importo = im.value; };
+    return h('tr', { class: 'fisso' }, h('td', {}, de), h('td', {}, im),
+      h('td', {}, h('button', { type: 'button', class: 'lk', 'aria-label': 'Togli la voce ' + (i + 1), onclick: () => { voci.splice(i, 1); if (!voci.length) voci.push({ descrizione: '', importo: '' }); disegna(); } }, 'Togli')));
+  }));
+  disegna();
+  const [lNum, iNum] = campo('prevNumero', 'Numero', prev.numero);
+  const [lData, iData] = campo('prevData', 'Data', prev.data || new Date().toISOString().slice(0, 10), { type: 'date' });
+  const [lInt, iInt] = campo('prevIntestatario', 'Intestato a', prev.intestatario, { placeholder: 'nome e codice fiscale del cliente' });
+  const pct = (id, et, k) => campo(id, et, prev[k] == null ? '' : String(prev[k]).replace('.', ','), { inputmode: 'decimal', class: 'num', placeholder: '0' });
+  const [lCassa, iCassa] = pct('prevCassa', 'Contributo cassa %', 'cassa_pct');
+  const [lIva, iIva] = pct('prevIva', 'IVA %', 'iva_pct');
+  const [lRit, iRit] = pct('prevRit', "Ritenuta d'acconto %", 'ritenuta_pct');
+  const imp = h('input', { type: 'checkbox', id: 'prevImposte' }); imp.checked = !!prev.includi_imposte;
+  const nota = h('textarea', { id: 'prevNota', rows: 2 }); nota.value = prev.nota || '';
+  // importi all'italiana: 1.234,50 -> 1234.50; un solo separatore «.» con 1-2 decimali resta decimale (12.5)
+  const num = x => { const t = String(x || '').trim(); if (!t) return ''; return t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : (/^\d+\.\d{1,2}$/.test(t) ? t : t.replace(/\./g, '')); };
+  const raccogli = () => ({ voci: voci.filter(v => (v.descrizione || '').trim() || String(v.importo || '').trim()).map(v => ({ descrizione: (v.descrizione || '').trim(), importo: num(v.importo) })),
+    numero: iNum.value.trim(), data: iData.value, intestatario: iInt.value.trim(), cassa_pct: num(iCassa.value), iva_pct: num(iIva.value),
+    ritenuta_pct: num(iRit.value), includi_imposte: imp.checked, nota: nota.value.trim() });
+  const salva = async () => {
+    if (S.writeBusy) { msg('Salvataggio in corso: riprova tra un momento.', 'e'); return false; }
+    return salvaOps([{ op: 'set', sezione: 'note', campi: { preventivo: raccogli() } }]);
+  };
+  const vedi = tipo => async () => { if (await salva()) { d.close(); anteprima('/api/pratiche/' + S.P.pratica_id + '/preventivo?tipo=' + tipo, tipo === 'parcella' ? 'Parcella' : 'Preventivo'); } };
+  d.replaceChildren(h('form', { method: 'dialog', onkeydown: invioNonChiude },
+    h('h2', { id: 'dPreventivoT' }, 'Preventivo e parcella'),
+    h('p', { class: 'mut' }, 'Voci e percentuali le decidi tu (vuote = 0): il programma fa solo le somme. Si salva nelle note interne della pratica, non nel file telematico. Non è una fattura.'),
+    h('table', { class: 'prev-voci' }, h('thead', {}, h('tr', { class: 'fisso' }, h('th', {}, 'Voce'), h('th', {}, 'Importo (€)'), h('th', {}, h('span', { class: 'vh' }, 'Azioni')))), corpoVoci),
+    h('div', { class: 'az' }, h('button', { type: 'button', class: 'gh', id: 'prevAggiungi', onclick: () => { voci.push({ descrizione: '', importo: '' }); disegna(); const x = corpoVoci.querySelectorAll('input'); if (x.length) x[x.length - 2].focus(); } }, 'Aggiungi voce')),
+    h('div', { class: 'prev-campi' }, lCassa, iCassa, lIva, iIva, lRit, iRit, lNum, iNum, lData, iData, lInt, iInt),
+    h('label', { class: 'chk', for: 'prevImposte' }, imp, h('span', {}, "Aggiungi le imposte della dichiarazione (dall'ultimo file generato), sommate a parte")),
+    h('label', { for: 'prevNota' }, 'Nota in fondo al documento'), nota,
+    h('div', { class: 'wiz-az' }, h('button', { type: 'button', class: 'gh', id: 'prevSalva', onclick: async () => { if (await salva()) d.close(); } }, 'Salva'),
+      h('span', { class: 'sp' }),
+      h('button', { type: 'button', class: 'gh', id: 'prevVediPreventivo', onclick: vedi('preventivo') }, 'Salva e vedi preventivo'),
+      h('button', { type: 'button', class: 'gh', id: 'prevVediParcella', onclick: vedi('parcella') }, 'Salva e vedi parcella'),
+      h('button', { class: 'pil' }, 'Chiudi'))));
+  if (!d.open) d.showModal();
+  const primo = corpoVoci.querySelector('input'); if (primo) primo.focus();
+}
 function argomentoDelQuadro(id) { return GUIDA.dati && GUIDA.dati.argomenti.find(a => a.quadro === id); }
 // Invio in un campo di Guida o Calcolatrice: il modulo lo tratterebbe come «Chiudi» e la finestra si chiuderebbe; qui non fa nulla
 function invioNonChiude(ev) { if (ev.key === "Enter" && ev.target.tagName === "INPUT" && !ev.isComposing) ev.preventDefault(); }
 async function apriGuida(scheda) {
   let d = $("#dGuida");
   if (!d) { d = h("dialog", { id: "dGuida", class: "guida", "aria-labelledby": "dGuidaT" }); document.body.append(d); }
-  const schede = [["istruzioni", "Istruzioni ufficiali"], ["uso", "Uso del programma"], ["info", "Informazioni"]];
+  const schede = [["istruzioni", "Istruzioni ufficiali"], ["uso", "Uso del programma"], ["tabelle", "Tabelle e fonti"], ["info", "Informazioni"]];
   const att = scheda || "istruzioni";
   const corpo = h("div", { class: "guida-corpo", id: "guidaPannello", role: "tabpanel", "aria-labelledby": "guidaTab_" + att }, h("p", { class: "mut" }, "Caricamento…"));
   const seg = h("div", { class: "seg", role: "tablist", "aria-label": "Sezioni della guida" }, schede.map(([k, n]) => h("button", { type: "button", role: "tab", id: "guidaTab_" + k, "aria-selected": att === k ? "true" : "false", onclick: () => apriGuida(k) }, n)));
@@ -2709,6 +2799,17 @@ async function apriGuida(scheda) {
         h("h3", {}, "Scorciatoie da tastiera"),
         h("table", { class: "scorciatoie" }, h("tbody", {}, SCORCIATOIE.map(([k, t]) => h("tr", { class: "fisso" }, h("td", {}, h("kbd", {}, k)), h("td", {}, t))))),
         h("p", { class: "mut piccolo" }, "Dati non noti: scrivi «?» (da confermare), «assente», «zero» o «non applicabile». Importi all'italiana: 150.000 oppure 1.234,50."));
+    } else if (att === "tabelle") {
+      if (!GUIDA.tabelle) GUIDA.tabelle = await api("/api/tabelle");
+      const T = GUIDA.tabelle;
+      corpo.replaceChildren(h("p", { class: "mut" }, T.nota),
+        h("nav", { class: "tab-indice", "aria-label": "Tabelle" }, T.tabelle.map(t => h("a", { href: "#tab_" + t.id, class: "lk",
+          onclick: ev => { ev.preventDefault(); const x = document.getElementById("tab_" + t.id); if (x) x.scrollIntoView({ block: "start" }); } }, t.titolo))),
+        ...T.tabelle.map(t => h("section", { class: "tab-fonte", id: "tab_" + t.id },
+          h("h3", {}, t.titolo), h("p", { class: "mut piccolo" }, "Si applica a: " + t.decorrenza),
+          h("table", { class: "tab-valori" }, h("thead", {}, h("tr", { class: "fisso" }, t.colonne.map(c => h("th", {}, c)))),
+            h("tbody", {}, t.righe.map(r => h("tr", { class: "fisso" }, r.map(c => h("td", {}, c)))))),
+          h("p", { class: "mut piccolo" }, h("b", {}, "Fonte: "), t.fonte), t.nota ? h("p", { class: "mut piccolo" }, t.nota) : null)));
     } else {
       if (!GUIDA.info) GUIDA.info = await api("/api/informazioni");
       const i = GUIDA.info, v = i.versioni || {};

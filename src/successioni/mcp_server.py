@@ -32,7 +32,7 @@ STRUMENTI_LETTURA = frozenset({
     "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
     "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
     "file_in_ingresso", "elenca_allegati", "diagnosi", "valori_catastali", "brogliaccio", "stima_imposte",
-    "codice_comune",
+    "codice_comune", "tabelle_calcolo",
 })
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "registra_esito_controllo", "backup_archivio", "stampa_modello",
@@ -190,6 +190,12 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
     def brogliaccio(pratica_id: str) -> dict:
         """Brogliaccio di lavoro: beni con dati catastali, diritto, quota e valore; quote per bene con la somma (completa, manca, supera 1/1); beni attribuiti a ogni soggetto. Dati come inseriti, nessun calcolo d'imposta. Stessi dati del CSV e della pagina stampabile dell'interfaccia."""
         return sv.brogliaccio(pratica_id)
+
+    @tool
+    def tabelle_calcolo() -> dict:
+        """Tabelle applicate dai calcoli del programma (aliquote e franchigie dell'imposta di successione, imposte ipotecaria e catastale, tasse e bolli del quadro EF, moltiplicatori catastali, coefficienti dell'usufrutto), ciascuna con fonte e decorrenza. Lette dai moduli di calcolo: sono i valori effettivamente usati, non una norma interpretata."""
+        from .tabelle import NOTA, tabelle
+        return {"tabelle": tabelle(), "nota": NOTA}
 
     @tool(ann=LOCALE)
     def esporta_xml(pratica_id: str, cf_fornitore: str | None = None, scopo: str = "completo") -> dict:

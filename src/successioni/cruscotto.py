@@ -236,3 +236,33 @@ def cruscotto(sv, limite: int = 12, oggi: date | None = None, tutte: bool = Fals
             "totale": len(voci), "altre": len(nascoste),
             "altre_da_lavorare": sum(1 for v in nascoste if not v.get("completata")),
             "nota": "Termine: dodici mesi dalla decorrenza indicata nel frontespizio o, se manca, dalla data del decesso."}
+
+
+STATI_TAPPA = {"fatto": "fatto", "corrente": "in corso", "da_fare": "da fare", "problema": "problema"}
+
+
+def _it(iso: str | None) -> str:
+    d = _data((iso or "")[:10])
+    return d.strftime("%d/%m/%Y") if d else ""
+
+
+def csv_elenco(sv, oggi: date | None = None) -> str:
+    """Elenco di tutte le pratiche per Excel (versione 0.4): stesso ordine e stessi stati della pagina iniziale. Separatore «;»,
+    UTF-8 con BOM, celle protette dalle formule come nel brogliaccio."""
+    import csv
+    import io
+    from .brogliaccio import _cella
+    c = cruscotto(sv, oggi=oggi, tutte=True)
+    out = io.StringIO()
+    w = csv.writer(out, delimiter=";", lineterminator="\r\n")
+    colonne = ["Pratica", "Data di riferimento del termine", "Termine di presentazione", "Giorni al termine", "Stato",
+               *[NOMI[t] for t in TAPPE], "Prossima azione", "Ultima modifica"]
+    w.writerow(colonne)
+    for v in c["pratiche"]:
+        t = v.get("termine") or {}
+        w.writerow([_cella("", x) for x in (
+            v["titolo"], _it(t.get("dal")), _it(t.get("data")), "" if t.get("giorni") is None else str(t["giorni"]),
+            "completata" if v.get("completata") else "da lavorare",
+            *[STATI_TAPPA.get((v.get("tappe") or {}).get(k), "") for k in TAPPE],
+            (v.get("azione") or {}).get("testo", ""), _it(v.get("aggiornata")))])
+    return "﻿" + out.getvalue()
