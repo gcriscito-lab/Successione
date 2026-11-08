@@ -1,5 +1,15 @@
 # Stato dei lavori (aggiornato 2026-11-08)
 
+## Versione 0.2.0 (2026-11-08, commit `e3c2d6c`, etichetta `v0.2.0`)
+- Novita' per lo studio in `docs/NOVITA.md`; nessuna regola di calcolo nuova (regole 2026-11-07).
+- Verifiche: suite Python 2060 passati e 1 saltato; con il pacchetto costruito `tests/test_installazione.py` 18/18 (anche il
+  test del pacchetto); prove interfaccia 15/15; XML SUC13 di prova valido sull'XSD di `fonti/`.
+- Pacchetto Windows: `dist/Successioni-0.2.0-win64` (106 MB) e zip da 51.588.292 byte, SHA-256
+  `d39bf1f73dfe1bdd673c8db6700e1988dd2ce842a39293ed0cecd96291ab0771`; `costruisci_pacchetto.py --verifica` senza problemi.
+  Python 3.13.17 embeddable e wheel del lock scaricati con impronta verificata.
+- Avvio dal pacchetto provato su questo PC (Python del pacchetto, archivio temporaneo): interfaccia attiva, versione 0.2.0,
+  codice comune dalle tabelle SUC13. **Da collaudare** l'installazione su un altro PC Windows e la pratica reale con la 0.2.0.
+
 ## Grafica dal confronto con DE.A.S. II (2026-11-08, ramo `grafica-rapida`, unito con avanzamento diretto)
 - Analisi: `Report_grafica_DEAS_rea_20261108.md` (cartella `Successioni` del Desktop, fuori dal repository): 255 maschere DFM
   di DEAS lette dall'eseguibile, solo come idee di layout; nessun codice, icona o testo di DEAS nel programma.
