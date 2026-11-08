@@ -52,7 +52,7 @@ const fixture = JSON.parse(require('node:fs').readFileSync('build/gui_review_fix
     // La fixture manuale viene creata da Python nel solo archivio sintetico del server.
     await page.evaluate(async pid => {
       await apri(pid);
-      S.tab = 'file'; renderIns();
+      vaiFile();
     }, fixture.manuale);
     await page.getByLabel("Protocollo dell'invio").waitFor();
     assert.equal(await page.getByText('Invio da eseguire con gli strumenti ufficiali', { exact: false }).count(), 1);
@@ -72,7 +72,7 @@ const fixture = JSON.parse(require('node:fs').readFileSync('build/gui_review_fix
     for await (const c of stream) chunks.push(c);
     assert.equal(Buffer.concat(chunks).toString(), 'ORIGINALE SINTETICO');
 
-    await page.evaluate(async pid => { await apri(pid); S.tab = 'file'; renderIns(); }, fixture.export);
+    await page.evaluate(async pid => { await apri(pid); vaiFile(); }, fixture.export);
     await page.getByRole('link', { name: 'Prospetto tecnico del file', exact: true }).waitFor();
     // versione 0.4: il prospetto si apre nell'anteprima interna
     await page.getByRole('link', { name: 'Prospetto tecnico del file', exact: true }).click();
