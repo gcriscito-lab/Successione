@@ -1,0 +1,105 @@
+/* Design system Successioni — token in tre livelli (primitivi → semantici → componenti).
+   Fonte di verità: design-system/successioni/MASTER.md. Generato il 8/11/2026 con la skill ui-ux-pro-max
+   (stile «Minimalism & Swiss», densità 8/10, movimento 2/10) partendo dalla palette esistente di app.css.
+   I nomi semantici storici (--t, --blu, --sep-f, …) restano gli alias usati da app.js e dalle preferenze.
+   Non ancora collegato all'app: vedi «Adozione» nel MASTER. */
+
+:root {
+  /* ── 1. PRIMITIVI ─────────────────────────────────────────────── */
+  /* Colori: «il modulo ministeriale reso chiaro» */
+  --p-carta:#F6F7F4;  --p-carta-2:#EEF1EC; --p-carta-3:#FBFCFA; --p-bianco:#FFFFFF;
+  --p-inchiostro:#1F2A2A; --p-inchiostro-2:#55615F;
+  --p-verde-700:#2F6B57; --p-verde-100:#DDEBE3;           /* verde modello, verde casella */
+  --p-esito-700:#2B6B45; --p-esito-500:#3E8E5E; --p-esito-100:#E1EFE5;
+  --p-ocra-800:#86540C;  --p-ocra-600:#A86A12; --p-ocra-100:#F5EBD8;   /* ocra timbro */
+  --p-rosso-700:#B3261E; --p-rosso-100:#F7E3E1;                        /* rosso registro */
+  --p-ardesia-700:#3E5794; --p-ardesia-100:#E8EDF7;                    /* valori calcolati */
+
+  /* Spazi: base 4 px, scala densa (dashboard) */
+  --s-0:0; --s-px:1px; --s-05:2px; --s-1:4px; --s-15:6px; --s-2:8px; --s-3:12px;
+  --s-4:16px; --s-5:20px; --s-6:24px; --s-8:32px; --s-10:40px;
+
+  /* Tipografia: base 14 px regolabile (--dimensione-base); scala a 5 passi */
+  --fs-s:.857rem;   /* 12 px  etichette, note, stato */
+  --fs-m:.929rem;   /* 13 px  tabelle, campi densi */
+  --fs-base:1rem;   /* 14 px  testo */
+  --fs-l:1.286rem;  /* 18 px  titoli di sezione */
+  --fs-xl:1.714rem; /* 24 px  titolo di pagina */
+  --fw-normale:400; --fw-medio:550; --fw-forte:700;
+  --lh-stretto:1.25; --lh-testo:1.5;
+  --f-ui:"Atkinson Hyperlegible Next","Segoe UI",system-ui,sans-serif;
+  --f-mono:"Atkinson Hyperlegible Mono",Consolas,ui-monospace,monospace;
+
+  /* Arrotondamenti */
+  --r0:2px;   /* caselle del codice fiscale, barre sottili */
+  --r1:4px;   /* campi, pulsanti, etichette */
+  --r2:8px;   /* pannelli, schede, finestre */
+  --r-pill:999px; --r-tondo:50%;
+
+  /* Elevazione: si separa con il bordo, l'ombra solo per ciò che galleggia */
+  --e0:none;
+  --e1:0 0 0 1px var(--sep);
+  --e2:0 0 0 1px var(--sep), 0 6px 18px rgba(20,30,28,.12);   /* menu, avvisi a comparsa, finestre */
+
+  /* Movimento */
+  --dur-1:120ms;  /* hover, stato dei pulsanti */
+  --dur-2:180ms;  /* cassetto laterale, aperture */
+  --ease:cubic-bezier(.2,0,0,1);
+
+  /* Focus */
+  --focus-w:2px; --focus-off:2px;
+
+  /* ── 2. SEMANTICI (tema chiaro) ───────────────────────────────── */
+  --t:var(--p-inchiostro); --t2:var(--p-inchiostro-2);
+  --fondo:var(--p-carta); --lat:var(--p-carta-2); --pann:var(--p-carta-3); --solido:var(--p-bianco); --campo:var(--p-bianco);
+  --sep:rgba(31,42,42,.13);
+  --sep-f:rgba(31,42,42,.52);          /* bordo dei controlli: ≥3:1 (WCAG 1.4.11); era .34 = 2,0:1 */
+  --grigio:rgba(31,42,42,.07);
+  --blu:var(--p-verde-700); --blu-t:var(--p-verde-100); --su-acc:var(--p-bianco); --su-er:var(--p-bianco);
+  --ok:var(--p-esito-700); --ok-b:var(--p-esito-500); --ok-t:var(--p-esito-100);
+  --er:var(--p-rosso-700); --er-b:var(--p-rosso-700); --er-t:var(--p-rosso-100);
+  --am:var(--p-ocra-800); --am-b:var(--p-ocra-600); --am-t:var(--p-ocra-100);
+  --calc:var(--p-ardesia-100); --calc-b:var(--p-ardesia-700);
+  --ombra:var(--e1);
+
+  /* ── 3. COMPONENTI ────────────────────────────────────────────── */
+  --btn-h:32px; --btn-px:var(--s-3); --btn-r:var(--r1); --btn-gap:var(--s-15);
+  --btn-pri-bg:var(--blu); --btn-pri-fg:var(--su-acc);
+  --btn-sec-bg:var(--solido); --btn-sec-fg:var(--t); --btn-sec-bd:var(--sep-f);
+  --campo-h:30px; --campo-px:var(--s-2); --campo-r:var(--r1); --campo-bd:var(--sep-f); --campo-bd-focus:var(--blu);
+  --cella-py:var(--s-15); --cella-px:var(--s-2); --riga-sel:var(--blu-t);
+  --casella-w:1.35em; --casella-r:var(--r0); --casella-bd:var(--sep-f);
+  --pann-p:var(--s-4); --pann-r:var(--r2); --pann-bd:var(--sep);
+  --fin-p:var(--s-6); --fin-r:var(--r2); --fin-ombra:var(--e2); --fin-max:720px;
+  --badge-h:20px; --badge-px:var(--s-15); --badge-r:var(--r-pill); --badge-fs:var(--fs-s);
+  --tappa-d:18px; --tappa-linea:2px;
+  --toast-ombra:var(--e2); --toast-r:var(--r2);
+}
+
+:root[data-tema="scuro"] {
+  --t:#E4EAE6; --t2:#A9B5B0;
+  --fondo:#151C1B; --lat:#1A2221; --pann:#182120; --solido:#1F2928; --campo:#131A19;
+  --sep:rgba(228,234,230,.14); --sep-f:rgba(228,234,230,.40);   /* era .34 = 2,8:1 */
+  --grigio:rgba(228,234,230,.08);
+  --blu:#7FB79F; --blu-t:rgba(127,183,159,.2); --su-acc:#10201A; --su-er:#1A0B0A;
+  --ok:#8CCB9F; --ok-b:#5FAF7C; --ok-t:rgba(95,175,124,.2);
+  --er:#F2A39C; --er-b:#E0645B; --er-t:rgba(224,100,91,.2);
+  --am:#E3B66A; --am-b:#D4973A; --am-t:rgba(212,151,58,.2);
+  --calc:#232C3B; --calc-b:#A9BEEF;
+  --e2:0 0 0 1px var(--sep), 0 8px 24px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+
+:root[data-tema="seppia"] {
+  --t:#3C342A; --t2:#5E5343; --fondo:#EDE5D7; --lat:#EEE6D9; --pann:#FAF6EE; --solido:#FFFBF4; --campo:#FFFCF7;
+  --blu:#6E5732; --blu-t:#EADFCB;
+  --sep:rgba(90,70,40,.16); --sep-f:rgba(90,70,40,.64);          /* era .34 = 1,8:1 */
+  --grigio:rgba(90,70,40,.08);
+  --calc:#E6E6EE; --calc-b:#4A4F7A;
+}
+
+:root[data-contrasto="alto"] { --t2:#1F2A2A; --sep:rgba(0,0,0,.5); --sep-f:rgba(0,0,0,.75); --focus-w:3px; }
+:root[data-contrasto="alto"][data-tema="scuro"] { --t:#ffffff; --t2:#eef2f0; --sep:rgba(255,255,255,.55); --sep-f:rgba(255,255,255,.8); }
+
+@media (prefers-reduced-motion: reduce) { :root { --dur-1:0ms; --dur-2:0ms; } }
+:root[data-movimento="ridotto"] { --dur-1:0ms; --dur-2:0ms; }
