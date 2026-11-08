@@ -428,7 +428,13 @@ select.stato-lavoro { font-size:var(--fs-s); width:auto; max-width:14rem; margin
 .gruppo-righe .riga-sc { display:flex; align-items:center; gap:8px; padding:2px 8px; text-align:left; }
 .dlg-op input[type=checkbox] { width:auto; min-width:0; flex:none; margin:0 6px 0 0; display:inline-block; vertical-align:middle; }
 .dlg-op .rg > label { display:flex; align-items:center; gap:4px; }
-.filtri-home { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; } .filtri-home input { flex:1; min-width:12rem; }
+.filtri-home { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; align-items:center; }
+.filtri-home input { flex:1 1 14rem; min-width:12rem; width:auto; } .filtri-home select { flex:0 1 auto; width:auto; max-width:18rem; }
+/* devoluzioni raggruppate per bene: riga di somma sotto ogni bene (confronto grafico con DEAS II, 08/11/2026) */
+tr.subtot td { background:var(--grigio); color:var(--t2); font-size:var(--fs-s); padding:4px 10px; white-space:normal; max-width:none; }
+tr.subtot .pz { margin-left:6px; }
+/* titolo del quadro su una riga anche con il pannello aperto: si accorcia invece di andare a capo */
+.testa-quadro h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 /* Guida e Informazioni */
 dialog.guida { width:min(880px,96vw); max-height:92vh; }

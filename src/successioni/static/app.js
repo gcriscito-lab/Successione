@@ -365,7 +365,9 @@ function render() {
   // il pannello di destra resta chiuso finche' non c'e' una riga selezionata (o una scheda Controlli/Cronologia aperta):
   // senza selezione occupava un quarto dello schermo per dire «Seleziona una riga»
   const conTabella = q && q.coll;
-  const pannello = aperta && S.sel !== 'FILE' && (S.tab !== 'dati' || (conTabella && !!S.riga));
+  // sempre booleano: con undefined (quadri senza tabella, es. AN) classList.toggle invertiva la classe a ogni ridisegno e
+  // lasciava una colonna vuota di 360-400 px a destra
+  const pannello = !!(aperta && S.sel !== 'FILE' && (S.tab !== 'dati' || (conTabella && !!S.riga)));
   $("#app").classList.toggle("conIns", pannello); $("#ins").hidden = !pannello; $('#ridimensiona').hidden = !pannello;
   renderAlbero(); renderVista(); renderIns(); renderSb(); aggiornaBottoni();
 }
@@ -538,7 +540,8 @@ function renderVista() {
   }
   const q = quadro();
   if (!q) return;
-  const titoloQ = h("h1", {}, (q.id === "AN" || q.id === "DV" ? "" : q.id + " — ") + q.titolo);
+  const testoTitolo = (q.id === "AN" || q.id === "DV" ? "" : q.id + " — ") + q.titolo;
+  const titoloQ = h("h1", { title: testoTitolo }, testoTitolo);   // se non sta su una riga si accorcia: il testo intero resta nel suggerimento
   const arg = typeof argomentoDelQuadro === "function" ? argomentoDelQuadro(q.id) : null;
   const linkIstr = arg ? h("button", { class: "lk istr-quadro", title: "Apre le istruzioni ufficiali alla pagina " + arg.pagina, onclick: () => apriIstruzioni(arg.documento, arg.pagina) }, "Istruzioni del quadro") : null;
   main.append(h("div", { class: "testa-quadro" }, titoloQ, linkIstr, q.coll && (q.vista === "tabella" || q.vista === "documenti") && q.supportato ? menuOperazioni(q) : null));
@@ -617,23 +620,28 @@ async function impostaQuadro(id, on) {
 
 function renderTabella(main, q) {
   const campi = S.schema.collezioni[q.coll];
-  const righe = righeQuadro(q);
+  const colonne = colonneVista(q);                    // solo l'ordine di visualizzazione: dati e colonne del quadro non cambiano
+  const righe = ordinaRigheVista(q, righeQuadro(q));
   const t = h("table", { role: "grid", "aria-label": q.titolo });
   // colonne fisse: la prima (riconoscimento) a sinistra, valore/importo (ultima) a destra (report grafica 07/11/2026, punto 1)
-  const ultima = q.colonne.length - 1, fissaDx = ["valore", "importo"].includes(q.colonne[ultima]);
+  const ultima = colonne.length - 1, fissaDx = ["valore", "importo"].includes(colonne[ultima]);
   const clsCol = (c, j) => [["quota", "importo", "rendita", "valore", "reddito_dominicale"].includes(c) ? "n" : "",
     j === 0 ? "fissa-sx" : "", j === ultima && fissaDx ? "fissa-dx" : ""].filter(Boolean).join(" ");
-  t.append(h("thead", {}, h("tr", {}, q.colonne.map((c, j) => h("th", { class: clsCol(c, j) }, lbl(q.coll, c, q.id))))));
+  t.append(h("thead", {}, h("tr", {}, colonne.map((c, j) => h("th", { class: clsCol(c, j) }, lbl(q.coll, c, q.id))))));
   const tb = h("tbody"); t.append(tb);
   righe.forEach((r, i) => {
+    if (r.subtotale) { tb.append(rigaSubtotaleDV(r, colonne)); return; }   // devoluzioni: somma delle quote del bene
     const id = r.e && r.e.id; const base = id ? q.coll + "[" + id + "]" : null;
     const rilRiga = base ? rilievi().filter(x => x.percorso === base || x.percorso.startsWith(base + ".")) : [];
     const tr = h("tr", { tabindex: (S.riga && righe.some(x => x.key === S.riga) ? S.riga === r.key : i === 0) ? "0" : "-1", "aria-selected": S.riga === r.key ? "true" : "false", class: (r.nuova || S.dirty.has(r.key)) ? "mod" : "", "data-key": r.key,
       onclick: () => selezionaRiga(r.key, "riga"),
       onkeydown: ev => tastiTabella(ev, tr, r.key) });
-    q.colonne.forEach((c, j) => {
+    colonne.forEach((c, j) => {
       const kind = campi[c]; const v = valRiga(r, c);
       let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v, true);
+      if (q.coll === "devoluzioni" && c === "diritto" && typeof v === "string" && v) {   // il diritto per nome («Proprieta'»), non il codice
+        const b = (S.P.dati.beni || []).find(x => x.id === valRiga(r, "bene_id")); txt = nomeDiritto(v, b && b.tipo);
+      }
       if (c === "grado_parentela" && typeof v === "string" && v) {   // il grado si legge per nome (menu dei codici), non come codice
         const sdg = struttDi(q.coll, c, null), og = sdg && sdg.opzioni.find(x => x.valore === riconosciVoce(sdg, v));
         if (og) txt = og.etichetta;
@@ -648,9 +656,9 @@ function renderTabella(main, q) {
     });
     tb.append(tr);
   });
-  if (!righe.length) tb.append(h("tr", {}, h("td", { colspan: q.colonne.length, class: "mut" }, "Nessuna riga. Usa «Aggiungi riga».")));
+  if (!righe.length) tb.append(h("tr", {}, h("td", { colspan: colonne.length, class: "mut" }, "Nessuna riga. Usa «Aggiungi riga».")));
   // riga dei totali per gli importi (report grafica 07/11/2026, punto 4): somma dei valori indicati, senza i dati non noti
-  const daSommare = q.colonne.filter(c => campi[c] === "importo" && ["valore", "importo"].includes(c));
+  const daSommare = colonne.filter(c => campi[c] === "importo" && ["valore", "importo"].includes(c));
   if (righe.length > 1 && daSommare.length) {
     const tot = {}, mancano = {};
     for (const c of daSommare) {
@@ -659,7 +667,7 @@ function renderTabella(main, q) {
         if (m) cent += (m[1] ? -1 : 1) * (Number(m[2]) * 100 + Number((m[3] || "").padEnd(2, "0"))); else nonNoti++; }
       tot[c] = cent; mancano[c] = nonNoti;
     }
-    t.append(h("tfoot", {}, h("tr", {}, q.colonne.map((c, j) => h("td", { class: clsCol(c, j) },
+    t.append(h("tfoot", {}, h("tr", {}, colonne.map((c, j) => h("td", { class: clsCol(c, j) },
       j === 0 ? "Totale (" + righe.length + " righe)" : c in tot ? (tot[c] / 100).toLocaleString("it-IT", { minimumFractionDigits: tot[c] % 100 ? 2 : 0, maximumFractionDigits: 2 }) + (mancano[c] ? " + " + mancano[c] + " da indicare" : "") : "")))));
   }
   main.append(h("div", { class: "tab" }, t));
@@ -835,6 +843,39 @@ function boxDevoluzioniBene(r) {
   }
   if (devs.some(x => x.nuova || S.dirty.has(x.key))) box.append(h("p", { class: "mut" }, "Comprende righe non ancora salvate."));
   return box;
+}
+/* Ordine di visualizzazione delle tabelle (confronto grafico con DEAS II, 08/11/2026). Cambia solo la vista:
+   - EA: prima chi e' (cognome, nome, parentela, ruolo), poi codice fiscale e nascita;
+   - DV: righe raggruppate per bene, con sotto ogni bene la somma delle quote per diritto. */
+const PRIMA_EA = ["cognome", "nome", "grado_parentela", "ruolo"];
+function colonneVista(q) {
+  if (q.id !== "EA") return q.colonne;
+  return [...PRIMA_EA.filter(c => q.colonne.includes(c)), ...q.colonne.filter(c => !PRIMA_EA.includes(c))];
+}
+function ordinaRigheVista(q, righe) {
+  if (q.coll !== "devoluzioni" || righe.length < 2) return righe;
+  const ordineBeni = new Map((S.P.dati.beni || []).map((b, i) => [b.id, i]));
+  const pos = r => { const b = valRiga(r, "bene_id"); return ordineBeni.has(b) ? ordineBeni.get(b) : 1e9; };
+  const ordinate = righe.map((r, i) => [r, i]).sort((a, b) => pos(a[0]) - pos(b[0]) || a[1] - b[1]).map(x => x[0]);
+  const out = [];
+  ordinate.forEach((r, i) => {
+    out.push(r);
+    const b = valRiga(r, "bene_id"), dopo = ordinate[i + 1];
+    if (b && (!dopo || valRiga(dopo, "bene_id") !== b)) out.push({ subtotale: true, bene_id: b, righe: ordinate.filter(x => valRiga(x, "bene_id") === b) });
+  });
+  return out;
+}
+function rigaSubtotaleDV(r, colonne) {
+  const bene = (S.P.dati.beni || []).find(x => x.id === r.bene_id);
+  const perDiritto = new Map();
+  for (const x of r.righe) { const k = valRiga(x, "diritto") || ""; if (!perDiritto.has(k)) perDiritto.set(k, []); perDiritto.get(k).push(valRiga(x, "quota")); }
+  const esiti = [...perDiritto].map(([dir, quote]) => {
+    const s = sommaQuote(quote);
+    const [cls, t] = s.nonNote ? ["am", s.nonNote === 1 ? "1 quota da indicare" : s.nonNote + " quote da indicare"]
+      : s.n === s.d ? ["ok", "completa"] : s.n > s.d ? ["er", "supera 1/1"] : ["am", "manca " + (s.d - s.n) + "/" + s.d];
+    return h("span", { class: "pz " + cls, title: nomeDiritto(dir, bene && bene.tipo) }, (perDiritto.size > 1 ? nomeDiritto(dir, bene && bene.tipo) + ": " : "") + s.n + "/" + s.d + " · " + t);
+  });
+  return h("tr", { class: "subtot", "aria-hidden": "true" }, h("td", { colspan: colonne.length }, "Somma delle quote" + (bene ? " di " + etichetta("beni", bene) : ""), " ", esiti));
 }
 /* Voce 33: riepilogo del soggetto nel quadro EA (ruolo, parentela, dichiarante, beni ricevuti con la quota). */
 function presentatoreId() {
