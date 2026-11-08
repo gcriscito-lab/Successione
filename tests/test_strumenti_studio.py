@@ -138,3 +138,43 @@ def test_elenco_csv(tmp_path):
     titoli = {x[0] for x in righe[1:]}
     assert "Successione ROSSI MARIO" in titoli and "'=HYPERLINK(\"x\")" in titoli   # niente formule in Excel
     assert len(CR.csv_elenco(sv).splitlines()) == 3
+
+
+def test_ogni_campo_di_testo_e_classificato_per_la_copia_anonima():
+    """Un campo di testo nuovo nello schema o nel supplemento deve essere classificato: sostituito, tolto o conservato."""
+    from successioni.schema import COLLEZIONI
+    from successioni.telematico import supplemento as SU
+    for coll, campi in COLLEZIONI.items():
+        testo = {k for k, kind in campi.items() if kind in ("str",)} | set(SU.CHIAVI.get(coll, ()))
+        noti = AN.CONSERVATI.get(coll, set()) | AN.GESTITI.get(coll, set()) | set(AN.SOSTITUISCI) | AN.TOGLI
+        assert not testo - noti, f"{coll}: campi non classificati per la copia anonima: {sorted(testo - noti)}"
+    for k in (SU.CHIAVI_TESTAMENTO | SU.CHIAVI_VERSAMENTO | SU.CHIAVI_PRESENTATORE) - {"persona_id", "codice_carica",
+                                                                                         "data_decorrenza", "estero", "serie",
+                                                                                         "data_pubblicazione", "data_registrazione",
+                                                                                         "ufficio_registrazione", "residente_estero",
+                                                                                         "rappresentato_cf", "cf_titolare"}:
+        assert k in AN.SOSTITUISCI or k in AN.TOGLI, k
+
+
+def test_copia_anonima_toglie_nomi_anche_dai_testi_liberi_e_dagli_estremi():
+    dati = T.caso_completo()
+    defunto = dati["persone"][0]
+    tel = dati["opzioni"].setdefault("telematico", {})
+    dich = tel.setdefault("dichiarazione", {})
+    dich["testamento"] = {"pubblico_ufficiale": "NOTAIO NERI GIOVANNA", "numero_registrazione": "4567",
+                          "ufficio_registrazione": "TJK", "serie": "1T", "data_pubblicazione": "2025-02-01"}
+    dich["versamento"] = {"iban": T.IBAN_SINTETICO, "cf_titolare": "VRDGPP60A01F205X"}
+    tel.setdefault("persone", {}).setdefault(dati["persone"][1]["id"], {})["rinuncia_estremi"] = "notaio Bianchi rep. 999"
+    tel["persone"][dati["persone"][1]["id"]]["denominazione"] = "FONDAZIONE ESEMPIO SPA"
+    dati["beni"][0]["provenienza"] = f"atto notaio Bianchi rep. 1234 a favore di {defunto['cognome'].title()} {defunto['nome']}"
+    tel.setdefault("beni", {}).setdefault(dati["beni"][0]["id"], {})["estremi_trascrizione"] = "Trascrizione 999 del 1990"
+    dati["persone"][1]["relazione_con_defunto"] = f"figlia di {defunto['nome'].lower()} {defunto['cognome'].lower()}"
+    anon, _ = AN.anonimizza_dati(dati)
+    testo = json.dumps(anon, ensure_ascii=False).upper()
+    for x in ("NERI", "BIANCHI", "4567", "999", "1234", "VRDGPP60A01F205X", "FONDAZIONE", defunto["cognome"].upper(),
+              defunto["codice_fiscale"]):
+        assert x not in testo, x
+    # il titolare del conto esterno riceve un codice di fantasia valido
+    assert cf_persona_fisica_valido(anon["opzioni"]["telematico"]["dichiarazione"]["versamento"]["cf_titolare"])
+    # la relazione resta leggibile («figlia di ...») ma senza il nome
+    assert anon["persone"][1]["relazione_con_defunto"].startswith("figlia di ")

@@ -16,6 +16,7 @@ comune dell'immobile possono ancora concorrere a identificare qualcuno: la copia
 from __future__ import annotations
 
 import copy
+import re
 from datetime import date
 
 from .telematico.identificativi import carattere_controllo
@@ -24,14 +25,48 @@ NOMI = ("ALFA", "BETA", "GAMMA", "DELTA", "EPSILON", "ZETA", "ETA", "TETA", "IOT
         "OMICRON", "PI", "RO", "SIGMA", "TAU", "UPSILON", "FI", "CHI", "PSI", "OMEGA")
 COGNOME = "PERSONA"
 COMUNE_NASCITA = ("ROMA", "RM", "H501")
-#: chiavi tolte ovunque compaiano (dati di contatto e pagamento, estremi di documenti)
+#: chiavi tolte ovunque compaiano (dati di contatto e pagamento)
 TOGLI = {"pec", "iban"}
 #: chiavi sostituite con un valore di fantasia (restano compilate, cosi' la copia si puo' ancora generare e controllare)
 SOSTITUISCI = {"indirizzo": "VIA DI FANTASIA 1", "localita_estero": "LOCALITA'", "stato_federato": "STATO",
                "comune_decesso": COMUNE_NASCITA[0], "provincia_decesso": COMUNE_NASCITA[1],
                "telefono": "0600000000", "email": "anonimo@example.com", "estremi_documento": "OMESSI",
                "certificatore_disabilita": "OMESSO", "numero_immatricolazione": "OMESSO", "numero_iscrizione": "1",
-               "marca_modello": "OMESSO", "inventario": "OMESSO"}
+               "marca_modello": "OMESSO", "inventario": "OMESSO",
+               # testi liberi ed estremi di atti: possono contenere nomi di notai, parti, enti, numeri di repertorio
+               "provenienza": "OMESSA", "denominazione": "ENTE ANONIMO",
+               "rinuncia_estremi": "OMESSI", "estremi_trascrizione": "OMESSI", "estremi_registrazione": "OMESSI",
+               "pubblico_ufficiale": "PUBBLICO UFFICIALE", "numero_registrazione": "1", "sottonumero_registrazione": "1",
+               "corpo_tavolare": "1", "porzione_materiale": "1", "particella_denominatore": "1",
+               "prima_volume": "1", "prima_numero": "1", "azienda_camera_commercio": "OMESSA"}
+#: campi di testo delle entita' che restano come sono: codici, scelte da elenco, dati catastali non identificativi.
+#: Ogni campo di testo dello schema e del supplemento deve stare qui, in SOSTITUISCI/TOGLI o in GESTITI (lo verifica un test).
+CONSERVATI = {
+    "persone": {"sesso", "ruolo", "relazione_con_defunto", "tipo_soggetto", "grado_parentela", "rappresentato_grado", "rinuncia", "residenza_estera",
+                "portatore_handicap"},
+    "beni": {"tipo", "comune", "sezione", "categoria", "diritto", "bene_estero", "codice_stato_estero", "stato_estero",
+             "provincia", "codice_comune", "comune_amministrativo", "codice_comune_amministrativo", "natura",
+             "tipologia_terreno", "classe", "zona_censuaria", "consistenza", "tipo_cespite", "tipo_titolo", "quantita",
+             "codice_titolo", "codice_fiscale_emittente", "valore_esente", "tipo_documento", "anno_costruzione", "nazionalita",
+             "anno_immatricolazione", "tipo_unita", "sigla_ufficio_iscrizione", "anno_iscrizione", "lunghezza", "stazza",
+             "comune_catastale", "codice_comune_catastale", "sistema_tavolare", "discordanza_intestatario",
+             "passaggi_senza_atti_legali", "rendita_proposta", "bene_aziendale", "diritto_abitazione", "superficie",
+             "valore_prec_succ", "imposta_estera", "graffati", "immobili_aziendali", "reddito_dominicale"},
+    "devoluzioni": {"diritto", "agevolazioni", "riduzioni"},
+    "passivita": {"tipo", "possesso", "ripartizione", "bene_id", "data_documento"},
+    "documenti_ref": {"allegato_id", "tipo_eg", "finalita"},
+}
+#: campi trattati a parte in anonimizza_dati (nomi, codici fiscali, luogo di nascita, descrizioni, dati catastali)
+GESTITI = {
+    "persone": {"cognome", "nome", "codice_fiscale", "luogo_nascita", "provincia_nascita", "rappresentato_cf"},
+    "beni": {"descrizione", "foglio", "particella", "subalterno", "partita_tavolare"},
+    "devoluzioni": set(),
+    "passivita": {"descrizione"},
+    "documenti_ref": set(),
+}
+# Il codice dell'emittente dei titoli identifica una societa' (di solito quotata), non una persona: resta, cosi' la copia
+# si genera ancora. Un codice di persona fisica che compaia in qualunque altro testo viene comunque sostituito.
+_CF_PERSONA = re.compile(r"(?<![A-Z0-9])[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z](?![A-Z0-9])")
 
 
 def _lettere(s: str) -> tuple[str, str]:
@@ -58,23 +93,45 @@ def codice_fiscale(cognome: str, nome: str, originale: str | None) -> str:
     return primi + carattere_controllo(primi)
 
 
-def _sostituisci_valori(x, mappa: dict):
-    """Sostituisce ricorsivamente i valori di testo presenti in `mappa` e applica TOGLI/SOSTITUISCI alle chiavi."""
+def _sostituisci_testo(x: str, mappa: dict, nomi: re.Pattern | None) -> str:
+    """Valore intero gia' noto; poi nomi e codici fiscali anche dentro testi piu' lunghi («atto notaio ... a favore di ROSSI»)."""
+    if x in mappa:
+        return mappa[x]
+    if nomi is not None:
+        x = nomi.sub(lambda m: mappa.get(m.group(0).upper(), "OMESSO"), x)
+    nuovi = set(mappa.values())      # codici gia' di fantasia: restano
+
+    def cf(m):
+        v = m.group(0)
+        return v if v in nuovi else mappa.setdefault(v, codice_fiscale("ANONIMO", "ANONIMO", v))
+    return _CF_PERSONA.sub(cf, x)
+
+
+def _sostituisci_valori(x, mappa: dict, nomi: re.Pattern | None = None):
+    """Sostituisce ricorsivamente i valori di testo e applica TOGLI/SOSTITUISCI alle chiavi."""
     if isinstance(x, dict):
         out = {}
         for k, v in x.items():
             if k in TOGLI:
                 continue
             if k in SOSTITUISCI and isinstance(v, str):
-                out[k] = SOSTITUISCI[k]
+                out[k] = SOSTITUISCI[k] if v else v
                 continue
-            out[k] = _sostituisci_valori(v, mappa)
+            out[k] = _sostituisci_valori(v, mappa, nomi)
         return out
     if isinstance(x, list):
-        return [_sostituisci_valori(v, mappa) for v in x]
-    if isinstance(x, str) and x in mappa:
-        return mappa[x]
+        return [_sostituisci_valori(v, mappa, nomi) for v in x]
+    if isinstance(x, str):
+        return _sostituisci_testo(x, mappa, nomi)
     return x
+
+
+def _espressione_nomi(mappa: dict) -> re.Pattern | None:
+    """Trova i nomi originali (almeno 3 caratteri) come parole intere, senza badare alle maiuscole."""
+    parole = sorted({k for k in mappa if len(k) >= 3 and not _CF_PERSONA.fullmatch(k)}, key=len, reverse=True)
+    if not parole:
+        return None
+    return re.compile(r"(?<!\w)(?:" + "|".join(re.escape(p) for p in parole) + r")(?!\w)", re.IGNORECASE)
 
 
 def anonimizza_dati(dati: dict) -> tuple[dict, list[str]]:
@@ -87,8 +144,8 @@ def anonimizza_dati(dati: dict) -> tuple[dict, list[str]]:
         nome = NOMI[i % len(NOMI)] + ("" if i < len(NOMI) else str(i // len(NOMI)))
         cf_orig = p.get("codice_fiscale") if isinstance(p.get("codice_fiscale"), str) else None
         for k in ("cognome", "nome"):
-            if isinstance(p.get(k), str) and p[k]:
-                mappa.setdefault(p[k], COGNOME if k == "cognome" else nome)
+            if isinstance(p.get(k), str) and p[k].strip():
+                mappa.setdefault(p[k].strip().upper(), COGNOME if k == "cognome" else nome)
         p["cognome"], p["nome"] = COGNOME, nome
         if cf_orig:
             nuovo = codice_fiscale(COGNOME, nome, cf_orig)
@@ -133,13 +190,20 @@ def anonimizza_dati(dati: dict) -> tuple[dict, list[str]]:
     opz = d.get("opzioni") or {}
     if opz.pop("fornitore", None) is not None:
         fatto.append("profilo del fornitore tolto")
-    d["opzioni"] = _sostituisci_valori(opz, mappa)
+    # denominazioni di enti e societa', sull'entita' o nel supplemento (opzioni.telematico.persone.<id>)
+    supp = ((opz.get("telematico") or {}).get("persone") or {})
+    for x in [*persone, *(v for v in supp.values() if isinstance(v, dict))]:
+        if isinstance(x.get("denominazione"), str) and x["denominazione"].strip():
+            mappa.setdefault(x["denominazione"].strip().upper(), "ENTE ANONIMO")
+    nomi = _espressione_nomi(mappa)
+    d["opzioni"] = _sostituisci_valori(opz, mappa, nomi)
     for coll in ("persone", "beni", "devoluzioni", "passivita"):
-        d[coll] = _sostituisci_valori(d.get(coll, []), mappa)
+        d[coll] = _sostituisci_valori(d.get(coll, []), mappa, nomi)
     if d.get("note"):
         fatto.append("note e appunti tolti")
     d["note"] = {}
-    fatto.append("telefono, posta elettronica ed estremi di documenti di fantasia; IBAN tolto; restano date, importi, quote e categorie")
+    fatto.append("telefono, posta elettronica, estremi di atti e documenti, provenienza e denominazioni di fantasia; "
+                 "nomi e codici fiscali sostituiti anche dentro i testi; IBAN tolto; restano date, importi, quote e categorie")
     return d, fatto
 
 
