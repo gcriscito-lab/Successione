@@ -672,3 +672,36 @@ dialog.preventivo textarea { width: 100%; }
 :root[data-accento="rosso"] { --blu:#c4001a; } :root[data-tema="scuro"][data-accento="rosso"] { --blu:#ff8a92; }
 :root[data-accento="grafite"] { --blu:#3a3f4a; } :root[data-tema="scuro"][data-accento="grafite"] { --blu:#c4c9d4; }
 :root[data-accento]:not([data-accento="predefinito"]) { --blu-t:color-mix(in srgb, var(--blu) 14%, transparent); }
+
+/* ---- Revisione grafica dell'8/11/2026: stesse misure e stessa gerarchia in tutte le viste (design-system/successioni/MASTER.md) */
+/* controlli: una sola altezza per campi, menu e pulsanti con icona, anche per i collegamenti con aspetto da pulsante */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), select { min-height:2.2rem; }
+input.cf { min-height:2.2rem; }
+.gh[data-ic], .pil[data-ic] { display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; }
+.home-actions button, .home-actions a { padding:var(--s-2) var(--s-4); }
+/* pagina iniziale: titolo a sinistra, azioni a destra, il riepilogo su tutta la larghezza sotto (non va piu' a capo accanto ai pulsanti) */
+.home-testa { display:grid; grid-template-columns:minmax(0, 1fr) auto; grid-template-areas:"titolo azioni" "intro intro"; align-items:end; row-gap:var(--s-1); }
+.home-titoli { display:contents; }
+.home-titoli h1 { grid-area:titolo; }
+.home-titoli .intro { grid-area:intro; margin:0; }
+.home-actions { grid-area:azioni; justify-content:flex-end; }
+@media (max-width:960px) {
+  .home-testa { grid-template-columns:minmax(0, 1fr); grid-template-areas:"titolo" "intro" "azioni"; }
+  .home-actions { justify-content:flex-start; }
+}
+/* titolo del quadro: sigla in casella come nella barra laterale */
+.testa-quadro h1.con-sigla { display:flex; align-items:center; gap:var(--s-3); }
+.testa-quadro h1 .testo-titolo { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.sigla-titolo { flex:none; min-width:2.6rem; height:2rem; padding:0 var(--s-15); border-radius:var(--r0); display:inline-grid; place-items:center;
+  font-family:var(--f-mono); font-size:var(--fs-base); font-weight:700; letter-spacing:.04em; color:var(--su-acc); background:var(--blu); }
+/* riga sotto il titolo: conteggio e stato di lavorazione allineati, senza rientri */
+.sottotitolo { display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-2); }
+select.stato-lavoro { margin-left:0; min-height:0; }
+/* titoli di sezione: un solo stile (inchiostro, grassetto) anche nella calcolatrice */
+.calc-dati h3, .calc-ris h3 { color:var(--t); font-size:var(--fs-base); }
+/* scheda della riga: spiegazione delle etichette in grassetto */
+.legenda-obbl { margin:var(--s-1) 0 var(--s-2); font-size:var(--fs-s); color:var(--t2); }
+/* intestazioni di colonna troppo strette: puntini invece del taglio netto (il testo intero resta nel suggerimento della colonna) */
+th { overflow:hidden; text-overflow:ellipsis; }
+/* schermo stretto: il titolo del quadro su una riga sua, i comandi sotto */
+@media (max-width:560px) { .testa-quadro h1 { flex:1 1 100%; white-space:normal; } .testa-quadro h1 .testo-titolo { white-space:normal; } }

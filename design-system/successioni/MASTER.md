@@ -160,6 +160,9 @@ Oggi `app.css` usa **21 valori diversi**. Quelli fuori scala si arrotondano al p
 | **Scheda di Prossime azioni** | pannello `--r2`, bordo `--sep`, spaziatura 16 | il motivo del blocco va in un riquadro con filo sinistro `--er-b` o `--am-b`; la scadenza a destra in `--t2` |
 | **Finestra** | larga al massimo 720, spaziatura 24, `--r2`, `--e2`, titolo `--fs-l` | trattiene il focus; azioni in fondo a destra, la principale per ultima |
 | **Avviso a comparsa** | `--e2`, `--r2`, `role="status"`, oppure `alert` per gli errori | resta finché serve se contiene un'azione |
+| **Titolo del quadro** | sigla in casella piena `--blu` (mono 700, `--r0`) seguita dal titolo `fs-xl`; su schermo stretto il titolo va su una riga sua | il titolo accessibile resta «EA — Eredi…» |
+| **Controlli** | campi, menu a tendina e pulsanti con icona alti uguali (min. 2,2 rem); i collegamenti con aspetto di pulsante (es. «Elenco in CSV») si allineano agli altri | etichetta in grassetto = dato richiesto dal quadro, spiegato in testa alla scheda |
+| **Titoli di sezione** | inchiostro `--t`, grassetto, `fs-base`, ovunque (schede, finestre, calcolatrice); il verde resta per azioni e selezione | |
 | **Barra laterale** | fondo `--lat`, pratiche in `--fs-m` | sotto 960 px diventa un cassetto (180 ms) che trattiene il focus |
 
 ## 9. Larghezze dello schermo

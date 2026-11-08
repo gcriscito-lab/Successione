@@ -208,7 +208,8 @@ def stato_pratica(sv, p: dict, oggi: date) -> dict:
     if corrente == "dati":
         r = rilievi[0]
         altri = len(rilievi) - 1
-        out["azione"] = {"testo": r.get("messaggio", "Completa i dati"), "altri": altri, "codice": r.get("codice"),
+        testo = str(r.get("messaggio") or "Completa i dati")
+        out["azione"] = {"testo": testo[:1].upper() + testo[1:], "altri": altri, "codice": r.get("codice"),
                          "dove": {"sel": r.get("quadro") or "AN", "percorso": r.get("percorso")}}
     elif corrente == "file":
         # il motivo bloccante si calcola dopo, solo per le pratiche mostrate (cruscotto)

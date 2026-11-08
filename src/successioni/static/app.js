@@ -611,7 +611,10 @@ function renderVista() {
   const q = quadro();
   if (!q) return;
   const testoTitolo = (q.id === "AN" || q.id === "DV" ? "" : q.id + " — ") + q.titolo;
-  const titoloQ = h("h1", { title: testoTitolo }, testoTitolo);   // se non sta su una riga si accorcia: il testo intero resta nel suggerimento
+  const conSigla = !(q.id === "AN" || q.id === "DV");
+  const titoloQ = h("h1", { title: testoTitolo, class: conSigla ? "con-sigla" : null },
+    conSigla ? h("span", { class: "sigla-titolo", "aria-hidden": "true" }, q.id) : null,
+    conSigla ? h("span", { class: "vh" }, q.id + " — ") : null, h("span", { class: "testo-titolo" }, q.titolo));   // se non sta su una riga si accorcia: il testo intero resta nel suggerimento
   const arg = typeof argomentoDelQuadro === "function" ? argomentoDelQuadro(q.id) : null;
   const linkIstr = arg ? h("button", { class: "lk istr-quadro", title: "Apre le istruzioni ufficiali alla pagina " + arg.pagina, onclick: () => apriIstruzioni(arg.documento, arg.pagina) }, "Istruzioni del quadro") : null;
   main.append(h("div", { class: "testa-quadro" }, titoloQ, linkIstr, q.coll && (q.vista === "tabella" || q.vista === "documenti") && q.supportato ? menuOperazioni(q) : null));
@@ -700,7 +703,7 @@ function renderTabella(main, q) {
   const righe = ordinaRigheVista(q, righeQuadro(q));
   const t = h("table", { "aria-label": q.titolo });
   const clsCol = classeColonna(q);
-  t.append(h("thead", {}, h("tr", {}, colonne.map((c, j) => h("th", { class: clsCol(c, j) }, LBL_VISTA[c] || lbl(q.coll, c, q.id))))));
+  t.append(h("thead", {}, h("tr", {}, colonne.map((c, j) => { const t = LBL_VISTA[c] || lbl(q.coll, c, q.id); return h("th", { class: clsCol(c, j), title: t }, t); }))));
   const lg = linguetteImmobili(q); if (lg) main.append(lg);
   const tb = h("tbody"); t.append(tb);
   const indice = indiceRilievi();
@@ -1288,6 +1291,7 @@ function insDati(ins) {
   ins.append(h("div", { class: "ins-testa" }, h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)),
     h("button", { class: "lk chiudi-ins", title: "Chiudi il pannello (Esc dalla tabella)", "aria-label": "Chiudi il pannello", onclick: chiudiPannello }, "Chiudi")));
   for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e e-riga" }, x.messaggio));
+  if ((OBBLIGATORI[q.id] || []).length) ins.append(h("p", { class: "legenda-obbl" }, "In grassetto i dati richiesti dal quadro."));
   const visibili = q.campi ? new Set(q.campi) : (((S.schema.ordine || {})[q.id]) ? new Set(S.schema.ordine[q.id]) : null);   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
   const ordine = ordinati(q.id, Object.keys(campi));
   const gruppi = q.coll === "beni" ? GRUPPI_SCHEDA[q.id] : null, righeCampi = [];
