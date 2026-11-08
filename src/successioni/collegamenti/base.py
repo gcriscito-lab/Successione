@@ -248,9 +248,10 @@ class RegistroJob:
         return f"{PREFISSI_JOB[tipo]}_{sha256_bytes((tipo + chr(0) + chiave).encode())[:24]}"
 
     def crea(self, tipo: str, pratica_id: str | None, input_: dict, *, stato: str, chiave: str | None = None,
-             risultato: dict | None = None, nota: str = "creato") -> tuple[dict, bool]:
+             risultato: dict | None = None, nota: str = "creato", vincolo=None) -> tuple[dict, bool]:
         """Crea un tentativo. Con `chiave` e' idempotente: stessa chiave e stesso input restituiscono il
-        tentativo gia' esistente (creato=False); stessa chiave con input diverso e' un errore."""
+        tentativo gia' esistente (creato=False); stessa chiave con input diverso e' un errore. `vincolo(c)`, se indicato,
+        gira nella stessa transazione subito prima dell'inserimento (puo' sollevare un errore che annulla tutto)."""
         if tipo not in PREFISSI_JOB:
             raise ValueError(f"tipo di job sconosciuto: {tipo}")
         verifica_assenza_segreti(input_, "input")
@@ -271,6 +272,8 @@ class RegistroJob:
                     raise ChiaveRiutilizzata("chiave di richiesta gia' usata con un contenuto diverso",
                                              chiave=chiave, job_id=job_id)
                 return esistente, False
+            if vincolo is not None:
+                vincolo(c)
             c.execute("INSERT INTO job(id,tipo,pratica_id,stato,input,risultato,errore,creato,aggiornato) "
                       "VALUES(?,?,?,?,?,?,?,?,?)",
                       (job_id, tipo, pratica_id, stato, json.dumps(corpo, ensure_ascii=False),

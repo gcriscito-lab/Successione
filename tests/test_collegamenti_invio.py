@@ -212,8 +212,13 @@ def test_seconda_copia_della_stessa_pratica_non_si_invia(ctx, monkeypatch):
     assert ad.trasmetti(a.job_id, chiave_richiesta="ta").stato == I.TRASMESSO
     with pytest.raises(ReinvioNonAmmesso, match="gia' trasmessa"):     # review 3: rifiutata gia' alla preparazione
         confermata(ctx, ad, chiave="b")
-    # seconda difesa (preparazione concorrente che ha superato il controllo): l'invio resta comunque bloccato
+    # seconda difesa: lo stesso controllo dentro la transazione che crea la copia (preparazione concorrente)
     monkeypatch.setattr(ad, "_blocco_nuova_copia", lambda *a, **k: None)
+    with pytest.raises(ReinvioNonAmmesso, match="nel frattempo"):
+        confermata(ctx, ad, chiave="b")
+    # terza difesa (archivio precedente con una copia in piu'): l'invio resta comunque bloccato
+    crea = ad.job.crea
+    monkeypatch.setattr(ad.job, "crea", lambda *a, vincolo=None, **k: crea(*a, **k))
     b = confermata(ctx, ad, chiave="b")
     with pytest.raises(ReinvioNonAmmesso):
         ad.trasmetti(b.job_id, chiave_richiesta="tb")

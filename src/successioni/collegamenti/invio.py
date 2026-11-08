@@ -390,10 +390,22 @@ class InvioAdattatore:
                      "importi": dict(importi or {}), "profilo": dict(profilo or {})}
         inp = {**base_conf, "controllo_job_id": controllo_job_id, "aspettative": dict(aspettative or {}),
                "impronta_conferma": impronta_json(base_conf), "impronta_manifest": impronta_json(manifest)}
+        modalita = self._modalita()
+
+        def nessun_invio_aperto(c):
+            """Stesso controllo di _blocco_nuova_copia, ripetuto dentro la transazione che crea la copia: tra il controllo
+            e la creazione un altro processo (interfaccia o MCP) puo' aver avviato l'invio di un'altra copia."""
+            for r in c.execute("SELECT id, stato, risultato FROM job WHERE tipo=? AND pratica_id=? AND stato IN (?,?)",
+                               (TIPO_COPIA, pratica_id, IN_INVIO, TRASMESSA)).fetchall():
+                if json.loads(r["risultato"] or "{}").get("modalita_copia", "manuale") == modalita:
+                    raise ReinvioNonAmmesso(
+                        f"nel frattempo e' stato avviato l'invio della copia {r['id']} (stato '{r['stato']}'): registra prima "
+                        "l'esito e solo dopo prepara una nuova copia", copia_id=r["id"], stato_copia=r["stato"])
+
         j, nuovo = self.job.crea(TIPO_COPIA, pratica_id, inp, stato=PREPARATA, chiave=chiave,
                                  risultato={"artefatti": artefatti, "requisiti_mancanti": requisiti,
                                             "conferma": None, "tentativi": [], "prove": [],
-                                            "modalita_copia": self._modalita()})
+                                            "modalita_copia": modalita}, vincolo=nessun_invio_aperto)
         if nuovo:  # le copie precedenti non ancora inviate della stessa pratica sono sostituite
             for vecchia in self.job.elenca(TIPO_COPIA, pratica_id, stati=[PREPARATA, CONFERMATA]):
                 if vecchia["job_id"] != j["job_id"]:

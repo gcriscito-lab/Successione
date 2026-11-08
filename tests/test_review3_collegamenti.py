@@ -169,6 +169,8 @@ def test_2_archivio_precedente_con_copia_piu_recente_mostra_il_tentativo_aperto(
     reale, cid = _reale_confermata(ctx, chiave="a")
     t = reale.trasmetti(cid, chiave_richiesta="m")
     monkeypatch.setattr(reale, "_blocco_nuova_copia", lambda *a, **k: None)
+    crea = reale.job.crea      # archivio precedente: senza il controllo dentro la transazione
+    monkeypatch.setattr(reale.job, "crea", lambda *a, vincolo=None, **k: crea(*a, **k))
     nuova = prepara(ctx, reale, chiave="b")
     st = ctx["sv"].invio_stato(ctx["pid"])
     assert st["copie"][0]["job_id"] == nuova.job_id                    # la piu' recente resta la prima dell'elenco
