@@ -22,8 +22,8 @@ const uguale = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 14, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240,
   accento: 'predefinito', densita: 'normale', contrasto: 'normale', movimento: 'normale', avvio: 'elenco', nome_studio: '', quadri_predefiniti: [],
   disposizione: 'destra', altezza_pannello: 380 };
-const ACCENTI = { blu: ['#0a74ff', '#6cb0ff'], verde: ['#1e7a37', '#6fd18a'], viola: ['#6e3fd1', '#b79cff'], arancio: ['#b25e00', '#ffb454'], rosso: ['#c4001a', '#ff8a92'], grafite: ['#3a3f4a', '#c4c9d4'] };
-const hexRgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
+// colori in app.css (:root[data-accento=...], con la variante per il tema scuro)
+const ACCENTI = ['blu', 'verde', 'viola', 'arancio', 'rosso', 'grafite'];
 const FONT_UI = { sistema: '"Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif', segoe: '"Segoe UI", system-ui, sans-serif',
   arial: 'Arial, sans-serif', verdana: 'Verdana, sans-serif', georgia: 'Georgia, serif', consolas: 'Consolas, monospace' };
 let preferenze = { ...ASPETTO_DEFAULT };
@@ -33,9 +33,7 @@ function applicaAspetto(valori) {
   root.dataset.tema = p.tema === 'sistema' ? (sistemaScuro.matches ? 'scuro' : 'chiaro') : p.tema;
   root.style.setProperty('--f-ui', FONT_UI[p.font] || FONT_UI.sistema);
   // personalizzazione: accento (con la variante adatta al tema scuro), densita', contrasto, movimento, nome dello studio
-  const acc = ACCENTI[p.accento];
-  if (acc) { const col = acc[root.dataset.tema === 'scuro' ? 1 : 0]; root.style.setProperty('--blu', col); root.style.setProperty('--blu-t', hexRgba(col, 0.14)); }
-  else { root.style.removeProperty('--blu'); root.style.removeProperty('--blu-t'); }
+  root.dataset.accento = ACCENTI.includes(p.accento) ? p.accento : 'predefinito';
   root.dataset.densita = p.densita; root.dataset.contrasto = p.contrasto; root.dataset.movimento = p.movimento;
   const sub = $('#bHome .marchio-sub'); if (sub) sub.textContent = p.nome_studio || 'Dichiarazioni telematiche';   // il nome dello studio sotto il marchio
   document.title = 'Successioni' + (p.nome_studio ? ' · ' + p.nome_studio : '');
@@ -109,11 +107,7 @@ function occupato(nome, fn) {
   };
 }
 const post = (u, b) => api(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) });
-/* Il messaggio e' un riquadro mobile in basso (non sposta il layout) con pulsante di chiusura. Stile aggiunto da qui. */
-document.head.append(h("style", {}, `#msg{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:60;margin:0;max-width:min(760px,calc(100vw - 24px));
-  display:flex;gap:12px;align-items:flex-start;white-space:pre-line;overflow-wrap:anywhere;max-height:40vh;overflow:auto}
-  #msg[hidden]{display:none} #msg .mt{flex:1} #msg .x{flex:none;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;line-height:1;padding:2px 6px}
-  #msg .x::before{content:"\\00d7";font-size:1.3em}`));
+/* Il messaggio e' un riquadro mobile in basso (non sposta il layout) con pulsante di chiusura: stile in app.css (#msg). */
 /* Gli esiti positivi (classe "o") spariscono da soli dopo 8 secondi: a 375 px il riquadro copriva i campi. Gli errori restano
    finche' non si chiudono (revisione 2, punto 9). */
 let msgTimer = null;
@@ -501,6 +495,18 @@ function listaSuggerimenti(chiave) {
   }
   return id;
 }
+/* Errori di un campo: ogni messaggio ha un id ed e' aggiunto alla descrizione accessibile del campo (senza togliere l'aiuto),
+   e il campo e' marcato come non valido: lo sente anche chi usa un lettore di schermo. */
+let _nErr = 0;
+function aggiungiDescrizione(el, id) {
+  const ids = (el.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+  if (!ids.includes(id)) el.setAttribute("aria-describedby", [...ids, id].join(" "));
+}
+function erroriCampo(el, err) {
+  if (!err.length) return [];
+  el.setAttribute("aria-invalid", "true");
+  return err.map(r => { const id = "err_" + (++_nErr); aggiungiDescrizione(el, id); return h("div", { class: "e", id }, r.messaggio); });
+}
 const MAX_LUNGHEZZA = { "beni.nazionalita": 20 };   // XSD: Nazionalita, massimo 20 caratteri (nessun elenco ufficiale: resta testo)
 function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
   const sd = kind === "str" || kind === "cf" ? struttDi(coll, campo, tipoBene) : null;
@@ -526,7 +532,7 @@ function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
   // e' gia' arrivato con «input», e la riga potrebbe non essere piu' quella mostrata. Un campo staccato dal documento non scrive.
   const f = () => { if (el.isConnected) onMod(campo, leggi(kind, el.value)); };
   el.addEventListener("input", f); el.addEventListener("change", f);
-  return h("div", {}, el, err.map(r => h("div", { class: "e" }, r.messaggio)));
+  return h("div", {}, el, erroriCampo(el, err));
 }
 
 /* Valore gia' presente scritto in un altro modo ma equivalente per l'esportazione: «A/2» e «a2» valgono «A2»; per i diritti la
@@ -571,7 +577,7 @@ function campoStrutturato(sd, val, onMod, path) {
   const f = () => { mostraAiuto(); onMod(leggi("str", el.value)); };
   el.addEventListener("change", f);
   mostraAiuto();
-  return h("div", {}, el, dett, err.map(r => h("div", { class: "e" }, r.messaggio)));
+  return h("div", {}, el, dett, erroriCampo(el, err));
 }
 
 /* ---------- vista centrale ---------- */
@@ -692,14 +698,15 @@ function renderTabella(main, q) {
   const campi = S.schema.collezioni[q.coll];
   const colonne = colonneVista(q);                    // solo l'ordine di visualizzazione: dati e colonne del quadro non cambiano
   const righe = ordinaRigheVista(q, righeQuadro(q));
-  const t = h("table", { role: "grid", "aria-label": q.titolo });
+  const t = h("table", { "aria-label": q.titolo });
   const clsCol = classeColonna(q);
   t.append(h("thead", {}, h("tr", {}, colonne.map((c, j) => h("th", { class: clsCol(c, j) }, LBL_VISTA[c] || lbl(q.coll, c, q.id))))));
   const lg = linguetteImmobili(q); if (lg) main.append(lg);
   const tb = h("tbody"); t.append(tb);
+  const indice = indiceRilievi();
   const vere = righe.filter(r => !r.subtotale);   // le righe di somma delle devoluzioni non sono righe di dati
   righe.forEach(r => tb.append(r.subtotale ? rigaSubtotaleDV(r, colonne)
-    : rigaTabella(q, r, (S.riga && vere.some(x => x.key === S.riga) ? S.riga === r.key : r === vere[0]))));
+    : rigaTabella(q, r, (S.riga && vere.some(x => x.key === S.riga) ? S.riga === r.key : r === vere[0]), indice)));
   if (!righe.length) tb.append(h("tr", { class: "vuota" }, h("td", { colspan: colonne.length, class: "mut" }, testoVuoto(q))));
   const piede = piedeTabella(q, vere); if (piede) t.append(piede);
   main.append(h("div", { class: "tab" }, t));
@@ -707,10 +714,22 @@ function renderTabella(main, q) {
 
     h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
 }
-function rigaTabella(q, r, focalizzabile) {
+/* Rilievi per riga («coll[id]») e per campo (percorso completo): costruito una volta per disegno, non per ogni cella. */
+function indiceRilievi() {
+  const riga = new Map(), campo = new Set();
+  for (const x of rilievi()) {
+    const p = x.percorso || "", m = p.match(/^[a-z_]+\[[^\]]+\]/);
+    if (!m) continue;
+    if (!riga.has(m[0])) riga.set(m[0], []);
+    riga.get(m[0]).push(x); campo.add(p);
+  }
+  return { riga, campo };
+}
+function rigaTabella(q, r, focalizzabile, indice) {
   const campi = S.schema.collezioni[q.coll], clsCol = classeColonna(q);
   const id = r.e && r.e.id; const base = id ? q.coll + "[" + id + "]" : null;
-  const rilRiga = base ? rilievi().filter(x => x.percorso === base || x.percorso.startsWith(base + ".")) : [];
+  indice = indice || indiceRilievi();
+  const rilRiga = base ? (indice.riga.get(base) || []) : [];
   const tr = h("tr", { tabindex: focalizzabile ? "0" : "-1", "aria-selected": S.riga === r.key ? "true" : "false", class: (r.nuova || S.dirty.has(r.key)) ? "mod" : "", "data-key": r.key,
     onclick: () => selezionaRiga(r.key, "riga"),
     onkeydown: ev => tastiTabella(ev, tr, r.key) });
@@ -736,7 +755,7 @@ function rigaTabella(q, r, focalizzabile) {
     if (kind.startsWith("ref:") && v) { const e = (S.P.dati[kind.slice(4)] || []).find(x => x.id === v); if (e) txt = etichetta(kind.slice(4), e); }
     if (q.coll === "documenti_ref" && c === "tipo_eg" && v) { const sd = struttDi(q.coll, c, null), o = sd && sd.opzioni.find(x => x.valore === v); if (o) txt = o.etichetta; }
     if (q.coll === "documenti_ref" && c === "allegato_id" && v) txt = descriviFileEG(v);
-    const errCampo = base && rilievi().some(x => x.percorso === base + "." + c);
+    const errCampo = base && indice.campo.has(base + "." + c);
     const td = h("td", { class: [clsCol(c, j), kind === "cf" ? "cf" : ""].filter(Boolean).join(" "), title: txt, "data-allegato": q.coll === "documenti_ref" && c === "allegato_id" ? (v || "") : null }, j === 0 && rilRiga.length ? h("span", { class: "punto", title: rilRiga.map(x => x.messaggio).join("; ") }) : null, errCampo ? h("span", { class: "pz er" }, "da correggere") : txt,
       j === 0 && q.coll === "persone" && id && id === presentatoreId() ? h("span", { class: "pz ok badge-dich", title: "Presentatore della dichiarazione" }, "dichiarante") : null);   // voce 33
     tr.append(td);
@@ -884,18 +903,19 @@ function menuOperazioni(q) {
   if (q.coll === "beni" || q.coll === "devoluzioni") voci.push(["Brogliaccio da stampare", "", () => anteprima("/api/pratiche/" + S.P.pratica_id + "/brogliaccio", "Brogliaccio beni e quote")],
     ["Brogliaccio in CSV", "", () => { const a = h("a", { href: "/api/pratiche/" + S.P.pratica_id + "/brogliaccio.csv", download: "" }); document.body.append(a); a.click(); a.remove(); }]);
   voci.push(["Elimina la riga selezionata", "", () => eliminaRigaSelezionata(q)]);
-  const d = h("details", { class: "operazioni" }, h("summary", { class: "gh", "aria-haspopup": "menu" }, "Operazioni"));
-  const voceMenu = n => { const v = [...d.querySelectorAll("[role=menuitem]")]; if (v.length) v[(n + v.length) % v.length].focus(); };
+  const d = h("details", { class: "operazioni" }, h("summary", { class: "gh" }, "Operazioni"));
+  const voceMenu = n => { const v = [...d.querySelectorAll(".menu-op button")]; if (v.length) v[(n + v.length) % v.length].focus(); };
   d.addEventListener("toggle", () => { if (d.open && document.activeElement === d.querySelector("summary")) voceMenu(0); });
   d.addEventListener("keydown", ev => {
-    const v = [...d.querySelectorAll("[role=menuitem]")], i = v.indexOf(document.activeElement);
+    const v = [...d.querySelectorAll(".menu-op button")], i = v.indexOf(document.activeElement);
     if (ev.target.tagName === "SUMMARY" && ev.key === "ArrowDown") { ev.preventDefault(); d.open = true; voceMenu(0); return; }
     if (i < 0) return;
     const n = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: v.length - 1 }[ev.key];
     if (n !== undefined) { ev.preventDefault(); voceMenu(n); }
     else if (ev.key === "Tab") d.open = false;
   });
-  d.append(h("div", { class: "menu-op", role: "menu", "aria-label": "Operazioni del quadro " + q.id }, voci.map(([t, k, f]) => h("button", { role: "menuitem", tabindex: "-1", onclick: () => { d.open = false; f(); } },
+  // il focus torna su «Operazioni» prima del comando: una finestra aperta dal comando lo restituisce li' alla chiusura
+  d.append(h("div", { class: "menu-op", role: "group", "aria-label": "Operazioni del quadro " + q.id }, voci.map(([t, k, f]) => h("button", { type: "button", onclick: () => { d.open = false; d.querySelector("summary").focus(); f(); } },
     h("span", {}, t), k ? h("kbd", {}, k) : null))));
   return d;
 }
@@ -912,8 +932,19 @@ function tastiTabella(ev, tr, key) {
 function rigaDaFocalizzare(key) { return document.querySelector('tr[data-key="' + CSS.escape(key) + '"]'); }
 function selezionaRiga(key, dove) {
   // vista unica degli immobili: la riga puo' appartenere a un altro quadro (EB, EC, EL, EM): il pannello segue quel quadro
+  const prima = { sel: S.sel, riga: S.riga, tab: S.tab };
   if (S.immobiliTutti) { const qr = quadroDellaRiga(key); if (qr && qr !== S.sel) S.sel = qr; }
-  S.riga = key; S.tab = "dati"; render();
+  S.riga = key; S.tab = "dati";
+  const nuova = rigaDaFocalizzare(key);
+  // stesso quadro, pannello gia' aperto sulla scheda Dati: basta spostare la selezione e ridisegnare il pannello (91 ms -> pochi ms
+  // con 150 righi). Negli altri casi (quadro cambiato, pannello da aprire) serve il disegno completo.
+  if (prima.sel === S.sel && prima.tab === "dati" && prima.riga && nuova && !$("#ins").hidden) {
+    const vecchia = rigaDaFocalizzare(prima.riga);
+    if (vecchia && vecchia !== nuova) { vecchia.setAttribute("aria-selected", "false"); vecchia.tabIndex = -1; }
+    for (const x of document.querySelectorAll('#vista tbody tr[tabindex="0"]')) if (x !== nuova) x.tabIndex = -1;
+    nuova.setAttribute("aria-selected", "true"); nuova.tabIndex = 0;
+    renderIns();
+  } else render();
   if (dove === "pannello") { const primo = $("#ins .rg input, #ins .rg select, #ins .rg textarea"); if (primo) { primo.focus(); return; } }
   if (dove) { const tr = rigaDaFocalizzare(key); if (tr) tr.focus({ preventScroll: true }); }
   if (window.innerWidth <= 960) $("#ins").scrollIntoView({ block: "start" });   // su schermo stretto il pannello sta sotto la tabella
@@ -1107,10 +1138,17 @@ function dialogo(id, titolo, corpo, conferma, onConferma) {
   const ok = h("button", { class: "pil", value: "ok", onclick: ev => { ev.preventDefault(); const e = onConferma(); if (e) { err.textContent = e; err.hidden = false; } else d.close(); } }, conferma);
   // Invio in un campo: il modulo lo tratterebbe come clic sul primo pulsante («Annulla») e chiuderebbe perdendo i dati;
   // qui applica l'azione principale (i campi che usano Invio per conto loro lo fermano prima con preventDefault)
-  const invio = ev => { if (ev.key === "Enter" && !ev.defaultPrevented && !ev.isComposing && ev.target.tagName === "INPUT") { ev.preventDefault(); ok.click(); } };
+  // (casella e scelta: Invio non applica, si cambiano con Spazio)
+  const invio = ev => { if (ev.key === "Enter" && !ev.defaultPrevented && !ev.isComposing && ev.target.tagName === "INPUT" && !["checkbox", "radio"].includes(ev.target.type)) { ev.preventDefault(); ok.click(); } };
+  const annulla = () => { if (firmaModulo(d) !== iniziale && !confirm("Chiudere senza applicare? I dati inseriti nella finestra andranno persi.")) return; d.close(); };
   const d = h("dialog", { id, class: "dlg-op", "aria-labelledby": id + "T" }, h("form", { method: "dialog", onkeydown: invio }, h("h2", { id: id + "T" }, titolo), corpo, err,
-    h("div", { class: "wiz-az" }, h("button", { class: "gh", value: "annulla" }, "Annulla"), h("span", { class: "sp" }), ok)));
-  document.body.append(d); d.showModal(); return d;
+    h("div", { class: "wiz-az" }, h("button", { type: "button", class: "gh", value: "annulla", onclick: annulla }, "Annulla"), h("span", { class: "sp" }), ok)));
+  d.addEventListener("cancel", ev => { ev.preventDefault(); annulla(); });   // Esc: stessa conferma di «Annulla»
+  document.body.append(d); const iniziale = firmaModulo(d); d.showModal(); return d;
+}
+/* Impronta dei campi di una finestra: serve a chiedere conferma prima di chiudere perdendo cio' che si e' scritto. */
+function firmaModulo(el) {
+  return JSON.stringify([...el.querySelectorAll("input, select, textarea")].map(x => x.type === "checkbox" || x.type === "radio" ? x.checked : x.value));
 }
 function descriviRigaGruppo(q, r) {
   if (q.coll !== "devoluzioni") return etichetta(q.coll, r.e);
@@ -1226,7 +1264,6 @@ function schedeTastiera(lista, pannelloId, dove) {
 function renderIns() {
   let ins = $("#ins"); ins.replaceChildren();
   if (!S.P) return;
-  if (S.tab === 'file') { vaiFile(); return; } // compatibilita' con collegamenti precedenti
   if (S.sel === 'FILE') return;
   const nr = rilievi().length;
   const seg = h("div", { class: "seg", role: "tablist", "aria-label": "Schede del pannello" }, [["dati", "Dati"], ["controlli", "Controlli" + (nr ? " (" + nr + ")" : "")], ["cronologia", "Cronologia"]].map(([k, n]) =>
@@ -1236,7 +1273,7 @@ function renderIns() {
   ins.append(seg, pannello);
   ins = pannello;
   if (S.tab === "dati" && S.riga) ins.append(h("button", { class: "lk solo-mobile", onclick: tornaTabella }, "↑ Torna alla tabella"));
-  if (S.tab === "dati") insDati(ins); else if (S.tab === "controlli") insControlli(ins); else if (S.tab === "file") insFile(ins); else insCronologia(ins);
+  if (S.tab === "dati") insDati(ins); else if (S.tab === "controlli") insControlli(ins); else insCronologia(ins);
 }
 const ESTERO_IMM = new Set(["codice_stato_estero", "stato_estero", "stato_federato", "localita_estero", "imposta_estera"]);   // etichette.py: _ESTERO_IMM
 function rigaSelezionata() {
@@ -1255,9 +1292,6 @@ function insDati(ins) {
   const ordine = ordinati(q.id, Object.keys(campi));
   const gruppi = q.coll === "beni" ? GRUPPI_SCHEDA[q.id] : null, righeCampi = [];
   let lista = null;   // campi delle schede senza gruppi: un contenitore, impaginato su piu' colonne con il pannello sotto
-  for (const [comune, provincia] of [['comune', 'provincia'], ['luogo_nascita', 'provincia_nascita']]) {
-    void comune; void provincia;   // provincia e comune seguono gia' l'ordine ufficiale (provincia prima del comune)
-  }
   // dati dell'immobile estero: solo con provincia EE (o se gia' compilati), come nelle istruzioni dei quadri EB ed EC
   const esteroNascosto = q.coll === "beni" && ["EB", "EC"].includes(q.id) && String(valRiga(r, "provincia") || "").trim().toUpperCase() !== "EE";
   let nascostiEstero = 0;
@@ -1307,7 +1341,7 @@ function insDati(ins) {
     if (aiuto) {   // nella scheda compatta l'aiuto compare entrando nel campo; resta sempre la descrizione accessibile del campo
       const idA = "aiuto_" + q.coll + "_" + c;
       w.append(h("div", { class: "mut aiuto-voce", id: idA }, aiuto));
-      const f = w.querySelector("input, select, textarea"); if (f) f.setAttribute("aria-describedby", idA);
+      const f = w.querySelector("input, select, textarea"); if (f) aggiungiDescrizione(f, idA);
     }
     const obbl = (OBBLIGATORI[q.id] || []).includes(c);
     // il suggerimento dell'etichetta riporta sempre il nome intero (nella scheda compatta l'etichetta si accorcia su una riga)
@@ -2168,7 +2202,7 @@ function mostraErroriSalvataggio(errori) {
     const el = document.querySelector('[data-path="' + CSS.escape(x.path) + '"]');
     if (!el) continue;
     el.classList.add("bad"); el.setAttribute("aria-invalid", "true");
-    if (!(el.parentElement && el.parentElement.querySelector(".e.sv"))) el.after(h("div", { class: "e sv" }, x.x.messaggio));
+    if (!(el.parentElement && el.parentElement.querySelector(".e.sv"))) { const id = "err_" + (++_nErr); el.after(h("div", { class: "e sv", id }, x.x.messaggio)); aggiungiDescrizione(el, id); }
     if (!focalizzato) { focalizzato = true; el.scrollIntoView({ block: "center" }); el.focus(); }
   }
 }
@@ -2290,7 +2324,7 @@ function wizRender() {
   $("#wIndietro").hidden = W.passo === 0; $("#wAvanti").textContent = W.passo === PASSI.length - 1 ? "Crea dichiarazione" : "Avanti";
   const d = W.dati;
   const f = (k, label, ph) => h("div", { class: "campo" }, h("label", { for: "w_" + k }, label), h("input", { id: "w_" + k, value: d[k] || "", placeholder: ph || "", class: k === "codice_fiscale" ? "mono cf" : "", oninput: ev => { d[k] = ev.target.value; if (k === "codice_fiscale") wizDaCF(ev.target.value); } }));
-  if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nei dati generali."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "GG/MM/AAAA"), f("luogo_nascita", "Comune di nascita"), f("provincia_nascita", "Provincia di nascita", "RM"), f("data_decesso", "Data del decesso", "GG/MM/AAAA"), f("comune_decesso", "Comune del decesso"), f("provincia_decesso", "Provincia del decesso", "RM")), h("div", { id: "w_cf_nota", class: "mut", class: "testo-m spazio-su", "aria-live": "polite" }));
+  if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nei dati generali."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "GG/MM/AAAA"), f("luogo_nascita", "Comune di nascita"), f("provincia_nascita", "Provincia di nascita", "RM"), f("data_decesso", "Data del decesso", "GG/MM/AAAA"), f("comune_decesso", "Comune del decesso"), f("provincia_decesso", "Provincia del decesso", "RM")), h("div", { id: "w_cf_nota", class: "mut testo-m spazio-su", "aria-live": "polite" }));
   if (W.passo === 1) {
     d.tipo = d.tipo || "originaria";
     for (const [v, t, s] of [["originaria", "Dichiarazione originaria", "Prima dichiarazione per questa successione."], ["sostitutiva", "Dichiarazione sostitutiva", "Sostituisce una dichiarazione già presentata. La gestione dei dati della precedente non è ancora disponibile."]]) {
@@ -2317,6 +2351,17 @@ async function wizDaCF(valore) {
 /* Una chiave di richiesta per ogni apertura della procedura: un doppio clic o un nuovo tentativo dopo un errore di rete
    non crea due pratiche (revisione 2, punto 1). */
 function wizApri() { if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di creare una pratica.", "e"); W.passo = 0; W.dati = {}; W.extra = null; W.chiave = crypto.randomUUID(); W.busy = false; S.gen++; wizRender(); $("#wAvanti").disabled = false; $("#wiz").showModal(); }
+/* Dati scritti nella procedura (anche quelli portati dalla calcolatrice): chiudere li perde, quindi si chiede conferma. */
+function wizHaDati() {
+  const d = W.dati;
+  return ["cognome", "nome", "codice_fiscale", "data_nascita", "luogo_nascita", "provincia_nascita", "data_decesso", "comune_decesso", "provincia_decesso"]
+    .some(k => String(d[k] || "").trim()) || (W.extra && W.extra.length > 0) || (d.tipo && d.tipo !== "originaria");
+}
+function wizChiudi() {
+  if (W.busy) return;
+  if (wizHaDati() && !confirm("Chiudere la procedura? I dati inseriti andranno persi.")) return;
+  $("#wiz").close();
+}
 async function wizAvanti() {
   if (W.busy) return;
   const d = W.dati;
@@ -2336,7 +2381,8 @@ async function wizAvanti() {
     $("#wizErr").textContent = t;
     return;
   } finally { W.busy = false; bt.disabled = false; bt.removeAttribute("aria-busy"); }
-  $("#wiz").close(); await caricaPratiche(); await apri(r.pratica_id, "AN"); msg("Dichiarazione creata.", "o");
+  $("#wiz").close(); await caricaPratiche(); await apri(r.pratica_id, "AN");
+  msg(S.P && S.P.pratica_id === r.pratica_id ? "Dichiarazione creata." : "Dichiarazione «" + titoloWiz() + "» creata: la trovi nell'elenco delle pratiche.", "o");
 }
 
 /* Impostazioni: percorsi degli strumenti esterni (server: /api/impostazioni), con stato di rilevamento. */
@@ -2549,6 +2595,8 @@ collegaSeparatore($('#ridimensiona'), () => preferenze.disposizione === 'sotto'
 collegaSeparatore($('#ridimensionaNav'), { chiave: 'larghezza_nav', pannello: '#lat', verso: 1, min: 180, max: () => limiteNav() || 480 });
 
 /* Importa un file telematico SUC13 (XML) come nuova pratica: importa solo cio' che il programma sa riprodurre e dice il resto. */
+const ETICHETTE_IMPORTATO = { eredi: "soggetti del quadro EA", terreni: "terreni", fabbricati: "fabbricati",
+  disponibilita_finanziarie: "conti, crediti e altri beni", passivita: "passività", voltura: "sezioni di voltura" };
 async function importaXml(file) {
   if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di importare.", "e");
   try {
@@ -2556,7 +2604,7 @@ async function importaXml(file) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return msg("Importazione non riuscita: " + (j.messaggio || j.codice || r.status), "e");
     await caricaPratiche(); await apri(j.pratica_id, "AN");
-    const n = Object.entries(j.importato).map(([k, v]) => v + " " + k.replaceAll("_", " ")).join(", ");
+    const n = Object.entries(j.importato).filter(([, v]) => v).map(([k, v]) => v + " " + (ETICHETTE_IMPORTATO[k] || k.replaceAll("_", " "))).join(", ");
     const resto = j.non_importato.concat(j.avvisi);
     msg("Importata: " + n + ". Verifica i dati." + (resto.length ? " Da reinserire o controllare: " + resto.join("; ") + "." : ""), resto.length ? "e" : "o");
   } catch (e) { msg("Importazione non riuscita: " + e.message, "e"); }
@@ -2564,13 +2612,17 @@ async function importaXml(file) {
 $("#bImporta").onclick = () => $("#fImporta").click();
 $("#fImporta").onchange = ev => { const f = ev.target.files[0]; ev.target.value = ""; if (f) importaXml(f); };
 $("#bNuova").onclick = wizApri;
-$("#wAnnulla").onclick = () => $("#wiz").close();
+$("#wAnnulla").onclick = wizChiudi;
+$("#wiz").addEventListener("cancel", ev => { ev.preventDefault(); wizChiudi(); });   // Esc: stessa conferma di «Annulla»
 $("#wIndietro").onclick = () => { W.passo--; wizRender(); };
 $("#wAvanti").onclick = wizAvanti;
 $("#bSalva").onclick = salvaTutto;
 $("#bGenera").onclick = vaiFile;
 $("#bControlla").onclick = async () => {
-  if (!S.P) return; if (nMod() && !(await salvaTutto())) return;
+  if (!S.P) return;
+  const n = nMod();
+  if (n && !confirm("Per controllare, il programma salva prima " + (n === 1 ? "la modifica in sospeso" : "le " + n + " modifiche in sospeso") + ". Continuare?")) return;
+  if (n && !(await salvaTutto())) return;
   try { S.Q = await api("/api/pratiche/" + S.P.pratica_id + "/quadri"); } catch (e) { msg("Controllo non eseguito. " + e.message, "e"); return; }
   if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render();
 };
@@ -2739,6 +2791,9 @@ function apriPreventivo() {
     if (S.writeBusy) { msg('Salvataggio in corso: riprova tra un momento.', 'e'); return false; }
     return salvaOps([{ op: 'set', sezione: 'note', campi: { preventivo: raccogli() } }]);
   };
+  let firma = null;
+  const chiudi = () => { if (JSON.stringify(raccogli()) !== firma && !confirm("Ci sono modifiche non salvate nel preventivo. Chiudere senza salvarle?")) return; d.close(); };
+  d.oncancel = ev => { ev.preventDefault(); chiudi(); };   // Esc: stessa conferma di «Chiudi»
   const vedi = tipo => async () => { if (await salva()) { d.close(); anteprima('/api/pratiche/' + S.P.pratica_id + '/preventivo?tipo=' + tipo, tipo === 'parcella' ? 'Parcella' : 'Preventivo'); } };
   d.replaceChildren(h('form', { method: 'dialog', onkeydown: invioNonChiude },
     h('h2', { id: 'dPreventivoT' }, 'Preventivo e parcella'),
@@ -2748,11 +2803,12 @@ function apriPreventivo() {
     h('div', { class: 'prev-campi' }, lCassa, iCassa, lIva, iIva, lRit, iRit, lNum, iNum, lData, iData, lInt, iInt),
     h('label', { class: 'chk', for: 'prevImposte' }, imp, h('span', {}, "Aggiungi le imposte della dichiarazione (dall'ultimo file generato), sommate a parte")),
     h('label', { for: 'prevNota' }, 'Nota in fondo al documento'), nota,
-    h('div', { class: 'wiz-az' }, h('button', { type: 'button', class: 'gh', id: 'prevSalva', onclick: async () => { if (await salva()) d.close(); } }, 'Salva'),
+    h('div', { class: 'wiz-az' }, h('button', { type: 'button', class: 'gh', id: 'prevChiudi', onclick: chiudi }, 'Chiudi'),
       h('span', { class: 'sp' }),
       h('button', { type: 'button', class: 'gh', id: 'prevVediPreventivo', onclick: vedi('preventivo') }, 'Salva e vedi preventivo'),
       h('button', { type: 'button', class: 'gh', id: 'prevVediParcella', onclick: vedi('parcella') }, 'Salva e vedi parcella'),
-      h('button', { class: 'pil' }, 'Chiudi'))));
+      h('button', { type: 'button', class: 'pil', id: 'prevSalva', onclick: async () => { if (await salva()) d.close(); } }, 'Salva'))));
+  firma = JSON.stringify(raccogli());
   if (!d.open) d.showModal();
   const primo = corpoVoci.querySelector('input'); if (primo) primo.focus();
 }
@@ -2924,26 +2980,31 @@ async function calcEsegui() {
     if (idx >= 0) { const el = [...$("#calcDati").querySelectorAll("input,select")][idx]; if (el) { el.focus(); try { if (pos != null) el.setSelectionRange(pos, pos); } catch (_) { /* campi senza selezione */ } } }
   }
 }
+function calcAnnuncia(t) { const a = $("#calcAnnuncio"); if (a && a.textContent !== t) a.textContent = t; }
 function calcMostraErrore(t) {
-  CALC.ultimo = null;
+  CALC.ultimo = null; calcAnnuncia(t);
   $("#calcRis").replaceChildren(h("p", { class: "calc-avv" }, "Stima: non sostituisce la dichiarazione né il controllo ufficiale."), h("p", { class: "err", id: "calcErrore" }, t));
 }
 function calcMostra(r) {
   const lista = (cls, voci) => voci && voci.length ? h("ul", { class: cls }, voci.map(v => h("li", {}, v))) : null;
   const imp = r.imposte || [];
+  // ridisegno a ogni tasto: i dettagli aperti (erede, ipotesi) restano aperti
+  const aperti = new Set([...$("#calcRis").querySelectorAll("details[open]")].map(x => x.dataset.k));
+  const det = (k, ...figli) => { const x = h("details", { "data-k": k, class: k.startsWith("erede") ? "calc-erede-ris" : null }, ...figli); if (aperti.has(k)) x.open = true; return x; };
+  calcAnnuncia(imp.length ? "Totale stimato: " + (r.totale_testo || "") : (r.non_stimabile || []).length ? "Stima non disponibile per alcuni dati" : "");
   $("#calcRis").replaceChildren(...[
     h("p", { class: "calc-avv", id: "calcAvv" }, r.avvertenza),
     imp.length ? h("table", { class: "calc-imp", id: "calcImposte" }, h("tbody", {},
       imp.map(x => h("tr", { class: "fisso" }, h("td", {}, x.voce), h("td", { class: "n" }, x.testo))),
       h("tr", { class: "fisso tot" }, h("td", {}, "Totale stimato"), h("td", { class: "n", id: "calcTotale" }, r.totale_testo || "")))) : null,
     r.non_stimabile && r.non_stimabile.length ? [h("h3", {}, "Non stimabile"), lista("calc-ns", r.non_stimabile.map(m => "non stimabile: " + m))] : null,
-    r.eredi && r.eredi.length ? [h("h3", {}, "Imposta di successione per erede"), ...r.eredi.map(e => h("details", { class: "calc-erede-ris" },
+    r.eredi && r.eredi.length ? [h("h3", {}, "Imposta di successione per erede"), ...r.eredi.map((e, i) => det("erede" + i,
       h("summary", {}, e.nome + " (" + (e.grado_testo || e.grado) + ", quota " + e.quota + "): " + e.imposta),
       h("p", { class: "mut" }, "Franchigia " + e.franchigia + (e.disabile ? " (disabilità grave)" : "") + ", aliquota " + e.aliquota + "."),
       h("ol", {}, e.passaggi.map(p => h("li", {}, p.voce + ": " + p.valore)))))] : null,
     r.passaggi && r.passaggi.length ? [h("h3", {}, "Come si arriva al risultato"), lista("", r.passaggi)] : null,
     r.note && r.note.length ? [h("h3", {}, "Note"), lista("", r.note)] : null,
-    r.assunzioni ? h("details", {}, h("summary", {}, "Ipotesi della stima"), lista("", r.assunzioni)) : null].flat().filter(Boolean));
+    r.assunzioni ? det("ipotesi", h("summary", {}, "Ipotesi della stima"), lista("", r.assunzioni)) : null].flat().filter(Boolean));
 }
 async function calcCreaPratica() {
   if (!CALC.dati.data_decesso) return calcMostraErrore("Indica almeno la data del decesso e gli eredi.");
@@ -2954,7 +3015,8 @@ async function calcCreaPratica() {
   if (!$("#wiz").open) return;
   W.dati.data_decesso = dataIt(r.data_decesso); W.extra = r.operazioni;
   wizRender();
-  msg("Procedura guidata compilata con la data del decesso e " + r.operazioni.length + " eredi. Da completare: " + r.da_completare + ".", "o");
+  const nEredi = r.operazioni.filter(o => o.coll === "persone" && o.op === "upsert").length;
+  msg("Procedura guidata compilata con la data del decesso e " + nEredi + (nEredi === 1 ? " erede" : " eredi") + ". Da completare: " + r.da_completare + ".", "o");
 }
 function apriCalcolatrice() {
   let d = $("#dCalc");
@@ -2962,12 +3024,15 @@ function apriCalcolatrice() {
     d = h("dialog", { id: "dCalc", class: "calc", "aria-labelledby": "dCalcT" }, h("form", { method: "dialog", onkeydown: invioNonChiude },
       h("h2", { id: "dCalcT" }, "Calcolatrice rapida"),
       h("p", { class: "mut" }, "Stima delle imposte di successione con i motori di calcolo del programma. Non crea e non salva pratiche."),
-      h("div", { class: "calc-corpo" }, h("div", { class: "calc-dati", id: "calcDati" }), h("div", { class: "calc-ris", id: "calcRis", "aria-live": "polite" })),
+      h("div", { class: "calc-corpo" }, h("div", { class: "calc-dati", id: "calcDati" }), h("div", { class: "calc-ris", id: "calcRis" })),
+      h("p", { class: "vh", id: "calcAnnuncio", "aria-live": "polite" }),
       h("div", { class: "wiz-az" },
-        h("button", { type: "button", class: "gh", id: "calcAzzera", onclick: () => { CALC.dati = calcNuovi(); CALC.ultimo = null; calcDisegnaDati(); calcEsegui(); } }, "Azzera"),
+        h("button", { type: "button", class: "gh", id: "calcAzzera", onclick: () => {
+          if (!uguale(CALC.dati, calcNuovi()) && !confirm("Azzerare la calcolatrice? I dati inseriti andranno persi.")) return;
+          CALC.dati = calcNuovi(); CALC.ultimo = null; calcDisegnaDati(); calcEsegui(); } }, "Azzera"),
         h("span", { class: "sp" }),
-        h("button", { type: "button", class: "gh", id: "calcCrea", onclick: occupato("calcCrea", calcCreaPratica) }, "Crea una pratica da questi dati"),
-        h("button", { class: "pil" }, "Chiudi"))));
+        h("button", { class: "gh" }, "Chiudi"),
+        h("button", { type: "button", class: "pil", id: "calcCrea", onclick: occupato("calcCrea", calcCreaPratica) }, "Crea una pratica da questi dati"))));
     document.body.append(d);
   }
   if (!CALC.dati) CALC.dati = calcNuovi();

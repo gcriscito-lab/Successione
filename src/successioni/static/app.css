@@ -101,7 +101,15 @@ td.cf { font-family:var(--f-mono); letter-spacing:.06em; }
 .brand { display:flex; align-items:center; gap:var(--s-2); border:0; background:none; padding:0; font-size:var(--fs-l); font-weight:700; color:var(--blu); }
 .titolo { font-weight:600; flex:1; min-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .azioni { display:flex; gap:var(--s-15); flex-wrap:wrap; align-items:center; }
-#msg { margin:var(--s-2) var(--s-4) 0; padding:var(--s-2) var(--s-3); border-radius:var(--r2); background:var(--solido); box-shadow:var(--e2); }
+/* riquadro mobile in basso (non sposta il layout), con pulsante di chiusura */
+#msg { position:fixed; left:50%; bottom:calc(var(--s-10) + var(--s-1)); transform:translateX(-50%); z-index:60; margin:0;
+  max-width:min(760px, calc(100vw - var(--s-6))); display:flex; gap:var(--s-3); align-items:flex-start; white-space:pre-line;
+  overflow-wrap:anywhere; max-height:40vh; overflow:auto;
+  padding:var(--s-2) var(--s-3); border-radius:var(--r2); background:var(--solido); box-shadow:var(--e2); }
+#msg[hidden] { display:none; }
+#msg .mt { flex:1; }
+#msg .x { flex:none; border:0; background:transparent; color:inherit; cursor:pointer; font:inherit; line-height:1; padding:var(--s-05) var(--s-15); }
+#msg .x::before { content:"\00d7"; font-size:1.3em; }
 #msg.e { background:var(--er-t); color:var(--er); } #msg.o { background:var(--ok-t); color:var(--ok); }
 
 .app { display:grid; grid-template-columns:var(--larghezza-nav,240px) 10px minmax(0,1fr); flex:1; min-height:0; }
@@ -655,3 +663,12 @@ dialog.preventivo .prev-campi { display: grid; grid-template-columns: max-conten
 dialog.preventivo .prev-campi input.num { width: 6em; text-align: right; }
 dialog.preventivo textarea { width: 100%; }
 @media (max-width: 600px) { dialog.preventivo .prev-campi { grid-template-columns: max-content 1fr; } }
+
+/* Colori di accento scelti nelle Impostazioni (prima scritti da app.js): chiaro e seppia usano il primo, il tema scuro il secondo. */
+:root[data-accento="blu"] { --blu:#0a74ff; } :root[data-tema="scuro"][data-accento="blu"] { --blu:#6cb0ff; }
+:root[data-accento="verde"] { --blu:#1e7a37; } :root[data-tema="scuro"][data-accento="verde"] { --blu:#6fd18a; }
+:root[data-accento="viola"] { --blu:#6e3fd1; } :root[data-tema="scuro"][data-accento="viola"] { --blu:#b79cff; }
+:root[data-accento="arancio"] { --blu:#b25e00; } :root[data-tema="scuro"][data-accento="arancio"] { --blu:#ffb454; }
+:root[data-accento="rosso"] { --blu:#c4001a; } :root[data-tema="scuro"][data-accento="rosso"] { --blu:#ff8a92; }
+:root[data-accento="grafite"] { --blu:#3a3f4a; } :root[data-tema="scuro"][data-accento="grafite"] { --blu:#c4c9d4; }
+:root[data-accento]:not([data-accento="predefinito"]) { --blu-t:color-mix(in srgb, var(--blu) 14%, transparent); }

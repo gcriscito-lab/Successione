@@ -123,7 +123,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   // 8. menu Operazioni: frecce, Home/Fine, Esc torna al pulsante
   await page.focus("#vista details.operazioni > summary");
   await page.keyboard.press("ArrowDown");
-  await page.waitForFunction(() => document.activeElement.getAttribute("role") === "menuitem");
+  await page.waitForFunction(() => !!document.activeElement.closest(".menu-op"));   // voce del menu (disclosure, senza ruoli di menu)
   const primaVoce = await page.evaluate(() => document.activeElement.textContent);
   await page.keyboard.press("ArrowDown");
   assert.notEqual(await page.evaluate(() => document.activeElement.textContent), primaVoce);
@@ -151,6 +151,8 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   page.once("dialog", d => d.accept());
   await page.click("#iChiudi");
   await page.waitForFunction(() => !document.querySelector("#imp[open]"));
+  // l'evento «close» del dialogo (che ripristina l'aspetto salvato) arriva dopo che l'attributo open e' tolto: si aspetta il titolo
+  await page.waitForFunction(() => document.title !== "Successioni · Studio di prova e2e", null, { timeout: 5000 }).catch(() => {});
   assert.notEqual(await page.evaluate(() => document.title), "Successioni · Studio di prova e2e", "modifica scartata");
 
   // 10. apri(): con modifiche non salvate e conferma annullata la pratica «ultima» non cambia

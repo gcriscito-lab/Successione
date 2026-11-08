@@ -52,7 +52,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   await page.waitForFunction(() => /non stimabile: imposta di successione/.test(document.querySelector("#calcRis").textContent), null, { timeout: 30000 });
   assert.equal(await pratiche(), prima, "la stima non crea pratiche");
   // dalla Guida
-  await page.click("#dCalc .wiz-az .pil");
+  await page.click("#dCalc .wiz-az button:has-text('Chiudi')");
   await page.click("#bGuida");
   await page.click("#dGuida [role=tab]:has-text('Uso del programma')");
   await page.click("#guidaCalc");

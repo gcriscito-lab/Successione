@@ -76,7 +76,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   await page.waitForTimeout(200);
   assert.equal(await page.isVisible("#dCalc[open]"), true, "Calcolatrice ancora aperta");
   assert.equal(await page.inputValue(".calc-erede >> nth=0 >> input.nome"), "Mario");
-  await page.click("#dCalc button.pil");
+  await page.click("#dCalc .wiz-az button:has-text('Chiudi')");
   await page.waitForFunction(() => !document.querySelector("#dCalc[open]"));
   await page.evaluate(() => apriGuida());
   const cerca = '#dGuida[open] input[type=search]';
