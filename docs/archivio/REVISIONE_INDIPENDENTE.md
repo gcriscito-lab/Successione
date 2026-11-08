@@ -1,7 +1,7 @@
 # Revisione indipendente (ripresa)
 
 - Revisore: agente indipendente, non partecipante allo sviluppo; sola lettura su codice, test e documenti altrui.
-- Commit esaminato: `08c358792d7b81d91a51b91a353d25e157105ee5` (HEAD all'avvio; snapshot WIP dichiarato "non ancora verificato né integrato"). Durante la revisione il coordinatore ha creato `a3d22666dfd94b379478b63241e26999911e8df1`, che modifica solo documenti (`docs/archivio/REVISIONE_INDIPENDENTE.md`, `docs/archivio/STATO_area4.md`, `docs/regole/STATO_area1.md`): il codice in `src/` e `tests/` esaminato è identico nei due commit. Il lavoro non ancora committato di altri agenti (es. `telematico/quadri_efgh.py`, modifiche a `telematico/supplemento.py`, `packaging/`, `scripts/windows/`) è escluso salvo dove indicato.
+- Commit esaminato: `08c358792d7b81d91a51b91a353d25e157105ee5` (HEAD all'avvio; snapshot WIP dichiarato "non ancora verificato né integrato"). Durante la revisione il coordinatore ha creato `a3d22666dfd94b379478b63241e26999911e8df1`, che modifica solo documenti (`docs/archivio/REVISIONE_INDIPENDENTE.md`, `docs/archivio/STATO_area4.md`, `docs/archivio/STATO_area1.md`): il codice in `src/` e `tests/` esaminato è identico nei due commit. Il lavoro non ancora committato di altri agenti (es. `telematico/quadri_efgh.py`, modifiche a `telematico/supplemento.py`, `packaging/`, `scripts/windows/`) è escluso salvo dove indicato.
 - Data: 2026-11-01.
 - Ambiente: container Linux, Python 3.13.
 - Stato del documento: concluso per il commit indicato (compilato man mano durante la revisione).

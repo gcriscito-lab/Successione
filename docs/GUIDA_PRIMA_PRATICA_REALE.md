@@ -79,4 +79,4 @@ dichiarazione resta del professionista, e il programma e' un assistente di compi
 - Rateazione e sostitutive codici 1 e 2 sono supportate; sanzioni e interessi e rimborsi no. Successioni **aperte dal 3/10/2006 al 31/12/2024**:
   il file si genera con il quadro EF senza la sezione V-bis (imposte ipocatastali, tassa e bollo; l'imposta di successione la liquida
   l'ufficio, quindi il programma non la calcola); prima del 3/10/2006 il file non si genera.
-- Evidenze e limiti aggiornati: `docs/MATRICE_COPERTURA.md`, `docs/regole/`, `docs/CONFRONTO_MERCATO_20261105.md`.
+- Evidenze e limiti aggiornati: `docs/MATRICE_COPERTURA.md`, `docs/regole/`, `docs/archivio/CONFRONTO_MERCATO_20261105.md`.

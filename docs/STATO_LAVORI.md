@@ -66,7 +66,7 @@
   con il professionista su una pratica reale; vista unica degli immobili; Alt+lettera per i quadri; elenco pratiche a tabella;
   anteprima interna; consultazione delle tabelle di `fonti/`.
 
-## Correzioni dalla seconda review completa del 07/11/2026 sera (`docs/REVIEW_COMPLETA_20261107_SERA.md`)
+## Correzioni dalla seconda review completa del 07/11/2026 sera (`docs/archivio/REVIEW_COMPLETA_20261107_SERA.md`)
 Priorita' 1, tutte affrontate (commit su `moduli/integr4`):
 - 1 usufrutto/nuda proprieta' con devoluzione per legge bloccati (`REGOLA_CODICE_DIRITTO`); 8 QuotaValore del file confrontato
   con la riesportazione e avviso sull'ordine del quadro EA; valore catastale con la prima casa dal diritto di abitazione
@@ -127,7 +127,7 @@ calcolatrice, accessibilita', prestazioni, test dipendenti da Java, accelerazion
   valido sull'XSD `fonti/Specifiche tecniche/SUC13_20250702/SUC/xsd/fornituraSUC13_v1.xsd` e identico byte per byte a quello
   del ramo principale (sha256 `d332eb88…`). Controllo ufficiale non rieseguito su questo file.
 
-## Sintesi corrente (2026-11-05, dopo la revisione esterna `docs/REVISIONE_ESTERNA_CODEX_20261105.md`)
+## Sintesi corrente (2026-11-05, dopo la revisione esterna `docs/archivio/REVISIONE_ESTERNA_CODEX_20261105.md`)
 - Corretti R01 (risposte CF tardive tra pratiche: contatore `S.gen` e verifica di coerenza in `suggerisciDaCF`), R02 (tipo
   dichiarazione non gestito: nessun XML, quindi nessuna preparazione), R03 (preparazione dopo modifica non dichiarativa) e
   R04 (rigenerazione ripara l'XML alterato). Regressioni Python in `tests/test_correzioni_codex.py`; R01 verificato nel browser
@@ -162,7 +162,7 @@ Avvertenza: `with_server.py` può lasciare il server attivo; chiudere per PID pr
 
 ## Subagenti (rilanciati su Opus)
 Tre agenti lavorano su file distinti (contratti in `docs/CONTRATTI_MODULI.md`): regole/XSD/XML, documenti/PDF-A, collegamenti.
-Ognuno tiene traccia in `docs/regole/STATO_area1.md`, `docs/archivio/STATO_area2.md`, `docs/archivio/STATO_area3.md`. Alla consegna: verificare direttamente,
+Ognuno tiene traccia in `docs/archivio/STATO_area1.md`, `docs/archivio/STATO_area2.md`, `docs/archivio/STATO_area3.md`. Alla consegna: verificare direttamente,
 integrare, poi revisore indipendente. I loro file nel repository sono bozze finché non consegnano.
 
 ## Limiti dichiarati
