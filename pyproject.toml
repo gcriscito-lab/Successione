@@ -1,6 +1,6 @@
 [project]
 name = "successioni"
-version = "0.1.0"
+version = "0.2.0"
 description = "Compilazione dichiarazioni di successione (SUC13): archivio, regole, MCP, GUI locale"
 requires-python = ">=3.11"
 dependencies = [

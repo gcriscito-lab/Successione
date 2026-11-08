@@ -1,5 +1,31 @@
 Novità del programma (le più recenti in alto)
 
+8 novembre 2026 — versione 0.2.0
+Nessuna regola di calcolo nuova: imposte, quote e file telematico restano quelli delle regole 2026-11-07.
+- Valori calcolati dal programma riconoscibili: tinta propria e scritta «calcolato» per il valore catastale proposto, i quadri
+  EE, EF, EH e le somme delle quote. Il professionista vede a colpo d'occhio cosa ha scritto e cosa propone il programma.
+- Codice comune ricavato dal nome nella scheda di fabbricati e terreni, con il pulsante «Usa» (mai scritto da solo). Con più
+  comuni dello stesso nome chiede la provincia; se esistono omonimi soppressi invita a controllare la visura. Serve il
+  componente ufficiale SUC13 configurato. Anche per Claude (strumento codice_comune, sola lettura).
+- Trascinamento dei file: documenti del quadro EG, esiti del controllo eseguito a mano (.dgn, _logSchema.xml, .wri nel campo
+  giusto), file .esi e ricevute. Il file va nel campo; il caricamento resta al pulsante.
+- Tabelle vuote con l'indicazione di cosa fare; titoli dei gruppi della scheda come barra leggera, alla dimensione del testo.
+- Devoluzioni raggruppate per bene, con la somma delle quote sotto ogni bene e il diritto per nome («Proprietà» invece di «1»).
+- Eredi (EA): cognome, nome, parentela e ruolo prima del codice fiscale; segno «dichiarante» sulla riga del presentatore e,
+  nella scheda, il riepilogo dei beni ricevuti con le quote.
+- Controlli: ogni rilievo e avviso ha «Come risolvere» (quadro e comando da usare) e «Vai al dato». Nuovi avvisi di qualità,
+  che non bloccano: spazi doppi, codice fiscale duplicato, errato o diverso da sesso e data di nascita, nascita dopo il
+  decesso, provincia diversa da quella del codice comune.
+- Scheda del bene: le devoluzioni del bene con la somma delle quote per diritto (completa, manca, supera 1/1).
+- Menu Operazioni: modifica di gruppo di beni e devoluzioni (una sola revisione, annullabile dalla Cronologia), incolla righe
+  da Excel, brogliaccio dei beni e delle quote da stampare o in CSV (anche per Claude: strumento brogliaccio).
+- Appunti per riga e stato di lavorazione del quadro (da completare, da controllare, completato): note interne, non entrano
+  nella dichiarazione.
+- Pagina iniziale: tutte le pratiche con ricerca, filtri per termine (in scadenza, superato, senza data) e ordine per
+  scadenza; «Prossime azioni» con le cinque tappe; calcolatrice rapida delle imposte senza creare una pratica.
+- Correzioni: in «Dati generali» non resta più una colonna vuota a destra; ricerca, filtro e ordinamento della pagina
+  iniziale su una riga; il titolo lungo di un quadro non va più a capo.
+
 7 novembre 2026 (sera) — correzioni dalla seconda revisione completa
 - Usufrutto e nuda proprietà con la devoluzione per legge: il file non si genera più (il controllo ufficiale lo scartava).
 - Controllo eseguito a mano: un rapporto .dgn di un altro file non vale più come «passato».
