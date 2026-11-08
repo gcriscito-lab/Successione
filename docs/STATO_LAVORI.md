@@ -1,4 +1,18 @@
-# Stato dei lavori (aggiornato 2026-11-07 sera)
+# Stato dei lavori (aggiornato 2026-11-08)
+
+## Grafica dal confronto con DE.A.S. II (2026-11-08, ramo `grafica-rapida`, unito con avanzamento diretto)
+- Analisi: `Report_grafica_DEAS_rea_20261108.md` (cartella `Successioni` del Desktop, fuori dal repository): 255 maschere DFM
+  di DEAS lette dall'eseguibile, solo come idee di layout; nessun codice, icona o testo di DEAS nel programma.
+- Fatte: «Dati generali» senza colonna vuota (classList.toggle con undefined), tabella eredi con cognome e nome per primi,
+  devoluzioni per bene con la somma delle quote e il diritto per nome, filtri della pagina iniziale su una riga, titolo del
+  quadro su una riga (`4288c80`, `871f873`); proposte 3, 4, 7, 11 del report (`c98a048`): tinta e scritta «calcolato» per i
+  valori calcolati (token `--calc`), codice comune ricavato dal nome con «Usa» (tabelle del componente SUC13, API
+  `/api/codice-comune`, MCP `codice_comune`), stati vuoti con istruzione e trascinamento dei file, titoli di gruppo come barra.
+- Verifiche: suite Python 2060 passati e 1 saltato; prove interfaccia 15/15 (porta 8823). Dopo l'unione 15/15 anche nella
+  cartella principale.
+- Da fare (report, proposte 1-2, 5, 6, 8-10): scheda compatta con etichette a sinistra e dettaglio sotto l'elenco, da provare
+  con il professionista su una pratica reale; vista unica degli immobili; Alt+lettera per i quadri; elenco pratiche a tabella;
+  anteprima interna; consultazione delle tabelle di `fonti/`.
 
 ## Correzioni dalla seconda review completa del 07/11/2026 sera (`docs/REVIEW_COMPLETA_20261107_SERA.md`)
 Priorita' 1, tutte affrontate (commit su `moduli/integr4`):
