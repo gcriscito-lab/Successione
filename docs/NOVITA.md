@@ -1,7 +1,11 @@
 Novità del programma (le più recenti in alto)
 
-In preparazione — versione 0.4: strumenti di studio
-Nessuna regola di calcolo nuova: imposte, quote e file telematico non cambiano.
+8 novembre 2026 — versione 0.4.0
+Contiene le versioni 0.3 e 0.4 e le correzioni della revisione completa dell'8 novembre. Imposte e file telematico non
+cambiano. Cambiano due cose: il valore catastale proposto per alcune categorie di lusso (vedi sotto) e la citazione delle norme
+nelle tabelle.
+
+Strumenti di studio
 - Anteprima interna: modello ministeriale, prospetti, brogliaccio, albero genealogico, istruzioni ufficiali, fascicolo e
   preventivo si aprono in una finestra del programma, con «Stampa» e «Apri in una nuova scheda».
 - Fascicolo per il cliente (File e invio > Strumenti di studio): un solo PDF con copertina e indice, il modello stampato, i
@@ -16,8 +20,8 @@ Nessuna regola di calcolo nuova: imposte, quote e file telematico non cambiano.
   possono aggiungere a parte le imposte dell'ultimo file generato. Si salva nelle note interne. Non è una fattura.
 - Pagina iniziale: «Elenco in CSV» scarica tutte le pratiche con termine, avanzamento e prossima azione, per Excel.
 
-In preparazione — versione 0.3: densità e velocità di inserimento (da provare su una pratica reale)
-Si attivano dalle Impostazioni: chi non le sceglie vede il programma come prima. Nessuna regola di calcolo nuova.
+Densità e velocità di inserimento
+Si attivano dalle Impostazioni: chi non le sceglie vede il programma come prima.
 - Pannello della riga sotto la tabella, a tutta larghezza (Impostazioni > Pannello della riga selezionata > Sotto la
   tabella): la barra che lo separa dalla tabella si trascina o si regola con Freccia su e Freccia giù e la misura resta.
 - Scheda compatta (Impostazioni > Densità > Compatta): etichette a sinistra su una riga, campi affiancati, gruppi in
@@ -32,6 +36,39 @@ Si attivano dalle Impostazioni: chi non le sceglie vede il programma come prima.
   scadenza era detta in due modi; ora la colonna dei quadri e i comandi della pratica compaiono solo aprendo una pratica.
 - Tastiera: Alt+1 … Alt+9 portano alle voci dell'elenco dei quadri (l'indicazione è nel suggerimento di ogni voce); nella
   scheda Invio passa al campo successivo e, dopo l'ultimo, al pulsante Salva.
+- Aspetto più uniforme (design system): spazi e arrotondamenti da una sola scala, bordi dei campi ben visibili (contrasto 3:1).
+
+Correzioni dalla revisione completa dell'8 novembre
+- Valore catastale proposto: le abitazioni di lusso (A/1, A/8, A/9) e i castelli (A/11) usano il moltiplicatore ordinario
+  (120) anche con la prima casa, come già il calcolo della prima casa; prima il programma proponeva 110.
+- Tabelle e fonti: per usufrutto e moltiplicatori si cita prima la norma in vigore al decesso, cioè il D.Lgs. 346/1990 come
+  modificato dal D.Lgs. 139/2024 (con l'art. 52 del DPR 131/1986); i testi unici successivi restano come conferma.
+- Copia anonima più completa: anche notaio, enti, estremi di atti e registrazioni, provenienze e nomi scritti dentro i testi
+  diventano di fantasia.
+- Pagina iniziale: le ricevute si leggono dalla copia trasmessa; pagamento negativo, volture parziali o negative ed esiti
+  contraddittori tengono aperta la pratica, con la tappa «problema»; oltre le prime 12 pratiche niente più «Genera il file»
+  quando il file non si può generare. Nel CSV i giorni al termine negativi restano numeri.
+- Fascicolo: se il modello stampato non è più aggiornato, la copertina lo dice. Preventivo: avviso se le imposte vengono da una
+  bozza o da un file incompleto.
+- Invio: non si può creare una nuova copia mentre un invio è aperto, anche con due richieste contemporanee.
+- Calcolatrice: se manca la categoria dell'immobile lo dice e invita a controllare la visura.
+- Finestre: procedura guidata, preventivo, modifica di gruppo, incolla da Excel e «Azzera» chiedono conferma prima di perdere
+  ciò che hai scritto; il pulsante evidenziato è l'azione («Salva», «Crea»), non «Chiudi». «Controlla» chiede prima di salvare
+  le modifiche in sospeso.
+- Messaggi: «Dichiarazione creata» solo se la pratica si apre; esito dell'importazione in italiano; nella calcolatrice i
+  dettagli aperti restano aperti mentre scrivi.
+- Accessibilità: i messaggi d'errore si leggono insieme al campo; tabella e menu «Operazioni» descritti correttamente ai
+  lettori di schermo; la calcolatrice annuncia solo il totale.
+- Velocità: selezionare una riga non ridisegna più tutta la pagina (con 150 righi da circa 90 ms a pochi ms).
+
+Limiti aperti (da confermare con il professionista)
+- Saggio legale per i decessi dal 2026: il programma usa il 2,5% e il prospetto in vigore, con un avviso; il decreto 2026 non è
+  nelle fonti del programma.
+- Pertinenze della prima casa (C/2, C/6, C/7 con codice X): oggi moltiplicatore 120; l'estensione del 110 non è nelle fonti.
+- Preventivo e parcella: IVA su compensi più contributo cassa e ritenuta sui soli compensi; spese anticipate esenti e bollo
+  non gestiti; nessuna dicitura per i regimi senza IVA; arrotondamento al centesimo voce per voce.
+- Esiti delle ricevute che tengono aperta la pratica: oggi pagamento negativo, volture parziali o negative ed esiti
+  contraddittori.
 
 8 novembre 2026 — versione 0.2.0
 Nessuna regola di calcolo nuova: imposte, quote e file telematico restano quelli delle regole 2026-11-07.

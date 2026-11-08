@@ -1,5 +1,13 @@
 # Stato dei lavori (aggiornato 2026-11-08)
 
+## Versione 0.4.0 (2026-11-08, ramo `rilascio-0.4.0`, etichetta `v0.4.0`)
+- Contiene 0.3 (densita', pannello sotto, vista unica immobili; opzioni, predefiniti invariati), 0.4 (strumenti di studio),
+  design system (token di spazi e raggi, bordi a 3:1), correzioni della revisione completa (`docs/REVIEW_COMPLETA_20261108.md`)
+  e i 16 rilievi sull'interfaccia (ramo `revisione-gui`, commit `2d02167`).
+- Novita' per lo studio e limiti aperti in `docs/NOVITA.md`; decisioni da confermare con il professionista: saggio legale dal
+  2026, pertinenze della prima casa, basi del preventivo, esiti delle ricevute che tengono aperta la pratica.
+- Verifiche e pacchetto: vedi il commit dell'etichetta `v0.4.0`.
+
 ## Versione 0.4 «Strumenti di studio» (2026-11-08, ramo `versione-0.4`)
 - Anteprima interna (`anteprima()` in app.js) per modello, prospetti, brogliaccio, albero, istruzioni, fascicolo e preventivo;
   intestazioni `X-Frame-Options: SAMEORIGIN` e `frame-ancestors 'self'` (middleware `IntestazioniSicurezza` in web.py).
