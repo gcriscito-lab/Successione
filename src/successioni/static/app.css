@@ -620,3 +620,31 @@ table.tab-pratiche { width:100%; border-collapse:collapse; background:var(--soli
   .tab-pratiche tr { border-top:1px solid var(--sep); padding:6px 0; } .tab-pratiche td { border:0; padding:3px 12px; }
   .filtri-destra { flex-basis:100%; }
 }
+
+/* ---------- Versione 0.4: anteprima interna dei documenti ---------- */
+dialog.anteprima { width:96vw; max-width:none; height:94vh; max-height:none; padding:0; }
+dialog.anteprima[open] { display:flex; flex-direction:column; }
+.anteprima-barra { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--sep); background:var(--solido); }
+.anteprima-barra h2 { margin:0; font-size:var(--fs-m); font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.anteprima-barra .sp { flex:1; }
+.anteprima-doc { flex:1; width:100%; border:0; background:#fff; }
+/* 0.4 — Guida > Tabelle e fonti */
+.tab-indice { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 12px; }
+.tab-fonte { margin: 0 0 18px; scroll-margin-top: 8px; }
+.tab-fonte h3 { margin: 0 0 2px; }
+table.tab-valori { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: .92em; }
+table.tab-valori th, table.tab-valori td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--bd, #ddd); vertical-align: top; }
+table.tab-valori td:nth-child(2) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* 0.4 — strumenti di studio, preventivo e parcella */
+.strumenti-studio .az { flex-wrap: wrap; }
+dialog.preventivo { width: min(760px, calc(100vw - 32px)); }
+dialog.preventivo table.prev-voci { width: 100%; border-collapse: collapse; margin: 8px 0; }
+dialog.preventivo table.prev-voci th { text-align: left; font-weight: 600; padding: 4px 6px; }
+dialog.preventivo table.prev-voci td { padding: 3px 6px; }
+dialog.preventivo table.prev-voci td:first-child input { width: 100%; }
+dialog.preventivo table.prev-voci td:nth-child(2) input { width: 9em; text-align: right; }
+dialog.preventivo .prev-campi { display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 6px 10px; align-items: center; margin: 10px 0; }
+dialog.preventivo .prev-campi input.num { width: 6em; text-align: right; }
+dialog.preventivo textarea { width: 100%; }
+@media (max-width: 600px) { dialog.preventivo .prev-campi { grid-template-columns: max-content 1fr; } }

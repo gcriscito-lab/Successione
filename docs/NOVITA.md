@@ -1,5 +1,21 @@
 Novità del programma (le più recenti in alto)
 
+In preparazione — versione 0.4: strumenti di studio
+Nessuna regola di calcolo nuova: imposte, quote e file telematico non cambiano.
+- Anteprima interna: modello ministeriale, prospetti, brogliaccio, albero genealogico, istruzioni ufficiali, fascicolo e
+  preventivo si aprono in una finestra del programma, con «Stampa» e «Apri in una nuova scheda».
+- Fascicolo per il cliente (File e invio > Strumenti di studio): un solo PDF con copertina e indice, il modello stampato, i
+  documenti del quadro EG nell'ordine dei righi (le immagini TIFF convertite) e le ricevute in PDF, con un segnalibro per
+  documento. Ciò che manca è elencato in copertina con il motivo.
+- Guida > Tabelle e fonti: aliquote e franchigie dell'imposta di successione, imposte ipotecaria e catastale, tasse e bolli,
+  moltiplicatori catastali e coefficienti dell'usufrutto, ognuna con la fonte e le successioni a cui si applica. I valori sono
+  letti dai moduli di calcolo: sono quelli che il programma applica davvero. Anche per Claude (strumento tabelle_calcolo).
+- Copia anonima: crea una nuova pratica con nomi, codici fiscali, indirizzi, riferimenti catastali e contatti di fantasia, senza
+  allegati né note; date, importi e quote restano per ripetere i calcoli. La pratica di partenza non cambia.
+- Preventivo e parcella: voci, contributo cassa, IVA e ritenuta li scrivi tu (vuoti = 0), il programma fa solo le somme; si
+  possono aggiungere a parte le imposte dell'ultimo file generato. Si salva nelle note interne. Non è una fattura.
+- Pagina iniziale: «Elenco in CSV» scarica tutte le pratiche con termine, avanzamento e prossima azione, per Excel.
+
 In preparazione — versione 0.3: densità e velocità di inserimento (da provare su una pratica reale)
 Si attivano dalle Impostazioni: chi non le sceglie vede il programma come prima. Nessuna regola di calcolo nuova.
 - Pannello della riga sotto la tabella, a tutta larghezza (Impostazioni > Pannello della riga selezionata > Sotto la

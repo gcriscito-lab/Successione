@@ -1,5 +1,25 @@
 # Stato dei lavori (aggiornato 2026-11-08)
 
+## Versione 0.4 «Strumenti di studio» (2026-11-08, ramo `versione-0.4`)
+- Anteprima interna (`anteprima()` in app.js) per modello, prospetti, brogliaccio, albero, istruzioni, fascicolo e preventivo;
+  intestazioni `X-Frame-Options: SAMEORIGIN` e `frame-ancestors 'self'` (middleware `IntestazioniSicurezza` in web.py).
+- `fascicolo.py` + `GET /api/pratiche/{pid}/fascicolo.pdf`: copertina con indice, modello stampato, allegati EG nell'ordine
+  dei righi (TIFF convertiti), ricevute PDF del tentativo con protocollo della copia attiva; segnalibri; mancanti in copertina.
+- `tabelle.py` + `GET /api/tabelle` + strumento MCP di lettura `tabelle_calcolo`: tabelle lette dalle costanti e funzioni di
+  calcolo (nessun numero nuovo), Guida > Tabelle e fonti.
+- `anonimizza.py` + `POST /api/pratiche/{pid}/copia-anonima`: nuova pratica con dati di fantasia (CF con controllo corretto,
+  stessi caratteri di data e sesso), senza allegati, note, IBAN, fornitore; originale invariata; idempotente con `chiave`.
+- `preventivo.py` + `GET /api/pratiche/{pid}/preventivo?tipo=preventivo|parcella`: dati in `note.preventivo`; percentuali
+  del professionista (vuote = 0); somme: IVA su compensi + contributo, ritenuta sui compensi (**scelta da confermare**).
+- `cruscotto.csv_elenco` + `GET /api/pratiche.csv` (stesso ordine della pagina iniziale, celle protette dalle formule).
+- **Divergenze segnalate, non corrette**: moltiplicatori catastali citano il D.Lgs. 141/2026 e l'usufrutto il D.Lgs. 123/2025
+  invece del D.Lgs. 346/1990 come modificato dal D.Lgs. 139/2024; saggio dell'usufrutto verificato solo fino al 31/12/2025.
+  `cruscotto.stato_pratica` legge le ricevute dalla copia piu' recente (`copie[0]`), non dalla copia attiva (da verificare).
+- Rinviati, da discutere: protezione con password, aiuto guidato per le agevolazioni.
+- Verifiche: suite Python 2080 passati e 1 saltato (pacchetto); interfaccia 18/18 con `tests/e2e/gui_versione_04.js`
+  (aggiornate `gui_guida.js` e `gui_review_20261103.js`: i documenti si aprono nell'anteprima). Nuovi test:
+  `test_fascicolo.py`, `test_tabelle.py`, `test_strumenti_studio.py`.
+
 ## Pagina iniziale ridisegnata (2026-11-08, ramo `home-chiara`)
 - Un solo elenco delle pratiche (tabella) al posto di colonna a sinistra + elenco a schede + «Prossime azioni»: per ogni pratica
   termine (con la decorrenza, da `cruscotto.py`), cinque tappe in piccolo e prossima azione; filtri a pulsanti con i conteggi,

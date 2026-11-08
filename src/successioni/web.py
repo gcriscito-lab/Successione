@@ -11,6 +11,7 @@ from pathlib import Path
 
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
@@ -131,6 +132,25 @@ def errore_file(e: OSError) -> JSONResponse:
                             status_code=409)
     return JSONResponse({"codice": "ERRORE_FILE", "messaggio": f"Operazione su file non riuscita{dove}: {causa}. Controlla "
                          "lo spazio su disco e la cartella dei dati, poi riprova."}, status_code=503)
+
+
+class IntestazioniSicurezza:
+    """Le pagine del programma si possono incorporare solo in se stesse (anteprima interna dei documenti, versione 0.4): un sito
+    esterno aperto nello stesso browser non puo' mostrarle in un riquadro per far cliccare l'utente a sua insaputa."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        async def invia(messaggio):
+            if messaggio["type"] == "http.response.start":
+                messaggio["headers"] = [*messaggio.get("headers", []), (b"x-frame-options", b"SAMEORIGIN"),
+                                        (b"content-security-policy", b"frame-ancestors 'self'")]
+            await send(messaggio)
+        await self.app(scope, receive, invia)
 
 
 def strutturati_completi() -> dict:
@@ -439,6 +459,45 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                         f'inline; filename="modello_successione_{j["id"]}.pdf"', "Cache-Control": "no-store"})
 
     @api
+    async def elenco_csv(request):
+        from datetime import date as _date
+        from . import cruscotto as CRU
+        testo = CRU.csv_elenco(sv)
+        return Response(testo.encode("utf-8"), media_type="text/csv; charset=utf-8", headers={
+            "Content-Disposition": f'attachment; filename="elenco_pratiche_{_date.today().isoformat()}.csv"', "Cache-Control": "no-store"})
+
+    @api
+    async def copia_anonima_api(request):
+        from .anonimizza import copia_anonima
+        b = await corpo(request)
+        return copia_anonima(sv, request.path_params["pid"], chiave=b.get("chiave"))
+
+    @api
+    async def preventivo_api(request):
+        import json as _json
+        from . import impostazioni
+        from .preventivo import html as prev_html
+        try:
+            conf = _json.loads(impostazioni.file_configurazione().read_text(encoding="utf-8-sig"))
+            studio = impostazioni.preferenze_interfaccia(conf if isinstance(conf, dict) else {}).get("nome_studio", "")
+        except (OSError, ValueError, DatiNonValidi):
+            studio = ""
+        testo = prev_html(sv, request.path_params["pid"], request.query_params.get("tipo", "preventivo"), studio)
+        return HTMLResponse(testo, headers={"Cache-Control": "no-store"})
+
+    @api
+    async def tabelle_api(request):
+        from .tabelle import NOTA, tabelle
+        return {"tabelle": tabelle(), "nota": NOTA}
+
+    @api
+    async def fascicolo_api(request):
+        from .fascicolo import fascicolo
+        pdf, _ = fascicolo(sv, request.path_params["pid"])
+        return Response(pdf, media_type="application/pdf", headers={"Content-Disposition":
+                        'inline; filename="fascicolo_cliente.pdf"', "Cache-Control": "no-store"})
+
+    @api
     async def scarica_copia(request):
         from .collegamenti.base import DepositoArtefatti
         ad = sv._adattatore_invio("manuale")
@@ -612,7 +671,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     import threading
     from .pulizia import pulisci_silenziosa
     threading.Thread(target=pulisci_silenziosa, args=(sv.arch.base,), daemon=True, name="pulizia-avvio").start()
-    return Starlette(routes=[
+    return Starlette(middleware=[Middleware(IntestazioniSicurezza)], routes=[
         Route("/api/codice-fiscale", cf_decodifica), Route("/api/codice-comune", codice_comune_api), Route("/api/calcolatrice", calcolatrice_api, methods=["POST"]), Route("/api/importa", importa, methods=["POST"]),
         Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
@@ -623,17 +682,17 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route("/api/invio/{cid}/file", scarica_copia),
         Route("/api/invio/{cid}/trasmetti", invio_trasmetti, methods=["POST"]),
         Route("/api/invio/tentativi/{tid}/riconcilia", invio_riconcilia, methods=["POST"]),
-        Route("/", home), Route("/static/{nome}", statico), Route("/api/guida", guida_api), Route("/api/cruscotto", cruscotto_api), Route("/api/guida/{doc}.pdf", guida_documento), Route("/api/informazioni", informazioni_api),
+        Route("/", home), Route("/static/{nome}", statico), Route("/api/guida", guida_api), Route("/api/cruscotto", cruscotto_api), Route("/api/guida/{doc}.pdf", guida_documento), Route("/api/informazioni", informazioni_api), Route("/api/tabelle", tabelle_api),
         Route("/api/info", info), Route("/favicon.ico", lambda richiesta: Response((STATIC / "logo.svg").read_bytes(), media_type="image/svg+xml")),
         Route("/api/pratiche/{pid}/quadri", quadri), Route("/api/schema", schema_),
-        Route("/api/pratiche", elenca), Route("/api/pratiche", crea, methods=["POST"]),
+        Route("/api/pratiche.csv", elenco_csv), Route("/api/pratiche", elenca), Route("/api/pratiche", crea, methods=["POST"]),
         Route(P, leggi), Route(P + "/aggiorna", aggiorna, methods=["POST"]),
         Route(P + "/revisioni", revisioni), Route(P + "/differenze", differenze),
         Route(P + "/ripristina", ripristina, methods=["POST"]),
         Route(P + "/esporta", esporta, methods=["POST"]), Route(P + "/elaborati", elaborati),
         Route(P + "/file.xml", scarica_xml), Route(P + "/stampa", stampa), Route(P + "/prospetto-cliente", prospetto_cliente_api),
         Route(P + "/brogliaccio.csv", brogliaccio_csv), Route(P + "/brogliaccio", brogliaccio_html),Route(P + "/stampa-modello", stampa_modello_api, methods=["POST"]),
-        Route(P + "/stampa-modello.pdf", scarica_stampa_modello), Route(P + "/file.dcm", scarica_dcm),
+        Route(P + "/stampa-modello.pdf", scarica_stampa_modello), Route(P + "/fascicolo.pdf", fascicolo_api), Route(P + "/copia-anonima", copia_anonima_api, methods=["POST"]), Route(P + "/preventivo", preventivo_api), Route(P + "/file.dcm", scarica_dcm),
         Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]),
         Route(P + "/controllo-ufficiale/diagnostico", diagnostico_controllo, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
