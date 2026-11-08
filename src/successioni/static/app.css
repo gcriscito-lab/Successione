@@ -24,6 +24,8 @@
   --er:var(--rosso); --er-b:var(--rosso); --er-t:#F7E3E1;
   --am:#86540C; --am-b:var(--ocra); --am-t:#F5EBD8;
   --fondo:var(--carta); --lat:#EEF1EC; --pann:#FBFCFA; --solido:#FFFFFF; --campo:#FFFFFF; --grigio:rgba(31,42,42,.07);
+  /* valori calcolati dal programma (proposti, mai scritti da soli): tinta ardesia, distinta da selezione (verde) e avvisi (ocra) */
+  --calc:#E8EDF7; --calc-b:#3E5794;
   --ombra:0 0 0 1px var(--sep);
   /* scala tipografica a cinque passi (base 14 px, regolabile nelle Impostazioni) */
   --fs-s:.857rem; --fs-m:.929rem; --fs-l:1.286rem; --fs-xl:1.714rem;
@@ -40,11 +42,13 @@
   --er:#F2A39C; --er-b:#E0645B; --er-t:rgba(224,100,91,.2);
   --am:#E3B66A; --am-b:#D4973A; --am-t:rgba(212,151,58,.2);
   --fondo:#151C1B; --lat:#1A2221; --pann:#182120; --solido:#1F2928; --campo:#131A19; --grigio:rgba(228,234,230,.08);
+  --calc:#232C3B; --calc-b:#A9BEEF;
   color-scheme:dark;
 }
 :root[data-tema="seppia"] {
   --t:#3C342A; --t2:#5E5343; --fondo:#EDE5D7; --lat:#EEE6D9; --pann:#FAF6EE; --solido:#FFFBF4; --campo:#FFFCF7;
   --blu:#6E5732; --blu-t:#EADFCB; --sep:rgba(90,70,40,.16); --sep-f:rgba(90,70,40,.34); --grigio:rgba(90,70,40,.08);
+  --calc:#E6E6EE; --calc-b:#4A4F7A;
 }
 
 * { box-sizing:border-box; }
@@ -237,7 +241,7 @@ body.ridimensionando, body.ridimensionando * { cursor:col-resize !important; use
 .generali-griglia { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; align-items:start; }
 .generali-griglia > .grp { margin:0; }
 .generali-griglia .rg { grid-template-columns:minmax(110px,35%) minmax(0,1fr); }
-.generali-griglia .grp h2 { color:var(--t); font-size:1.071rem; padding:14px 18px 8px; }
+.generali-griglia .grp h2 { color:var(--t); font-size:1rem; font-weight:700; padding:14px 18px 8px; }
 .generali-griglia .intera { grid-column:1/-1; }
 .persona-campi { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 4px; }
 .persona-campi [data-campo="data_nascita"], .persona-campi [data-campo="data_decesso"], .persona-campi [data-campo="codice_fiscale"] { grid-column:1/-1; }
@@ -370,10 +374,10 @@ tbody tr.fisso { cursor:default; } tbody tr.fisso:hover td { background:none; }
 @container (max-width:820px) { .generali-griglia .grp.intera { grid-template-columns:1fr; } }
 label > input.cf { display:block; margin-top:4px; }
 /* valore catastale proposto nel pannello della riga (EB/EC) */
-.vc { border:1px solid var(--sep); border-left:3px solid var(--blu); border-radius:var(--r1); padding:10px 12px; margin:12px 0; background:var(--blu-t); }
-.vc h4 { margin:0 0 6px; font-size:.95em; }
+.vc { border:1px solid var(--sep); border-left:3px solid var(--calc-b); border-radius:var(--r1); padding:10px 12px; margin:12px 0; background:var(--calc); }
+.vc h4 { margin:0 0 6px; font-size:var(--fs-m); font-weight:700; }
 .vc p { margin:4px 0; }
-.vc .fonte-vc { font-size:.85em; }
+.vc .fonte-vc { font-size:var(--fs-s); }
 
 /* ---------- Report grafica e layout 07/11/2026 ---------- */
 .ins-testa { display:flex; align-items:baseline; gap:8px; } .ins-testa h3 { flex:1; min-width:0; overflow-wrap:anywhere; }
@@ -387,8 +391,9 @@ tbody tr[aria-selected=true] td.fissa-sx, tbody tr[aria-selected=true] td.fissa-
 tfoot td { position:sticky; bottom:0; background:var(--solido); border-top:1px solid var(--sep-f); border-bottom:0; font-weight:600; }
 tfoot td.fissa-sx, tfoot td.fissa-dx { z-index:3; }
 /* scheda dell'immobile a gruppi: etichetta sopra il campo, piu' colonne secondo la larghezza del pannello */
-.gruppo-scheda { margin:10px 0 4px; padding-top:6px; border-top:1px solid var(--sep); }
-.gruppo-scheda > h4, .gruppo-scheda > summary { margin:0 0 4px; font-size:var(--fs-m); font-weight:700; color:var(--t); }
+.gruppo-scheda { margin:10px 0 4px; }
+/* titoli di gruppo come barra leggera, alla stessa dimensione del testo (report grafico DEAS 08/11/2026, proposta 11) */
+.gruppo-scheda > h4, .gruppo-scheda > summary { margin:0 0 4px; font-size:var(--fs-m); font-weight:700; color:var(--t); background:var(--grigio); border-radius:var(--r1); padding:3px 8px; }
 .gruppo-scheda > summary { cursor:pointer; padding:2px 0; }
 .campi-scheda { display:grid; grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr)); gap:2px 10px; }
 .ins .campi-scheda .rg { display:block; padding:4px 0; }
@@ -419,7 +424,7 @@ table.scorciatoie td { white-space:normal; max-width:none; }
 /* miglioramenti dall'analisi del 07/11/2026 (docs/ANALISI_REPLICA_2026-11-07.md): solo token esistenti */
 .rimedio { margin-top:4px; font-size:var(--fs-s); color:var(--t); }
 .dv-bene, .riepilogo-soggetto { border:1px solid var(--sep); border-radius:var(--r1); padding:10px 12px; margin:12px 0; }
-.dv-bene h4, .riepilogo-soggetto h4 { margin:0 0 6px; font-size:.95em; }
+.dv-bene h4, .riepilogo-soggetto h4 { margin:0 0 6px; font-size:var(--fs-m); font-weight:700; background:var(--grigio); border-radius:var(--r1); padding:3px 8px; }
 .dv-somma { width:100%; border-collapse:collapse; margin:4px 0 8px; }
 .dv-somma caption { text-align:left; font-weight:600; padding:2px 0; }
 .dv-somma td { padding:2px 4px; border-bottom:1px solid var(--sep); } .dv-somma tfoot td { border-bottom:0; font-weight:600; }
@@ -438,8 +443,17 @@ select.stato-lavoro { font-size:var(--fs-s); width:auto; max-width:14rem; margin
 .filtri-home { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; align-items:center; }
 .filtri-home input { flex:1 1 14rem; min-width:12rem; width:auto; } .filtri-home select { flex:0 1 auto; width:auto; max-width:18rem; }
 /* devoluzioni raggruppate per bene: riga di somma sotto ogni bene (confronto grafico con DEAS II, 08/11/2026) */
-tr.subtot td { background:var(--grigio); color:var(--t2); font-size:var(--fs-s); padding:4px 10px; white-space:normal; max-width:none; }
+tr.subtot td { background:var(--calc); color:var(--t); font-size:var(--fs-s); padding:4px 10px; white-space:normal; max-width:none; }
 tr.subtot .pz { margin-left:6px; }
+/* valori calcolati dal programma: tinta propria e scritta «calcolato» (il colore da solo non basta) */
+.calcolato { background:var(--calc); border-left:3px solid var(--calc-b); border-radius:var(--r1); padding:4px 8px; margin-top:4px; font-size:var(--fs-s); color:var(--t); }
+.calcolato .gh { padding:1px 8px; margin-left:4px; }
+.riquadro-calc { font-size:var(--fs-m); padding:8px 14px; margin:10px 0; max-width:72ch; }
+.etich-calc { display:inline-block; font-size:var(--fs-s); font-weight:700; color:var(--calc-b); border:1px solid var(--calc-b); border-radius:var(--r1); padding:0 5px; line-height:1.4; vertical-align:baseline; }
+/* zone in cui si possono trascinare i file */
+.zona-trascina { outline:1px dashed transparent; outline-offset:2px; transition:outline-color .12s, background-color .12s; }
+.zona-trascina.trascina-sopra { outline-color:var(--blu); background-color:var(--blu-t); }
+tr.vuota td { white-space:normal; max-width:none; padding:14px 10px; }
 /* titolo del quadro su una riga anche con il pannello aperto: si accorcia invece di andare a capo */
 .testa-quadro h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 

@@ -548,6 +548,12 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         return calcolatrice.stima(b)
 
     @api
+    async def codice_comune_api(request):
+        """Codice catastale dal nome del comune (tabelle del componente SUC13 configurato), per la scheda dell'immobile."""
+        from .codice_fiscale import cerca_codice_comune
+        return cerca_codice_comune(request.query_params.get("nome", ""), request.query_params.get("provincia"))
+
+    @api
     async def cf_decodifica(request):
         from .codice_fiscale import decodifica
         return decodifica(request.query_params.get("cf", ""), ruolo=request.query_params.get("ruolo"))
@@ -607,7 +613,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     from .pulizia import pulisci_silenziosa
     threading.Thread(target=pulisci_silenziosa, args=(sv.arch.base,), daemon=True, name="pulizia-avvio").start()
     return Starlette(routes=[
-        Route("/api/codice-fiscale", cf_decodifica), Route("/api/calcolatrice", calcolatrice_api, methods=["POST"]), Route("/api/importa", importa, methods=["POST"]),
+        Route("/api/codice-fiscale", cf_decodifica), Route("/api/codice-comune", codice_comune_api), Route("/api/calcolatrice", calcolatrice_api, methods=["POST"]), Route("/api/importa", importa, methods=["POST"]),
         Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),

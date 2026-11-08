@@ -67,6 +67,39 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   await page.click('#vista tr[data-key="e:beni:b_villa0001"]');
   const h1 = await page.$eval(".testa-quadro h1", e => ({ h: e.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(e).lineHeight) || 0, title: e.title }));
   assert.ok(h1.h < 50, "titolo su una riga: " + JSON.stringify(h1)); assert.match(h1.title, /EC — /);
+
+  // proposta 3: valori calcolati con tinta propria e scritta «calcolato» (valore catastale, somme delle quote)
+  await page.waitForSelector("#ins .vc .etich-calc");
+  assert.ok(dv[2].includes("calcolato"));
+  // proposta 4: codice comune dal nome, proposto con «Usa» (solo se le tabelle del componente SUC13 sono configurate)
+  const cc = await page.evaluate(() => api("/api/codice-comune?nome=Roma"));
+  if (cc.esito === "trovato") {
+    await page.waitForFunction(() => /H501/.test((document.querySelector("#ins .proposta-comune") || {}).textContent || ""), null, { timeout: 20000 });
+    assert.doesNotMatch(await page.textContent("#ins .proposta-comune"), /null|undefined/);
+    await page.click("#ins .proposta-comune button");
+    assert.equal(await page.evaluate(() => S.dirty.get("e:beni:b_villa0001").campi.codice_comune), "H501");
+    const salvato = await page.evaluate(async id => (await api("/api/pratiche/" + id)).dati.beni.find(b => b.id === "b_villa0001").codice_comune, pid);
+    assert.ok(!salvato, "il codice non si salva senza «Salva»");
+    await page.waitForFunction(() => /coincide/.test((document.querySelector("#ins .proposta-comune") || {}).textContent || ""), null, { timeout: 20000 });
+    await page.evaluate(() => { S.dirty.clear(); render(); });
+  } else assert.equal(await page.$("#ins .proposta-comune"), null, "senza tabelle nessuna proposta");
+
+  // proposta 7: stato vuoto con istruzione e trascinamento nel quadro EG
+  await page.evaluate(() => scegliQuadro("EG"));
+  await page.waitForSelector("#vista tr.vuota");
+  assert.match(await page.textContent("#vista tr.vuota"), /Trascina un PDF/);
+  await page.waitForSelector("#vista .grp.allegati.zona-trascina");
+  const trascinato = await page.evaluate(() => {
+    const zona = document.querySelector("#vista .grp.allegati"), dt = new DataTransfer();
+    dt.items.add(new File(["%PDF-1.4 prova"], "documento-prova.pdf", { type: "application/pdf" }));
+    zona.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    const evidenziata = zona.classList.contains("trascina-sopra");
+    zona.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    return { evidenziata, file: document.querySelector("#file").files[0] && document.querySelector("#file").files[0].name, dopo: zona.classList.contains("trascina-sopra") };
+  });
+  assert.deepEqual(trascinato, { evidenziata: true, file: "documento-prova.pdf", dopo: false });
+  const allegati = await page.evaluate(async id => (await api("/api/pratiche/" + id + "/allegati")).length, pid);
+  assert.equal(allegati, 0, "il file trascinato non si carica da solo");
   assert.deepEqual(errori, []);
   return { esito: "passato", ambito: "GUI locale, dati sintetici" };
 }

@@ -32,6 +32,7 @@ STRUMENTI_LETTURA = frozenset({
     "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
     "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
     "file_in_ingresso", "elenca_allegati", "diagnosi", "valori_catastali", "brogliaccio", "stima_imposte",
+    "codice_comune",
 })
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "registra_esito_controllo", "backup_archivio", "stampa_modello",
@@ -236,6 +237,12 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Dati anagrafici ricavabili da un codice fiscale di persona fisica (sesso, data di nascita, comune e provincia se le tabelle del componente SUC13 sono configurate), con controllo del carattere di controllo. E' un suggerimento da verificare: il secolo non e' nel codice e viene dedotto (ruolo 'defunto' per il defunto)."""
         from .codice_fiscale import decodifica
         return decodifica(codice_fiscale, ruolo=ruolo)
+
+    @tool
+    def codice_comune(nome: str, provincia: str | None = None) -> dict:
+        """Codice catastale di un comune dal nome (ed eventualmente dalla sigla della provincia), dalle tabelle del componente SUC13 configurato. Esito: trovato (codice, nome, provincia), ambiguo (candidati: indicare la provincia), non_trovato o tabelle_assenti. Non modifica la pratica: per usarlo aggiornare beni.codice_comune con aggiorna_pratica."""
+        from .codice_fiscale import cerca_codice_comune
+        return cerca_codice_comune(nome, provincia)
 
     @tool
     def stima_imposte(data_decesso: str, eredi: list, immobili: list | None = None,

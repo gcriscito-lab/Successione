@@ -100,6 +100,48 @@ def cerca_comune(codice: str) -> dict | None:
     return {"nome": voce[0], "provincia": voce[1]} if voce else None
 
 
+def _norm_nome(s: str) -> str:
+    """Nome del comune confrontabile: maiuscole, senza accenti, apostrofi e spazi ripetuti («Sant'Agata» = «SANT AGATA»)."""
+    import unicodedata
+    s = re.sub(r"[‘’‛´`']", " ", s or "")   # apostrofi tipografici: spazio, non cancellati
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
+    return re.sub(r"[^A-Z0-9]+", " ", s.upper()).strip()
+
+
+def cerca_codice_comune(nome: str, provincia: str | None = None) -> dict:
+    """Codice catastale di un comune dal nome (ed eventualmente dalla provincia), dalle stesse tabelle del componente ufficiale
+    SUC13 usate per il codice fiscale. Nessuna tabella nel programma: senza componente configurato l'esito e'
+    ``tabelle_assenti`` e il codice resta da scrivere a mano.
+
+    ``esito``: ``trovato`` (un solo comune: ``codice``, ``nome``, ``provincia``), ``ambiguo`` (piu' comuni con quel nome:
+    ``candidati``, si sceglie con la provincia), ``non_trovato`` o ``tabelle_assenti``."""
+    jar = _jar()
+    if jar is None:
+        return {"esito": "tabelle_assenti", "candidati": []}
+    chiave = _norm_nome(nome)
+    if not chiave:
+        return {"esito": "non_trovato", "candidati": []}
+    try:
+        tab = _comuni(str(jar))
+    except (OSError, zipfile.BadZipFile):
+        return {"esito": "tabelle_assenti", "candidati": []}
+    cand = [{"codice": c, "nome": n, "provincia": p} for c, (n, p) in tab.items() if _norm_nome(n) == chiave]
+    prov = (provincia or "").strip().upper()
+    if prov and prov != "EE":
+        cand = [x for x in cand if x["provincia"] == prov] or [x for x in cand if x["provincia"] is None]
+    esclusi = 0
+    if len(cand) > 1:
+        # comuni con provincia (elenco delle conservatorie) prima di quelli dell'altro elenco, che non la riporta e contiene
+        # anche comuni soppressi: se ne resta uno solo si propone quello, segnalando gli omonimi esclusi
+        attuali = [x for x in cand if x["provincia"]]
+        if len(attuali) == 1:
+            esclusi, cand = len(cand) - 1, attuali
+    cand.sort(key=lambda x: (x["provincia"] or "ZZ", x["codice"]))
+    if len(cand) == 1:
+        return {"esito": "trovato", **cand[0], "candidati": cand, "omonimi_senza_provincia": esclusi}
+    return {"esito": "ambiguo" if cand else "non_trovato", "candidati": cand[:20], "omonimi_senza_provincia": 0}
+
+
 # ---------------------------------------------------------------------------------------------------------- decodifica
 def decodifica(codice_fiscale: str, *, oggi: date | None = None, ruolo: str | None = None) -> dict:
     """Ricava i dati anagrafici dal codice fiscale.

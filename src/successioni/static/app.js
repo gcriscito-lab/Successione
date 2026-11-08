@@ -577,7 +577,7 @@ const VOCI_EH = { FlagDeceduto: "Il defunto è deceduto (data e luogo del decess
 const euroIt = v => { const n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString("it-IT", { minimumFractionDigits: String(v).includes(".") ? 2 : 0, maximumFractionDigits: 2 }) + " €"; };
 async function renderAnteprima(main, q) {
   const pid = S.P.pratica_id;
-  main.append(h("div", { class: "nota" }, "Il quadro " + q.id + " è calcolato dal programma con i dati salvati della pratica, come nel file della dichiarazione. " +
+  main.append(h("div", { class: "calcolato riquadro-calc" }, h("span", { class: "etich-calc" }, "calcolato"), " Il quadro " + q.id + " è calcolato dal programma con i dati salvati della pratica, come nel file della dichiarazione. " +
     (nMod() ? "Ci sono modifiche non salvate: salva per aggiornare questa vista." : "")));
   const box = h("div", {}, h("p", { class: "mut" }, "Calcolo in corso…")); main.append(box);
   let r;
@@ -638,7 +638,7 @@ function renderTabella(main, q) {
   const vere = righe.filter(r => !r.subtotale);   // le righe di somma delle devoluzioni non sono righe di dati
   righe.forEach(r => tb.append(r.subtotale ? rigaSubtotaleDV(r, colonne)
     : rigaTabella(q, r, (S.riga && vere.some(x => x.key === S.riga) ? S.riga === r.key : r === vere[0]))));
-  if (!righe.length) tb.append(h("tr", {}, h("td", { colspan: colonne.length, class: "mut" }, "Nessuna riga. Usa «Aggiungi riga».")));
+  if (!righe.length) tb.append(h("tr", { class: "vuota" }, h("td", { colspan: colonne.length, class: "mut" }, testoVuoto(q))));
   const piede = piedeTabella(q, vere); if (piede) t.append(piede);
   main.append(h("div", { class: "tab" }, t));
   main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, "Aggiungi riga"),
@@ -751,10 +751,10 @@ function valoriCatastali() {
   return VALORI_CAT.promessa;
 }
 function boxValoreCatastale(q, r) {
-  const box = h("div", { class: "vc", "aria-live": "polite" }, h("h4", {}, "Valore catastale"), h("p", { class: "mut" }, "Calcolo in corso…"));
+  const box = h("div", { class: "vc", "aria-live": "polite" }, h("h4", {}, "Valore catastale ", h("span", { class: "etich-calc" }, "calcolato")), h("p", { class: "mut" }, "Calcolo in corso…"));
   valoriCatastali().then(res => {
     const v = (res.beni || []).find(x => x.bene_id === r.e.id);
-    box.replaceChildren(h("h4", {}, "Valore catastale"));
+    box.replaceChildren(h("h4", {}, "Valore catastale ", h("span", { class: "etich-calc" }, "calcolato")));
     if (!v) return box.append(h("p", { class: "mut" }, "Non disponibile per questa riga."));
     if (!v.calcolabile) return box.append(h("p", { class: "mut" }, "Non calcolato: " + v.motivo + "."));
     box.append(h("p", {}, h("strong", {}, euroIntero(v.valore)), " — minimo che l'ufficio non può rettificare."),
@@ -765,7 +765,7 @@ function boxValoreCatastale(q, r) {
     if (v.dichiarato === null || v.inferiore || Number(v.dichiarato) !== Number(v.valore))
       box.append(h("button", { class: "gh", onclick: () => { scriviValore(r.e.id, v.valore); renderVista(); renderIns(); aggiornaBottoni(); renderSb();
         msg("Valore " + euroIntero(v.valore) + " inserito nella riga: premi «Salva» per confermarlo.", "o"); } }, "Usa il valore catastale"));
-  }).catch(e => box.replaceChildren(h("h4", {}, "Valore catastale"), h("p", { class: "avv" }, "Valore catastale non calcolabile: " + e.message)));
+  }).catch(e => box.replaceChildren(h("h4", {}, "Valore catastale ", h("span", { class: "etich-calc" }, "calcolato")), h("p", { class: "avv" }, "Valore catastale non calcolabile: " + e.message)));
   return box;
 }
 async function ricalcolaValori(q) {
@@ -921,7 +921,68 @@ function rigaSubtotaleDV(r, colonne) {
       : s.n === s.d ? ["ok", "completa"] : s.n > s.d ? ["er", "supera 1/1"] : ["am", "manca " + (s.d - s.n) + "/" + s.d];
     return h("span", { class: "pz " + cls, title: nomeDiritto(dir, bene && bene.tipo) }, (perDiritto.size > 1 ? nomeDiritto(dir, bene && bene.tipo) + ": " : "") + s.n + "/" + s.d + " · " + t);
   });
-  return h("tr", { class: "subtot", "aria-hidden": "true" }, h("td", { colspan: colonne.length }, "Somma delle quote" + (bene ? " di " + etichetta("beni", bene) : ""), " ", esiti));
+  return h("tr", { class: "subtot", "aria-hidden": "true" }, h("td", { colspan: colonne.length }, h("span", { class: "etich-calc" }, "calcolato"), " Somma delle quote" + (bene ? " di " + etichetta("beni", bene) : ""), " ", esiti));
+}
+/* Report grafico DEAS dell'08/11/2026, proposta 4: codice catastale ricavato dal nome del comune, dalle tabelle del componente
+   SUC13 configurato (server: codice_fiscale.cerca_codice_comune). E' un valore calcolato: si propone con «Usa», non si scrive
+   mai da solo; con omonimi soppressi si chiede di controllare la visura. Solo EB ed EC (i tavolari hanno il comune catastale). */
+function propostaCodiceComune(q, r, ins) {
+  if (q.coll !== "beni" || !["EB", "EC"].includes(q.id)) return;
+  const rg = ins.querySelector('.rg[data-campo="codice_comune"]'); if (!rg) return;
+  const vecchia = rg.querySelector(".proposta-comune"); if (vecchia) vecchia.remove();
+  const nome = String(valRiga(r, "comune") || "").trim(), prov = String(valRiga(r, "provincia") || "").trim().toUpperCase();
+  if (!nome || prov === "EE") return;
+  const box = h("div", { class: "calcolato proposta-comune", "aria-live": "polite" }); rg.append(box);
+  const attuale = String(valRiga(r, "codice_comune") || "").trim().toUpperCase();
+  const descr = c => c.codice + " (" + c.nome + (c.provincia ? ", " + c.provincia : "") + ")";
+  api("/api/codice-comune?nome=" + encodeURIComponent(nome) + (prov ? "&provincia=" + encodeURIComponent(prov) : "")).then(res => {
+    if (!box.isConnected) return;
+    const etich = h("span", { class: "etich-calc" }, "calcolato");
+    if (res.esito === "trovato") {
+      if (attuale === res.codice) box.append(etich, " dal nome: " + descr(res) + " — coincide");
+      else box.append(...[etich, " dal nome: ", h("strong", {}, res.codice), " (" + res.nome + (res.provincia ? ", " + res.provincia : "") + ") ",
+        attuale ? h("span", { class: "pz am" }, "diverso da " + attuale) : null, " "].filter(x => x !== null),   // Element.append scriverebbe «null»
+        h("button", { type: "button", class: "gh", onclick: () => {
+          if (r.nuova) r.nuova.campi.codice_comune = res.codice;
+          else { const d = S.dirty.get(r.key) || { coll: q.coll, id: r.e.id, campi: {} }; d.campi.codice_comune = res.codice; S.dirty.set(r.key, d); }
+          renderVista(); renderIns(); aggiornaBottoni(); renderSb();
+          msg("Codice comune " + res.codice + " inserito nella riga: premi «Salva» per confermarlo.", "o");
+        } }, "Usa"));
+      if (res.omonimi_senza_provincia) box.append(h("div", {}, "Con lo stesso nome ci sono anche " + res.omonimi_senza_provincia +
+        (res.omonimi_senza_provincia === 1 ? " comune" : " comuni") + " senza provincia nelle tabelle (anche soppressi): controlla il codice sulla visura."));
+    } else if (res.esito === "ambiguo") box.append(etich, " Più comuni con questo nome: indica la provincia. " + res.candidati.map(descr).join(", "));
+    else if (res.esito === "non_trovato") box.append(etich, " Nessun comune con questo nome nelle tabelle ufficiali: controlla il nome o scrivi il codice dalla visura.");
+    else box.remove();   // tabelle del componente non configurate: nessuna proposta, il codice si scrive a mano
+  }).catch(() => box.remove());
+}
+/* Proposta 7: trascinamento dei file. Un file lasciato sul riquadro va nel campo file con l'estensione ammessa (o nel primo);
+   poi si conferma con il pulsante di sempre: nulla viene caricato da solo. */
+function zonaTrascina(zona) {
+  const avvia = ev => { if ([...(ev.dataTransfer || {}).types || []].includes("Files")) { ev.preventDefault(); zona.classList.add("trascina-sopra"); } };
+  zona.addEventListener("dragenter", avvia); zona.addEventListener("dragover", avvia);
+  zona.addEventListener("dragleave", ev => { if (!zona.contains(ev.relatedTarget)) zona.classList.remove("trascina-sopra"); });
+  zona.addEventListener("drop", ev => {
+    zona.classList.remove("trascina-sopra");
+    const files = [...((ev.dataTransfer || {}).files || [])]; if (!files.length) return;
+    ev.preventDefault();
+    const campi = [...zona.querySelectorAll('input[type="file"]')];
+    const ammette = (inp, f) => { const acc = (inp.getAttribute("accept") || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+      return !acc.length || acc.some(a => f.name.toLowerCase().endsWith(a)); };
+    const messi = [];
+    for (const f of files) {
+      const inp = campi.find(i => !messi.includes(i) && ammette(i, f)); if (!inp) continue;
+      const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event("change", { bubbles: true })); messi.push(inp);
+    }
+    msg(messi.length ? (messi.length === 1 ? "File pronto: " + files[0].name + ". Completa i dati e conferma con il pulsante." : messi.length + " file pronti: conferma con il pulsante.")
+      : "Nessun campo di questo riquadro accetta il file trascinato.", messi.length ? "o" : "e");
+  });
+  zona.classList.add("zona-trascina");
+  return zona;
+}
+function testoVuoto(q) {
+  if (q.id === "EG") return "Nessun documento collegato. Trascina un PDF nel riquadro «Aggiungi un documento» qui sotto, oppure sceglilo da lì.";
+  const incolla = q.vista === "tabella" && colonneIncolla(q).length ? " oppure «Incolla da Excel» nel menu Operazioni" : "";
+  return "Nessuna riga in questo quadro. Usa «Aggiungi riga» (Alt+N)" + incolla + ".";
 }
 /* Voce 33: riepilogo del soggetto nel quadro EA (ruolo, parentela, dichiarante, beni ricevuti con la quota). */
 function presentatoreId() {
@@ -1155,6 +1216,11 @@ function insDati(ins) {
     if (gruppi) righeCampi.push([c, rg, vuoto]); else ins.append(rg);
   }
   if (gruppi) ins.append(...schedaAGruppi(gruppi, righeCampi));
+  if (q.coll === "beni" && ["EB", "EC"].includes(q.id)) {   // codice comune calcolato dal nome (report grafico DEAS 08/11/2026, proposta 4)
+    propostaCodiceComune(q, r, ins);
+    for (const c of ["comune", "provincia"]) { const el = ins.querySelector('.rg[data-campo="' + c + '"] input, .rg[data-campo="' + c + '"] select');
+      if (el) el.addEventListener("change", () => propostaCodiceComune(q, r, ins)); }
+  }
   if (nascostiEstero) ins.append(h("p", { class: "mut nota-campi" }, "Per un immobile all'estero scegli la provincia EE: compaiono i campi dello Stato estero."));
   renderStrutturati(ins, q, r);
   if (q.coll === "beni" && r.e && ["fabbricato", "terreno"].includes(valRiga(r, "tipo"))) ins.append(boxValoreCatastale(q, r));
@@ -1385,7 +1451,8 @@ async function insFile(dest) {
   if (ct.stato_job === 'attesa_diagnostico') {
     const fDgn = h('input', { type: 'file', accept: '.dgn', 'aria-label': 'File .dgn' }), fLog = h('input', { type: 'file', accept: '.xml', 'aria-label': 'File _logSchema.xml' });
     const fWri = h('input', { type: 'file', accept: '.wri', 'aria-label': 'File .wri (facoltativo)' }), conf = h('input', { type: 'checkbox', id: 'dgn_conf' });
-    controllo.append(h('div', { class: 'sotto' }, h('h3', {}, 'Carica l’esito del controllo eseguito a mano'),
+    controllo.append(zonaTrascina(h('div', { class: 'sotto' }, h('h3', {}, 'Carica l’esito del controllo eseguito a mano'),
+      h('p', { class: 'mut' }, 'Puoi trascinare qui insieme i file .dgn, _logSchema.xml e .wri: ognuno va nel suo campo.'),
       h('label', {}, 'Diagnostico (.dgn)', fDgn), h('label', {}, 'Esito dello schema (_logSchema.xml)', fLog), h('label', {}, 'Avvisi (.wri, facoltativo)', fWri),
       h('label', { class: 'chk', for: 'dgn_conf' }, conf, h('span', {}, 'Confermo che questi esiti riguardano il file di questa pratica')),
       h('div', { class: 'az' }, h('button', { class: 'gh', disabled: OCCUPATI.has('diagnostico'), onclick: occupato('diagnostico', async () => {
@@ -1396,7 +1463,7 @@ async function insFile(dest) {
           msg('Esito registrato: controllo ' + String(r.stato).replaceAll('_', ' ') + '.', r.stato === 'positivo' ? 'o' : 'e'); }
         catch (e) { msg(e.message, 'e'); }
         if (S.P && S.P.pratica_id === pid && S.sel === 'FILE') renderVista();
-      }) }, 'Registra esito'))));
+      }) }, 'Registra esito')))));
   }
   const stampa = passo(4, 'Stampa e rileggi', (st.stampa_modello || {}).stato === 'aggiornata');
   stampa.append(h('p', { class: 'mut' }, 'Rileggi il modello stampato prima di inviare: confronta immobili, eredi, quote e imposte con i documenti.'),
@@ -1496,7 +1563,7 @@ async function renderInvio(ins, ex, ct) {
       ins.append(protocollo, fonte, h("div", { class: "az" },
         h("button", { onclick: () => registra(false) }, "Registra protocollo"),
         h("button", { onclick: () => { if (confirm("Hai verificato che questo invio non è avvenuto?")) registra(true); } }, "Registra invio non avvenuto")),
-        h("div", { class: "az" }, esi, h("button", { class: "gh", disabled: OCCUPATI.has("riconcilia"), onclick: registraEsi }, "Registra file .esi")));
+        zonaTrascina(h("div", { class: "az" }, esi, h("button", { class: "gh", disabled: OCCUPATI.has("riconcilia"), onclick: registraEsi }, "Registra file .esi"))));
     }
   }
   // le prove simulate sono separate: non consumano la copia confermata (revisione 2)
@@ -1519,13 +1586,14 @@ async function renderRicevute(ins, pid, tid) {
   const aggiorna = () => esito.replaceChildren(h('option', { value: '' }, '(senza esito)'), ...tipi[tipo.value].esiti.map(k => h('option', { value: k }, k)));
   tipo.addEventListener('change', aggiorna); aggiorna();
   const file = h('input', { type: 'file', 'aria-label': 'Documento ricevuto' });
-  ins.append(tipo, esito, file, h('button', { disabled: OCCUPATI.has('ricevuta'), onclick: occupato('ricevuta', async () => {
+  ins.append(zonaTrascina(h('div', { class: 'ricevuta-nuova' }, h('p', { class: 'mut' }, 'Scegli o trascina qui il documento ricevuto, poi indica tipo ed esito.'),
+    tipo, esito, file, h('button', { disabled: OCCUPATI.has('ricevuta'), onclick: occupato('ricevuta', async () => {
     const f = file.files[0]; if (!f) return msg('Scegli il documento ricevuto.', 'e');
     try {
       await api(url + '?' + new URLSearchParams({ tipo: tipo.value, esito: esito.value, nome: f.name }), { method: 'POST', body: await f.arrayBuffer() });
       msg('Ricevuta originale acquisita e associata al protocollo.', 'o'); renderVista();
     } catch (e) { msg(e.message, 'e'); }
-  }) }, 'Acquisisci ricevuta'));
+  }) }, 'Acquisisci ricevuta'))));
   for (const doc of stato.documenti) ins.append(h('p', { class: 'mut' }, h('a', { href: url + '/file/' + doc.job_id, download: '' }, doc.nome), ' · ' + doc.tipo + ' · ' + (doc.esito || '') + ' · SHA-256 ' + doc.sha256));
 }
 function vaiA(r) {
@@ -1891,7 +1959,8 @@ async function renderAllegati(main) {
   const refs = S.P.dati.documenti_ref || [];
   const usati = new Set(refs.map(r => r.allegato_id));
   const sd = struttDi("documenti_ref", "tipo_eg", null);
-  const sez = h("section", { class: "grp allegati" }, h("h2", {}, "Aggiungi un documento"));
+  const sez = zonaTrascina(h("section", { class: "grp allegati" }, h("h2", {}, "Aggiungi un documento"),
+    h("p", { class: "mut dentro-testo" }, "Trascina qui un file oppure sceglilo; poi indica il rigo e conferma con il pulsante qui sotto.")));
   const selTipo = h("select", { id: "teg", "aria-label": "Rigo del quadro EG" }, h("option", { value: "" }, "Rigo del quadro EG…"), sd.opzioni.map(o => h("option", { value: o.valore, title: o.aiuto }, o.etichetta)));
   sez.append(h("div", { class: "barra dentro" }, h("input", { type: "file", id: "file", "aria-label": "File da caricare" }), selTipo,
     h("input", { id: "fin", placeholder: "Descrizione (es. carta d'identità di …)", "aria-label": "Descrizione del documento" }),
