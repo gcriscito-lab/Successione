@@ -1,5 +1,6 @@
 """«Prossime azioni» della pagina iniziale (src/successioni/cruscotto.py): tappe, azione e termine, dati SINTETICI."""
 from datetime import date
+import pytest
 
 from starlette.testclient import TestClient
 
@@ -164,3 +165,49 @@ def test_e_registrazione_negativa_e_un_problema():
     assert v["azione"]["livello"] == "problema"
     v = _una(_SvFinto([("pr_1", "Una", "2026-01-10")], tr, registrazione="registrata"))
     assert v["completata"] and v["azione"]["testo"] == "Pratica completata"
+
+class _SvDueCopie(_SvFinto):
+    """La copia trasmessa (attiva) non e' la piu' recente: le ricevute vanno lette da quella attiva."""
+    def invio_stato(self, pid):
+        return {"copia_attiva": "c_vecchia", "copie": [{"job_id": "c_nuova", "dettaglio": {}},
+                                                       {"job_id": "c_vecchia", "dettaglio": {"tentativo_corrente": "tn_1"}}]}
+
+
+def test_ricevute_dalla_copia_attiva_non_dalla_piu_recente():
+    sv = _SvDueCopie([("p1", "Trasmessa", "2026-01-10")], trasmissione={"stato": "trasmessa"}, registrazione="registrata")
+    v = _una(sv)
+    assert v["completata"] and v["tappe"]["ricevute"] == "fatto" and v["ricevute"]["registrazione"] == "registrata"
+
+
+class _SvPagamento(_SvFinto):
+    def __init__(self, *a, pagamento="negativo", volture="non_applicabile", **k):
+        super().__init__(*a, **k)
+        self.pag, self.vol = pagamento, volture
+
+    def ricevute_stato(self, pid, tid):
+        return {"registrazione": self.reg, "pagamento": self.pag, "volture": self.vol}
+
+
+@pytest.mark.parametrize("pag,vol,testo", [("negativo", "non_applicabile", "Pagamento con esito negativo"),
+                                           ("positivo", "parziali", "Volture parziali"),
+                                           ("positivo", "negative", "Volture negative")])
+def test_pagamento_negativo_o_volture_incomplete_restano_da_lavorare(pag, vol, testo):
+    sv = _SvPagamento([("p1", "Registrata", "2026-01-10")], trasmissione={"stato": "trasmessa"}, registrazione="registrata",
+                      pagamento=pag, volture=vol)
+    v = _una(sv)
+    assert not v["completata"] and v["tappe"]["ricevute"] == "problema" and v["azione"]["testo"].startswith(testo)
+
+
+def test_oltre_il_limite_nessun_genera_il_file_senza_motivo():
+    sv = _SvFinto([(f"p{i}", f"P{i}", "2026-01-10") for i in range(3)])
+    sv.stato_elaborati = lambda pid: {"export": {"stato": "assente"}, "controllo_ufficiale": {}, "trasmissione": {}}
+    c = C.cruscotto(sv, limite=1, oggi=date(2026, 11, 7), tutte=True)
+    testi = [v["azione"]["testo"] for v in c["pratiche"]]
+    assert len(testi) == 3 and sum(t.startswith("Apri la pratica e verifica") for t in testi) == 2
+
+
+def test_csv_giorni_negativi_restano_numeri():
+    sv = _SvFinto([("p1", "Scaduta", "2025-01-10")])
+    testo = C.csv_elenco(sv, oggi=date(2026, 11, 7))
+    riga = testo.splitlines()[1].split(";")
+    assert riga[3].lstrip("-").isdigit() and riga[3].startswith("-")

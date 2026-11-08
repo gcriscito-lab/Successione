@@ -134,7 +134,26 @@ def _azione_invio(tr: dict) -> dict:
     return a
 
 
+def _esito_negativo(ric: dict) -> str | None:
+    """Ricevute successive alla registrazione con esito da gestire (Fascicolo I, p. PDF 5): pagamento negativo, volture
+    parziali o negative, documenti contraddittori."""
+    pag = str((ric or {}).get("pagamento") or "")
+    vol = str((ric or {}).get("volture") or "")
+    if pag == "negativo":
+        return "Pagamento con esito negativo: verifica l'addebito e versa le imposte dovute"
+    if pag.startswith("contraddittorio"):
+        return "Ricevute di pagamento contraddittorie: controlla i documenti registrati"
+    if vol in ("parziali", "negative"):
+        return f"Volture {vol}: verifica la ricevuta e presenta le volture mancanti"
+    if vol.startswith("contraddittorio"):
+        return "Ricevute delle volture contraddittorie: controlla i documenti registrati"
+    return None
+
+
 def _azione_ricevute(ric: dict) -> dict:
+    neg = _esito_negativo(ric)
+    if neg and str((ric or {}).get("registrazione") or "").startswith("registrat"):
+        return {"testo": neg, "livello": "problema", "dove": {"sel": "FILE"}}
     reg = str((ric or {}).get("registrazione") or "attesa")
     if reg.startswith("scartat"):
         return {"testo": "Dichiarazione scartata: leggi i motivi nella ricevuta, correggi e prepara di nuovo", "livello": "problema",
@@ -173,10 +192,13 @@ def stato_pratica(sv, p: dict, oggi: date) -> dict:
     ric = {}
     if fatto["invio"]:
         try:
-            copia = sv.invio_stato(pid)["copie"][0]
+            inv = sv.invio_stato(pid)
+            copie = inv.get("copie") or []
+            copia = next((x for x in copie if x.get("job_id") == inv.get("copia_attiva")), copie[0] if copie else {})
             tid = (copia.get("dettaglio") or {}).get("tentativo_corrente")
             ric = sv.ricevute_stato(pid, tid) if tid else {}
-            fatto["ricevute"] = str(ric.get("registrazione", "")).startswith(("ricevut", "positiv", "registrat"))
+            fatto["ricevute"] = (str(ric.get("registrazione", "")).startswith(("ricevut", "positiv", "registrat"))
+                                 and not _esito_negativo(ric))
             out["ricevute"] = {k: ric.get(k) for k in ("registrazione", "pagamento", "volture")}
         except Exception:
             pass
@@ -229,7 +251,8 @@ def cruscotto(sv, limite: int = 12, oggi: date | None = None, tutte: bool = Fals
     for v in mostrate:
         _completa_file(sv, v)
     for v in nascoste:
-        v.pop("_file", None)
+        if v.pop("_file", None) is not None:
+            v["azione"] = {"testo": "Apri la pratica e verifica se il file telematico si puo' generare", "dove": {"sel": "FILE"}}
     if tutte:
         mostrate, nascoste = voci, []
     return {"oggi": oggi.isoformat(), "tappe": [{"id": t, "nome": NOMI[t]} for t in TAPPE], "pratiche": mostrate,
@@ -260,9 +283,10 @@ def csv_elenco(sv, oggi: date | None = None) -> str:
     w.writerow(colonne)
     for v in c["pratiche"]:
         t = v.get("termine") or {}
-        w.writerow([_cella("", x) for x in (
-            v["titolo"], _it(t.get("dal")), _it(t.get("data")), "" if t.get("giorni") is None else str(t["giorni"]),
+        giorni = "" if t.get("giorni") is None else str(int(t["giorni"]))   # numero intero: resta numero anche se negativo
+        w.writerow([giorni if i == 3 else _cella("", x) for i, x in enumerate((
+            v["titolo"], _it(t.get("dal")), _it(t.get("data")), giorni,
             "completata" if v.get("completata") else "da lavorare",
             *[STATI_TAPPA.get((v.get("tappe") or {}).get(k), "") for k in TAPPE],
-            (v.get("azione") or {}).get("testo", ""), _it(v.get("aggiornata")))])
+            (v.get("azione") or {}).get("testo", ""), _it(v.get("aggiornata"))))])
     return "﻿" + out.getvalue()
