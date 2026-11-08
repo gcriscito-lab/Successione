@@ -26,9 +26,9 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
     await caricaPratiche(); renderHome();
   });
 
-  // pagina iniziale: ricerca, filtro e ordinamento su una riga
-  const alti = await page.evaluate(() => [...document.querySelectorAll("#homeFiltri > *")].map(e => Math.round(e.getBoundingClientRect().top)));
-  assert.equal(alti.length, 3); assert.ok(Math.max(...alti) - Math.min(...alti) < 12, "filtri su una riga: " + alti);   // input e select differiscono di 1-2 px
+  // pagina iniziale: ricerca e ordinamento su una riga (i filtri sono pulsanti, dall'08/11/2026)
+  const alti = await page.evaluate(() => [...document.querySelectorAll("#homeFiltri .filtri-destra > *")].map(e => Math.round(e.getBoundingClientRect().top)));
+  assert.equal(alti.length, 2); assert.ok(Math.max(...alti) - Math.min(...alti) < 12, "ricerca e ordinamento su una riga: " + alti);   // input e select differiscono di 1-2 px
 
   const pid = await page.evaluate(() => S.pratiche.find(p => p.titolo === "Grafica rapida e2e").id);
   await page.evaluate(id => apri(id), pid);

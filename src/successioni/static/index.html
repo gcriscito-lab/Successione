@@ -39,29 +39,27 @@
   <div id="ridimensionaNav" class="ridimensiona" role="separator" aria-label="Larghezza menu dei quadri" aria-orientation="vertical" aria-controls="lat" aria-valuemin="180" aria-valuemax="480" aria-valuenow="240" tabindex="0"></div>
   <main id="vista" tabindex="-1">
     <div class="vuoto" id="vuoto">
+      <!-- pagina iniziale: un solo elenco delle pratiche, ordinato per urgenza (revisione dell'08/11/2026) -->
       <div class="home-testa">
-        <h1 id="homeTitolo">Riprendi il lavoro</h1>
-        <p class="intro" id="homeIntro">Apri una pratica recente oppure inizia una nuova dichiarazione di successione.</p>
+        <div class="home-titoli">
+          <h1 id="homeTitolo">Pratiche</h1>
+          <p class="intro" id="homeIntro">Apri una pratica oppure inizia una nuova dichiarazione di successione.</p>
+        </div>
         <div class="home-actions"><button class="pil" id="homeNuova" data-ic="nuova">Nuova dichiarazione</button><button class="gh" id="homeImporta" data-ic="importa">Importa da file XML</button><button class="gh" id="homeCalc" data-ic="calcola" title="Stima rapida delle imposte, senza creare una pratica">Calcolatrice</button></div>
       </div>
       <div class="home-corpo">
-        <section class="home-main" aria-labelledby="homeElencoT">
-          <h2 id="homeElencoT" class="home-h2">Pratiche recenti</h2>
-          <ul class="recenti" id="recenti" aria-label="Pratiche recenti"></ul>
+        <section class="home-main" aria-labelledby="homeTitolo">
+          <div id="elencoPratiche" class="elenco-pratiche"></div>
           <ol class="percorso" id="percorso" hidden aria-label="Come si arriva all’invio">
             <li><span class="n">1</span><div><b>Crea la pratica</b><span>La procedura guidata chiede i dati del defunto e i quadri da compilare.</span></div></li>
             <li><span class="n">2</span><div><b>Compila i quadri</b><span>Eredi in EA, terreni in EB, fabbricati in EC, passività in ED, titoli e conti negli altri quadri. I rilievi mostrano cosa manca.</span></div></li>
             <li><span class="n">3</span><div><b>Allega e genera il file</b><span>In «File e invio»: allegati in PDF/A, file telematico e controllo ufficiale sul tuo PC.</span></div></li>
             <li><span class="n">4</span><div><b>Rileggi e invia</b><span>Stampa il modello, confrontalo con le visure, poi invia con Desktop Telematico.</span></div></li>
           </ol>
+          <p class="home-nota" id="homeNota" hidden>Termine: dodici mesi dalla data del decesso o dalla decorrenza indicata nel frontespizio (per esempio dopo una rinuncia o con il beneficio d’inventario).</p>
           <div class="home-stato" id="homeStato" hidden aria-label="Stato del programma"></div>
-          <p class="home-nota" id="homeNota" hidden>Il termine indicato è quello ordinario: dodici mesi dalla data del decesso. Le istruzioni del modello prevedono casi in cui decorre da un’altra data, per esempio dopo una rinuncia o con il beneficio d’inventario.</p>
-        </section>
-        <aside class="home-lato prossime" aria-labelledby="homeProssimeT">
-          <h2 id="homeProssimeT" class="home-h2">Prossime azioni</h2>
-          <div id="prossime" aria-live="polite"><p class="mut">Calcolo dello stato delle pratiche…</p></div>
           <p class="archivio-home" id="homeArchivio" hidden></p>
-        </aside>
+        </section>
       </div>
     </div>
   </main>

@@ -54,7 +54,8 @@ async function apriPratica(page, q) {
   assert.ok(Math.abs(w2 - w1) < 2); ok('larghezza memorizzata dopo ricarica: ' + w2);
   const srv = await page.evaluate(async () => (await (await fetch('/api/impostazioni')).json()).interfaccia.larghezza_nav);
   assert.equal(srv, Math.round(w1)); ok('persistita nel file di configurazione (' + srv + ')');
-  // tastiera sul separatore
+  // tastiera sul separatore (con una pratica aperta: dall'08/11/2026 la pagina iniziale non mostra la colonna dei quadri)
+  await apriPratica(page, 'EA');
   await page.locator('#ridimensionaNav').focus();
   await page.keyboard.press('Home'); await page.waitForFunction(() => preferenze.larghezza_nav === 180);
   await page.keyboard.press('ArrowRight'); await page.waitForFunction(() => preferenze.larghezza_nav === 196);

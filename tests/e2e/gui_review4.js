@@ -34,17 +34,22 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
 
   // 1. contrasto della pagina iniziale (iniziali e «Riprendi») nei temi chiaro, scuro, seppia e con contrasto alto
   await page.evaluate(() => caricaPratiche());
-  await page.waitForSelector("#recenti .iniz");
+  // pagina iniziale ridisegnata l'08/11/2026: un solo elenco; si attende anche lo stato dal server (prossima azione)
+  await page.waitForSelector("#elencoPratiche .apri-pratica"); await page.waitForSelector("#elencoPratiche .lk-azione");
   for (const asp of [{ tema: "chiaro" }, { tema: "scuro" }, { tema: "seppia" }, { tema: "chiaro", contrasto: "alto" }, { tema: "scuro", contrasto: "alto" }]) {
     await page.evaluate(a => applicaAspetto({ ...preferenze, ...a }), asp);
-    for (const sel of ["#recenti .iniz", "#recenti .riprendi", "#recenti .dett"]) {
+    await page.waitForTimeout(250);   // i pulsanti cambiano colore con una transizione di 120 ms: si misura a transizione finita
+    for (const sel of ["#elencoPratiche .apri-pratica .tit", "#elencoPratiche .apri-pratica .dett", "#elencoPratiche .lk-azione",
+                       "#elencoPratiche th", "#homeFiltri .chip[aria-pressed=true]", "#homeIntro"]) {
       const c = await page.evaluate(CONTRASTO + "(" + JSON.stringify(sel) + ")");
       assert.ok(c >= 4.5, sel + " " + JSON.stringify(asp) + ": contrasto " + c.toFixed(2));
     }
   }
   await page.evaluate(() => applicaAspetto(preferenze));
 
-  // 2. barra alta compatta a 1366: una sola riga, pulsanti secondari a icona con il nome accessibile intatto
+  // 2. barra alta compatta a 1366 con una pratica aperta (sulla pagina iniziale i comandi della pratica non ci sono):
+  //    una sola riga, pulsanti secondari a icona con il nome accessibile intatto
+  await page.evaluate(id => apri(id), pid); await page.waitForFunction(() => S.P);
   const alta = await page.evaluate(() => Math.round(document.querySelector(".tb").getBoundingClientRect().height));
   assert.ok(alta <= 64, "barra alta su una riga a 1366 px: " + alta + " px");
   assert.equal(await page.getAttribute("body", "data-barra"), "icone");
@@ -166,7 +171,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   await page.evaluate(id => apri(id), pid);
   const largo = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.equal(await largo(), 0, "pratica a 390 px senza scorrimento orizzontale");
-  await page.click("#bHome"); await page.waitForSelector("#recenti .tit");
+  await page.click("#bHome"); await page.waitForSelector("#elencoPratiche .apri-pratica .tit");
   await page.waitForTimeout(300);
   assert.equal(await largo(), 0, "pagina iniziale a 390 px senza scorrimento orizzontale");
   await page.evaluate(id => apri(id), pid);

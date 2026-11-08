@@ -258,7 +258,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     @api
     async def cruscotto_api(request):
         from . import cruscotto
-        return cruscotto.cruscotto(sv)
+        return cruscotto.cruscotto(sv, tutte=request.query_params.get("tutte") == "1")   # pagina iniziale: tutte le pratiche
 
     @api
     async def guida_api(request):

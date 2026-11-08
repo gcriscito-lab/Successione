@@ -216,81 +216,139 @@ function terminePresentazione(decesso) {
   return { data: t, giorni: Math.round((t - oggi) / 86400000) };
 }
 const dataBreve = d => String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
-function renderHome() {
-  const ul = $("#recenti"); if (!ul) return;
-  ul.replaceChildren();
-  const vuoto = !S.pratiche.length;
-  $("#homeTitolo").textContent = vuoto ? "Prima dichiarazione" : "Riprendi il lavoro";
-  $("#homeIntro").textContent = vuoto ? "L’archivio non contiene ancora pratiche. Crea la prima oppure importa un file telematico già preparato."
-    : "Apri una pratica recente oppure inizia una nuova dichiarazione di successione.";
-  ul.hidden = vuoto; $("#homeElencoT").textContent = vuoto ? "Come si arriva all’invio" : "Pratiche recenti"; $("#percorso").hidden = !vuoto;
-  if (vuoto) { $("#homeNota").hidden = true; const f = $("#homeFiltri"); if (f) f.remove(); return; }
-  // voce 8 dell'analisi del 07/11/2026: tutte le pratiche, filtrabili per termine ordinario e ordinabili per scadenza
-  const pratiche = praticheFiltrate(S.pratiche, HOME.filtro, HOME.ordine, HOME.cerca);
-  $("#homeElencoT").textContent = S.pratiche.length > 8 || HOME.filtro !== "tutte" || HOME.cerca ? "Pratiche (" + pratiche.length + " di " + S.pratiche.length + ")" : "Pratiche recenti";
-  filtriHome(ul);
-  if (!pratiche.length) ul.append(h("li", { class: "mut" }, "Nessuna pratica corrisponde al filtro."));
-  let conTermine = false;
-  for (const p of pratiche.slice(0, HOME.tutte ? pratiche.length : 8)) {
-    const t = terminePresentazione(p.data_decesso); conTermine = conTermine || !!t;
-    const term = !t ? h("span", { class: "term mut" }, "Data del decesso da indicare")
-      : t.giorni < 0 ? h("span", { class: "term scaduto" }, "Termine ordinario superato il " + dataBreve(t.data))
-      : h("span", { class: "term" + (t.giorni <= 60 ? " vicino" : "") }, "Termine ordinario " + dataBreve(t.data) + (t.giorni <= 60 ? ", tra " + t.giorni + (t.giorni === 1 ? " giorno" : " giorni") : ""));
-    // pagina iniziale «premium» (proposta Canva del 07/11/2026): iniziali della pratica in casella, stato del termine in chiaro, «Riprendi»
-    const iniz = String(p.titolo || "?").replace(/^(successione|eredit[aà]|dichiarazione)\s+/i, "").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase() || "?";
-    const badge = t && t.giorni < 0 ? h("span", { class: "badge er" }, "Termine superato") : t && t.giorni <= 60 ? h("span", { class: "badge am" }, "In scadenza") : null;
-    ul.append(h("li", {}, h("button", { type: "button", onclick: () => apri(p.id), "aria-label": "Riprendi " + p.titolo },
-      h("span", { class: "iniz", "aria-hidden": "true" }, iniz),
-      h("span", { class: "tit" }, p.titolo, badge ? " " : null, badge),
-      h("span", { class: "dett" }, "Aggiornata il " + dataIt(String(p.aggiornata || "").slice(0, 10)) + " · revisione " + p.revisione), term,
-      h("span", { class: "riprendi", "aria-hidden": "true" }, "Riprendi"))));
-  }
-  if (pratiche.length > 8) ul.append(h("li", { class: "altre" }, h("button", { type: "button", class: "lk", onclick: () => { HOME.tutte = !HOME.tutte; renderHome(); } },
-    HOME.tutte ? "Mostra solo le prime 8" : "Mostra tutte (" + pratiche.length + ")")));
-  $("#homeNota").hidden = !conTermine;
-  statoHome();
-  renderProssime();
+const isoData = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+/* ---------- Pagina iniziale (revisione dell'08/11/2026) ----------
+   Un solo elenco delle pratiche, ordinato per urgenza: per ogni pratica il defunto, il termine, l'avanzamento in cinque tappe e
+   la prossima cosa da fare (server: cruscotto.py, ?tutte=1). Prima le stesse pratiche comparivano tre volte (colonna a
+   sinistra, elenco, «Prossime azioni») con due modi diversi di dire la scadenza. */
+const HOME = { filtro: "tutte", ordine: "urgenza", cerca: "" };
+const FILTRI_HOME = { tutte: "Tutte", lavorare: "Da lavorare", vicine: "In scadenza (60 giorni)", superate: "Termine superato",
+  senza_data: "Senza data del decesso", completate: "Completate" };
+let CRUSCOTTO = null;   // ultimo stato delle pratiche calcolato dal server: { tappe, mappa: pratica_id -> stato }
+function voceHome(p) {
+  const st = CRUSCOTTO && CRUSCOTTO.mappa.get(p.id), tl = terminePresentazione(p.data_decesso);
+  // il termine del server tiene conto della decorrenza indicata nel frontespizio; finche' non arriva vale quello dal decesso
+  const termine = st && st.termine ? st.termine : tl ? { data: isoData(tl.data), giorni: tl.giorni, base: "decesso" } : null;
+  return { ...p, termine, stato: st || null, completata: !!(st && st.completata) };
 }
-/* «Prossime azioni» (proposta Canva 07/11/2026; server: cruscotto.py): per ogni pratica le cinque tappe e la cosa da fare,
-   che porta dritto al punto dell'interfaccia in cui farla. */
-let prossimeGen = 0;
-async function renderProssime() {
-  const box = $("#prossime"); if (!box || S.P) return;   // si calcola solo sulla pagina iniziale, non durante il lavoro
-  // i filtri dell'elenco ridisegnano la pagina a ogni tasto: lo stato delle pratiche si ricalcola al massimo ogni 5 secondi
+function filtraHome(voci, filtro, cerca) {
+  const c = String(cerca || "").trim().toLowerCase();
+  return voci.filter(v => {
+    if (c && !String(v.titolo || "").toLowerCase().includes(c)) return false;
+    const t = v.termine;
+    return filtro === "lavorare" ? !!v.stato && !v.completata : filtro === "completate" ? v.completata
+      : filtro === "vicine" ? !v.completata && !!t && t.giorni >= 0 && t.giorni <= 60
+      : filtro === "superate" ? !v.completata && !!t && t.giorni < 0
+      : filtro === "senza_data" ? !t : true;
+  });
+}
+function ordinaHome(voci, ordine) {
+  if (ordine === "recenti") return voci;   // ordine del server: ultima modifica prima
+  if (ordine === "nome") return [...voci].sort((a, b) => String(a.titolo).localeCompare(String(b.titolo), "it"));
+  // urgenza: prima da lavorare, poi completate; dentro, il termine piu' vicino (senza data in fondo)
+  return [...voci].sort((a, b) => (a.completata - b.completata) || ((a.termine ? a.termine.giorni : 1e6) - (b.termine ? b.termine.giorni : 1e6)));
+}
+function riepilogoHome(voci) {
+  const n = voci.length, parti = [n + (n === 1 ? " pratica" : " pratiche")];
+  const conta = f => filtraHome(voci, f, "").length;
+  if (CRUSCOTTO) { const l = conta("lavorare"); parti.push(l + " da lavorare"); }
+  const vic = conta("vicine"), sup = conta("superate"), sd = conta("senza_data");
+  if (vic) parti.push(vic + " in scadenza nei prossimi 60 giorni");
+  if (sup) parti.push(sup + " con termine superato");
+  if (sd) parti.push(sd + " senza data del decesso");
+  return parti.join(" · ");
+}
+const titoloTermine = t => "Termine del " + dataIt(t.data) + (t.base === "decorrenza" ? ", dalla decorrenza del " + dataIt(t.dal) : ", dalla data del decesso");
+function cellaTermine(v) {
+  const t = v.termine;
+  if (!t) return h("td", { class: "c-term" }, h("span", { class: "mut" }, "da indicare"));
+  const gg = t.giorni, dec = t.base === "decorrenza" ? " dalla decorrenza" : "";
+  const pill = v.completata ? null : gg < 0 ? h("span", { class: "pz er" }, "superato" + dec) : gg === 0 ? h("span", { class: "pz am" }, "oggi" + dec)
+    : h("span", { class: "pz" + (gg <= 60 ? " am" : "") }, "tra " + gg + (gg === 1 ? " giorno" : " giorni") + dec);
+  return h("td", { class: "c-term", title: titoloTermine(t) }, h("span", { class: "data-term" }, dataIt(t.data)), pill ? " " : null, pill);
+}
+function testoAzione(a) {
+  if (!a) return "";
+  const m = String((a.dove || {}).percorso || "").match(/^([a-z_]+)\[[^\]]+\]\.([a-z_]+)$/);
+  const campo = m && S.schema.collezioni[m[1]] ? lbl(m[1], m[2], a.dove.sel) : null;
+  return (campo ? campo.charAt(0).toUpperCase() + campo.slice(1) + ": " : "") + a.testo + (a.altri ? " (e altri " + a.altri + ")" : "");
+}
+function cellaAvanzamento(v) {
+  if (!v.stato) return h("td", { class: "c-avanz mut" }, "…");
+  const tappe = (CRUSCOTTO.tappe || []), stati = v.stato.tappe || {};
+  const corrente = tappe.find(t => ["corrente", "problema"].includes(stati[t.id]));
+  const descr = v.completata ? "Completata" : corrente ? corrente.nome : "";
+  return h("td", { class: "c-avanz" },
+    h("ol", { class: "tappe-mini", "aria-label": "Avanzamento: " + (v.completata ? "pratica completata" : "tappa " + descr) },
+      tappe.map(t => h("li", { class: "tm " + (stati[t.id] || "da_fare"), title: t.nome + ": " + ({ fatto: "fatto", corrente: "in corso", problema: "da correggere" }[stati[t.id]] || "da fare") }))),
+    h("span", { class: "tappa-nome" + (corrente && stati[corrente.id] === "problema" ? " er" : "") }, descr));
+}
+function cellaAzione(v) {
+  if (!v.stato) return h("td", { class: "c-azione mut" }, "…");
+  const a = v.stato.azione;
+  if (!a || v.completata) return h("td", { class: "c-azione mut" }, v.completata ? "Nessuna" : "");
+  return h("td", { class: "c-azione" }, h("button", { type: "button", class: "lk-azione" + (a.livello === "problema" ? " problema" : ""),
+    onclick: ev => { ev.stopPropagation(); vaiAllAzione(v.stato); } }, testoAzione(a)));
+}
+function rigaHome(v) {
+  const dec = v.data_decesso ? "Decesso " + dataIt(v.data_decesso) : "Data del decesso da indicare";
+  return h("tr", { class: v.completata ? "completata" : null, "data-pratica": v.id },
+    h("td", { class: "c-pratica" }, h("button", { type: "button", class: "apri-pratica", onclick: () => apri(v.id), title: "Apri la pratica" },
+      h("span", { class: "tit" }, v.titolo), h("span", { class: "dett" }, dec))),
+    cellaTermine(v), cellaAvanzamento(v), cellaAzione(v));
+}
+function filtriHome(box) {
+  let f = $("#homeFiltri");
+  if (!f) {
+    const chips = h("div", { class: "chips", role: "group", "aria-label": "Mostra" });
+    const cerca = h("input", { type: "search", "aria-label": "Cerca nel titolo", placeholder: "Cerca una pratica", oninput: ev => { HOME.cerca = ev.target.value; renderHome(); } });
+    const ordine = h("select", { "aria-label": "Ordina", onchange: ev => { HOME.ordine = ev.target.value; renderHome(); } },
+      h("option", { value: "urgenza" }, "Ordina per urgenza"), h("option", { value: "recenti" }, "Ultime modificate"), h("option", { value: "nome" }, "Per nome"));
+    f = h("div", { id: "homeFiltri", class: "filtri-home" }, chips, h("div", { class: "filtri-destra" }, cerca, ordine));
+    box.before(f);
+  }
+  return f;
+}
+function renderHome() {
+  const box = $("#elencoPratiche"); if (!box) return;
+  document.body.classList.toggle("in-home", !S.P);   // anche all'avvio, prima del primo render()
+  // con una pratica aperta l'elenco non serve (e le sue righe non devono confondersi con quelle dei quadri): si ricostruisce al ritorno
+  if (S.P) { box.replaceChildren(); return; }
+  const vuoto = !S.pratiche.length;
+  $("#homeTitolo").textContent = vuoto ? "Prima dichiarazione" : "Pratiche";
+  $("#percorso").hidden = !vuoto; box.hidden = vuoto; $("#homeNota").hidden = vuoto;
+  const voci = S.pratiche.map(voceHome);
+  $("#homeIntro").textContent = vuoto ? "L’archivio non contiene ancora pratiche. Crea la prima oppure importa un file telematico già preparato." : riepilogoHome(voci);
+  const f = filtriHome(box); f.hidden = vuoto;
+  if (vuoto) { box.replaceChildren(); statoHome(); return; }
+  const chips = f.querySelector(".chips"); chips.replaceChildren();
+  for (const [k, nome] of Object.entries(FILTRI_HOME)) {
+    const n = filtraHome(voci, k, "").length;
+    if (k !== "tutte" && k !== HOME.filtro && (!n || (["lavorare", "completate"].includes(k) && !CRUSCOTTO))) continue;   // solo i filtri utili
+    chips.append(h("button", { type: "button", class: "chip", "aria-pressed": HOME.filtro === k ? "true" : "false",
+      onclick: () => { HOME.filtro = k; renderHome(); } }, nome, h("span", { class: "n" }, String(n))));
+  }
+  const righe = ordinaHome(filtraHome(voci, HOME.filtro, HOME.cerca), HOME.ordine);
+  box.replaceChildren(righe.length ? h("table", { class: "tab-pratiche" },
+    h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Pratica"), h("th", { scope: "col", title: "Dodici mesi dal decesso o dalla decorrenza" }, "Termine"),
+      h("th", { scope: "col" }, "Avanzamento"), h("th", { scope: "col" }, "Prossima azione"))),
+    h("tbody", {}, righe.map(rigaHome))) : h("p", { class: "mut nessuna" }, "Nessuna pratica corrisponde al filtro."));
+  statoHome();
+  caricaCruscotto();
+}
+/* Stato delle pratiche dal server (cinque tappe e prossima azione): al massimo ogni 5 secondi e solo sulla pagina iniziale. */
+let cruscottoGen = 0;
+async function caricaCruscotto() {
+  if (S.P || !S.pratiche.length) return;
   const firma = S.pratiche.map(p => p.id + ":" + p.revisione).join(",");
-  if (firma === renderProssime.firma && Date.now() - (renderProssime.quando || 0) < 5000) return;
-  renderProssime.firma = firma; renderProssime.quando = Date.now();
-  const gen = ++prossimeGen;
-  if (!S.pratiche.length) { box.replaceChildren(h("p", { class: "mut" }, "Qui compariranno, pratica per pratica, i passi che restano fino alle ricevute.")); return; }
+  if (firma === caricaCruscotto.firma && Date.now() - (caricaCruscotto.quando || 0) < 5000) return;
+  caricaCruscotto.firma = firma; caricaCruscotto.quando = Date.now();
+  const gen = ++cruscottoGen;
   let c;
-  try { c = await api("/api/cruscotto"); } catch (e) { if (gen === prossimeGen) box.replaceChildren(h("p", { class: "err" }, e.message)); return; }
-  if (gen !== prossimeGen || S.P) return;
-  // il termine conta dalla decorrenza indicata nel frontespizio, se c'e' (cruscotto.py): lo si dice nel testo
-  const daDec = t => t.base === "decorrenza" ? " dalla decorrenza" : "";
-  const titTermine = t => "Termine del " + dataIt(t.data) + (t.base === "decorrenza" ? ", dalla decorrenza del " + dataIt(t.dal) : ", dalla data del decesso");
-  const termine = t => !t ? null : t.giorni < 0 ? h("span", { class: "scad er", title: titTermine(t) }, "superato" + daDec(t))
-    : h("span", { class: "scad" + (t.giorni <= 60 ? " am" : ""), title: titTermine(t) },
-      (t.giorni === 0 ? "oggi" : "tra " + t.giorni + (t.giorni === 1 ? " giorno" : " giorni")) + daDec(t));
-  const testoAzione = a => {
-    if (!a) return "";
-    const m = String((a.dove || {}).percorso || "").match(/^([a-z_]+)\[[^\]]+\]\.([a-z_]+)$/);
-    const campo = m && S.schema.collezioni[m[1]] ? lbl(m[1], m[2], a.dove.sel) : null;
-    return (campo ? campo.charAt(0).toUpperCase() + campo.slice(1) + ": " : "") + a.testo + (a.altri ? " (e altri " + a.altri + ")" : "");
-  };
-  box.replaceChildren(...c.pratiche.map(v => {
-    const tappe = h("ol", { class: "tappe", "aria-label": "Avanzamento della pratica" }, c.tappe.map(t => {
-      const st = (v.tappe || {})[t.id] || "da_fare";
-      return h("li", { class: "tappa " + st, "aria-current": st === "corrente" ? "step" : null },
-        h("span", { class: "nodo", "aria-hidden": "true" }), h("span", { class: "nome-tappa" }, t.nome),
-        h("span", { class: "vh" }, st === "fatto" ? " (fatto)" : st === "corrente" ? " (in corso)" : st === "problema" ? " (da correggere)" : " (da fare)"));
-    }));
-    return h("article", { class: "card-azione" + (v.completata ? " completata" : "") },
-      h("button", { type: "button", class: "card-tit", onclick: () => apri(v.pratica_id) }, v.titolo),
-      tappe,
-      h("button", { type: "button", class: "azione" + ((v.azione || {}).livello === "problema" ? " problema" : ""), onclick: () => vaiAllAzione(v) },
-        h("span", { class: "freccia", "aria-hidden": "true" }), h("span", { class: "testo-az" }, testoAzione(v.azione)), termine(v.termine)));
-  }), ...(c.altre ? [h("p", { class: "mut prossime-altre" }, "Altre " + c.altre + (c.altre === 1 ? " pratica" : " pratiche") + " con termine più lontano"
-    + (c.altre_da_lavorare ? " (" + c.altre_da_lavorare + " da lavorare)" : "") + ": sono nell'elenco delle pratiche.")] : []));
+  try { c = await api("/api/cruscotto?tutte=1"); } catch (e) { if (gen === cruscottoGen) msg("Stato delle pratiche non disponibile: " + e.message, "e"); return; }
+  if (gen !== cruscottoGen || S.P) return;
+  CRUSCOTTO = { tappe: c.tappe, mappa: new Map(c.pratiche.map(v => [v.pratica_id, v])) };
+  renderHome();
 }
 async function vaiAllAzione(v) {
   const dove = (v.azione || {}).dove || {};
@@ -320,8 +378,7 @@ async function statoHome() {
       voce("Controllo ufficiale", ctl ? (ok ? "Disponibile su questo computer" : "Da configurare (vedi Impostazioni)") : "Non verificato", ok ? "ok" : "am"));
   }
 }
-const HOME = { filtro: "tutte", ordine: "recenti", cerca: "", tutte: false };
-const FILTRI_HOME = { tutte: "Tutte", vicine: "In scadenza (60 giorni)", superate: "Termine superato", senza_data: "Senza data del decesso" };
+/* filtro per termine sui dati dell'elenco (usato anche dalle prove dell'interfaccia) */
 function praticheFiltrate(elenco, filtro, ordine, cerca) {
   const c = String(cerca || "").trim().toLowerCase();
   const out = elenco.filter(p => {
@@ -333,19 +390,6 @@ function praticheFiltrate(elenco, filtro, ordine, cerca) {
   if (ordine === "scadenza") out.sort((a, b) => { const ta = terminePresentazione(a.data_decesso), tb = terminePresentazione(b.data_decesso);
     return (ta ? ta.data.getTime() : Infinity) - (tb ? tb.data.getTime() : Infinity); });
   return out;   // «recenti»: ordine del server (ultima modifica prima)
-}
-function filtriHome(ul) {
-  let f = $("#homeFiltri");
-  if (!f) {
-    const cerca = h("input", { type: "search", "aria-label": "Cerca nel titolo", placeholder: "Cerca nel titolo", oninput: ev => { HOME.cerca = ev.target.value; renderHome(); } });
-    const filtro = h("select", { "aria-label": "Filtra per termine", onchange: ev => { HOME.filtro = ev.target.value; renderHome(); } },
-      Object.entries(FILTRI_HOME).map(([v, t]) => h("option", { value: v }, t)));
-    const ordine = h("select", { "aria-label": "Ordina", onchange: ev => { HOME.ordine = ev.target.value; renderHome(); } },
-      h("option", { value: "recenti" }, "Ultime modificate"), h("option", { value: "scadenza" }, "Per termine di presentazione"));
-    f = h("div", { id: "homeFiltri", class: "filtri-home" }, cerca, filtro, ordine);
-    ul.before(f);
-  }
-  f.hidden = S.pratiche.length < 2;
 }
 async function caricaPratiche() {
   S.pratiche = await api("/api/pratiche");
@@ -374,6 +418,9 @@ async function ricarica(id) {
 function render() {
   const aperta = !!S.P;
   $("#vuoto") && ($("#vuoto").hidden = aperta);
+  // pagina iniziale: niente colonna dei quadri e niente comandi della pratica (sarebbero spenti); tornano aprendo una pratica
+  document.body.classList.toggle("in-home", !aperta);
+  if (aperta) { const e = $("#elencoPratiche"); if (e) e.replaceChildren(); }   // righe della pagina iniziale fuori dal DOM
   const q = aperta ? quadro() : null;
   // quadro con una sola riga: si apre gia' selezionata (report grafica 07/11/2026, punto 2)
   if (q && q.coll && !S.riga && S.tab === "dati" && S.chiuso !== q.id) { const rr = righeQuadro(q); if (rr.length === 1) S.riga = rr[0].key; }

@@ -218,7 +218,9 @@ def _completa_file(sv, v: dict) -> None:
             v["tappe"]["file"] = "problema"
 
 
-def cruscotto(sv, limite: int = 12, oggi: date | None = None) -> dict:
+def cruscotto(sv, limite: int = 12, oggi: date | None = None, tutte: bool = False) -> dict:
+    """Stato delle pratiche, le piu' urgenti prima. ``tutte``: la pagina iniziale mostra ogni pratica in un solo elenco; il motivo
+    preciso per cui il file non si genera (calcolo piu' costoso) resta solo per le prime ``limite``."""
     oggi = oggi or date.today()
     voci = [stato_pratica(sv, p, oggi) for p in sv.elenca()]
     # prima le pratiche da lavorare con il termine piu' vicino; in fondo quelle complete. La scelta avviene DOPO l'ordinamento
@@ -228,6 +230,8 @@ def cruscotto(sv, limite: int = 12, oggi: date | None = None) -> dict:
         _completa_file(sv, v)
     for v in nascoste:
         v.pop("_file", None)
+    if tutte:
+        mostrate, nascoste = voci, []
     return {"oggi": oggi.isoformat(), "tappe": [{"id": t, "nome": NOMI[t]} for t in TAPPE], "pratiche": mostrate,
             "totale": len(voci), "altre": len(nascoste),
             "altre_da_lavorare": sum(1 for v in nascoste if not v.get("completata")),

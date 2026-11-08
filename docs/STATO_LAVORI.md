@@ -1,5 +1,15 @@
 # Stato dei lavori (aggiornato 2026-11-08)
 
+## Pagina iniziale ridisegnata (2026-11-08, ramo `home-chiara`)
+- Un solo elenco delle pratiche (tabella) al posto di colonna a sinistra + elenco a schede + «Prossime azioni»: per ogni pratica
+  termine (con la decorrenza, da `cruscotto.py`), cinque tappe in piccolo e prossima azione; filtri a pulsanti con i conteggi,
+  ricerca e ordine (urgenza, ultime modificate, nome). `GET /api/cruscotto?tutte=1` restituisce tutte le pratiche; senza
+  parametro il comportamento resta quello di prima (12 piu' urgenti).
+- Sulla pagina iniziale sono nascosti la colonna dei quadri e i comandi della pratica (Salva, Controlla, File e invio).
+- Prove aggiornate alla struttura nuova mantenendo cio' che verificano (contrasto nei temi, decorrenza, tappa da correggere):
+  `gui_review3.js`, `gui_review4.js`, `gui_grafica_rapida.js`, `gui_layout_20261103.js`; nuove `gui_home.js`,
+  `tests/test_home_elenco.py`. Suite Python 2066 passati e 1 saltato; interfaccia 17/17.
+
 ## Versione 0.3 in prova: densita' e velocita' di inserimento (ramo `versione-0.3`)
 - Proposte 1, 2, 5, 6 del report grafico DEAS (`Report_grafica_DEAS_rea_20261108.md`). Predefiniti invariati: si attivano con
   le preferenze `disposizione` (`destra`/`sotto`, con `altezza_pannello` 200-900) e `densita` = `compatta`.

@@ -89,26 +89,25 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   await page.click("#dGuida button.pil");
   await page.waitForFunction(() => !document.querySelector("#dGuida[open]"));
 
-  // 5. Prossime azioni: termine dalla decorrenza, passo da correggere, pratiche non mostrate
-  await page.route("**/api/cruscotto", async route => {
+  // 5. Pagina iniziale (un solo elenco dall'08/11/2026): termine dalla decorrenza, passo da correggere, tutte le pratiche elencate
+  await page.route("**/api/cruscotto*", async route => {
     const response = await route.fetch(); const c = await response.json();
     const v = c.pratiche.find(x => x.pratica_id !== pid);
     if (v) { v.azione = { testo: "Invio rifiutato: correggi i dati e prepara di nuovo la copia", livello: "problema", dove: { sel: "FILE" } };
       v.tappe = { ...v.tappe, invio: "problema" }; }
-    c.altre = 3; c.altre_da_lavorare = 2;
     await route.fulfill({ response, json: c });
   });
   await page.click("#bHome");
-  // il pannello si ridisegna quando arriva l'elenco aggiornato: si attende la risposta (in parte simulata) del cruscotto
-  await page.waitForFunction(() => document.querySelector("#prossime .prossime-altre")
-    && /dalla decorrenza/.test(document.querySelector("#prossime").textContent), null, { timeout: 20000 });
-  const card = page.locator("#prossime article", { hasText: "Review3 decorrenza e2e" });
-  assert.match(await card.locator(".scad").textContent(), /dalla decorrenza$/);
-  assert.match(await card.locator(".scad").getAttribute("title"), /Termine del 01\/03\/2027, dalla decorrenza del 01\/03\/2026/);
-  assert.match(await page.textContent("#prossime .azione.problema"), /correggi/);
-  assert.ok(await page.locator("#prossime .tappa.problema").count() >= 1, "tappa da correggere evidenziata");
-  assert.match(await page.textContent("#prossime .prossime-altre"), /Altre 3 pratiche con termine più lontano \(2 da lavorare\)/);
-  await page.unroute("**/api/cruscotto");
+  // l'elenco si completa quando arriva lo stato (in parte simulato) delle pratiche
+  await page.waitForFunction(() => /dalla decorrenza/.test((document.querySelector("#elencoPratiche") || {}).textContent || "")
+    && document.querySelector("#elencoPratiche .lk-azione.problema"), null, { timeout: 20000 });
+  const riga = page.locator("#elencoPratiche tr", { hasText: "Review3 decorrenza e2e" });
+  assert.match(await riga.locator(".c-term .pz").textContent(), /dalla decorrenza$/);
+  assert.match(await riga.locator(".c-term").getAttribute("title"), /Termine del 01\/03\/2027, dalla decorrenza del 01\/03\/2026/);
+  assert.match(await page.textContent("#elencoPratiche .lk-azione.problema"), /correggi/);
+  assert.ok(await page.locator("#elencoPratiche .tm.problema").count() >= 1, "tappa da correggere evidenziata");
+  assert.equal(await page.locator("#elencoPratiche tbody tr").count(), await page.evaluate(() => S.pratiche.length), "tutte le pratiche nell'elenco");
+  await page.unroute("**/api/cruscotto*");
   assert.deepEqual(errori, []);
   return { esito: "passato", ambito: "GUI locale, dati sintetici" };
 }

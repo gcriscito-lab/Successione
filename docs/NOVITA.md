@@ -10,6 +10,10 @@ Si attivano dalle Impostazioni: chi non le sceglie vede il programma come prima.
   (prima 10); un erede da 1.420 a 590 pixel, tutti i campi visibili.
 - Immobili in una tabella sola: linguette «Tutti gli immobili / Fabbricati / Terreni / tavolari» sopra i quadri EB, EC,
   EL, EM, con la sigla del quadro in prima colonna e il totale complessivo. Il file telematico non cambia.
+- Pagina iniziale più chiara: un solo elenco delle pratiche, ordinato per urgenza, con termine, avanzamento in cinque tappe e
+  prossima cosa da fare (cliccabile); in alto un riepilogo in una riga e filtri a pulsanti con i conteggi (da lavorare, in
+  scadenza, termine superato, senza data, completate), ricerca e ordine. Prima le stesse pratiche comparivano tre volte e la
+  scadenza era detta in due modi; ora la colonna dei quadri e i comandi della pratica compaiono solo aprendo una pratica.
 - Tastiera: Alt+1 … Alt+9 portano alle voci dell'elenco dei quadri (l'indicazione è nel suggerimento di ogni voce); nella
   scheda Invio passa al campo successivo e, dopo l'ultimo, al pulsante Salva.
 
