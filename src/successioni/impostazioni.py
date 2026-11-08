@@ -315,6 +315,18 @@ def _valida_profilo(p) -> dict:
     return out
 
 
+def nome_studio(cartella_dati: Path | str | None = None) -> str:
+    """Nome dello studio dalle preferenze dell'interfaccia, letto dal file di configurazione accanto ai dati indicati (lo
+    stesso usato da preferenze e profilo): con un archivio di prova si stampa il nome di quell'archivio, non di un altro."""
+    env = os.environ.get("SUCCESSIONI_CONFIG")
+    f = Path(env) if env else (Path(cartella_dati) / "configurazione.json" if cartella_dati else file_configurazione())
+    try:
+        conf = json.loads(f.read_text(encoding="utf-8-sig"))
+        return preferenze_interfaccia(conf if isinstance(conf, dict) else {}).get("nome_studio", "") or ""
+    except (OSError, ValueError, DatiNonValidi):
+        return ""
+
+
 def profilo_studio(cartella_dati: Path | str | None = None) -> dict:
     """Profilo salvato (vuoto se assente o non valido). Si legge dal file di configurazione accanto ai dati indicati."""
     env = os.environ.get("SUCCESSIONI_CONFIG")

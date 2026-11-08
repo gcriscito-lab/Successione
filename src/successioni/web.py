@@ -395,17 +395,12 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     @api
     async def prospetto_cliente_api(request):
         """Riepilogo stampabile per gli eredi, letto dall'ultimo file generato (stessi importi della dichiarazione)."""
-        import json as _json
         from . import impostazioni
         from .prospetto_cliente import html as prospetto_html
         pid = request.path_params["pid"]
         xml, j = sv.file_export(pid)
         stato = sv.stato_elaborati(pid)["export"]
-        try:
-            conf = _json.loads(impostazioni.file_configurazione().read_text(encoding="utf-8-sig"))
-            studio = impostazioni.preferenze_interfaccia(conf if isinstance(conf, dict) else {}).get("nome_studio", "")
-        except (OSError, ValueError, DatiNonValidi):
-            studio = ""
+        studio = impostazioni.nome_studio(sv.arch.base)
         return HTMLResponse(prospetto_html(xml, titolo=sv.leggi(pid)["titolo"], studio=studio, revisione=j["input"]["revisione"],
                                            completo=bool(j["risultato"].get("completo")), obsoleto=stato.get("stato") == "obsoleto"),
                             headers={"Cache-Control": "no-store"})
@@ -446,7 +441,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def scarica_dcm(request):
         dcm, m = sv.file_controllato_dcm(request.path_params["pid"])
         return Response(dcm, media_type="application/octet-stream", headers={"Content-Disposition":
-                        f'attachment; filename="{m["nome"] or "file_controllato.dcm"}"', "Cache-Control": "no-store"})
+                        "attachment; filename*=UTF-8''" + quote(m["nome"] or "file_controllato.dcm", safe=""),
+                        "Cache-Control": "no-store"})
 
     @api
     async def stampa_modello_api(request):
@@ -474,14 +470,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def preventivo_api(request):
-        import json as _json
         from . import impostazioni
         from .preventivo import html as prev_html
-        try:
-            conf = _json.loads(impostazioni.file_configurazione().read_text(encoding="utf-8-sig"))
-            studio = impostazioni.preferenze_interfaccia(conf if isinstance(conf, dict) else {}).get("nome_studio", "")
-        except (OSError, ValueError, DatiNonValidi):
-            studio = ""
+        studio = impostazioni.nome_studio(sv.arch.base)
         testo = prev_html(sv, request.path_params["pid"], request.query_params.get("tipo", "preventivo"), studio)
         return HTMLResponse(testo, headers={"Cache-Control": "no-store"})
 
@@ -502,7 +493,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         from .collegamenti.base import DepositoArtefatti
         ad = sv._adattatore_invio("manuale")
         j = ad.job.leggi(request.path_params["cid"], "invio_copia")
-        a = next(a for a, m in zip(j["risultato"]["artefatti"], j["input"]["manifest"]) if m["ruolo"] == "telematico")
+        a = next((a for a, m in zip(j["risultato"]["artefatti"], j["input"]["manifest"]) if m["ruolo"] == "telematico"), None)
+        if a is None:
+            raise NonTrovato("la copia non contiene il file telematico")
         return Response(DepositoArtefatti(sv.arch).leggi(a), media_type="application/xml",
                         headers={"Content-Disposition": 'attachment; filename="copia_congelata.xml"', "Cache-Control": "no-store"})
 
