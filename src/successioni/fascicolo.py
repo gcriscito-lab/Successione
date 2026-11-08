@@ -31,7 +31,12 @@ def _documenti(sv, pid: str) -> tuple[list[tuple[str, bytes]], list[str]]:
     docs, assenti = [], []
     try:
         pdf, _ = sv.file_stampa_modello(pid)
-        docs.append(("Modello ministeriale (stampa del file telematico)", pdf))
+        superata = sv.stato_elaborati(pid).get("stampa_modello", {}).get("stato") == "obsoleta"
+        docs.append(("Modello ministeriale (stampa del file telematico)"
+                     + (" - SUPERATO: i dati sono cambiati dopo la stampa, rigenerala" if superata else ""), pdf))
+        if superata:
+            assenti.append("Modello ministeriale aggiornato: la stampa inclusa e' precedente alle ultime modifiche "
+                           "(rigenera la stampa e poi il fascicolo)")
     except ErroreServizio as e:
         assenti.append(f"Modello ministeriale: {e.messaggio}")
     dati = sv.leggi(pid)["dati"]

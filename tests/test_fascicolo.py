@@ -85,3 +85,14 @@ def test_pratica_vuota_e_api(tmp_path):
     assert r.headers["content-disposition"].startswith("inline") and r.content[:5] == b"%PDF-"
     assert r.headers["x-frame-options"] == "SAMEORIGIN"
     assert cl.get("/api/pratiche/inesistente/fascicolo.pdf").status_code == 404
+
+
+def test_stampa_superata_dichiarata_in_copertina(tmp_path, monkeypatch):
+    sv, pid = _pratica(tmp_path)
+    crea_pdf(tmp_path / "mod.pdf", 4)
+    monkeypatch.setattr(sv, "file_stampa_modello", lambda p: ((tmp_path / "mod.pdf").read_bytes(), {"id": "x"}))
+    originale = sv.stato_elaborati
+    monkeypatch.setattr(sv, "stato_elaborati", lambda p: {**originale(p), "stampa_modello": {"stato": "obsoleta"}})
+    pdf, ind = fascicolo(sv, pid)
+    assert "SUPERATO" in ind["documenti"][0][0]
+    assert any(x.startswith("Modello ministeriale aggiornato") for x in ind["non_inclusi"])

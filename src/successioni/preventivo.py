@@ -74,9 +74,11 @@ def imposte_dal_file(sv, pid: str) -> dict | None:
     except ErroreServizio:
         return None
     letto = leggi(xml)
-    stato = sv.stato_elaborati(pid)["export"].get("stato")
+    ex = sv.stato_elaborati(pid)["export"]
     return {"righe": letto["imposte"], "totale": letto.get("importo_da_versare") if letto.get("importo_da_versare") is not None
-            else letto.get("totale_ef"), "revisione": j["input"]["revisione"], "obsoleto": stato == "obsoleto"}
+            else letto.get("totale_ef"), "revisione": j["input"]["revisione"], "obsoleto": ex.get("stato") == "obsoleto",
+            # una bozza tecnica o un file incompleto puo' avere imposte parziali o mancanti
+            "incompleto": j["input"].get("scopo") == "bozza_tecnica" or not j["risultato"].get("completo")}
 
 
 def html(sv, pid: str, tipo: str, studio: str = "") -> str:
@@ -116,7 +118,8 @@ def html(sv, pid: str, tipo: str, studio: str = "") -> str:
                             for t, v in imp["righe"])
             tot = f"<tr class='tot'><td>Totale imposte da versare con la dichiarazione</td><td class='n'>{_euro(Decimal(imp['totale']))}</td></tr>" \
                 if imp["totale"] is not None else ""
-            avviso = " <b>Il file non e' aggiornato alle ultime modifiche.</b>" if imp["obsoleto"] else ""
+            avviso = (" <b>Il file non e' aggiornato alle ultime modifiche.</b>" if imp["obsoleto"] else "") + (
+                " <b>Il file e' una bozza o e' incompleto: le imposte possono essere parziali.</b>" if imp.get("incompleto") else "")
             blocco_imp = (f"<h2>Imposte della dichiarazione (per conto del cliente)</h2><table>{r_imp}{tot}</table>"
                           f"<p class='mut'>Dal file generato (revisione {imp['revisione']}); sommate a parte, non fanno parte dei compensi.{avviso}</p>")
     intest = e(str(prev.get("intestatario") or "").strip())
