@@ -64,7 +64,8 @@ Correzioni dalla revisione completa dell'8 novembre
 Limiti aperti (da confermare con il professionista)
 - Saggio legale per i decessi dal 2026: il programma usa il 2,5% e il prospetto in vigore, con un avviso; il decreto 2026 non è
   nelle fonti del programma.
-- Pertinenze della prima casa (C/2, C/6, C/7 con codice X): oggi moltiplicatore 120; l'estensione del 110 non è nelle fonti.
+- Pertinenze della prima casa (C/2, C/6, C/7 con codice X): dal 9/11/2026 moltiplicatore 110 come la prima casa (confermato
+  dal professionista; prima 120).
 - Preventivo e parcella: IVA su compensi più contributo cassa e ritenuta sui soli compensi; spese anticipate esenti e bollo
   non gestiti; nessuna dicitura per i regimi senza IVA; arrotondamento al centesimo voce per voce.
 - Esiti delle ricevute che tengono aperta la pratica: oggi pagamento negativo, volture parziali o negative ed esiti

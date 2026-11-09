@@ -44,6 +44,16 @@ MOLT_A10_D = Decimal("60")
 MOLT_PRIMA_CASA = Decimal("110")
 MOLT_ALTRI = Decimal("120")
 CODICI_PRIMA_CASA = ("P", "Z")
+#: pertinenze della prima casa: codice X sulla riga di devoluzione, oppure casella «Diritto di abitazione» 3 o 7 (pertinenza).
+#: Il moltiplicatore 110 vale anche per loro: art. 2 c. 63 L. 350/2003 (+10% per tutti gli immobili) e art. 1-bis c. 7 D.L.
+#: 168/2004 (+20% solo per i beni «diversi dalla prima casa di abitazione»); l'agevolazione prima casa comprende le pertinenze
+#: C/2, C/6, C/7 (Fascicolo I pp. PDF 26-27). Scelta confermata dal professionista il 9/11/2026 dopo la revisione indipendente.
+CODICE_PERTINENZA = "X"
+CODICI_DA_PERTINENZA = ("3", "7")
+CATEGORIE_PERTINENZA = ("C2", "C6", "C7")
+FONTE_PERTINENZA = ("pertinenza della prima casa (codice X): art. 2 c. 63 L. 350/2003 e art. 1-bis c. 7 D.L. 168/2004 (la "
+                    "rivalutazione del 20% riguarda i beni diversi dalla prima casa); Succ_FASCICOLO_I_Nov_23.pdf pp. PDF 26-27 "
+                    "(pertinenze C/2, C/6, C/7)")
 #: categorie per cui l'agevolazione prima casa non si applica (A/1, A/8, A/9 come telematico/prima_casa.CAT_ESCLUSE; A/10 e
 #: A/11 non sono case di abitazione ai fini della lettera e): moltiplicatore ordinario
 CATEGORIE_SENZA_PRIMA_CASA = ("A1", "A8", "A9", "A11")
@@ -88,7 +98,7 @@ def _categoria(b: dict) -> str:
     return str(b.get("categoria") or "").strip().upper().replace(" ", "")
 
 
-def moltiplicatore_fabbricato(categoria: str, prima_casa: bool) -> tuple[Decimal | None, str]:
+def moltiplicatore_fabbricato(categoria: str, prima_casa: bool, pertinenza: bool = False) -> tuple[Decimal | None, str]:
     """Moltiplicatore della rendita rivalutata per categoria (art. 309 c. 6, lettere b-f)."""
     c = categoria.replace("/", "")
     if not c or c.startswith("F"):
@@ -101,6 +111,8 @@ def moltiplicatore_fabbricato(categoria: str, prima_casa: bool) -> tuple[Decimal
         return MOLT_A10_D, "categoria A/10 o gruppo D (lettera d)"
     if c.startswith("A") and prima_casa and c not in CATEGORIE_SENZA_PRIMA_CASA:
         return MOLT_PRIMA_CASA, "casa di abitazione con agevolazione prima casa (lettera e)"
+    if pertinenza and c in CATEGORIE_PERTINENZA:
+        return MOLT_PRIMA_CASA, "pertinenza della prima casa (lettera e)"
     return MOLT_ALTRI, "altre case di abitazione e altre categorie (lettera f)"
 
 
@@ -160,14 +172,20 @@ def calcola(dati: dict, b: dict) -> dict:
         prima = prima_da or any(d.get("bene_id") == b.get("id")
                                 and str(SUP.attr(dati, "devoluzioni", d, "agevolazioni") or "").strip().upper() in CODICI_PRIMA_CASA
                                 for d in dati.get("devoluzioni", []))
-        molt, voce = moltiplicatore_fabbricato(_categoria(b), prima)
+        cod_da = "" if isinstance(da, dict) else str(da or "").strip()
+        pert = cod_da in CODICI_DA_PERTINENZA or any(
+            d.get("bene_id") == b.get("id")
+            and str(SUP.attr(dati, "devoluzioni", d, "agevolazioni") or "").strip().upper() == CODICE_PERTINENZA
+            for d in dati.get("devoluzioni", []))
+        molt, voce = moltiplicatore_fabbricato(_categoria(b), prima, pert)
+        pert = pert and molt == MOLT_PRIMA_CASA and not _categoria(b).startswith("A")
         if molt is None:
             out["motivo"] = voce
             return out
         base = rendita * RIV_RENDITA * molt
         formula = f"rendita {rendita} × 1,05 × {str(molt).replace('.', ',')} ({voce}) × quota {q.numerator}/{q.denominator}"
         out["fonti"] = [FONTE_RIVALUTAZIONE, FONTE_MOLTIPLICATORI] + ([FONTE_PRIMA_CASA] if prima else []) + (
-            [FONTE_PRIMA_CASA_DA] if prima_da else [])
+            [FONTE_PRIMA_CASA_DA] if prima_da else []) + ([FONTE_PERTINENZA] if pert else [])
     valore = (base * Decimal(q.numerator) / Decimal(q.denominator)).quantize(Decimal("1"), rounding=ROUND_CEILING)
     out.update(calcolabile=True, valore=str(valore), formula=formula + f" = {valore} euro (arrotondato per eccesso)",
                inferiore=dich is not None and dich < valore)

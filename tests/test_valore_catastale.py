@@ -72,6 +72,25 @@ def test_prima_casa_non_vale_per_le_pertinenze_c():
     assert VC.calcola(_dati([b], devoluzioni=devs), b)["valore"] == "126000"
 
 
+@pytest.mark.parametrize("categoria", ["C/2", "C/6", "C/7"])
+def test_pertinenza_della_prima_casa_con_codice_x_a_110(categoria):
+    """Revisione indipendente del 9/11/2026 (M1): la pertinenza con codice X ha il moltiplicatore della prima casa."""
+    b = _fab(categoria=categoria, rendita="100.00")
+    devs = [{"id": "d1", "bene_id": "b_x", "persona_id": "p1", "agevolazioni": "X"}]
+    r = VC.calcola(_dati([b], devoluzioni=devs), b)
+    assert r["valore"] == "11550" and "pertinenza" in r["formula"], r     # 100 x 1,05 x 110
+    assert any("codice X" in f for f in r["fonti"])
+    assert not VC.avvisi(dict(_dati([_fab(categoria=categoria, rendita="100.00", valore="11550")], devoluzioni=devs)))
+    b3 = _fab(categoria=categoria, rendita="100.00", diritto_abitazione="3")     # casella diritto di abitazione: pertinenza
+    assert VC.calcola(_dati([b3]), b3)["valore"] == "11550"
+
+
+def test_codice_x_non_vale_fuori_dalle_categorie_di_pertinenza():
+    b = _fab(categoria="C/1")
+    devs = [{"id": "d1", "bene_id": "b_x", "persona_id": "p1", "agevolazioni": "X"}]
+    assert VC.calcola(_dati([b], devoluzioni=devs), b)["valore"] == "42840"
+
+
 def test_terreno_agricolo_e_edificabile():
     t = {"id": "t1", "tipo": "terreno", "natura": "T", "tipologia_terreno": "3", "reddito_dominicale": "100.00",
          "diritto": "1", "quota_defunto": "1/2"}

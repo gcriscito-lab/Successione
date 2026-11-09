@@ -39,7 +39,7 @@ Le note di Normattiva sull'art. 52 DPR 131/1986 confermano queste rivalutazioni 
 ## Casi non calcolati (con il motivo mostrato)
 
 - **Diritto diverso dalla piena proprietà** (codice 1). Per nuda proprietà e diritti reali l'art. 309 c. 7 rinvia all'art. 99 del testo unico registro (D.Lgs. 123/2025), da implementare con il modulo usufrutto. Per questi beni il valore dichiarato non è confrontato con un minimo.
-- **Pertinenze della prima casa** (C/2, C/6, C/7 con agevolazione X): oggi moltiplicatore 120. L'estensione del 110 alle pertinenze non è nelle fonti del progetto: **da confermare con il professionista** prima di cambiarla.
+- **Pertinenze della prima casa** (C/2, C/6, C/7 con agevolazione X, o casella «Diritto di abitazione» 3 o 7): moltiplicatore 110, come la prima casa. Base: art. 2 c. 63 L. 350/2003 e art. 1-bis c. 7 D.L. 168/2004 (la rivalutazione del 20% riguarda i beni diversi dalla prima casa); Fascicolo I pp. PDF 26-27 per le categorie. Confermato dal professionista il 9/11/2026 dopo la revisione indipendente (prima era 120).
 - **Categorie del gruppo F** o categoria mancante: nessuna rendita.
 - **Terreni edificabili o parzialmente edificabili** (tipologia 1 o 2), nature diverse da T/R.
   - Se la tipologia manca, il valore si calcola con l'avviso di verificare che il terreno non sia edificabile.

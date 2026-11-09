@@ -323,7 +323,9 @@ def _pratica(c: dict, quote: list[Fraction]) -> dict:
             # la rendita e' obbligatoria nel quadro EC ma non entra nelle imposte (calcolate sul valore): senza rendita si usa un
             # segnaposto, che resta nella pratica sintetica
             b["rendita"] = str(im["rendita"]) if im["rendita"] is not None else "1.00"
-            ob.update(indirizzo="Via Esempio 1", classe="1", consistenza="1")
+            ob.update(indirizzo="Via Esempio 1", classe="1")
+            if im["categoria"][:1] in "ABC":      # la consistenza si indica solo per i gruppi A, B, C (esporta: REGOLA_CONSISTENZA)
+                ob["consistenza"] = "1"
         else:
             ob.update(natura="T", tipologia_terreno="3", superficie={"ettari": 0, "are": 10, "centiare": 0})
             if im["reddito_dominicale"] is not None:

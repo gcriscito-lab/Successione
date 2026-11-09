@@ -309,3 +309,12 @@ def test_richiesta_non_oggetto_e_mcp_con_voce_non_oggetto(tmp_path):
     res = asyncio.run(scenario())
     testo = res.content[0].text
     assert res.is_error and "Input should be" not in testo
+
+
+@pytest.mark.parametrize("categoria,valore", [("D/1", "63000"), ("E/1", "42840")])
+def test_categorie_d_ed_e_stimabili(categoria, valore):
+    """Revisione indipendente del 9/11/2026 (M2): per i gruppi D ed E la consistenza non si indica; prima la stima falliva."""
+    r = C.stima({"data_decesso": "2025-03-10", "eredi": [{"grado": "02"}],
+                 "immobili": [{"tipo": "fabbricato", "rendita": "1000", "categoria": categoria}]})
+    assert r["stato"] == "stimato", r["non_stimabile"]
+    assert r["valori_catastali"][0]["valore_catastale"] == valore
