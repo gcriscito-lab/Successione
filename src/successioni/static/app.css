@@ -845,3 +845,59 @@ dialog p.e { font-size:var(--fs-base); }
 dialog.preventivo table.prev-voci :is(td, th):nth-child(2) { width:1%; }   /* «Togli» subito accanto all'importo */
 dialog .campo .aspetto-griglia[role=group] > label.chk { display:flex; align-items:center; gap:var(--s-2); padding:0; border:0; margin:0; color:var(--t); font-size:var(--fs-base); }
 dialog .campo .aspetto-griglia[role=group] > label.chk input { margin:0; }
+
+/* ==== Revisione grafica del 9/11/2026, lotti 3-6 ==== */
+/* Lotto 3: campi della pratica larghi secondo il dato */
+.generali-griglia .grp .rg :is(input, select) { max-width:30rem; }                                       /* B02 */
+.generali-griglia .grp .rg input[placeholder="GG/MM/AAAA"] { max-width:var(--l-data); }
+.generali-griglia .rg:is([data-campo^=provincia], [data-campo=sesso], [data-campo=relazione_con_defunto]) :is(input, select) { max-width:12rem; }
+#dd_acconto, #dd_pagamento_rateale { text-align:right; max-width:var(--l-importo); font-variant-numeric:tabular-nums; }   /* B12 */
+.ins .rg[data-campo=consistenza] input { text-align:right; }
+.rg.rg-stato { grid-template-columns:10.5rem minmax(0,1fr); }                                             /* B18 */
+.file-griglia select { max-width:24rem; }
+.ins .campi-scheda .rg > label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }          /* B04 */
+:is(.gruppo-opzionale, .riquadro-calc + div) .grp > .rg { grid-template-columns:minmax(14rem, 30%) minmax(0, 34rem); }   /* B03 */
+
+/* Lotto 4: coerenza fra schede e quadri */
+.riquadro-calc { max-width:44rem; }                                                                       /* B06 */
+.riquadro-calc + div > :is(.tab.piatta, .grp) { max-width:44rem; }
+.riquadro-calc + div > .tab.piatta { margin-bottom:var(--s-3); }
+.grp > :is(.elenco-azioni, .spunte-eh, p) { margin-left:var(--s-3); margin-right:var(--s-3); }           /* B07 */
+.grp > .elenco-azioni { padding-left:var(--s-4); margin-bottom:var(--s-3); }
+.grp h2 { font-size:var(--fs-base); font-weight:700; color:var(--t); padding:var(--s-3) var(--s-3) var(--s-2); }   /* B08 */
+.generali-griglia .grp h2 { padding:var(--s-3) var(--s-3) var(--s-2); }
+.grp .grp { box-shadow:none; border-radius:0; border-top:1px solid var(--sep); margin-bottom:0; }        /* B10 */
+.barra > .mut, .grp > p.mut { font-size:var(--fs-s); }                                                    /* B11 */
+.ins > h3, .ins details.altri > h3 { font-size:var(--fs-m); font-weight:700; background:var(--grigio); border-radius:var(--r1);
+  padding:var(--s-1) var(--s-2); margin:var(--s-4) 0 var(--s-15); }                                     /* B16 */
+td.n + td:not(.n), th.n + th:not(.n) { padding-left:var(--s-5); }                                        /* B13 */
+.tab th { font-size:var(--fs-m); color:var(--t); }                                                   /* B23 */
+.gruppo-opzionale + .gruppo-opzionale { margin-top:0; }                                                   /* B09 */
+.gruppo-opzionale { padding:var(--s-1) 0; } .gruppo-opzionale[open] { padding-bottom:var(--s-3); }
+.menu-op { min-width:300px; } .menu-op button { align-items:center; }                                     /* B14 */
+@media (min-width:961px) { :root[data-disposizione="sotto"] .ins { padding-left:var(--s-6); padding-right:var(--s-6); } }   /* B15 */
+@media (min-width:961px) and (max-width:1440px) { :root[data-disposizione="sotto"] .ins { padding-left:var(--s-5); padding-right:var(--s-5); } }
+
+/* Lotto 5: leggibilita' (solo valori) */
+::placeholder { color:var(--t2); opacity:1; }                                                             /* C02 */
+.chip[aria-pressed=true] .n { background:color-mix(in srgb, var(--su-acc) 12%, transparent); }           /* C03 */
+:root { --fs-s:max(.857rem, 12px); --fs-m:max(.929rem, 13px); }                                           /* C04 */
+button:disabled { opacity:.6; }                                                                           /* C06 */
+:root:not([data-contrasto="alto"]) { --sep-f:rgba(31,42,42,.60); }                                                                     /* C08 */
+:root[data-tema="scuro"]:not([data-contrasto="alto"]) { --sep-f:rgba(228,234,230,.48); }
+:root[data-tema="seppia"]:not([data-contrasto="alto"]) { --sep-f:rgba(90,70,40,.72); }
+.sb { font-size:var(--fs-m); } .sb button { font-size:var(--fs-m); }                                     /* C10 */
+.lat { scroll-padding-block:var(--s-2); }                                                                 /* C11 */
+
+/* Lotto 6: rifiniture e schermi larghi */
+#wiz { margin-block:8vh auto; }                                                                           /* A08 */
+#wiz form { display:flex; flex-direction:column; min-height:min(40rem, 84vh); }
+#wizCorpo { flex:1; }
+@media (min-width:1600px) { #imp, dialog.guida { width:1040px; } }                                        /* A23 */
+@media (min-width:1800px) { .vuoto { max-width:100rem; } }                                                /* B21 */
+.elenco-pratiche .nessuna { padding:var(--s-6) var(--s-4); background:var(--solido); border-radius:var(--r2); box-shadow:0 0 0 1px var(--sep); color:var(--t2); }   /* B19 */
+.chip { min-height:2.2rem; }                                                                              /* B20 */
+input[type=file]::file-selector-button { font:inherit; color:var(--t); border:1px solid var(--sep-f); background:var(--solido);
+  border-radius:var(--r1); padding:var(--s-1) var(--s-3); margin-right:var(--s-2); cursor:pointer; }    /* B22 */
+.ridimensiona::after { opacity:.45; } .ridimensiona:hover::after, .ridimensiona:focus-visible::after { opacity:1; }   /* B25 */
+.voce .st { line-height:1.3; } .voce[data-stato=inattivo] { padding-top:1px; padding-bottom:1px; }

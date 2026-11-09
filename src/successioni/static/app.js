@@ -86,7 +86,7 @@ function applicaAspetto(valori) {
   const nav = limiteNav() ? Math.min(limiteNav(), Math.max(180, Number(p.larghezza_nav) || 240)) : 240;
   root.style.setProperty('--larghezza-nav', nav + 'px');
   const limite = limitePannello(nav);
-  root.style.setProperty('--larghezza-ins', Math.min(limite, Math.max(280, Number(p.larghezza_pannello) || 360)) + 'px');
+  root.style.setProperty('--larghezza-ins', Math.min(limite, Math.max(280, Number(p.larghezza_pannello) || (window.innerWidth >= 1680 ? 440 : 360))) + 'px');
   // versione 0.3: pannello della riga sotto l'elenco, a tutta larghezza (separatore orizzontale) oppure a destra
   const sotto = p.disposizione === 'sotto';
   root.dataset.disposizione = sotto ? 'sotto' : 'destra';
@@ -695,7 +695,7 @@ const VOCI_EH = { FlagDeceduto: "Il defunto è deceduto (data e luogo del decess
   FlagProspetto: "Inventari/prospetti delle attività e passività: copie degli originali (lettera l)", FlagInventari: "Inventari allegati tra gli altri documenti: copie degli originali (lettera l)",
   FlagAttiLegali: "Passaggi senza atti legali (quadro EI)" };
 // «2.820 €» anche sotto i 10.000 (in italiano il separatore delle migliaia di norma si omette a quattro cifre: negli importi no)
-const euroIt = v => { const n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString("it-IT", { minimumFractionDigits: String(v).includes(".") ? 2 : 0, maximumFractionDigits: 2, useGrouping: "always" }) + " €"; };
+const euroIt = (v, dec) => { const n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString("it-IT", { minimumFractionDigits: dec ?? (String(v).includes(".") ? 2 : 0), maximumFractionDigits: 2, useGrouping: "always" }) + " €"; };
 async function renderAnteprima(main, q) {
   const pid = S.P.pratica_id;
   main.append(h("div", { class: "calcolato riquadro-calc" }, h("span", { class: "etich-calc" }, "calcolato"), " Il quadro " + q.id + " è calcolato dal programma con i dati salvati della pratica, come nel file della dichiarazione. " +
@@ -708,13 +708,13 @@ async function renderAnteprima(main, q) {
   if (q.id === "EE") {
     if (!r.ee.length) box.append(h("p", { class: "mut" }, "Nessun totale calcolabile: vedi i motivi qui sotto."));
     else box.append(h("div", { class: "tab piatta" }, h("table", {}, h("tbody", {}, r.ee.map(x => h("tr", { class: ["TotaleAttivo", "TotaleValoreAsseEreditarioNetto"].includes(x.campo) ? "fisso forte" : "fisso" },
-      h("td", {}, VOCI_EE[x.campo] || x.campo), h("td", { class: "n" }, euroIt(x.valore))))))));
+      h("td", {}, VOCI_EE[x.campo] || x.campo), h("td", { class: "n" }, euroIt(x.valore, 2))))))));
   } else if (q.id === "EF") {
     if (!r.ef) box.append(h("p", { class: "mut" }, "Imposte non calcolabili finché non si risolvono i punti qui sotto."));
     else box.append(h("div", { class: "tab piatta prospetto-ef" }, h("table", { "aria-label": "Liquidazione delle imposte (quadro EF)" }, h("tbody", {},
-      r.ef.imposte.map(([k, v]) => h("tr", { class: "fisso" }, h("td", {}, k), h("td", { class: "n" }, isNaN(Number(v)) ? v : euroIt(v)))),
-      h("tr", { class: "fisso forte" }, h("td", {}, "Totale da versare (EF19)"), h("td", { class: "n" }, r.ef.totale ? euroIt(r.ef.totale) : "—")),
-      r.ef.importo_da_versare && r.ef.importo_da_versare !== r.ef.totale ? h("tr", { class: "fisso" }, h("td", {}, "Importo da versare (frontespizio, con sanzioni e interessi)"), h("td", { class: "n" }, euroIt(r.ef.importo_da_versare))) : null))));
+      r.ef.imposte.map(([k, v]) => h("tr", { class: "fisso" }, h("td", {}, k), h("td", { class: "n" }, isNaN(Number(v)) ? v : euroIt(v, 2)))),
+      h("tr", { class: "fisso forte" }, h("td", {}, "Totale da versare (EF19)"), h("td", { class: "n" }, r.ef.totale ? euroIt(r.ef.totale, 2) : "—")),
+      r.ef.importo_da_versare && r.ef.importo_da_versare !== r.ef.totale ? h("tr", { class: "fisso" }, h("td", {}, "Importo da versare (frontespizio, con sanzioni e interessi)"), h("td", { class: "n" }, euroIt(r.ef.importo_da_versare, 2))) : null))));
   } else if (q.id === "EH") {
     const sez1 = r.eh.filter(x => x.sezione === "SezioneI_DichSost"), altre = r.eh.filter(x => x.sezione !== "SezioneI_DichSost");
     box.append(h("section", { class: "grp" }, h("h2", {}, "Sezione I - Dichiarazioni sostitutive: cosa risulta dai dati"),
@@ -745,7 +745,7 @@ async function impostaQuadro(id, on) {
 // colonne fisse: la prima (riconoscimento) a sinistra, valore/importo (ultima) a destra (report grafica 07/11/2026, punto 1)
 function classeColonna(q) {
   const col = colonneVista(q), ultima = col.length - 1, fissaDx = ["valore", "importo"].includes(col[ultima]);
-  return (c, j) => [["quota", "importo", "rendita", "valore", "reddito_dominicale"].includes(c) ? "n" : "",
+  return (c, j) => [["quota", "quota_defunto", "importo", "rendita", "valore", "reddito_dominicale"].includes(c) ? "n" : "",
     j === 0 ? "fissa-sx" : "", j === ultima && fissaDx ? "fissa-dx" : ""].filter(Boolean).join(" ");
 }
 function renderTabella(main, q) {

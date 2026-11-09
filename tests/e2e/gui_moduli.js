@@ -58,6 +58,35 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   const sfondo = await page.evaluate(() => getComputedStyle(document.querySelector(".ins > .seg")).backgroundImage);
   assert.match(sfondo, /linear-gradient/, "sfondo delle linguette con il fondo pieno del pannello");
 
+  // B02 (lotto 3): nei Dati generali le date non sono larghe quanto la scheda
+  await page.evaluate(id => apri(id, "AN"), pid);
+  await page.waitForSelector('.generali-griglia input[placeholder="GG/MM/AAAA"]');
+  const date = await page.evaluate(() => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    return { rem, w: [...document.querySelectorAll('.generali-griglia input[placeholder="GG/MM/AAAA"]')].filter(e => e.offsetParent).map(e => e.getBoundingClientRect().width) };
+  });
+  for (const x of date.w) assert.ok(x <= 11 * date.rem + 1, `data larga ${x}px (max 11rem)`);
+
+  // C02 (lotto 5): il segnaposto ha il colore del testo secondario, non il grigio del browser, anche nel tema scuro
+  const segnaposto = await page.evaluate(() => {
+    document.documentElement.dataset.tema = "scuro";
+    const i = document.querySelector('.generali-griglia input[placeholder="GG/MM/AAAA"]');
+    const rgb = c => c.match(/[\d.]+/g).slice(0, 3).map(Number);
+    const lum = c => { const [r, g, b] = rgb(c).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const a = lum(getComputedStyle(i, "::placeholder").color), f = lum(getComputedStyle(i).backgroundColor);
+    const r = (Math.max(a, f) + 0.05) / (Math.min(a, f) + 0.05); document.documentElement.dataset.tema = "chiaro"; return r;
+  });
+  assert.ok(segnaposto >= 4.5, `contrasto del segnaposto nel tema scuro ${segnaposto.toFixed(2)} (min 4,5)`);
+
+  // B04 (lotto 3): nella scheda della riga ogni etichetta sta su una riga sola
+  await page.evaluate(id => apri(id, "EC"), pid);
+  await page.waitForSelector("#vista tbody tr");
+  await page.click("#vista tbody tr >> nth=0");
+  await page.waitForSelector(".ins .campi-scheda .rg > label");
+  const alte = await page.evaluate(() => [...document.querySelectorAll(".ins .campi-scheda .rg > label")].filter(l => l.offsetParent)
+    .filter(l => l.getBoundingClientRect().height > parseFloat(getComputedStyle(l).lineHeight) * 1.5 + 1).map(l => l.textContent));
+  assert.deepEqual(alte, [], "etichette della scheda su una riga");
+
   assert.deepEqual(errori, []);
   return { esito: "passato", ambito: "GUI locale, dati sintetici", esiti };
 }

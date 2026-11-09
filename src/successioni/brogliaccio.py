@@ -152,13 +152,15 @@ def html(dati: dict, *, titolo: str, revisione: int | None = None) -> str:
 
     def tabella(intest: list[str], righe_t: list[dict]) -> str:
         th = "".join(f"<th>{escape(c.replace('_', ' '))}</th>" for c in intest)
-        trs = "".join("<tr>" + "".join(f"<td>{escape(str(x.get(c, '')))}</td>" for c in intest) + "</tr>" for x in righe_t)
+        trs = "".join("<tr>" + "".join(f"<td{' class=n' if c in COLONNE_NUMERICHE else ''}>{escape(str(x.get(c, '')))}</td>"
+                                       for c in intest) + "</tr>" for x in righe_t)
         return f"<table><thead><tr>{th}</tr></thead><tbody>{trs or '<tr><td colspan=99>nessuna riga</td></tr>'}</tbody></table>"
 
     sotto = f" · revisione {revisione}" if revisione is not None else ""
     return ("<!doctype html><html lang=it><head><meta charset=utf-8><title>Brogliaccio · " + escape(titolo) + "</title><style>"
             "body{font:12px/1.4 system-ui,sans-serif;margin:16px;color:#111}h1{font-size:18px}h2{font-size:14px;margin-top:18px}"
             "table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:2px 4px;text-align:left;vertical-align:top}"
+            "td.n{text-align:right;font-variant-numeric:tabular-nums}"
             "th{background:#eee}@media print{h2{break-after:avoid}tr{break-inside:avoid}}</style></head><body>"
             f"<h1>Brogliaccio · {escape(titolo)}</h1><p>Documento di lavoro dello studio{escape(sotto)}: dati come inseriti nella "
             "pratica, senza calcoli d'imposta. Non sostituisce la dichiarazione.</p>"

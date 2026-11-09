@@ -9,7 +9,9 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   await page.waitForFunction(() => typeof S !== "undefined" && S.schema);
   const pratiche = async () => (await page.evaluate(async () => await api("/api/pratiche"))).length;
   const prima = await pratiche();
-  assert.ok(await page.isVisible("#bCalc"), "pulsante Calcolatrice nella barra");
+  // sulla pagina iniziale il comando sta nella testata (#homeCalc); nella barra (#bCalc) quando c'e' una pratica aperta o lo schermo e' stretto
+  await page.waitForSelector("#homeCalc");
+  assert.ok(await page.isVisible("#homeCalc") || await page.isVisible("#bCalc"), "pulsante Calcolatrice visibile");
   await page.click("#homeCalc");
   await page.waitForSelector("#dCalc[open] #calcData");
   assert.match(await page.textContent("#calcRis"), /Stima: non sostituisce la dichiarazione né il controllo ufficiale/);
