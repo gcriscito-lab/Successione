@@ -733,3 +733,21 @@ th { overflow:hidden; text-overflow:ellipsis; }
 @media (max-width:960px) { .tab-pratiche { table-layout:auto; } .tab-pratiche colgroup { display:none; } .c-term, .c-avanz { padding-top:var(--s-1) !important; } }
 /* telefono: il carattere resta al massimo 14 px, cosi' la barra in alto non va a capo (il programma si usa dal PC) */
 @media (max-width:560px) { html { font-size:min(var(--dimensione-base,14px), 14px); } }
+
+/* ---- Report grafica DE.A.S. del 9/11/2026 */
+/* etichette: nome intero; con la densita' compatta il nome breve (punto 1) */
+.et-breve { display:none; }
+:root[data-densita="compatta"] .ins .rg > label .et-intera { display:none; }
+:root[data-densita="compatta"] .ins .rg > label .et-breve { display:inline; }
+/* etichette della scheda: stessa grandezza e stesso allineamento in tutti i quadri (punto 9) */
+.ins .rg > label, .ins .campi-scheda .rg > label, :root[data-densita="compatta"] .ins .campi-scheda .rg > label { font-size:var(--fs-m); }
+:root[data-densita="compatta"] .ins .rg > label { text-align:left; }
+/* erede: due colonne, le coppie sulla stessa riga (punto 2) */
+/* al massimo due colonne; una sola se il pannello e' stretto (con le etichette a sinistra serve piu' spazio) */
+.campi-scheda.coppie { grid-template-columns:repeat(auto-fit, minmax(max(9.5rem, calc(50% - var(--s-2))), 1fr)); }
+:root[data-densita="compatta"] .ins .campi-scheda.coppie { grid-template-columns:repeat(auto-fit, minmax(max(17rem, calc(50% - var(--s-3))), 1fr)); }
+.campi-scheda.coppie .rg[data-campo=luogo_nascita], .campi-scheda.coppie .rg[data-campo=certificatore_disabilita], .campi-scheda.coppie .rg[data-campo=relazione_con_defunto] { grid-column:1/-1; }
+/* avvisi raggruppati (punto 5) */
+.avvisi-elenco { list-style:none; margin:var(--s-15) 0 0; padding:0; }
+.avvisi-elenco li { display:flex; justify-content:space-between; align-items:baseline; gap:var(--s-3); padding:var(--s-05) 0; border-top:1px solid color-mix(in srgb, var(--am-b) 35%, transparent); }
+.avvisi-elenco li .lk { flex:none; }

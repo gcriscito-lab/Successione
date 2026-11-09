@@ -10,6 +10,46 @@ function h(tag, attrs, ...kids) {
   for (const c of kids.flat()) if (c !== null && c !== undefined && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c)));
   return e;
 }
+/* ---------- accenti (report grafica DE.A.S. 09/11/2026, punto 4) ----------
+   Molti testi (etichette, messaggi del servizio, voci degli elenchi) scrivono l'accento con l'apostrofo («proprieta'», «e'»).
+   Si correggono SOLO nella visualizzazione: i dati, i valori dei campi e il file XML non cambiano.
+   Restano com'erano: le elisioni («dell'immobile»), gli apici di citazione ('defunto'), «po'», i testi in <code>/<pre>. */
+function accento(parola) {
+  const low = parola.toLowerCase(); if (low === "po") return parola + "'";
+  const base = parola.slice(0, -1), v = parola.slice(-1), maiu = v === v.toUpperCase();
+  const nuova = v.toLowerCase() === "e" ? (/ch$/i.test(base) || ["n", "s"].includes(base.toLowerCase()) ? "é" : "è")
+    : ({ a: "à", i: "ì", o: "ò", u: "ù" })[v.toLowerCase()];
+  return nuova ? base + (maiu ? nuova.toUpperCase() : nuova) : parola + "'";
+}
+function accenta(s) {
+  if (!s || s.indexOf("'") < 0) return s;
+  let aperte = 0;
+  return s.replace(/(^|[\s(«"\[\/])'(?=\p{L})|(\p{L}+)'(?=$|[\s.,;:!?)»\]"…\/–—-])/gu, (m, pre, parola, off, str) => {
+    if (parola === undefined) { aperte++; return m; }          // apice che apre una citazione
+    if (aperte > 0) { aperte--; return m; }                    // ...e quello che la chiude
+    if (!/[aeiou]$/i.test(parola)) return m;
+    const prima = str[off - 1]; if (prima && /[\p{N}_]/u.test(prima)) return m;   // identificativi (al_albero')
+    return accento(parola);
+  });
+}
+const SALTA_ACCENTI = "code, pre, textarea, script, style, [data-grezzo]";
+function accentaNodo(n) {
+  if (n.nodeType === 3) { const p = n.parentElement; if (p && !p.closest(SALTA_ACCENTI)) { const v = accenta(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v; } return; }
+  if (n.nodeType !== 1 || n.closest(SALTA_ACCENTI)) return;
+  for (const el of [n, ...n.querySelectorAll("[title], [aria-label], [placeholder]")])
+    for (const a of ["title", "aria-label", "placeholder"]) { const x = el.getAttribute(a); if (x && x.indexOf("'") >= 0) { const v = accenta(x); if (v !== x) el.setAttribute(a, v); } }
+  const tw = document.createTreeWalker(n, NodeFilter.SHOW_TEXT); let t;
+  while ((t = tw.nextNode())) accentaNodo(t);
+}
+function avviaAccenti() {
+  accentaNodo(document.body);
+  new MutationObserver(lista => { for (const m of lista) {
+    if (m.type === "childList") m.addedNodes.forEach(accentaNodo);
+    else if (m.type === "characterData") accentaNodo(m.target);
+    else if (m.type === "attributes") { const x = m.target.getAttribute(m.attributeName); if (x && x.indexOf("'") >= 0 && !m.target.closest(SALTA_ACCENTI)) { const v = accenta(x); if (v !== x) m.target.setAttribute(m.attributeName, v); } }
+  } }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["title", "aria-label", "placeholder"] });
+}
+if (document.body) avviaAccenti(); else document.addEventListener("DOMContentLoaded", avviaAccenti);
 const S = { schema: null, pratiche: [], P: null, Q: null, sel: "AN", riga: null, tab: "dati", dirty: new Map(), nuove: new Map(), salvata: null, writeBusy: false, gen: 0 };
 const STUDIO = { profilo: {}, archivio: '', ultimoBackup: null };   // profilo dello studio, archivio in uso, ultimo backup
 const STATI = { vuoto: "da compilare", compilato: "compilato", rilievi: "rilievi", non_supportato: "non supportato", inattivo: "non selezionato" };
@@ -709,7 +749,7 @@ function renderTabella(main, q) {
   const righe = ordinaRigheVista(q, righeQuadro(q));
   const t = h("table", { "aria-label": q.titolo });
   const clsCol = classeColonna(q);
-  t.append(h("thead", {}, h("tr", {}, colonne.map((c, j) => { const t = LBL_VISTA[c] || lbl(q.coll, c, q.id); return h("th", { class: clsCol(c, j), title: t }, t); }))));
+  t.append(h("thead", {}, h("tr", {}, colonne.map((c, j) => { const t = LBL_VISTA[c] || lbl(q.coll, c, q.id); return h("th", { class: clsCol(c, j), title: t }, SIGLE_COLONNA[c] || t); }))));
   const lg = linguetteImmobili(q); if (lg) main.append(lg);
   const tb = h("tbody"); t.append(tb);
   const indice = indiceRilievi();
@@ -756,6 +796,10 @@ function rigaTabella(q, r, focalizzabile, indice) {
     let txt = kind.startsWith("enum:") && typeof v === "string" ? nomeVal(q.coll, c, v) : mostra(kind, v, true);
     if (q.coll === "devoluzioni" && c === "diritto" && typeof v === "string" && v) {   // il diritto per nome («Proprieta'»), non il codice
       const b = (S.P.dati.beni || []).find(x => x.id === valRiga(r, "bene_id")); txt = nomeDiritto(v, b && b.tipo);
+    }
+    if (q.coll === "beni" && c === "diritto" && typeof v === "string" && v) {   // anche nei quadri dei beni il diritto per nome (elenco ufficiale), non «proprieta»
+      const sdd = struttDi("beni", "diritto", valRiga(r, "tipo")), od = sdd && sdd.opzioni && sdd.opzioni.find(x => x.valore === riconosciVoce(sdd, v));
+      if (od) txt = od.etichetta;
     }
     if (c === "grado_parentela" && typeof v === "string" && v) {   // il grado si legge per nome (menu dei codici), non come codice
       const sdg = struttDi(q.coll, c, null), og = sdg && sdg.opzioni.find(x => x.valore === riconosciVoce(sdg, v));
@@ -811,6 +855,10 @@ const GRUPPI_SCHEDA = {
        ["Diritto e valore", ["diritto", "quota_defunto", "valore"]]],
   EL: [["Identificazione tavolare", [...G_IDENT, ...G_TAV]], ["Terreno", ["natura", "tipologia_terreno", "reddito_dominicale", "rendita"]], ["Diritto e valore", ["diritto", "quota_defunto", "valore"]]],
   EM: [["Identificazione tavolare", [...G_IDENT, ...G_TAV]], ["Classamento", ["categoria", "classe", "zona_censuaria", "consistenza", "rendita", "rendita_proposta"]], ["Diritto e valore", ["diritto", "quota_defunto", "valore"]]],
+  // erede: coppie che si leggono insieme sulla stessa riga (Cognome | Nome, Codice fiscale | Sesso), report 09/11/2026 punto 2
+  EA: [["Anagrafica", ["cognome", "nome", "codice_fiscale", "sesso", "data_nascita", "provincia_nascita", "luogo_nascita"], "coppie"],
+       ["Nella successione", ["ruolo", "tipo_soggetto", "grado_parentela", "relazione_con_defunto"], "coppie"],
+       ["Rappresentazione", ["rappresentato_cf", "rappresentato_grado"], "coppie"], ["Disabilità", ["certificatore_disabilita"], "coppie"]],
 };
 /* Dati da riportare «con gli estremi presenti in catasto» (Fascicolo I p. PDF 20 per EB, p. PDF 28 per EC): etichetta in grassetto. */
 const OBBLIGATORI = {
@@ -820,10 +868,11 @@ const OBBLIGATORI = {
 };
 function schedaAGruppi(gruppi, righe) {
   const usati = new Set(), out = [];
-  for (const [titolo, campi] of gruppi) {
+  for (const [titolo, campi, tipo] of gruppi) {
     const qui = righe.filter(([c]) => campi.includes(c)); if (!qui.length) continue;
+    if (tipo === "coppie") qui.sort((a, b) => campi.indexOf(a[0]) - campi.indexOf(b[0]));   // l'ordine del gruppo, non quello del modello
     qui.forEach(([c]) => usati.add(c));
-    out.push(h("section", { class: "gruppo-scheda" }, h("h4", {}, titolo), h("div", { class: "campi-scheda" }, qui.map(([, el]) => el))));
+    out.push(h("section", { class: "gruppo-scheda" }, h("h4", {}, titolo), h("div", { class: "campi-scheda" + (tipo === "coppie" ? " coppie" : "") }, qui.map(([, el]) => el))));
   }
   const resto = righe.filter(([c]) => !usati.has(c));
   if (resto.length) {
@@ -1014,6 +1063,20 @@ const IMMOBILI = ["EC", "EB", "EM", "EL"];
 const NOMI_IMMOBILI = { EC: "Fabbricati", EB: "Terreni", EM: "Fabbricati tavolari", EL: "Terreni tavolari" };
 const COLONNE_IMMOBILI = ["_quadro", "comune", "foglio", "particella", "subalterno", "categoria", "_rendita", "diritto", "quota_defunto", "valore"];
 const LBL_VISTA = { _quadro: "Quadro", _rendita: "Rendita / reddito dom." };
+/* Intestazioni brevi, come nei modelli e in DE.A.S. (report 09/11/2026, punto 3): il nome intero resta nel suggerimento. */
+const SIGLE_COLONNA = { foglio: "Fg.", particella: "Part.", subalterno: "Sub.", categoria: "Cat.", rendita: "Rendita", reddito_dominicale: "Reddito dom.",
+  diritto: "Diritto", quota_defunto: "Quota", data_nascita: "Nascita", grado_parentela: "Grado", partita_tavolare: "Partita tav.",
+  codice_fiscale_emittente: "CF emittente", _rendita: "Rendita / R.D." };
+/* Etichette brevi della scheda compatta (punto 1): si vedono solo con la densita' compatta; il nome intero e' nel suggerimento. */
+const ETICHETTE_BREVI = { grado_parentela: "Grado", ruolo: "Ruolo", tipo_soggetto: "Tipo soggetto", relazione_con_defunto: "Relazione",
+  luogo_nascita: "Comune nascita", provincia_nascita: "Prov. nascita", data_nascita: "Data nascita", rappresentato_cf: "CF rappr.",
+  rappresentato_grado: "Grado rappr.", certificatore_disabilita: "Verbale", categoria: "Categoria", quota_defunto: "Quota",
+  diritto: "Diritto", comune_amministrativo: "Comune amm.", codice_comune: "Cod. comune", codice_comune_amministrativo: "Cod. amm.",
+  indirizzo: "Indirizzo", zona_censuaria: "Zona cens.", consistenza: "Consistenza", rendita: "Rendita", rendita_proposta: "Rendita DOCFA",
+  reddito_dominicale: "Reddito dom.", tipologia_terreno: "Tipologia", particella_denominatore: "Denominatore", sezione: "Sezione",
+  data_visura: "Data visura", diritto_abitazione: "Abitazione coniuge", codice_stato_estero: "Cod. Stato", stato_federato: "Stato federato",
+  localita_estero: "Località estera", imposta_estera: "Imposta estera", bene_estero: "Bene estero", discordanza_intestatario: "Discordanza",
+  passaggi_senza_atti_legali: "Passaggi senza atti", codice_comune_catastale: "Cod. com. catastale", comune_catastale: "Comune catastale" };
 const vistaImmobili = q => !!(S.immobiliTutti && q && IMMOBILI.includes(q.id));
 function quadriImmobili() { return IMMOBILI.map(id => S.Q && S.Q.quadri.find(x => x.id === id)).filter(x => x && x.supportato && (x.attivo || righeQuadro(x).length)); }
 function quadroDellaRiga(key) { for (const q of quadriImmobili()) if (righeQuadro(q).some(r => r.key === key)) return q.id; return null; }
@@ -1300,7 +1363,7 @@ function insDati(ins) {
   if ((OBBLIGATORI[q.id] || []).length) ins.append(h("p", { class: "legenda-obbl" }, "In grassetto i dati richiesti dal quadro."));
   const visibili = q.campi ? new Set(q.campi) : (((S.schema.ordine || {})[q.id]) ? new Set(S.schema.ordine[q.id]) : null);   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
   const ordine = ordinati(q.id, Object.keys(campi));
-  const gruppi = q.coll === "beni" ? GRUPPI_SCHEDA[q.id] : null, righeCampi = [];
+  const gruppi = q.coll === "beni" || q.id === "EA" ? GRUPPI_SCHEDA[q.id] : null, righeCampi = [];
   let lista = null;   // campi delle schede senza gruppi: un contenitore, impaginato su piu' colonne con il pannello sotto
   // dati dell'immobile estero: solo con provincia EE (o se gia' compilati), come nelle istruzioni dei quadri EB ed EC
   const esteroNascosto = q.coll === "beni" && ["EB", "EC"].includes(q.id) && String(valRiga(r, "provincia") || "").trim().toUpperCase() !== "EE";
@@ -1356,7 +1419,9 @@ function insDati(ins) {
     const obbl = (OBBLIGATORI[q.id] || []).includes(c);
     // il suggerimento dell'etichetta riporta sempre il nome intero (nella scheda compatta l'etichetta si accorcia su una riga)
     const titoloEt = [lbl(q.coll, c, q.id), obbl ? "dato richiesto nel quadro " + q.id : "", aiuto || ""].filter(Boolean).join(". ");
-    const rg = h("div", { class: "rg" + (obbl ? " obbl" : "") + (aiuto ? " con-aiuto" : ""), "data-campo": c }, h("label", { title: titoloEt }, lbl(q.coll, c, q.id)), w);
+    const breve = ETICHETTE_BREVI[c];
+    const rg = h("div", { class: "rg" + (obbl ? " obbl" : "") + (aiuto ? " con-aiuto" : ""), "data-campo": c }, h("label", { title: titoloEt },
+      breve ? [h("span", { class: "et-intera" }, lbl(q.coll, c, q.id)), h("span", { class: "et-breve", "aria-hidden": "true" }, breve)] : lbl(q.coll, c, q.id)), w);
     if (gruppi) righeCampi.push([c, rg, vuoto]);
     else { if (!lista) { lista = h("div", { class: "campi-lista" }); ins.append(lista); } lista.append(rg); }
   }
@@ -1492,12 +1557,28 @@ function insControlli(ins) {
   // avvisi che non impediscono la finalizzazione (es. visure catastali vecchie o senza data)
   // ogni rilievo e avviso con il rimedio: dove intervenire e con quale comando (docs/ANALISI_REPLICA_2026-11-07.md, voce 19)
   const rimedio = x => x.rimedio ? h("div", { class: "rimedio" }, h("b", {}, "Come risolvere: "), x.rimedio) : null;
-  for (const a of (q.avvisi || [])) ins.append(h("div", { class: "nota stretta", role: "status" }, h("b", {}, "Avviso: "), a.messaggio, rimedio(a),
-    a.quadro && a.percorso ? h("button", { class: "lk", onclick: () => vaiA(a) }, "Vai al dato") : null));
+  // avvisi dello stesso tipo in un solo riquadro, con l'elenco dei dati (report 09/11/2026, punto 5): non otto riquadri uguali
+  const perTipo = new Map();
+  for (const a of (q.avvisi || [])) { const k = a.codice || a.messaggio; if (!perTipo.has(k)) perTipo.set(k, []); perTipo.get(k).push(a); }
+  for (const gruppo of perTipo.values()) {
+    const a = gruppo[0];
+    if (gruppo.length === 1) { ins.append(h("div", { class: "nota stretta", role: "status" }, h("b", {}, "Avviso: "), a.messaggio, rimedio(a),
+      a.quadro && a.percorso ? h("button", { class: "lk", onclick: () => vaiA(a) }, "Vai al dato") : null)); continue; }
+    const uguali = gruppo.every(x => x.messaggio === a.messaggio);
+    ins.append(h("div", { class: "nota stretta avvisi-gruppo", role: "status" }, h("b", {}, "Avviso, " + gruppo.length + " dati: "), uguali ? a.messaggio : null, rimedio(a),
+      h("ul", { class: "avvisi-elenco" }, gruppo.map(x => h("li", {}, h("span", {}, nomeDatoAvviso(x) + (uguali ? "" : ": " + x.messaggio)),
+        x.quadro && x.percorso ? h("button", { class: "lk", onclick: () => vaiA(x) }, "Vai al dato") : null)))));
+  }
   if (!q.rilievi.length) { ins.append(h("p", { class: "ok esito-ok" }, "Nessun rilievo sui dati inseriti.")); return; }
   const ul = h("ul", { class: "rl" });
   for (const r of q.rilievi) ul.append(h("li", {}, h("button", { onclick: () => vaiA(r) }, h("span", { class: "sigla" }, r.quadro), h("span", {}, h("div", {}, r.messaggio), rimedio(r), h("div", { class: "cod" }, r.codice + " · " + r.percorso)))));
   ins.append(ul);
+}
+/* «Fabbricato Roma fg.100 p.200 sub.3 (EC)»: la riga a cui si riferisce l'avviso, dal percorso «coll[id].campo». */
+function nomeDatoAvviso(x) {
+  const m = String(x.percorso || "").match(/^([a-z_]+)\[([^\]]+)\]/);
+  const e = m && (S.P.dati[m[1]] || []).find(y => y.id === m[2]);
+  return (e ? etichetta(m[1], e) : (x.percorso || "dato")) + (x.quadro ? " (" + x.quadro + ")" : "");
 }
 async function insCronologia(ins) {
   ins.append(h("p", { class: "mut" }, "Ogni salvataggio crea una revisione. Il ripristino non cancella la cronologia."));
@@ -1533,7 +1614,8 @@ async function insFile(dest) {
       h('span', {}, h('span', { class: 'vh' }, 'Passo ' + n + ': '), titolo, fatto ? h('span', { class: 'vh' }, ' (fatto)') : null)));
   const fileOk = ex.generato && ex.completo && ex.stato === 'aggiornato';
   const stato = h('section', { class: 'grp riepilogo' }, h('h2', {}, 'Stato della dichiarazione'));
-  stato.append(riga_stato('Dati', st.dati.stato, st.dati.rilievi + (st.dati.rilievi === 1 ? ' rilievo' : ' rilievi')),
+  const nAvv = ((S.Q && S.Q.avvisi) || []).length;   // come nella barra in basso: rilievi e avvisi insieme (report 09/11/2026, punto 7)
+  stato.append(riga_stato('Dati', st.dati.stato, st.dati.rilievi + (st.dati.rilievi === 1 ? ' rilievo' : ' rilievi') + ' · ' + nAvv + (nAvv === 1 ? ' avviso' : ' avvisi')),
     riga_stato('File XML', ex.stato, ex.generato ? (ex.completo ? 'Completo nel perimetro supportato' : 'Bozza tecnica: non trasmissibile') : 'Nessun file generato'),
     riga_stato('Struttura del file', st.xsd.stato), riga_stato('Controllo ufficiale', ct.stato, ct.versione_controllo),
     riga_stato('Trasmissione', st.trasmissione.stato, st.trasmissione.nota));
