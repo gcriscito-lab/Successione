@@ -731,3 +731,5 @@ th { overflow:hidden; text-overflow:ellipsis; }
 /* note in fondo: non sotto la misura minima */
 .vuoto .home-nota, .vuoto .home-stato .stato-voce, .vuoto .home-stato .stato-tit, .vuoto .home-stato .stato-val, .vuoto .archivio-home { font-size:var(--fs-m); }
 @media (max-width:960px) { .tab-pratiche { table-layout:auto; } .tab-pratiche colgroup { display:none; } .c-term, .c-avanz { padding-top:var(--s-1) !important; } }
+/* telefono: il carattere resta al massimo 14 px, cosi' la barra in alto non va a capo (il programma si usa dal PC) */
+@media (max-width:560px) { html { font-size:min(var(--dimensione-base,14px), 14px); } }

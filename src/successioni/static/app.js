@@ -19,7 +19,7 @@ S.fornitoreDirty = {};
 const nMod = () => S.dirty.size + S.nuove.size + S.dichDirty.size + S.supDirty.size + (Object.keys(S.fornitoreDirty).length ? 1 : 0);
 const nuovoId = coll => ({ persone: "p", beni: "b", devoluzioni: "d", passivita: "ps", documenti_ref: "dr" }[coll]) + "_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const uguale = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 14, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240,
+const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 16, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240,
   accento: 'predefinito', densita: 'normale', contrasto: 'normale', movimento: 'normale', avvio: 'elenco', nome_studio: '', quadri_predefiniti: [],
   disposizione: 'destra', altezza_pannello: 380 };
 // colori in app.css (:root[data-accento=...], con la variante per il tema scuro)
@@ -37,7 +37,7 @@ function applicaAspetto(valori) {
   root.dataset.densita = p.densita; root.dataset.contrasto = p.contrasto; root.dataset.movimento = p.movimento;
   const sub = $('#bHome .marchio-sub'); if (sub) sub.textContent = p.nome_studio || 'Dichiarazioni telematiche';   // il nome dello studio sotto il marchio
   document.title = 'Successioni' + (p.nome_studio ? ' · ' + p.nome_studio : '');
-  root.style.setProperty('--dimensione-base', Math.max(12, Math.min(22, Number(p.dimensione) || 14)) + 'px');
+  root.style.setProperty('--dimensione-base', Math.max(12, Math.min(22, Number(p.dimensione) || 16)) + 'px');
   root.style.setProperty('--interlinea', ({ compatta: 1.3, normale: 1.5, ampia: 1.8 })[p.interlinea] || 1.5);
   const nav = limiteNav() ? Math.min(limiteNav(), Math.max(180, Number(p.larghezza_nav) || 240)) : 240;
   root.style.setProperty('--larghezza-nav', nav + 'px');

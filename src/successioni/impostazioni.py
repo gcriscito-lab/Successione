@@ -51,7 +51,7 @@ CHIAVI = {v[0]: v for v in VOCI}
 _ESEMPIO = {"SUCCESSIONI_JAVA": "java.exe", "SUCCESSIONI_GS": "gswin64c.exe", "SUCCESSIONI_VERAPDF": "verapdf.bat",
             "SUCCESSIONI_QPDF": "qpdf.exe", "SUCCESSIONI_ICC": "srgb.icc"}
 MINIMO_TIMEOUT, MASSIMO_TIMEOUT = 10, 7200
-INTERFACCIA_DEFAULT = {"tema": "sistema", "font": "sistema", "dimensione": 14,
+INTERFACCIA_DEFAULT = {"tema": "sistema", "font": "sistema", "dimensione": 16,
                        "interlinea": "normale", "larghezza_pannello": 360, "larghezza_nav": 240,
                        # personalizzazione dell'app
                        "accento": "predefinito", "densita": "normale", "contrasto": "normale", "movimento": "normale",
