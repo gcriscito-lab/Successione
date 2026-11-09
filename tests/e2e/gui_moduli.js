@@ -86,6 +86,10 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   const alte = await page.evaluate(() => [...document.querySelectorAll(".ins .campi-scheda .rg > label")].filter(l => l.offsetParent)
     .filter(l => l.getBoundingClientRect().height > parseFloat(getComputedStyle(l).lineHeight) * 1.5 + 1).map(l => l.textContent));
   assert.deepEqual(alte, [], "etichette della scheda su una riga");
+  // con i puntini il nome intero resta nel suggerimento (title)
+  const senzaTitolo = await page.evaluate(() => [...document.querySelectorAll(".ins .campi-scheda .rg > label")].filter(l => l.offsetParent)
+    .filter(l => l.scrollWidth > l.clientWidth + 1 && !(l.title || "").includes(l.querySelector(".et-intera")?.textContent || l.textContent)).map(l => l.textContent));
+  assert.deepEqual(senzaTitolo, [], "etichette accorciate con il nome intero nel suggerimento");
 
   assert.deepEqual(errori, []);
   return { esito: "passato", ambito: "GUI locale, dati sintetici", esiti };

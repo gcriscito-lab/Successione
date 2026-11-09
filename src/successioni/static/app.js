@@ -1852,7 +1852,7 @@ function schedaPersona(titolo, ruolo, vis) {
   const griglia = h('div', { class: 'persona-campi' }); g.append(griglia);
   for (const c of ordinati(ruolo === 'presentatore' ? 'AN.presentatore' : 'AN', vis)) {
     const cur = S.dirty.has(key) && c in S.dirty.get(key).campi ? S.dirty.get(key).campi[c] : (e ? e[c] : undefined);
-    griglia.append(h("div", { class: "rg", 'data-campo': c }, h("label", {}, lbl("persone", c)), campoInput("persone", e && e.id, c, campi[c], cur, (campo, v) => {
+    griglia.append(h("div", { class: "rg", 'data-campo': c }, h("label", { title: lbl("persone", c) }, lbl("persone", c)), campoInput("persone", e && e.id, c, campi[c], cur, (campo, v) => {
       const scrivi = (c2, x) => { const d = S.dirty.get(key) || { coll: "persone", id: e ? e.id : null, campi: e ? {} : { ruolo } }; d.campi[c2] = x; S.dirty.set(key, d); };
       scrivi(campo, v); aggiornaBottoni(); renderSb();
       if (campo === "codice_fiscale")
@@ -1984,7 +1984,7 @@ function sezioneDatiDichiarazione(chiavi = null, titolo = 'Dati della dichiarazi
     };
     inp.addEventListener("input", modifica); inp.addEventListener("change", modifica);
     inputs[chiave] = inp;
-    sez.append(h("div", { class: "rg" }, h("label", { for: id }, etichetta), inp));
+    sez.append(h("div", { class: "rg" }, h("label", { for: id, title: etichetta }, etichetta), inp));
   }
   if (!chiavi) sez.append(h("div", { class: "barra dentro" }, h("button", { class: "pil", id: "dd_salva", onclick: async () => {
     // legge l'oggetto corrente e modifica solo le chiavi toccate: persone, beni e passivita' dell'oggetto restano intatti
@@ -2017,7 +2017,7 @@ function sezionePrimaCasa() {
       mostraAiuto(); aggiornaBottoni(); renderSb();
     };
     inp.addEventListener("change", modifica); mostraAiuto();
-    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto), dett)));
+    sez.append(h("div", { class: "rg" }, h("label", { for: id, title: sd.etichetta }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto), dett)));
   }
   sez.append(h("div", { class: "barra dentro" }, h("button", { class: "pil", id: "pc_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
   return sez;
@@ -2045,7 +2045,7 @@ function sezioneRiduzioni() {
       aggiornaBottoni(); renderSb();
     };
     inp.addEventListener("input", modifica); inp.addEventListener("change", modifica);
-    sez.append(h("div", { class: "rg" }, h("label", { for: id }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto))));
+    sez.append(h("div", { class: "rg" }, h("label", { for: id, title: sd.etichetta }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto))));
   }
   sez.append(h("div", { class: "barra dentro" }, h("button", { class: "pil", id: "ra_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
   return sez;
