@@ -173,6 +173,54 @@ function dataIso(t) {
   m = t.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/);
   return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : t;
 }
+/* Calendario accanto ai campi data (richiesta del 9/11/2026). Il campo resta di testo (GG/MM/AAAA, come prima); un pulsante
+   apre il calendario del browser e la data scelta viene scritta nel campo come se fosse stata digitata (eventi input e change).
+   Un solo aggancio per tutti i campi, anche quelli creati dopo (scheda della riga, finestre, passi della procedura guidata):
+   si riconoscono dal segnaposto «GG/MM/AAAA». I campi data nativi (preventivo, calcolatrice) restano come sono. */
+const SEL_CAMPO_DATA = 'input[placeholder="GG/MM/AAAA"]';
+function dataEsiste(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso); if (!m) return false;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
+}
+function agganciaCalendario(inp) {
+  if (inp.closest(".con-calendario") || inp.classList.contains("cal-nativo")) return;
+  const nativo = h("input", { type: "date", class: "cal-nativo", tabindex: "-1", "aria-hidden": "true" });
+  const b = h("button", { type: "button", class: "cal-apri", "data-ic": "calendario", tabindex: "-1",
+    "aria-label": "Scegli la data dal calendario", title: "Scegli la data dal calendario" });
+  const fermo = () => inp.disabled || inp.readOnly;
+  b.disabled = fermo();
+  b.addEventListener("click", () => {
+    if (fermo()) { b.disabled = true; return; }
+    const iso = dataIso(inp.value);
+    nativo.value = dataEsiste(iso) ? iso : "";       // con una data valida il calendario si apre su quella
+    try { nativo.showPicker(); } catch (_) { nativo.focus(); nativo.click(); }
+  });
+  // gli eventi del campo nascosto non devono arrivare ai moduli: conta solo il campo di testo
+  nativo.addEventListener("input", ev => ev.stopPropagation());
+  nativo.addEventListener("change", ev => {
+    ev.stopPropagation();
+    if (!nativo.value || fermo()) return;
+    inp.value = dataIt(nativo.value);
+    inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true }));
+    inp.focus();
+  });
+  const attivo = document.activeElement === inp;
+  const involucro = h("span", { class: "con-calendario" });
+  inp.replaceWith(involucro); involucro.append(inp, b, nativo);
+  if (attivo) inp.focus();                            // spostare il campo nel DOM gli toglie il fuoco
+}
+function agganciaCalendari(nodo) {
+  if (!nodo || nodo.nodeType !== 1) return;
+  if (nodo.matches(SEL_CAMPO_DATA)) agganciaCalendario(nodo);
+  else for (const x of nodo.querySelectorAll(SEL_CAMPO_DATA)) agganciaCalendario(x);
+}
+function avviaCalendari() {
+  agganciaCalendari(document.body);
+  new MutationObserver(lista => { for (const m of lista) m.addedNodes.forEach(agganciaCalendari); })
+    .observe(document.body, { childList: true, subtree: true });
+}
+if (document.body) avviaCalendari(); else document.addEventListener("DOMContentLoaded", avviaCalendari);
 /* Dato non noto: nella pratica {stato: ...}, all'utente in parole. Si possono scrivere le parole, «?» o la forma [stato]. */
 const STATI_DATO = { da_confermare: "da confermare", assente: "assente", zero: "zero", non_applicabile: "non applicabile" };
 /* Importi: nella pratica col punto decimale (1234.50), all'utente con la virgola; in tabella anche col punto delle migliaia. */
@@ -1225,7 +1273,7 @@ function dialogo(id, titolo, corpo, conferma, onConferma) {
 }
 /* Impronta dei campi di una finestra: serve a chiedere conferma prima di chiudere perdendo cio' che si e' scritto. */
 function firmaModulo(el) {
-  return JSON.stringify([...el.querySelectorAll("input, select, textarea")].map(x => x.type === "checkbox" || x.type === "radio" ? x.checked : x.value));
+  return JSON.stringify([...el.querySelectorAll("input:not(.cal-nativo), select, textarea")].map(x => x.type === "checkbox" || x.type === "radio" ? x.checked : x.value));
 }
 function descriviRigaGruppo(q, r) {
   if (q.coll !== "devoluzioni") return etichetta(q.coll, r.e);
@@ -2768,7 +2816,7 @@ function campoSuccessivo(ev) {
   const ins = $("#ins"), t = ev.target;
   if (!ins || !ins.contains(t) || document.querySelector("dialog[open]")) return;
   if (!(t.tagName === "SELECT" || (t.tagName === "INPUT" && !["checkbox", "radio", "file", "button", "submit", "reset"].includes(t.type)))) return;
-  const campi = [...ins.querySelectorAll('input:not([type=hidden]):not([type=file]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled])')]
+  const campi = [...ins.querySelectorAll('input:not([type=hidden]):not([type=file]):not([disabled]):not([readonly]):not(.cal-nativo), select:not([disabled]), textarea:not([disabled])')]
     .filter(x => x.getClientRects().length && !x.closest("details:not([open]) > :not(summary)"));
   const i = campi.indexOf(t); if (i < 0) return;
   ev.preventDefault();
