@@ -52,7 +52,11 @@ function avviaAccenti() {
 if (document.body) avviaAccenti(); else document.addEventListener("DOMContentLoaded", avviaAccenti);
 const S = { schema: null, pratiche: [], P: null, Q: null, sel: "AN", riga: null, tab: "dati", dirty: new Map(), nuove: new Map(), salvata: null, writeBusy: false, gen: 0 };
 const STUDIO = { profilo: {}, archivio: '', ultimoBackup: null };   // profilo dello studio, archivio in uso, ultimo backup
-const STATI = { vuoto: "da compilare", compilato: "compilato", rilievi: "rilievi", non_supportato: "non supportato", inattivo: "non selezionato" };
+const STATI = { vuoto: "da compilare", compilato: "compilato", rilievi: "rilievi", non_supportato: "non supportato", inattivo: "non selezionato",
+  calcolato: "calcolato dal programma" };
+/* Quadri che il programma calcola dagli altri (EE, EF, EH): non si selezionano, quindi per il server risultano «inattivi»;
+   nell'elenco si mostrano come calcolati, non spenti in grigio (richiesta del 9/11/2026: «il quadro EF sia visibile»). */
+const statoInElenco = q => q.generato && ["EE", "EF", "EH"].includes(q.id) && q.stato === "inattivo" ? "calcolato" : q.stato;
 S.dichDirty = new Map();
 S.supDirty = new Map();
 S.fornitoreDirty = {};
@@ -511,7 +515,7 @@ function renderAlbero() {
   for (const [g, nome] of [["frontespizio", "Frontespizio"], ["quadri", "Quadri"], ["riepiloghi", "Riepiloghi"], ["lavoro", "Tabella di lavoro"]]) {
     nav.append(h("div", { class: "gruppo" }, nome));
     for (const q of S.Q.quadri.filter(x => x.gruppo === g)) {
-      const st = q.stato;
+      const st = statoInElenco(q);
       const lav = statoLavoro(q.id);   // stato di lavorazione scelto dallo studio (voce 10), dopo lo stato calcolato
       const testo = [st === "rilievi" ? q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi") : (q.righe && st === "compilato" ? q.righe + (q.righe === 1 ? " riga" : " righe") : STATI[st]),
         lav && STATI_LAVORO[lav]].filter(Boolean).join(" · ");
@@ -690,7 +694,8 @@ const VOCI_EH = { FlagDeceduto: "Il defunto è deceduto (data e luogo del decess
   FlagAeromobili: "Aeromobili (estremi)", FlagPassivita: "Documenti delle passività: copie degli originali (lettera l)",
   FlagProspetto: "Inventari/prospetti delle attività e passività: copie degli originali (lettera l)", FlagInventari: "Inventari allegati tra gli altri documenti: copie degli originali (lettera l)",
   FlagAttiLegali: "Passaggi senza atti legali (quadro EI)" };
-const euroIt = v => { const n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString("it-IT", { minimumFractionDigits: String(v).includes(".") ? 2 : 0, maximumFractionDigits: 2 }) + " €"; };
+// «2.820 €» anche sotto i 10.000 (in italiano il separatore delle migliaia di norma si omette a quattro cifre: negli importi no)
+const euroIt = v => { const n = Number(v); return isNaN(n) ? String(v) : n.toLocaleString("it-IT", { minimumFractionDigits: String(v).includes(".") ? 2 : 0, maximumFractionDigits: 2, useGrouping: "always" }) + " €"; };
 async function renderAnteprima(main, q) {
   const pid = S.P.pratica_id;
   main.append(h("div", { class: "calcolato riquadro-calc" }, h("span", { class: "etich-calc" }, "calcolato"), " Il quadro " + q.id + " è calcolato dal programma con i dati salvati della pratica, come nel file della dichiarazione. " +
@@ -706,7 +711,7 @@ async function renderAnteprima(main, q) {
       h("td", {}, VOCI_EE[x.campo] || x.campo), h("td", { class: "n" }, euroIt(x.valore))))))));
   } else if (q.id === "EF") {
     if (!r.ef) box.append(h("p", { class: "mut" }, "Imposte non calcolabili finché non si risolvono i punti qui sotto."));
-    else box.append(h("div", { class: "tab piatta" }, h("table", {}, h("tbody", {},
+    else box.append(h("div", { class: "tab piatta prospetto-ef" }, h("table", { "aria-label": "Liquidazione delle imposte (quadro EF)" }, h("tbody", {},
       r.ef.imposte.map(([k, v]) => h("tr", { class: "fisso" }, h("td", {}, k), h("td", { class: "n" }, isNaN(Number(v)) ? v : euroIt(v)))),
       h("tr", { class: "fisso forte" }, h("td", {}, "Totale da versare (EF19)"), h("td", { class: "n" }, r.ef.totale ? euroIt(r.ef.totale) : "—")),
       r.ef.importo_da_versare && r.ef.importo_da_versare !== r.ef.totale ? h("tr", { class: "fisso" }, h("td", {}, "Importo da versare (frontespizio, con sanzioni e interessi)"), h("td", { class: "n" }, euroIt(r.ef.importo_da_versare))) : null))));
