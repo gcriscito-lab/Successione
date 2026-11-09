@@ -9,7 +9,7 @@ const { ok } = require('./verifiche');
   try {
   const errs = []; pg.on('pageerror', e => errs.push(String(e))); pg.on('console', m => m.type() === 'error' && !m.text().includes('422') && errs.push(m.text()));
   await pg.goto('http://127.0.0.1:8813/?t=t0k'); await pg.waitForLoadState('networkidle'); const numeroIniziale = await pg.locator('#lista li button').count();
-  await pg.click('#bNuova'); await pg.fill('#w_cognome', 'Rossi'); await pg.fill('#w_nome', 'Mario'); await pg.fill('#w_codice_fiscale', 'rssmra50a01h501x'); await pg.fill('#w_data_decesso', '2026-03-14');
+  await pg.click('#homeNuova'); await pg.fill('#w_cognome', 'Rossi'); await pg.fill('#w_nome', 'Mario'); await pg.fill('#w_codice_fiscale', 'rssmra50a01h501x'); await pg.fill('#w_data_decesso', '2026-03-14');
   for (let i = 0; i < 4; i++) await pg.click('#wAvanti');
   await pg.waitForSelector('.voce'); ok((await pg.textContent('#titolo')) === 'Successione Rossi Mario', 'pratica creata dalla procedura guidata');
   ok(!(await pg.locator('#ins').isVisible()), 'dati generali nel pannello centrale');

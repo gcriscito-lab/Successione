@@ -282,13 +282,18 @@ function cellaAzione(v) {
   const a = v.stato.azione;
   if (!a || v.completata) return h("td", { class: "c-azione mut" }, v.completata ? "Nessuna" : "");
   return h("td", { class: "c-azione" }, h("button", { type: "button", class: "lk-azione" + (a.livello === "problema" ? " problema" : ""),
-    onclick: ev => { ev.stopPropagation(); vaiAllAzione(v.stato); } }, testoAzione(a)));
+    onclick: ev => { ev.stopPropagation(); vaiAllAzione(v.stato); } },
+    a.livello === "problema" ? h("span", { class: "segno-problema" }, "Da correggere") : null, h("span", { class: "testo-azione" }, testoAzione(a))));
+}
+function titoloHome(t) {
+  const m = /^(.*\S)\s+[-–—]\s+([A-Z0-9]{16})$/i.exec(String(t || ""));
+  return m ? [h("span", { class: "tit" }, m[1]), h("span", { class: "cf-tit" }, m[2].toUpperCase())] : [h("span", { class: "tit" }, t)];
 }
 function rigaHome(v) {
   const dec = v.data_decesso ? "Decesso " + dataIt(v.data_decesso) : "Data del decesso da indicare";
   return h("tr", { class: v.completata ? "completata" : null, "data-pratica": v.id },
     h("td", { class: "c-pratica" }, h("button", { type: "button", class: "apri-pratica", onclick: () => apri(v.id), title: "Apri la pratica" },
-      h("span", { class: "tit" }, v.titolo), h("span", { class: "dett" }, dec))),
+      ...titoloHome(v.titolo), h("span", { class: "dett" }, dec))),
     cellaTermine(v), cellaAvanzamento(v), cellaAzione(v));
 }
 function filtriHome(box) {
@@ -324,6 +329,7 @@ function renderHome() {
   }
   const righe = ordinaHome(filtraHome(voci, HOME.filtro, HOME.cerca), HOME.ordine);
   box.replaceChildren(righe.length ? h("table", { class: "tab-pratiche" },
+    h("colgroup", {}, h("col", { class: "k-pratica" }), h("col", { class: "k-termine" }), h("col", { class: "k-avanz" }), h("col", { class: "k-azione" })),
     h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Pratica"), h("th", { scope: "col", title: "Dodici mesi dal decesso o dalla decorrenza" }, "Termine"),
       h("th", { scope: "col" }, "Avanzamento"), h("th", { scope: "col" }, "Prossima azione"))),
     h("tbody", {}, righe.map(rigaHome))) : h("p", { class: "mut nessuna" }, "Nessuna pratica corrisponde al filtro."));

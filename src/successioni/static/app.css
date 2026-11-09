@@ -705,3 +705,29 @@ select.stato-lavoro { margin-left:0; min-height:0; }
 th { overflow:hidden; text-overflow:ellipsis; }
 /* schermo stretto: il titolo del quadro su una riga sua, i comandi sotto */
 @media (max-width:560px) { .testa-quadro h1 { flex:1 1 100%; white-space:normal; } .testa-quadro h1 .testo-titolo { white-space:normal; } }
+
+/* ---- Pagina iniziale leggibile (9/11/2026) */
+/* i comandi della pagina iniziale stanno accanto al titolo: nella barra in alto restano solo Impostazioni e Guida */
+@media (min-width:961px) { body.in-home :is(#bNuova, #bImporta, #bCalc) { display:none !important; } }
+/* elenco: testo a grandezza piena, colonne stabili, intestazioni leggibili */
+.tab-pratiche { table-layout:fixed; }
+.tab-pratiche .k-pratica { width:30%; } .tab-pratiche .k-termine { width:14rem; } .tab-pratiche .k-avanz { width:10.5rem; }
+.tab-pratiche th { font-size:var(--fs-m); color:var(--t); padding:var(--s-2) var(--s-4); }
+.tab-pratiche td { padding:var(--s-3) var(--s-4); vertical-align:top; }
+.apri-pratica { gap:var(--s-05); }
+.apri-pratica .cf-tit { font-family:var(--f-mono); font-size:var(--fs-m); color:var(--t2); letter-spacing:.03em; }
+.apri-pratica .dett { font-size:var(--fs-m); }
+.c-term, .c-avanz { padding-top:calc(var(--s-3) + 1px) !important; }
+.c-term .pz { margin-left:var(--s-1); }
+/* prossima azione: testo in inchiostro normale; se blocca il lavoro lo dice un'etichetta rossa, non tutta la frase */
+.lk-azione { font-size:var(--fs-base); line-height:1.45; display:block; }
+.lk-azione::before { content:none; }
+.lk-azione .testo-azione { color:var(--blu); }
+.lk-azione.problema { color:var(--t); font-weight:400; }
+.lk-azione.problema .testo-azione { color:var(--t); }
+.lk-azione:hover .testo-azione, .lk-azione:focus-visible .testo-azione { text-decoration:underline; text-underline-offset:3px; }
+.segno-problema { display:inline-block; margin:0 var(--s-2) var(--s-05) 0; padding:0 var(--s-15); border-radius:var(--r1); font-size:var(--fs-s); font-weight:700;
+  color:var(--er); box-shadow:inset 0 0 0 1px var(--er); background:color-mix(in srgb, var(--er) 7%, var(--solido)); vertical-align:1px; }
+/* note in fondo: non sotto la misura minima */
+.vuoto .home-nota, .vuoto .home-stato .stato-voce, .vuoto .home-stato .stato-tit, .vuoto .home-stato .stato-val, .vuoto .archivio-home { font-size:var(--fs-m); }
+@media (max-width:960px) { .tab-pratiche { table-layout:auto; } .tab-pratiche colgroup { display:none; } .c-term, .c-avanz { padding-top:var(--s-1) !important; } }

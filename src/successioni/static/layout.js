@@ -47,7 +47,9 @@
      --alto-barra serve all'altezza della tabella, cosi' le righe visibili crescono quando la barra e' bassa. */
   const tb = document.querySelector(".tb"), azioni = document.getElementById("azioni");
   function vaACapo() {
-    const brand = document.getElementById("bHome"), primo = document.getElementById("bSalva");
+    // il primo pulsante visibile (nella pagina iniziale Salva e' nascosto e alto zero)
+    const brand = document.getElementById("bHome"), primo = [...azioni.querySelectorAll("button")].find(b => b.offsetHeight);
+    if (!primo) return false;
     return azioni.offsetTop > brand.offsetTop + brand.offsetHeight / 2 || azioni.offsetHeight > primo.offsetHeight * 1.6;
   }
   function compattaBarra() {
