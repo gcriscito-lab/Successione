@@ -1211,7 +1211,7 @@ function boxRiepilogoSoggetto(r) {
 const CAMPI_GRUPPO = { beni: ["diritto", "quota_defunto", "data_visura"], devoluzioni: ["diritto", "quota"] };
 function dialogo(id, titolo, corpo, conferma, onConferma) {
   const vecchio = document.getElementById(id); if (vecchio) vecchio.remove();
-  const err = h("p", { class: "e", role: "alert", hidden: true });
+  const err = h("p", { class: "err e", role: "alert", hidden: true });
   const ok = h("button", { class: "pil", value: "ok", onclick: ev => { ev.preventDefault(); const e = onConferma(); if (e) { err.textContent = e; err.hidden = false; } else d.close(); } }, conferma);
   // Invio in un campo: il modulo lo tratterebbe come clic sul primo pulsante («Annulla») e chiuderebbe perdendo i dati;
   // qui applica l'azione principale (i campi che usano Invio per conto loro lo fermano prima con preventDefault)
@@ -2420,7 +2420,7 @@ function wizRender() {
   const c = $("#wizCorpo"); c.replaceChildren(); $("#wizErr").textContent = "";
   $("#wIndietro").hidden = W.passo === 0; $("#wAvanti").textContent = W.passo === PASSI.length - 1 ? "Crea dichiarazione" : "Avanti";
   const d = W.dati;
-  const f = (k, label, ph) => h("div", { class: "campo" }, h("label", { for: "w_" + k }, label), h("input", { id: "w_" + k, value: d[k] || "", placeholder: ph || "", class: k === "codice_fiscale" ? "mono cf" : "", oninput: ev => { d[k] = ev.target.value; if (k === "codice_fiscale") wizDaCF(ev.target.value); } }));
+  const f = (k, label, ph) => h("div", { class: "campo" }, h("label", { for: "w_" + k }, label), h("input", { id: "w_" + k, value: d[k] || "", placeholder: ph || "", class: k === "codice_fiscale" ? "mono cf" : "", oninput: ev => { d[k] = ev.target.value; $("#wizErr").textContent = ""; if (k === "codice_fiscale") wizDaCF(ev.target.value); } }));
   if (W.passo === 0) c.append(h("p", { class: "mut" }, "Dati anagrafici del defunto. Potrai completarli o correggerli nei dati generali."), h("div", { class: "griglia" }, f("cognome", "Cognome"), f("nome", "Nome"), f("codice_fiscale", "Codice fiscale"), f("data_nascita", "Data di nascita", "GG/MM/AAAA"), f("luogo_nascita", "Comune di nascita"), f("provincia_nascita", "Provincia di nascita", "RM"), f("data_decesso", "Data del decesso", "GG/MM/AAAA"), f("comune_decesso", "Comune del decesso"), f("provincia_decesso", "Provincia del decesso", "RM")), h("div", { id: "w_cf_nota", class: "mut testo-m spazio-su", "aria-live": "polite" }));
   if (W.passo === 1) {
     d.tipo = d.tipo || "originaria";
@@ -2551,22 +2551,21 @@ function impPreferenzeRender(p) {
   const casella = (chiave, titolo, nota) => {
     const el = h('input', { type: 'checkbox', id: 'pref_' + chiave, checked: !!p[chiave] });
     el.addEventListener('change', () => { IMP.preferenze[chiave] = el.checked; });
-    return h('div', { class: 'campo' }, h('label', { class: 'chk', for: el.id }, el, h('span', {}, titolo)), h('div', { class: 'mut testo-m' }, nota));
+    return h('div', { class: 'campo casella' }, h('label', { class: 'chk', for: el.id }, el, h('span', {}, titolo)), h('div', { class: 'mut aiuto' }, nota));
   };
-  const numero = (chiave, titolo, minimo, massimo) => {
+  const numero = (chiave, titolo, minimo, massimo, pulsante) => {
     const el = h('input', { type: 'number', id: 'pref_' + chiave, min: String(minimo), max: String(massimo), value: String(p[chiave]) });
     el.addEventListener('input', () => { const n = parseInt(el.value, 10); if (Number.isInteger(n)) IMP.preferenze[chiave] = n; });
-    return h('div', { class: 'campo' }, h('label', { for: el.id }, titolo + ' (' + minimo + '–' + massimo + ')'), el);
+    return h('div', { class: 'campo' }, h('label', { for: el.id }, titolo + ' (' + minimo + '–' + massimo + ')'), pulsante ? h('div', { class: 'in-linea' }, el, pulsante) : el);
   };
   $('#impPreferenze').replaceChildren(h('h3', {}, 'Operatività e sicurezza'),
     casella('pulizia_automatica', 'Elimina automaticamente i file temporanei e di lavoro', 'Copie di XML e uscite dei controlli lasciate nella cartella di lavoro. Non tocca pratiche, allegati, file generati né backup.'),
-    numero('pulizia_ore', 'Elimina i temporanei più vecchi di (ore)', 1, 720),
-    h('button', { type: 'button', class: 'gh', onclick: async ev => {
+    numero('pulizia_ore', 'Elimina i temporanei più vecchi di (ore)', 1, 720, h('button', { type: 'button', class: 'gh', onclick: async ev => {
       ev.target.disabled = true;
       try { const r = await post('/api/pulizia', {}); msg('Pulizia eseguita: ' + r.eliminati + ' elementi, ' + r.byte_liberati + ' byte liberati.', 'o'); }
       catch (e) { msg('Pulizia non riuscita: ' + e.message, 'e'); }
       ev.target.disabled = false;
-    } }, 'Pulisci ora'),
+    } }, 'Pulisci ora')),
     numero('avviso_visura_giorni', 'Avvisa se la visura catastale ha più di (giorni)', 30, 365),
     casella('visura_blocca', 'Una visura vecchia o senza data blocca la finalizzazione', 'Il Fascicolo chiede visure di non più di tre mesi prima della presentazione. Se non spunti, è solo un avviso.'),
     casella('mcp_sola_lettura', 'Claude (MCP) in sola lettura', 'Claude può leggere pratiche e controlli ma non modificare pratiche, generare file, allegare o fare backup. Vale subito, senza riavvio.'));
@@ -2585,7 +2584,7 @@ function impDiagnosiRender(componente) {
         const icona = { ok: '✓', avviso: '⚠', errore: '✗', info: 'ℹ' };
         risultato.replaceChildren(h('p', { class: 'forte' }, r.riepilogo),
           ...r.voci.map(v => h('div', { class: 'campo diagnosi-voce' }, h('div', {}, (icona[v.stato] || '·') + ' ' + v.nome + ' — ' + v.dettaglio),
-            v.rimedio && v.stato !== 'ok' ? h('div', { class: 'mut testo-m' }, v.rimedio) : null)));
+            v.rimedio && v.stato !== 'ok' ? h('div', { class: 'mut aiuto' }, v.rimedio) : null)));
       } catch (e) { risultato.replaceChildren(h('p', { class: 'err' }, 'Diagnosi non riuscita: ' + e.message)); }
       ev.target.disabled = false;
     } }, 'Esegui diagnosi'), risultato);
@@ -2599,8 +2598,8 @@ function impRender(s) {
   $("#impCorpo").replaceChildren(...s.voci.map(v => h("div", { class: "campo voce-imp" },
     h("label", { for: "imp_" + v.chiave }, v.etichetta),
     h("input", { id: "imp_" + v.chiave, class: "mono", value: v.valore || "", disabled: !v.modificabile, placeholder: v.modificabile ? "non impostato" : "" }),
-    h("div", { class: "mut testo-m" }, (v.a_posto ? "✓ " : "✗ ") + v.dettaglio + (v.valore ? " · origine: " + v.origine : "")),
-    h("div", { class: "mut testo-m" }, v.nota))));
+    h("div", { class: "mut aiuto" }, (v.a_posto ? "✓ " : "✗ ") + v.dettaglio + (v.valore ? " · origine: " + v.origine : "")),
+    h("div", { class: "mut aiuto" }, v.nota))));
 }
 /* Impronta di cio' che si puo' modificare nelle Impostazioni: se alla chiusura e' diversa, ci sono modifiche non salvate. */
 function impFirma() {
@@ -2973,7 +2972,7 @@ async function apriGuida(scheda) {
         riga("Modulo di esportazione", v.modulo_esportazione), riga("Archivio in uso", i.archivio), riga("Sistema", i.sistema + " · Python " + i.python))),
         h("h3", {}, "Componenti"),
         h("ul", { class: "guida-lista" }, (i.componenti || []).map(c => h("li", {},
-          h("span", { class: "pz " + (c.esito === "ok" ? "ok" : c.esito === "avviso" ? "am" : "er") }, c.esito || "?"), " ", h("b", {}, c.nome),
+          h("span", { class: "pz " + (c.esito === "ok" ? "ok" : c.esito === "avviso" ? "am" : c.esito === "info" ? "" : "er") }, c.esito || "?"), " ", h("b", {}, c.nome),
           h("span", { class: "mut" }, " — " + (c.dettaglio || ""))))),
         h("h3", {}, "Novità"), h("pre", { class: "novita" }, i.novita || "—"),
         h("p", { class: "mut piccolo" }, i.avvertenza));

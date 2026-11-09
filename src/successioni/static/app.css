@@ -770,3 +770,78 @@ th { overflow:hidden; text-overflow:ellipsis; }
 /* prospetto delle imposte: largo quanto serve a leggere voce e importo insieme */
 .prospetto-ef, .riquadro-calc + div > .tab.piatta { max-width:44rem; }
 .prospetto-ef td { font-size:var(--fs-base); padding-top:var(--s-2); padding-bottom:var(--s-2); }
+
+/* ==== Revisione grafica del 9/11/2026, lotti 1 e 2 (docs/revisione_grafica_20261109/ELENCO_UNICO.md) ==== */
+/* Lotto 1 */
+/* B01 = C01: linguette Dati/Controlli/Cronologia opache e non tagliate; il campo col focus non finisce sotto la barra */
+.ins > .seg { top:calc(-1 * var(--s-4)); background:linear-gradient(var(--grigio), var(--grigio)), var(--lat); }
+.ins { scroll-padding-top:3.5rem; scroll-padding-bottom:var(--s-3); }
+@media (min-width:961px) and (max-width:1440px) { .ins > .seg { top:calc(-1 * var(--s-3)); } }
+/* B05: una riga nuova con le celle vuote ha l'altezza di una riga vera */
+tbody td:empty::before { content:"\00a0"; }
+
+/* Lotto 2: una sola riga di modulo in tutte le finestre.
+   Ritmo: etichetta -> campo 4 px, campo -> aiuto 4 px, voce -> voce 16 px, pulsante legato al campo 8 px accanto. */
+:root { --l-num:8rem; --l-data:11rem; --l-sigla:5rem; --l-importo:12rem; --l-media:28rem; }
+dialog .campo { margin:0 0 var(--s-4); }
+dialog .campo:last-child { margin-bottom:0; }
+dialog :is(.griglia, .aspetto-griglia) > .campo { margin-bottom:0; }
+dialog .griglia { row-gap:var(--s-3); }
+dialog .campo > label:not(.chk) { display:block; color:var(--t); font-weight:500; font-size:var(--fs-m); margin-bottom:var(--s-1); }
+/* aiuto: un passo sotto l'etichetta, grigio, staccato dal campo, larghezza di lettura */
+dialog .campo > .mut, .aiuto { font-size:var(--fs-s); line-height:1.45; color:var(--t2); margin-top:var(--s-1); max-width:72ch; }
+dialog .campo > .mut + .mut { margin-top:var(--s-05); }
+/* larghezza secondo il dato (la regola generale width:100% resta per tabelle e schede) */
+dialog input[type=number], dialog input.num, #imp_SUCCESSIONI_CONTROLLI_TIMEOUT { width:var(--l-num); text-align:right; font-variant-numeric:tabular-nums; }
+dialog input[type=date], #w_data_nascita, #w_data_decesso, #calcData { width:var(--l-data); font-variant-numeric:tabular-nums; }
+#w_provincia_nascita, #w_provincia_decesso { width:var(--l-sigla); text-transform:uppercase; }
+dialog select { max-width:var(--l-media); }
+dialog input.mono::placeholder { font-family:var(--f-ui); letter-spacing:normal; }
+dialog input.cf { padding-inline:calc(var(--l) / 2 + var(--s-1)); width:calc(16 * var(--cella) + var(--l) + 10px); }
+/* caselle: 16 px, sulla prima riga del testo, 8 px di stacco; l'aiuto sta sotto il testo, non sotto il quadratino */
+dialog input[type=checkbox], dialog input[type=radio] { width:1rem; height:1rem; flex:none; accent-color:var(--blu); }
+dialog .campo > label.chk { display:flex; align-items:flex-start; gap:var(--s-2); padding:0; border:0; color:var(--t); font-weight:400; font-size:var(--fs-base); }
+dialog .campo > label.chk input { margin:.2em 0 0; }
+dialog .campo.casella > label.chk + .mut { margin-left:calc(1rem + var(--s-2)); }
+/* pulsante legato a un campo: accanto, mai attaccato */
+.in-linea { display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; }
+.in-linea > input { flex:none; }
+/* intestazioni e sezioni: stessi stacchi in tutte le finestre */
+dialog h2 + p { margin-top:0; }
+#imp .imp-testa p { margin:0 0 var(--s-2); }
+#imp .imp-sezioni h3 { margin:0 0 var(--s-3); }
+#imp .imp-sezioni > section > p.mut { margin:0 0 var(--s-3); max-width:72ch; }
+#imp .imp-sezioni > section > p.mut + button { margin-top:0; }
+#imp .imp-corpo { grid-template-columns:200px minmax(0,1fr); }
+.strumenti .campo { margin-top:0; } .voce-imp { margin-bottom:var(--s-4); }
+.diagnosi-voce { margin-bottom:var(--s-3); } .diagnosi-voce .mut { font-size:var(--fs-s); margin-top:var(--s-05); }
+/* A16: quadri proposti in una griglia stretta */
+.aspetto-griglia[role=group] { grid-template-columns:repeat(auto-fill, minmax(5.5rem, 1fr)); gap:var(--s-1) var(--s-3); margin:var(--s-1) 0 0; }
+/* A17: descrizione della scelta un passo sotto il titolo */
+.radio { padding:var(--s-2) 0; } .radio .mut { font-size:var(--fs-m); margin-top:var(--s-05); }
+/* A06, A21: modifica di gruppo */
+.dlg-op .rg > .gruppo-svuota { grid-column:2; display:flex; align-items:center; gap:var(--s-15); font-weight:400; color:var(--t2); margin-top:0; }
+.gruppo-righe .riga-sc { align-items:flex-start; } .gruppo-righe .riga-sc input { margin-top:.2em; }
+.dlg-op .rg[data-gruppo^=quota] input { width:var(--l-num); }
+/* A20: elenco delle colonne di Incolla righe in stile codice */
+.dlg-op .cod { font-family:var(--f-mono); font-size:var(--fs-s); color:var(--t2); background:var(--grigio); border-radius:var(--r1); padding:var(--s-15) var(--s-2); }
+/* A15: Vai al quadro */
+#dVai { width:min(420px, 94vw); } #vaiSigla { width:var(--l-num); text-transform:uppercase; }
+/* A09: calcolatrice, importi a destra */
+.calc-riga input.n { text-align:right; font-variant-numeric:tabular-nums; } .calc-riga .chk { gap:var(--s-15); }
+/* A11: preventivo */
+dialog.preventivo .prev-campi { grid-template-columns:max-content var(--l-data) max-content 1fr; }
+dialog.preventivo .prev-campi input.num { width:var(--l-num); }
+dialog.preventivo table.prev-voci td:last-child { width:1%; white-space:nowrap; }
+dialog.preventivo table.prev-voci td:nth-child(2) input { width:var(--l-importo); }
+dialog.preventivo .chk { padding-left:0; padding-right:0; border-bottom:0; }
+/* A10 = C09: tabelle della Guida senza testo troncato, bordo dal token */
+table.tab-valori td { white-space:normal; max-width:none; }
+table.tab-valori th, table.tab-valori td { border-bottom-color:var(--sep); }
+/* A22: ricerca della Guida */
+.guida-corpo input[type=search] { max-width:32rem; }
+/* errori: una sola classe .err (.e resta come sinonimo nelle finestre) */
+dialog p.e { font-size:var(--fs-base); }
+dialog.preventivo table.prev-voci :is(td, th):nth-child(2) { width:1%; }   /* «Togli» subito accanto all'importo */
+dialog .campo .aspetto-griglia[role=group] > label.chk { display:flex; align-items:center; gap:var(--s-2); padding:0; border:0; margin:0; color:var(--t); font-size:var(--fs-base); }
+dialog .campo .aspetto-griglia[role=group] > label.chk input { margin:0; }
