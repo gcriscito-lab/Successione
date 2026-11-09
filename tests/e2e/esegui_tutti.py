@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DATI = ROOT / "build" / "gui_fix_data"
-PROVE = ["gui_flusso", "gui_regressioni", "gui_cf_tardivo", "gui_layout_20261103", "gui_aspetto", "gui_review_20261103", "gui_valore_catastale", "gui_review2", "gui_albero", "gui_miglioramenti_replica", "gui_grafica_rapida", "gui_guida", "gui_calcolatrice", "gui_review3", "gui_review4", "gui_versione_03", "gui_home", "gui_versione_04", "gui_revisione_interfaccia", "gui_quadro_ef", "gui_moduli"]
+PROVE = ["gui_flusso", "gui_regressioni", "gui_cf_tardivo", "gui_layout_20261103", "gui_aspetto", "gui_review_20261103", "gui_valore_catastale", "gui_review2", "gui_albero", "gui_miglioramenti_replica", "gui_grafica_rapida", "gui_guida", "gui_calcolatrice", "gui_review3", "gui_review4", "gui_versione_03", "gui_home", "gui_versione_04", "gui_revisione_interfaccia", "gui_quadro_ef", "gui_moduli", "gui_calendario"]
 
 
 def _attendi_server(url="http://127.0.0.1:8813/", secondi=60):
