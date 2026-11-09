@@ -751,3 +751,15 @@ th { overflow:hidden; text-overflow:ellipsis; }
 .avvisi-elenco { list-style:none; margin:var(--s-15) 0 0; padding:0; }
 .avvisi-elenco li { display:flex; justify-content:space-between; align-items:baseline; gap:var(--s-3); padding:var(--s-05) 0; border-top:1px solid color-mix(in srgb, var(--am-b) 35%, transparent); }
 .avvisi-elenco li .lk { flex:none; }
+
+/* ---- Scheda compatta di nuovo fitta (9/11/2026): solo con densita' compatta; testo a grandezza piena, la scheda normale non cambia */
+:root[data-densita="compatta"] .ins :is(input:not([type=checkbox]):not([type=radio]), select) { min-height:0; height:1.75rem; padding-top:0; padding-bottom:0; line-height:1.3; }
+:root[data-densita="compatta"] .ins input.cf { min-height:0; height:1.75rem; }
+:root[data-densita="compatta"] .ins .campi-scheda .rg, :root[data-densita="compatta"] .ins .rg { padding-top:1px; padding-bottom:1px; }
+:root[data-densita="compatta"] .ins .campi-scheda { row-gap:var(--s-05); }
+:root[data-densita="compatta"] .ins .gruppo-scheda > h4, :root[data-densita="compatta"] .ins .gruppo-scheda > summary { line-height:1.35; }
+:root[data-densita="compatta"] :is(td, th) { line-height:1.3; }
+/* pannello sotto: i gruppi occupano tutta la larghezza (prima tre colonne fisse e ~400 px vuoti a destra sugli schermi larghi) */
+@media (min-width:961px) {
+  :root[data-disposizione="sotto"] .ins .gruppi-scheda { columns:auto; display:grid; grid-template-columns:repeat(auto-fit, minmax(22rem, 1fr)); gap:0 var(--s-5); align-items:start; }
+}

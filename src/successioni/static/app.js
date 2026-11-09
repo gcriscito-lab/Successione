@@ -1074,9 +1074,9 @@ const ETICHETTE_BREVI = { grado_parentela: "Grado", ruolo: "Ruolo", tipo_soggett
   diritto: "Diritto", comune_amministrativo: "Comune amm.", codice_comune: "Cod. comune", codice_comune_amministrativo: "Cod. amm.",
   indirizzo: "Indirizzo", zona_censuaria: "Zona cens.", consistenza: "Consistenza", rendita: "Rendita", rendita_proposta: "Rendita DOCFA",
   reddito_dominicale: "Reddito dom.", tipologia_terreno: "Tipologia", particella_denominatore: "Denominatore", sezione: "Sezione",
-  data_visura: "Data visura", diritto_abitazione: "Abitazione coniuge", codice_stato_estero: "Cod. Stato", stato_federato: "Stato federato",
+  data_visura: "Data visura", diritto_abitazione: "Abit. coniuge", codice_stato_estero: "Cod. Stato", stato_federato: "Stato federato",
   localita_estero: "Località estera", imposta_estera: "Imposta estera", bene_estero: "Bene estero", discordanza_intestatario: "Discordanza",
-  passaggi_senza_atti_legali: "Passaggi senza atti", codice_comune_catastale: "Cod. com. catastale", comune_catastale: "Comune catastale" };
+  passaggi_senza_atti_legali: "Passaggi s. atti", codice_comune_catastale: "Cod. com. catastale", comune_catastale: "Comune catastale" };
 const vistaImmobili = q => !!(S.immobiliTutti && q && IMMOBILI.includes(q.id));
 function quadriImmobili() { return IMMOBILI.map(id => S.Q && S.Q.quadri.find(x => x.id === id)).filter(x => x && x.supportato && (x.attivo || righeQuadro(x).length)); }
 function quadroDellaRiga(key) { for (const q of quadriImmobili()) if (righeQuadro(q).some(r => r.key === key)) return q.id; return null; }
