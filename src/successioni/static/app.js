@@ -568,7 +568,7 @@ function renderAlbero() {
       const testo = [st === "rilievi" ? q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi") : (q.righe && st === "compilato" ? q.righe + (q.righe === 1 ? " riga" : " righe") : STATI[st]),
         lav && STATI_LAVORO[lav]].filter(Boolean).join(" · ");
       nav.append(h("button", { class: "voce", "data-stato": st, "data-lavoro": lav || null, "data-q": q.id, title: q.id + " — " + q.titolo + (testo ? " (" + testo + ")" : "") + tastoVoce(q.id), "aria-current": S.sel === q.id ? "true" : "false", onclick: () => scegliQuadro(q.id) },
-        h("span", { class: "sigla" }, q.id), h("span", { class: "testi" }, h("span", { class: "nome" }, TITOLI_BREVI[q.id] || q.titolo), h("span", { class: "st" }, testo))));
+        h("span", { class: "sigla" }, q.id), h("span", { class: "testi" }, h("span", { class: "nome" }, TITOLI_BREVI[q.id] || q.titolo), st === "inattivo" && !lav ? null : h("span", { class: "st" }, testo))));
     }
   }
 }
@@ -670,7 +670,7 @@ function campoStrutturato(sd, val, onMod, path) {
   const mostraAiuto = () => {
     const o = sd.opzioni.find(x => x.valore === el.value);
     dett.textContent = o ? o.aiuto : "";
-    el.title = el.selectedOptions[0] ? el.selectedOptions[0].textContent : "";
+    el.title = (el.selectedOptions[0] ? el.selectedOptions[0].textContent : "") + (o && o.aiuto ? " — " + o.aiuto : "");
   };
   const f = () => { mostraAiuto(); onMod(leggi("str", el.value)); };
   el.addEventListener("change", f);
@@ -1519,13 +1519,13 @@ function renderStrutturati(ins, q, r) {
     const sd = (S.schema.strutturati || {})['devoluzioni.agevolazioni'];
     const bene = (S.P.dati.beni || []).find(b => b.id === valRiga(r, 'bene_id'));
     const attuale = String(valore('agevolazioni') || '').toUpperCase();
-    ins.append(h('h3', {}, 'Agevolazione (prima casa, riduzioni)'));
+    ins.append(h('h3', { class: 'con-aiuto', title: sd.aiuto || '' }, 'Agevolazione (prima casa, riduzioni)'));
     ins.append(campoStrutturato(sd, valore('agevolazioni'), v => { scrivi('agevolazioni', v); renderIns(); }, null));
     ins.append(h('div', { class: 'mut aiuto-voce' }, sd.aiuto));
     if (bene && ['P', 'X', 'Z'].includes(attuale) && quadroBene(bene) !== 'EC')
       ins.append(h('div', { class: 'nota stretta' }, 'Il bene collegato non è un fabbricato del quadro EC: i codici P, X, Z sono ammessi solo lì e l\'esportazione segnalerà un errore.'));
     const rd = (S.schema.strutturati || {})['devoluzioni.riduzioni'];
-    ins.append(h('h3', {}, 'Riduzione art. 25 comma 1'));
+    ins.append(h('h3', { class: 'con-aiuto', title: rd.aiuto || '' }, 'Riduzione art. 25 comma 1'));
     ins.append(campoStrutturato(rd, valore('riduzioni'), v => scrivi('riduzioni', v), null));
     ins.append(h('div', { class: 'mut aiuto-voce' }, rd.aiuto));
     if (valore('riduzioni') && bene)
@@ -1542,7 +1542,7 @@ function renderStrutturati(ins, q, r) {
     const vp = (S.schema.strutturati || {})['beni.valore_prec_succ'];
     const inp = h('input', { id: 'vps_' + id, class: 'num', autocomplete: 'off', 'aria-label': vp.etichetta, value: mostra('importo', valore('valore_prec_succ')),
       oninput: ev => scrivi('valore_prec_succ', leggi('importo', ev.target.value)) });
-    altri.append(h('h3', {}, 'Precedenti successioni o donazioni'), h('div', { class: 'rg' }, h('label', { for: 'vps_' + id }, vp.etichetta), h('div', {}, inp, h('div', { class: 'mut aiuto-voce' }, vp.aiuto))));
+    altri.append(h('h3', {}, 'Precedenti successioni o donazioni'), h('div', { class: 'rg' + (vp.aiuto ? ' con-aiuto' : '') }, h('label', { for: 'vps_' + id, title: [vp.etichetta, vp.aiuto].filter(Boolean).join('. ') }, vp.etichetta), h('div', {}, inp, h('div', { class: 'mut aiuto-voce' }, vp.aiuto))));
   }
   if (q.coll === 'persone') {
     const cb = h('input', { type: 'checkbox', 'aria-label': 'portatore handicap', onchange: ev => scrivi('portatore_handicap', ev.target.checked) });
@@ -2065,7 +2065,7 @@ function sezionePrimaCasa() {
       mostraAiuto(); aggiornaBottoni(); renderSb();
     };
     inp.addEventListener("change", modifica); mostraAiuto();
-    sez.append(h("div", { class: "rg" }, h("label", { for: id, title: sd.etichetta }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto), dett)));
+    sez.append(h("div", { class: "rg" + (sd.aiuto ? " con-aiuto" : "") }, h("label", { for: id, title: [sd.etichetta, sd.aiuto].filter(Boolean).join(". ") }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto), dett)));
   }
   sez.append(h("div", { class: "barra dentro" }, h("button", { class: "pil", id: "pc_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
   return sez;
@@ -2093,7 +2093,7 @@ function sezioneRiduzioni() {
       aggiornaBottoni(); renderSb();
     };
     inp.addEventListener("input", modifica); inp.addEventListener("change", modifica);
-    sez.append(h("div", { class: "rg" }, h("label", { for: id, title: sd.etichetta }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto))));
+    sez.append(h("div", { class: "rg" + (sd.aiuto ? " con-aiuto" : "") }, h("label", { for: id, title: [sd.etichetta, sd.aiuto].filter(Boolean).join(". ") }, sd.etichetta), h("div", {}, inp, h("div", { class: "mut aiuto-voce" }, sd.aiuto))));
   }
   sez.append(h("div", { class: "barra dentro" }, h("button", { class: "pil", id: "ra_salva", onclick: () => salvaTutto() }, "Salva dati della dichiarazione")));
   return sez;

@@ -913,3 +913,21 @@ input[type=file]::file-selector-button { font:inherit; color:var(--t); border:1p
 .con-calendario > input.cal-nativo { position:absolute; right:0; bottom:0; width:1px; height:1px !important; min-height:0 !important; padding:0; border:0;
   opacity:0; pointer-events:none; }
 
+
+/* ==== 10/11/2026: niente istruzioni sotto i campi (tolgono spazio ai dati). Il testo resta nel suggerimento dell'etichetta,
+   segnalato da «?», e nella descrizione accessibile del campo (aria-describedby funziona anche con l'elemento nascosto). ==== */
+.aiuto-voce, :root[data-densita] .ins .rg:focus-within .aiuto-voce { display:none; }
+:is(.rg.con-aiuto > label, h3.con-aiuto)::after { content:"\00a0?"; color:var(--blu); font-weight:700; }
+:is(.rg.con-aiuto > label, h3.con-aiuto) { cursor:help; }
+
+/* ==== 10/11/2026: barra laterale dei quadri piu' leggibile ==== */
+.lat .gruppo { margin:var(--s-4) var(--s-2) var(--s-1); padding-top:var(--s-2); border-top:1px solid var(--sep);
+  font-size:var(--fs-s); font-weight:700; color:var(--t); letter-spacing:.02em; }
+.lat .voce { align-items:center; padding:var(--s-15) var(--s-2); }
+.lat .voce .nome { font-size:var(--fs-base); font-weight:500; color:var(--t); line-height:1.3; }
+.lat .voce .st { font-size:var(--fs-s); }
+.lat .voce .sigla { min-width:2.3rem; height:1.8rem; font-size:var(--fs-m); }
+.lat .voce[data-stato=inattivo] { padding-top:var(--s-05); padding-bottom:var(--s-05); }
+.lat .voce[data-stato=inattivo] .nome { font-size:var(--fs-m); font-weight:400; color:var(--t2); }
+.lat .voce[aria-current=true], .lat .voce[aria-current=page] { box-shadow:inset 3px 0 0 var(--blu); }
+.lat .voce[aria-current=true] .nome { font-weight:700; }

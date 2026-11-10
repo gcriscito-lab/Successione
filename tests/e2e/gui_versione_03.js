@@ -44,11 +44,15 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   assert.ok(sotto.alto < destra.alto * 0.6, `scheda piu' bassa: ${sotto.alto} contro ${destra.alto}`);
   const sep = await page.$eval("#ridimensiona", s => [s.getAttribute("aria-orientation"), s.getAttribute("aria-label")]);
   assert.deepEqual(sep, ["horizontal", "Altezza pannello dati"]);
-  // aiuto: nascosto, compare entrando nel campo
+  // aiuto (10/11/2026): mai sotto il campo, nemmeno entrandoci; il testo resta nel suggerimento dell'etichetta e nella
+  // descrizione accessibile del campo
   const aiuto = await page.evaluate(() => { const rg = document.querySelector("#ins .rg.con-aiuto"); return rg && getComputedStyle(rg.querySelector(".aiuto-voce")).display; });
   assert.equal(aiuto, "none");
   await page.focus("#ins .rg.con-aiuto input, #ins .rg.con-aiuto select");
-  assert.notEqual(await page.evaluate(() => getComputedStyle(document.activeElement.closest(".rg").querySelector(".aiuto-voce")).display), "none");
+  const nelTitolo = await page.evaluate(() => { const rg = document.activeElement.closest(".rg"), a = rg.querySelector(".aiuto-voce");
+    return { nascosto: getComputedStyle(a).display === "none", titolo: rg.querySelector("label").title.includes(a.textContent),
+      descritto: (document.activeElement.getAttribute("aria-describedby") || "").split(/\s+/).includes(a.id) }; });
+  assert.deepEqual(nelTitolo, { nascosto: true, titolo: true, descritto: true });
   // separatore da tastiera: Freccia su allarga il pannello (altezza salvata)
   const h0 = await page.evaluate(() => preferenze.altezza_pannello);
   const salvata = page.waitForResponse(r => r.url().includes("/api/impostazioni") && r.request().method() === "POST");
