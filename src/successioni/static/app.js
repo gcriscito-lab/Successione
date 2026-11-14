@@ -63,7 +63,7 @@ S.fornitoreDirty = {};
 const nMod = () => S.dirty.size + S.nuove.size + S.dichDirty.size + S.supDirty.size + (Object.keys(S.fornitoreDirty).length ? 1 : 0);
 const nuovoId = coll => ({ persone: "p", beni: "b", devoluzioni: "d", passivita: "ps", documenti_ref: "dr" }[coll]) + "_" + crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const uguale = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const ASPETTO_DEFAULT = { tema: 'sistema', font: 'sistema', dimensione: 16, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240,
+const ASPETTO_DEFAULT = { tema: 'sistema', stile: 'moderno', font: 'sistema', dimensione: 16, interlinea: 'normale', larghezza_pannello: 360, larghezza_nav: 240,
   accento: 'predefinito', densita: 'normale', contrasto: 'normale', movimento: 'normale', avvio: 'elenco', nome_studio: '', quadri_predefiniti: [],
   disposizione: 'destra', altezza_pannello: 380 };
 // colori in app.css (:root[data-accento=...], con la variante per il tema scuro)
@@ -79,6 +79,7 @@ function applicaAspetto(valori) {
   // personalizzazione: accento (con la variante adatta al tema scuro), densita', contrasto, movimento, nome dello studio
   root.dataset.accento = ACCENTI.includes(p.accento) ? p.accento : 'predefinito';
   root.dataset.densita = p.densita; root.dataset.contrasto = p.contrasto; root.dataset.movimento = p.movimento;
+  root.dataset.stile = p.stile === 'classico' ? 'classico' : 'moderno';
   const sub = $('#bHome .marchio-sub'); if (sub) sub.textContent = p.nome_studio || 'Dichiarazioni telematiche';   // il nome dello studio sotto il marchio
   document.title = 'Successioni' + (p.nome_studio ? ' · ' + p.nome_studio : '');
   root.style.setProperty('--dimensione-base', Math.max(12, Math.min(22, Number(p.dimensione) || 16)) + 'px');
@@ -2583,6 +2584,7 @@ function impAspettoRender(p) {
     grid.append(h('div', { class: 'campo' }, h('label', { for: id }, titolo), el));
   };
   scelte('tema', 'Tema', [['sistema', 'Come il sistema'], ['chiaro', 'Chiaro'], ['scuro', 'Scuro'], ['seppia', 'Seppia']]);
+  scelte('stile', 'Stile grafico', [['moderno', 'Moderno (predefinito)'], ['classico', 'Classico (com’era fino al 14/11/2026)']]);
   scelte('font', 'Carattere', [['sistema', 'Atkinson Hyperlegible (predefinito)'], ['segoe', 'Segoe UI'], ['arial', 'Arial'], ['verdana', 'Verdana'], ['georgia', 'Georgia'], ['consolas', 'Consolas']]);
   scelte('dimensione', 'Dimensione del testo', Array.from({ length: 11 }, (_, i) => [String(i + 12), (i + 12) + ' px']));
   scelte('interlinea', 'Spaziatura delle righe', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);

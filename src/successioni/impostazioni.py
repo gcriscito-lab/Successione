@@ -51,7 +51,7 @@ CHIAVI = {v[0]: v for v in VOCI}
 _ESEMPIO = {"SUCCESSIONI_JAVA": "java.exe", "SUCCESSIONI_GS": "gswin64c.exe", "SUCCESSIONI_VERAPDF": "verapdf.bat",
             "SUCCESSIONI_QPDF": "qpdf.exe", "SUCCESSIONI_ICC": "srgb.icc"}
 MINIMO_TIMEOUT, MASSIMO_TIMEOUT = 10, 7200
-INTERFACCIA_DEFAULT = {"tema": "sistema", "font": "sistema", "dimensione": 16,
+INTERFACCIA_DEFAULT = {"tema": "sistema", "stile": "moderno", "font": "sistema", "dimensione": 16,
                        "interlinea": "normale", "larghezza_pannello": 360, "larghezza_nav": 240,
                        # personalizzazione dell'app
                        "accento": "predefinito", "densita": "normale", "contrasto": "normale", "movimento": "normale",
@@ -64,6 +64,8 @@ QUADRI_SCEGLIBILI = ("EA", "EB", "EC", "ER", "ED", "EF", "EG", "EH", "EI", "EL",
 INTERVALLI_INTERFACCIA = {"dimensione": (12, 22), "larghezza_pannello": (280, 760), "larghezza_nav": (180, 480),
                           "altezza_pannello": (200, 900)}
 SCELTE_INTERFACCIA = {"tema": ("sistema", "chiaro", "scuro", "seppia"),
+                      # 14/11/2026: aspetto rinnovato (superfici, pulsanti, tabelle); «classico» e' quello di prima
+                      "stile": ("moderno", "classico"),
                       "font": ("sistema", "segoe", "arial", "verdana", "georgia", "consolas"),
                       "interlinea": ("compatta", "normale", "ampia"),
                       "accento": ("predefinito", "blu", "verde", "viola", "arancio", "rosso", "grafite"),
