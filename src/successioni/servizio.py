@@ -14,6 +14,8 @@ from .albero_genealogico import AlberoGenealogicoMixin
 from .allegati import AllegatiMixin
 from .elaborati import ElaboratiMixin
 from .invio_servizio import InvioMixin
+from .visura_servizio import VisuraMixin
+from .ricevute_cartella import RicevuteCartellaMixin
 from .archivio import Archivio
 from .errori import (ChiaveRiutilizzata, ConflittoRevisione, DatiNonValidi, ErroreServizio,  # noqa: F401
                      NonTrovato, ora)
@@ -70,7 +72,7 @@ ID_VALIDO = re.compile(r"^[a-z]{1,4}_[a-z0-9]{4,32}$")
 PREFISSI = {"persone": "p", "beni": "b", "devoluzioni": "d", "passivita": "ps", "documenti_ref": "dr"}
 
 
-class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin):
+class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin, VisuraMixin, RicevuteCartellaMixin):
     def __init__(self, archivio: Archivio | None = None):
         self.arch = archivio or Archivio()
 
@@ -151,6 +153,63 @@ class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin
             return {"pratica_id": pratica_id, "titolo": p["titolo"], "revisione": rev,
                     "revisione_corrente": p["revisione"], "dati": dati,
                     "impronta_dichiarativa": impronta_dichiarativa(dati)}
+
+    def duplica_pratica(self, pratica_id: str, titolo: str | None = None, *, chiave: str | None = None, autore="utente",
+                        canale="gui") -> dict:
+        """Nuova pratica con gli stessi dati (per una dichiarazione sostitutiva o un caso simile), con l'origine di ogni dato
+        conservata. Non si copiano: allegati e documenti del quadro EG (appartengono alla pratica di partenza), preventivo e
+        parcella, file generati, controlli e invii."""
+        self._canale(canale)
+        p = self.leggi(pratica_id)
+        dati = copy.deepcopy(p["dati"])
+        dati["documenti_ref"] = []
+        note = dati.get("note") if isinstance(dati.get("note"), dict) else {}
+        note.pop("preventivo", None)
+        titolo = (titolo or "").strip() or f"Copia di {p['titolo']}"
+        impr = _impronta({"duplica": pratica_id, "revisione": p["revisione"], "titolo": titolo})
+        with self.arch.transazione() as c:
+            if chiave:
+                prec = self._richiesta(c, chiave, "duplica_pratica", impr)
+                if prec is not None:
+                    return {**prec, "ripetuta": True}
+            errori = S.valida_forma(dati)
+            if errori:
+                raise DatiNonValidi("dati della pratica di partenza non validi: copia non creata",
+                                    errori=[e.asdict() for e in errori])
+            pid = "pr_" + uuid.uuid4().hex[:12]
+            t = ora()
+            c.execute("INSERT INTO pratiche VALUES(?,?,?,?,?,?)", (pid, titolo, t, t, 1, json.dumps(dati)))
+            c.execute("INSERT INTO revisioni VALUES(?,?,?,?,?,?,?,?)",
+                      (pid, 1, t, autore, canale, chiave, f"copia della pratica {pratica_id} (revisione {p['revisione']})",
+                       json.dumps(dati)))
+            risp = {"pratica_id": pid, "revisione": 1, "titolo": titolo, "da": pratica_id,
+                    "non_copiati": ["allegati e documenti del quadro EG", "preventivo e parcella", "file generati, controlli e invii"]}
+            if chiave:
+                c.execute("INSERT INTO richieste VALUES(?,?,?,?,?,?)", (chiave, pid, "duplica_pratica", impr, json.dumps(risp), t))
+            return risp
+
+    def ordina_beni(self, pratica_id: str, revisione_attesa: int, quadro: str, *, chiave: str | None = None,
+                    canale: str = "gui") -> dict:
+        """Ordina gli immobili di un quadro per comune, sezione, foglio, particella e subalterno (numeri in ordine numerico);
+        le righe degli altri quadri restano dove sono."""
+        p = self.leggi(pratica_id)
+        beni = p["dati"].get("beni", [])
+        pos = [i for i, b in enumerate(beni) if Q.quadro_di("beni", b) == quadro]
+        if not pos:
+            raise DatiNonValidi(f"nessun bene nel quadro {quadro}")
+
+        def chiave_ordine(b):
+            def num(v):
+                s = str(v or "").strip()
+                return (0, int(s), "") if s.isdigit() else (1, 0, s.upper())
+            return (str(b.get("comune") or b.get("codice_comune") or "").upper(), str(b.get("sezione") or "").upper(),
+                    num(b.get("foglio")), num(b.get("particella")), num(b.get("subalterno")))
+        ordinati = sorted((beni[i] for i in pos), key=chiave_ordine)
+        nuovi = list(beni)
+        for i, b in zip(pos, ordinati):
+            nuovi[i] = b
+        return self.aggiorna(pratica_id, revisione_attesa, [{"op": "ordina", "coll": "beni", "ids": [b["id"] for b in nuovi]}],
+                             chiave=chiave, canale=canale)
 
     def revisioni(self, pratica_id: str) -> list[dict]:
         with self.arch.lettura() as c:
@@ -399,5 +458,15 @@ class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin
                     dati.setdefault(sez, {}).pop(k, None)
                 else:
                     dati.setdefault(sez, {})[k] = v
+        elif tipo == "ordina":
+            # nuovo ordine delle righe di una collezione (sposta su/giu', ordina per comune e foglio): conta nei moduli
+            coll = op.get("coll")
+            if coll not in S.COLLEZIONI:
+                raise DatiNonValidi(f"operazione {i}: collezione sconosciuta", ammesse=list(S.COLLEZIONI))
+            ids, righe = op.get("ids"), dati.get(coll, [])
+            if not isinstance(ids, list) or sorted(map(str, ids)) != sorted(e["id"] for e in righe):
+                raise DatiNonValidi(f"operazione {i}: 'ids' deve elencare una sola volta tutte le righe di {coll}", coll=coll)
+            per_id = {e["id"]: e for e in righe}
+            dati[coll] = [per_id[x] for x in ids]
         else:
-            raise DatiNonValidi(f"operazione {i}: 'op' deve essere upsert, remove o set")
+            raise DatiNonValidi(f"operazione {i}: 'op' deve essere upsert, remove, set o ordina")

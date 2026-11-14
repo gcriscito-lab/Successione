@@ -32,12 +32,12 @@ STRUMENTI_LETTURA = frozenset({
     "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
     "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
     "file_in_ingresso", "elenca_allegati", "diagnosi", "valori_catastali", "brogliaccio", "stima_imposte",
-    "codice_comune", "tabelle_calcolo",
+    "codice_comune", "tabelle_calcolo", "visura_stato",
 })
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "registra_esito_controllo", "backup_archivio", "stampa_modello",
     "invio_prepara", "importa_xml_telematico", "acquisisci_allegato", "prepara_pdfa", "suddividi_allegato",
-    "riordina_allegati", "genera_albero_genealogico",
+    "riordina_allegati", "genera_albero_genealogico", "visura_carica", "visura_applica", "duplica_pratica",
 })
 MESSAGGIO_SOLA_LETTURA = ("Claude è in sola lettura: modifica disattivata nelle Impostazioni → Operatività e sicurezza. "
                           "Lo strumento non è stato eseguito e nulla è stato modificato.")
@@ -157,7 +157,8 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
     def aggiorna_pratica(pratica_id: str, revisione_attesa: int, operazioni: list[dict], chiave_richiesta: str) -> dict:
         """Applica in modo atomico una lista di operazioni. Conflitto di revisione = nessuna modifica. Con op 'remove' toglie
         elementi dalla pratica: e' una modifica distruttiva della revisione corrente, ma le revisioni precedenti restano
-        conservate (revisioni_pratica, leggi_pratica con 'revisione') e si possono confrontare o ripristinare."""
+        conservate (revisioni_pratica, leggi_pratica con 'revisione') e si possono confrontare o ripristinare. Con op 'ordina'
+        ({op: 'ordina', coll, ids}) si cambia l'ordine delle righe di una collezione: 'ids' elenca tutte le righe nel nuovo ordine."""
         return sv.aggiorna(pratica_id, revisione_attesa, operazioni, chiave=chiave_richiesta,
                            autore="assistente", canale="mcp")
 
@@ -274,6 +275,35 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
             raise DatiNonValidi("file non disponibile nella cartella d'ingresso o oltre 60 MB (stesso limite dell'interfaccia)")
         return sv.importa_xml_telematico(p.read_bytes(), titolo=titolo, autore="assistente", canale="mcp",
                                          chiave=chiave_richiesta)
+
+    @tool(ann=SCRITTURA)
+    def duplica_pratica(pratica_id: str, titolo: str | None = None, chiave_richiesta: str | None = None) -> dict:
+        """Crea una nuova pratica con gli stessi dati di quella indicata (per una sostitutiva o un caso simile), con l'origine
+        dei dati conservata. Allegati e documenti EG, preventivo, file generati, controlli e invii non si copiano."""
+        return sv.duplica_pratica(pratica_id, titolo, chiave=chiave_richiesta, autore="assistente", canale="mcp")
+
+    @tool(ann=SCRITTURA)
+    def visura_carica(pratica_id: str, nome_file: str) -> dict:
+        """Legge il PDF delle «Risultanze catastali» di Entratel (ricerca per soggetto, salvato dal browser) messo nella
+        cartella d'ingresso: conserva l'originale e restituisce gli immobili letti con la proposta per la pratica. Non scrive
+        nella pratica. Piu' PDF (fabbricati, terreni, altre province) si sommano nella stessa pratica."""
+        p = (sv.cartella_ingresso / nome_file).resolve()
+        if not p.is_relative_to(sv.cartella_ingresso.resolve()) or not p.is_file() or p.stat().st_size > 20_000_000:
+            raise DatiNonValidi("file non disponibile nella cartella d'ingresso o oltre 20 MB")
+        return sv.visura_carica(pratica_id, p.read_bytes(), nome=p.name)
+
+    @tool
+    def visura_stato(pratica_id: str) -> dict:
+        """Immobili letti dalle visure caricate nella pratica, con l'esito per ciascuno (nuovi, aggiornati, invariati, conflitti)
+        e le segnalazioni (situazione da verificare alla data del decesso, limiti della ricerca). Nessuna scrittura."""
+        return sv.visura_stato(pratica_id)
+
+    @tool(ann=SCRITTURA)
+    def visura_applica(pratica_id: str, revisione_attesa: int, chiavi_immobili: list[str],
+                       chiave_richiesta: str | None = None) -> dict:
+        """Aggiunge alla pratica gli immobili scelti fra quelli di visura_stato (campo 'chiave'), con origine «acquisito». I
+        dati inseriti o confermati dall'utente non vengono sovrascritti. Leggere prima la pratica per la revisione."""
+        return sv.visura_applica(pratica_id, revisione_attesa, chiavi_immobili, chiave=chiave_richiesta, canale="mcp")
 
     @tool(ann=SCRITTURA)
     def registra_esito_controllo(pratica_id: str, file_dgn: str, file_log_schema: str, file_wri: str | None = None,

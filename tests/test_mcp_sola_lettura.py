@@ -54,6 +54,9 @@ def argomenti_scrittura(pid, aid):
         "riordina_allegati": {"pratica_id": pid},
         "genera_albero_genealogico": {"pratica_id": pid},
         "registra_esito_controllo": {"pratica_id": pid, "file_dgn": "x.dgn", "file_log_schema": "x_logSchema.xml"},
+        "visura_carica": {"pratica_id": pid, "nome_file": "inesistente.pdf"},
+        "visura_applica": {"pratica_id": pid, "revisione_attesa": 2, "chiavi_immobili": ["x"]},
+        "duplica_pratica": {"pratica_id": pid, "chiave_richiesta": "ro-4"},
     }
 
 
