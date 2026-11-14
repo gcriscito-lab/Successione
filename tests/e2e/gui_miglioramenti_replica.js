@@ -86,7 +86,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
 
   // 8: filtri della pagina iniziale (funzione pura, date relative a oggi)
   const filtri = await page.evaluate(() => {
-    const g = n => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+    const g = n => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };   // data locale, non UTC
     const el = [{ id: "a", titolo: "Alfa", data_decesso: g(30) }, { id: "b", titolo: "Beta", data_decesso: g(-10) }, { id: "c", titolo: "Gamma", data_decesso: null },
       { id: "d", titolo: "Delta", data_decesso: g(200) }];
     const ids = l => l.map(x => x.id).join("");

@@ -10,7 +10,9 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   await page.goto(url);
   await page.waitForFunction(() => typeof S !== "undefined" && S.schema);
   const ids = await page.evaluate(async () => {
-    const d = n => { const x = new Date(); x.setFullYear(x.getFullYear() - 1); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+    const d = n => { const x = new Date(); x.setFullYear(x.getFullYear() - 1); x.setDate(x.getDate() + n);
+      // data LOCALE (toISOString e' in UTC: fra mezzanotte e l'una il giorno era quello prima e il termine «tra 9 giorni»)
+      return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
     const crea = async (titolo, dec) => (await post("/api/pratiche", { titolo, iniziali: [{ op: "upsert", coll: "persone",
       id: "p_" + Math.random().toString(36).slice(2, 12), campi: { ruolo: "defunto", cognome: "HOME", nome: titolo.split(" ").pop().toUpperCase(), ...(dec ? { data_decesso: dec } : {}) } }] })).pratica_id;
     const r = { vicina: await crea("Home e2e Vicina", d(10)), lontana: await crea("Home e2e Lontana", d(200)),

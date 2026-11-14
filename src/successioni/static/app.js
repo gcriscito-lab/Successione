@@ -417,7 +417,7 @@ function renderHome() {
   const voci = S.pratiche.map(voceHome);
   $("#homeIntro").textContent = vuoto ? "L’archivio non contiene ancora pratiche. Crea la prima oppure importa un file telematico già preparato." : riepilogoHome(voci);
   const f = filtriHome(box); f.hidden = vuoto;
-  if (vuoto) { box.replaceChildren(); statoHome(); return; }
+  if (vuoto) { box.replaceChildren(h("div", { class: "vuoto-illustrato vuoto-home" }, h("img", { src: "/static/vuoto_home.svg", alt: "", "aria-hidden": "true", class: "illustrazione" }))); statoHome(); return; }
   const chips = f.querySelector(".chips"); chips.replaceChildren();
   for (const [k, nome] of Object.entries(FILTRI_HOME)) {
     const n = filtraHome(voci, k, "").length;
@@ -825,9 +825,14 @@ function renderTabella(main, q) {
   const vere = righe.filter(r => !r.subtotale);   // le righe di somma delle devoluzioni non sono righe di dati
   righe.forEach(r => tb.append(r.subtotale ? rigaSubtotaleDV(r, colonne)
     : rigaTabella(q, r, (S.riga && vere.some(x => x.key === S.riga) ? S.riga === r.key : r === vere[0]), indice)));
-  if (!righe.length) tb.append(h("tr", { class: "vuota" }, h("td", { colspan: colonne.length, class: "mut" }, testoVuoto(q))));
+  if (!righe.length) tb.append(h("tr", { class: "vuota" }, h("td", { colspan: colonne.length, class: "mut" },
+    q.coll === "beni" ? h("div", { class: "vuoto-illustrato" }, h("img", { src: "/static/vuoto_beni.svg", alt: "", "aria-hidden": "true", class: "illustrazione" }),
+      h("div", {}, testoVuoto(q), ["EB", "EC"].includes(q.id) ? h("div", { class: "az" }, h("button", { class: "gh", type: "button", onclick: () => caricaVisura(q) }, "Carica visura catastale (PDF)")) : null))
+      : testoVuoto(q))));
   const piede = piedeTabella(q, vere); if (piede) t.append(piede);
+  if (q.coll === "beni" && vere.length > 3) main.append(cercaImmobile(tb));
   main.append(h("div", { class: "tab" }, t));
+  if (q.coll === "beni" && S.cercaBeni) filtraRigheBeni(tb, S.cercaBeni);
   main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, vistaImmobili(q) ? "Aggiungi riga in " + q.id : "Aggiungi riga"),
 
     h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
@@ -1024,6 +1029,153 @@ async function eliminaRigaSelezionata(q) {
   if (confirm("Eliminare dal quadro " + q.id + " la riga «" + etichetta(q.coll, r.e) + "»?")) await salvaOps([{ op: "remove", coll: q.coll, id: r.e.id }], () => {
     S.dirty.delete(r.key); S.riga = null; });
 }
+/* ==== Piccole comodita' (15/11/2026, con il lavoro della sessione «GitHub installation» sul server) ==== */
+/* Cerca immobile: filtra le righe gia' disegnate mentre si scrive (comune, foglio, particella, indirizzo...): il campo non
+   perde il fuoco e i dati non cambiano. */
+function cercaImmobile(tb) {
+  const inp = h("input", { type: "search", class: "cerca-beni", placeholder: "Cerca immobile: comune, foglio, particella, indirizzo", "aria-label": "Cerca immobile",
+    value: S.cercaBeni || "", oninput: e => { S.cercaBeni = e.target.value; filtraRigheBeni(tb, S.cercaBeni); } });
+  return h("div", { class: "barra-cerca" }, inp);
+}
+function filtraRigheBeni(tb, testo) {
+  const parole = String(testo || "").toLowerCase().split(/\s+/).filter(Boolean);
+  for (const tr of tb.querySelectorAll("tr[data-key]")) {
+    const t = tr.textContent.toLowerCase();
+    tr.hidden = parole.length > 0 && !parole.every(w => t.includes(w));
+  }
+}
+/* Prima di un'operazione che riscrive la pratica sul server: le modifiche in sospeso vanno salvate. */
+async function primaSalva() {
+  if (!nMod()) return true;
+  if (!confirm("Ci sono modifiche non salvate: il programma le salva prima di continuare. Continuare?")) return false;
+  return await salvaTutto();
+}
+/* Ordina gli immobili del quadro per comune, sezione, foglio, particella e subalterno (server: ordina-beni). */
+async function ordinaBeni(q) {
+  if (S.writeBusy || !(await primaSalva())) return;
+  try { await post("/api/pratiche/" + S.P.pratica_id + "/ordina-beni", { revisione_attesa: S.P.revisione, quadro: q.id, chiave: crypto.randomUUID() });
+    await ricarica(); render(); msg("Immobili del quadro " + q.id + " ordinati per comune, foglio e particella.", "o"); }
+  catch (e) { msg(e.message, "e"); }
+}
+/* Sposta su/giu' la riga selezionata fra le righe di questo quadro (le righe degli altri quadri della stessa raccolta restano dove
+   sono): nuova permutazione degli identificativi con l'operazione «ordina». */
+async function spostaRiga(q, verso) {
+  const r = rigaSelezionata();
+  if (!r || !r.e) return msg("Seleziona prima una riga salvata da spostare.", "e");
+  if (S.writeBusy || !(await primaSalva())) return;
+  const visibili = righeQuadro(q).filter(x => x.e).map(x => x.e.id), i = visibili.indexOf(r.e.id), j = i + verso;
+  if (i < 0 || j < 0 || j >= visibili.length) return msg(verso < 0 ? "La riga è già la prima." : "La riga è già l'ultima.", "o");
+  const tutti = (S.P.dati[q.coll] || []).map(x => x.id), a = tutti.indexOf(visibili[i]), b = tutti.indexOf(visibili[j]);
+  [tutti[a], tutti[b]] = [tutti[b], tutti[a]];
+  const chiave = r.key;
+  await salvaOps([{ op: "ordina", coll: q.coll, ids: tutti }], () => { S.riga = chiave; });
+  const tr = document.querySelector('#vista tbody tr[data-key="' + CSS.escape(chiave) + '"]'); if (tr) tr.focus({ preventScroll: false });
+}
+/* Duplica la pratica: dati copiati, allegati e invii no (il server elenca cosa non copia). */
+function duplicaPratica() {
+  if (!S.P) return;
+  const titolo = h("input", { id: "dupTitolo", value: "Copia di " + (S.P.titolo || ""), maxlength: "200" });
+  dialogo("dDuplica", "Duplica la pratica", h("div", {}, h("p", { class: "mut" }, "Si crea una nuova pratica con gli stessi dati. Allegati, file generati e invii non vengono copiati."),
+    h("div", { class: "campo" }, h("label", { for: "dupTitolo" }, "Titolo della nuova pratica"), titolo)), "Duplica", () => {
+    if (!titolo.value.trim()) return "Scrivi il titolo della nuova pratica.";
+    const pid = S.P.pratica_id, t = titolo.value.trim();
+    setTimeout(async () => {
+      if (!(await primaSalva())) return;
+      try { const r = await post("/api/pratiche/" + pid + "/duplica", { titolo: t, chiave: crypto.randomUUID() });
+        await caricaPratiche(); await apri(r.pratica_id, "AN");
+        msg("Pratica duplicata: «" + r.titolo + "»." + ((r.non_copiati || []).length ? " Non copiati: " + r.non_copiati.join("; ") + "." : ""), "o"); }
+      catch (e) { msg(e.message, "e"); }
+    }, 0);
+    return null;
+  });
+  titolo.select();
+}
+/* Carica visura: il PDF «Risultanze catastali» scaricato da Entratel; si scelgono gli immobili da aggiungere. */
+function caricaVisura(q) {
+  if (!S.P) return;
+  const pid = S.P.pratica_id, base = "/api/pratiche/" + pid + "/visure";
+  const corpo = h("div", { class: "visura-corpo" }), err = h("p", { class: "err e", role: "alert", hidden: true });
+  const file = h("input", { type: "file", accept: ".pdf,application/pdf", multiple: true, id: "visuraFile", hidden: true });
+  const scegli = h("button", { class: "gh", type: "button", onclick: () => file.click() }, "Scegli il PDF della visura…");
+  const applica = h("button", { class: "pil", type: "button", disabled: true }, "Aggiungi gli immobili scelti");
+  const d = h("dialog", { id: "dVisura", class: "guida dlg-visura", "aria-labelledby": "dVisuraT" },
+    h("form", { method: "dialog" }, h("h2", { id: "dVisuraT" }, "Carica visura catastale"),
+      h("p", { class: "mut" }, "Scegli il PDF «Risultanze catastali» scaricato dai servizi dell'Agenzia. Gli immobili letti si aggiungono solo se li scegli; i dati già inseriti non vengono sovrascritti."),
+      h("div", { class: "az" }, scegli, file), err, corpo,
+      h("div", { class: "wiz-az" }, h("button", { class: "gh", value: "chiudi" }, "Chiudi"), h("span", { class: "sp" }), applica)));
+  d.addEventListener("close", () => d.remove());
+  document.body.append(d); d.showModal();
+  const errore = t => { err.textContent = t || ""; err.hidden = !t; };
+  const mostra = st => {
+    corpo.replaceChildren();
+    const imm = st.immobili || [];
+    // segnalazioni di una riga (con «chiave»): accanto alla riga; le altre in cima
+    const segn = (st.proposta || {}).segnalazioni || [], perRiga = {};
+    // lo stesso avviso su tutte le righe (per esempio «titolarita' da verificare alla data del decesso") si scrive una volta in cima
+    const nImm = (st.immobili || []).length, conta = {};
+    for (const x of segn) if (x && typeof x === "object" && x.chiave) conta[x.messaggio] = (conta[x.messaggio] || 0) + 1;
+    const comune = m => nImm > 1 && conta[m] >= nImm;
+    for (const x of segn) if (x && typeof x === "object" && x.chiave && !comune(x.messaggio)) (perRiga[x.chiave] = perRiga[x.chiave] || []).push(x);
+    const avvisi = [...new Set([...(st.avvisi || []), ...(st.limiti || []), ...segn.filter(x => !(x && x.chiave) || comune(x.messaggio)).map(x => typeof x === "string" ? x : x.messaggio || "")].filter(Boolean))];
+    if (avvisi.length) corpo.append(h("ul", { class: "nota stretta visura-avvisi" }, avvisi.map(t => h("li", {}, t))));
+    if (!imm.length) { corpo.append(h("div", { class: "vuoto-illustrato" }, h("img", { src: "/static/vuoto_visura.svg", alt: "", "aria-hidden": "true", class: "illustrazione" }),
+      h("p", { class: "mut" }, "Nessun immobile letto finora."))); applica.disabled = true; return; }
+    const ESITI = { nuovi: "nuovo", aggiornati: "da aggiornare", invariati: "già presente", conflitti: "in conflitto" };
+    const righe = imm.map(x => {
+      const c = h("input", { type: "checkbox", value: x.chiave, checked: x.esito === "nuovi", disabled: x.esito === "invariati" });
+      const estremi = [x.comune, x.sezione ? "sez. " + x.sezione : "", "fg. " + x.foglio, "part. " + x.particella, x.subalterno ? "sub. " + x.subalterno : ""].filter(Boolean).join(" ");
+      const note = (perRiga[x.chiave] || []).map(y => y.codice === "DIRITTO_NON_AMMESSO_PER_IMMOBILI"
+        ? "Il diritto del defunto (" + y.diritto + ") non si può indicare per un immobile: si aggiunge senza diritto e quota, da verificare." : y.messaggio);
+      return h("tr", {}, h("td", {}, c), h("td", {}, x.catasto === "T" ? "Terreno" : "Fabbricato"), h("td", {}, estremi, note.map(t => h("div", { class: "nota-riga am" }, t))),
+        h("td", {}, x.categoria || x.qualita || ""), h("td", { class: "n" }, x.rendita ? importoIt(String(x.rendita), true) : x.reddito_dominicale ? importoIt(String(x.reddito_dominicale), true) : ""),
+        h("td", {}, (x.titolarita || []).join("; ")), h("td", {}, h("span", { class: "pz " + (x.esito === "conflitti" ? "am" : x.esito === "nuovi" ? "ok" : "") }, ESITI[x.esito] || x.esito)));
+    });
+    corpo.append(h("div", { class: "tab" }, h("table", { "aria-label": "Immobili letti dalla visura" },
+      h("thead", {}, h("tr", {}, ["", "Catasto", "Estremi", "Categoria", "Rendita / reddito", "Titolarità", "Esito"].map(t => h("th", {}, t)))), h("tbody", {}, righe))));
+    applica.disabled = false;
+  };
+  const aggiorna = async () => { try { mostra(await api(base)); } catch (e) { errore(e.message); } };
+  file.addEventListener("change", async () => {
+    errore("");
+    for (const f of [...file.files]) {
+      try { const r = await rete(base + "?nome=" + encodeURIComponent(f.name), { method: "POST", body: await f.arrayBuffer(), headers: { "Content-Type": "application/pdf" } });
+        const j = await r.json().catch(() => ({})); if (!r.ok) { errore(f.name + ": " + (j.messaggio || j.codice || r.status)); break; } }
+      catch (e) { errore(e.message); break; }
+    }
+    file.value = ""; await aggiorna();
+  });
+  applica.addEventListener("click", async () => {
+    const scelti = [...corpo.querySelectorAll("tbody input[type=checkbox]:checked")].map(c => c.value);
+    if (!scelti.length) return errore("Scegli almeno un immobile.");
+    if (!(await primaSalva())) return;
+    try { const r = await post(base + "/applica", { revisione_attesa: S.P.revisione, selezione: scelti, chiave: crypto.randomUUID() });
+      d.close(); await ricarica(); render(); msg("Immobili aggiunti dalla visura: " + scelti.length + ". Controlla diritto, quota e valore.", "o"); return r; }
+    catch (e) { errore(e.message); }
+  });
+  aggiorna();
+}
+/* Ricevute dalla cartella dei download: il programma non entra nei servizi dell'Agenzia; i PDF scaricati dal professionista si
+   riconoscono e si conservano nella pratica. */
+async function cercaRicevute(box, pid) {
+  box.replaceChildren(h("p", { class: "mut" }, "Ricerca nella cartella dei download…"));
+  let r;
+  try { r = await api("/api/ricevute-cartella"); } catch (e) { box.replaceChildren(h("p", { class: "err" }, e.message)); return; }
+  const miei = (r.documenti || []).filter(x => (x.pratiche || []).some(p => p.pratica_id === pid) && x.conservato_in !== pid);
+  if (!miei.length) { box.replaceChildren(h("div", { class: "vuoto-illustrato" }, h("img", { src: "/static/vuoto_ricevute.svg", alt: "", "aria-hidden": "true", class: "illustrazione" }),
+    h("p", { class: "mut" }, "Nessun documento nuovo per questa pratica in " + (r.cartella || "Download") + "."))); return; }
+  box.replaceChildren(h("ul", { class: "ricevute-trovate" }, miei.map(x => {
+    const dt = x.dati || {}, reg = dt.registrazione || {};
+    const descr = (x.tipo === "attestazione" ? "Attestazione di avvenuta presentazione" : "Documento da classificare") +
+      (dt.data_presentazione ? " del " + dataIt(dt.data_presentazione) : "") + (reg.volume ? " · registrazione " + reg.volume + "/" + reg.numero + "/" + reg.anno : "");
+    const b = h("button", { class: "gh", type: "button", onclick: async () => {
+      b.disabled = true;
+      try { await post("/api/pratiche/" + pid + "/ricevute/da-cartella", { file: x.file, cartella: r.cartella, tipo: x.tipo === "attestazione" ? undefined : null });
+        await ricarica(); msg("Documento conservato nella pratica: " + x.file + ".", "o"); if (S.sel === "FILE") renderVista(); }
+      catch (e) { b.disabled = false; msg(e.message, "e"); }
+    } }, "Conserva");
+    return h("li", {}, h("div", {}, h("b", {}, x.file), h("div", { class: "mut" }, descr)), b);
+  })));
+}
 /* Menu «Operazioni» del quadro (report grafica 07/11/2026, punto 9): i comandi che valgono solo in questo quadro, con la scorciatoia. */
 function menuOperazioni(q) {
   const voci = [["Aggiungi riga", "Alt+N", () => aggiungiRiga(q)], ["Duplica la riga selezionata", "Alt+D", () => duplicaRiga(q)]];
@@ -1032,7 +1184,10 @@ function menuOperazioni(q) {
   if (q.vista === "tabella" && colonneIncolla(q).length) voci.push(["Incolla da Excel…", "", () => incollaRighe(q)]);
   if (q.coll === "beni" || q.coll === "devoluzioni") voci.push(["Brogliaccio da stampare", "", () => anteprima("/api/pratiche/" + S.P.pratica_id + "/brogliaccio", "Brogliaccio beni e quote")],
     ["Brogliaccio in CSV", "", () => { const a = h("a", { href: "/api/pratiche/" + S.P.pratica_id + "/brogliaccio.csv", download: "" }); document.body.append(a); a.click(); a.remove(); }]);
-  voci.push(["Cronologia delle modifiche", "", apriCronologia]);
+  if (q.coll === "beni" && ["EB", "EC"].includes(q.id)) voci.push(["Carica visura catastale (PDF)…", "", () => caricaVisura(q)]);
+  if (q.coll === "beni") voci.push(["Ordina per comune, foglio e particella", "", () => ordinaBeni(q)]);
+  if (q.vista === "tabella") voci.push(["Sposta su la riga selezionata", "Alt+↑", () => spostaRiga(q, -1)], ["Sposta giù la riga selezionata", "Alt+↓", () => spostaRiga(q, 1)]);
+  voci.push(["Cronologia delle modifiche", "", apriCronologia], ["Duplica la pratica…", "", duplicaPratica]);
   voci.push(["Elimina la riga selezionata", "", () => eliminaRigaSelezionata(q)]);
   const d = h("details", { class: "operazioni" }, h("summary", { class: "gh" }, "Operazioni"));
   const voceMenu = n => { const v = [...d.querySelectorAll(".menu-op button")]; if (v.length) v[(n + v.length) % v.length].focus(); };
@@ -1685,7 +1840,7 @@ async function insCronologia(ins, attiva = () => true) {
     ins.append(h("div", { class: "rv" }, h("b", {}, "Revisione " + x.n), " · " + x.canale + " · " + x.autore, h("div", { class: "mut" }, x.ts), h("div", {}, x.sommario), b));
   }
 }
-const PILLOLE = { da_sistemare: "am", non_generato: "", aggiornato: "ok", valido: "ok", positivo: "ok", senza_rilievi: "ok", negativo: "er", non_valido: "er", con_rilievi: "am", obsoleto: "am", non_eseguito: "", non_preparata: "" };
+const PILLOLE = { registrata: "ok", da_sistemare: "am", non_generato: "", aggiornato: "ok", valido: "ok", positivo: "ok", senza_rilievi: "ok", negativo: "er", non_valido: "er", con_rilievi: "am", obsoleto: "am", non_eseguito: "", non_preparata: "" };
 function riga_stato(nome, stato, extra) {
   return h("div", { class: "rg rg-stato" }, h("span", { class: "etichetta" }, nome), h("div", {}, h("span", { class: "pz " + (PILLOLE[stato] || "") }, String(stato).replaceAll("_", " ")), extra ? h("div", { class: "mut stato-extra" }, extra) : null));
 }
@@ -1713,6 +1868,9 @@ async function insFile(dest) {
     riga_stato('File XML', ex.generato ? ex.stato : 'non_generato', ex.generato ? (ex.completo ? 'Completo nel perimetro supportato' : 'Bozza tecnica: non trasmissibile') : 'Nessun file generato'),
     riga_stato('Struttura del file', st.xsd.stato), riga_stato('Controllo ufficiale', ct.stato, ct.versione_controllo),
     riga_stato('Trasmissione', st.trasmissione.stato, st.trasmissione.nota));
+  const reg = (S.P.dati.note || {}).registrazione;   // estremi dall'attestazione conservata (ricevute dai download)
+  if (reg && reg.volume) stato.append(riga_stato('Registrazione', 'registrata', 'Volume ' + reg.volume + ' n. ' + reg.numero + '/' + reg.anno +
+    (reg.ufficio ? ', ' + reg.ufficio : '') + (reg.data_presentazione ? ', presentata il ' + dataIt(reg.data_presentazione) : '')));
   if (ex.versioni) stato.append(h('p', { class: 'mut piccolo' }, 'Versioni del file: programma ' + ex.versioni.applicazione + ', regole ' + ex.versioni.regole +
     ', specifiche ' + ex.versioni.specifiche_suc + (ct.versione_controllo ? ', controllo ' + ct.versione_controllo : '') + '.'));
   const profiloSalvato = (S.P.dati.opzioni.fornitore || {}).cf;
@@ -1734,7 +1892,13 @@ async function insFile(dest) {
   tipoIn.addEventListener('change', () => { modifica('tipo', tipoIn.value); dettagli.hidden = tipoIn.value !== '10'; });
   impegnoIn.addEventListener('change', () => modifica('impegno_codice', impegnoIn.value || null));
   dataIn.addEventListener('input', () => modifica('data_impegno', dataIso(dataIn.value) || null));
-  fornitore.append(h('label', {}, 'Codice fiscale del fornitore', cfIn), h('label', {}, 'Tipo fornitore', tipoIn), dettagli,
+  const daRubrica = h('select', { 'aria-label': 'Scegli dalla rubrica', class: 'da-rubrica' }, h('option', { value: '' }, 'Scegli dalla rubrica…'));
+  rubrica().then(voci => { for (const v of voci) daRubrica.append(h('option', { value: v.id }, v.nome + ' · ' + v.codice_fiscale)); daRubrica.hidden = !voci.length; });
+  daRubrica.addEventListener('change', () => { const v = (RUBRICA || []).find(x => x.id === daRubrica.value); if (!v) return;
+    cfIn.value = v.codice_fiscale; modifica('cf', v.codice_fiscale);
+    if (v.ruolo === 'intermediario') { tipoIn.value = '10'; modifica('tipo', '10'); dettagli.hidden = false; }
+    daRubrica.value = ''; msg('Fornitore preso dalla rubrica: ' + v.nome + '. Premi «Salva profilo» per confermarlo.', 'o'); });
+  fornitore.append(h('label', {}, 'Codice fiscale del fornitore', cfIn), daRubrica, h('label', {}, 'Tipo fornitore', tipoIn), dettagli,
     h('div', { class: 'az' }, h('button', { class: 'gh', onclick: salvaTutto }, 'Salva profilo'),
       STUDIO.profilo && STUDIO.profilo.cf ? h('button', { class: 'gh', type: 'button', onclick: () => {
         for (const [k, v] of Object.entries(STUDIO.profilo)) modifica(k, v);
@@ -1811,6 +1975,12 @@ async function insFile(dest) {
   const invio = passo(5, 'Invio e ricevute', st.trasmissione.stato === 'trasmessa' && st.trasmissione.modalita !== 'simulata', { id: 'invioPratica' });
   griglia.append(controlli, stato, fornitore, elaborati, controllo, stampa, invio, strumentiStudio(pid));
   await renderInvio(invio, ex, ct);
+  // ricevute scaricate dal professionista: si cercano nella cartella dei download (15/11/2026)
+  const trovate = h("div", { class: "ricevute-download" });
+  invio.append(h("h3", {}, "Ricevute scaricate"),
+    h("p", { class: "mut" }, "Scarica le ricevute dall'area riservata dell'Agenzia con il tuo browser, poi cercale qui: il programma le riconosce e le conserva nella pratica."),
+    h("div", { class: "az" }, h("button", { class: "gh", type: "button", onclick: () => cercaRicevute(trovate, pid) }, "Cerca nei download"),
+      h("a", { class: "lk", href: "https://telematici.agenziaentrate.gov.it", target: "_blank", rel: "noopener noreferrer" }, "Apri l'area riservata dell'Agenzia")), trovate);
 }
 /* Profilo e importi della copia congelata in parole, non in JSON (revisione 2, punto 6). */
 function descriviFornitore(p) {
@@ -2582,7 +2752,25 @@ async function wizAvanti() {
 }
 
 /* Impostazioni: percorsi degli strumenti esterni (server: /api/impostazioni), con stato di rilevamento. */
-const IMP = { voci: [], iniziali: {}, aspetto: null, profilo: {}, intestazione: {}, preferenze: {} };
+const IMP = { voci: [], iniziali: {}, aspetto: null, profilo: {}, intestazione: {}, preferenze: {}, rubrica: [] };
+const RUOLI_RUBRICA = [["intermediario", "Intermediario"], ["delegato", "Delegato"], ["presentatore", "Presentatore"], ["altro", "Altro"]];
+let RUBRICA = null;   // voci della rubrica dello studio, lette alla prima necessita'
+async function rubrica() { if (!RUBRICA) { try { RUBRICA = (await api("/api/rubrica")).voci || []; } catch (_) { RUBRICA = []; } } return RUBRICA; }
+function impRubricaRender() {
+  const box = $("#impRubrica"); if (!box) return;
+  const riga = (v, i) => {
+    const campo = (k, attr, el) => { el = el || h("input", { value: v[k] || "", ...attr }); el.addEventListener("input", () => { IMP.rubrica[i][k] = k === "codice_fiscale" ? el.value.trim().toUpperCase() : el.value; }); return el; };
+    const ruolo = h("select", { "aria-label": "Ruolo" }, RUOLI_RUBRICA.map(([k, t]) => h("option", { value: k }, t))); ruolo.value = v.ruolo || "intermediario";
+    ruolo.addEventListener("change", () => { IMP.rubrica[i].ruolo = ruolo.value; });
+    return h("tr", {}, h("td", {}, campo("nome", { "aria-label": "Nome", maxlength: "120" })), h("td", {}, campo("codice_fiscale", { "aria-label": "Codice fiscale", maxlength: "16", class: "mono" })),
+      h("td", {}, ruolo), h("td", {}, campo("note", { "aria-label": "Note", maxlength: "200" })),
+      h("td", {}, h("button", { class: "lk", type: "button", onclick: () => { IMP.rubrica.splice(i, 1); impRubricaRender(); } }, "Togli")));
+  };
+  box.replaceChildren(h("h3", {}, "Rubrica"), h("p", { class: "mut" }, "Intermediari, delegati e presentatori ricorrenti: si scelgono dalla rubrica nel fornitore di File e invio."),
+    IMP.rubrica.length ? h("div", { class: "tab piatta" }, h("table", { class: "tab-rubrica" }, h("thead", {}, h("tr", {}, ["Nome", "Codice fiscale", "Ruolo", "Note", ""].map(t => h("th", {}, t)))),
+      h("tbody", {}, IMP.rubrica.map(riga)))) : null,
+    h("div", { class: "az" }, h("button", { class: "gh", type: "button", onclick: () => { IMP.rubrica.push({ nome: "", codice_fiscale: "", ruolo: "intermediario", note: "" }); impRubricaRender(); } }, "Aggiungi alla rubrica")));
+}
 function impAspettoRender(p) {
   IMP.aspetto = { ...preferenze, ...p };
   const grid = h('div', { class: 'aspetto-griglia' });
@@ -2700,7 +2888,7 @@ function impDiagnosiRender(componente) {
 }
 function impRender(s) {
   impDiagnosiRender(s.componente_controllo);
-  impProfiloRender(s.profilo || {}, s.intestazione || {}); impBackupRender(); impPreferenzeRender(s.preferenze || {});
+  impProfiloRender(s.profilo || {}, s.intestazione || {}); impRubricaRender(); impBackupRender(); impPreferenzeRender(s.preferenze || {});
   IMP.voci = s.voci; IMP.iniziali = Object.fromEntries(s.voci.map(v => [v.chiave, v.valore || ""]));
   impAspettoRender(s.interfaccia);
   $("#impFile").textContent = "File di configurazione: " + s.file;
@@ -2713,7 +2901,7 @@ function impRender(s) {
 /* Impronta di cio' che si puo' modificare nelle Impostazioni: se alla chiusura e' diversa, ci sono modifiche non salvate. */
 function impFirma() {
   const voci = (IMP.voci || []).filter(v => v.modificabile).map(v => { const el = document.getElementById("imp_" + v.chiave); return el ? el.value.trim() : ""; });
-  return JSON.stringify([IMP.aspetto, IMP.profilo, IMP.intestazione, IMP.preferenze, voci]);
+  return JSON.stringify([IMP.aspetto, IMP.profilo, IMP.intestazione, IMP.preferenze, IMP.rubrica, voci]);
 }
 function impChiudi() {
   if (IMP.firma && impFirma() !== IMP.firma && !confirm("Ci sono modifiche non salvate nelle Impostazioni. Chiudere senza salvarle?")) return false;
@@ -2721,7 +2909,7 @@ function impChiudi() {
 }
 async function impApri() {
   $("#impErr").textContent = "";
-  try { impRender(await api("/api/impostazioni")); IMP.firma = impFirma(); $("#imp").showModal(); }
+  try { IMP.rubrica = ((await api("/api/rubrica")).voci || []).map(v => ({ ...v })); impRender(await api("/api/impostazioni")); IMP.firma = impFirma(); $("#imp").showModal(); }
   catch (e) { msg("Impostazioni non disponibili: " + e.message, "e"); }
 }
 async function impSalva() {
@@ -2730,6 +2918,8 @@ async function impSalva() {
   try {
     const profilo = Object.fromEntries(Object.entries(IMP.profilo).filter(([, v]) => v));
     const intestazione = Object.fromEntries(Object.entries(IMP.intestazione).map(([k, v]) => [k, String(v || '').trim()]).filter(([, v]) => v));
+    const voci = IMP.rubrica.filter(v => (v.nome || "").trim() || (v.codice_fiscale || "").trim()).map(v => ({ ...v, nome: (v.nome || "").trim(), note: (v.note || "").trim() }));
+    IMP.rubrica = (await post("/api/rubrica", { voci })).voci || []; RUBRICA = IMP.rubrica.map(v => ({ ...v }));
     const s = await post("/api/impostazioni", { modifiche, interfaccia: IMP.aspetto, profilo, intestazione, preferenze: IMP.preferenze });
     STUDIO.profilo = s.profilo || {};
     memorizzaAspetto(s.interfaccia);
@@ -2904,6 +3094,7 @@ document.addEventListener("keydown", ev => {
   if (ev.altKey && !ev.ctrlKey && (ev.key === "n" || ev.key === "N")) { if (q && q.coll && q.supportato) { ev.preventDefault(); aggiungiRiga(q); } return; }
   if (ev.altKey && !ev.ctrlKey && (ev.key === "d" || ev.key === "D")) { if (q && q.coll) { ev.preventDefault(); duplicaRiga(q); } return; }
   if (ev.altKey && !ev.ctrlKey && (ev.key === "c" || ev.key === "C")) { ev.preventDefault(); $("#bControlla").click(); return; }
+  if (ev.altKey && !ev.ctrlKey && !inCampo && (ev.key === "ArrowUp" || ev.key === "ArrowDown")) { if (q && q.vista === "tabella" && q.coll) { ev.preventDefault(); spostaRiga(q, ev.key === "ArrowUp" ? -1 : 1); } return; }
   // Alt+1 … Alt+9: voce dell'elenco dei quadri (ev.code: indipendente dalla tastiera italiana o da Maiusc)
   const cifra = /^Digit([1-9])$/.exec(ev.code || "");
   if (ev.altKey && !ev.ctrlKey && !ev.metaKey && cifra) {
