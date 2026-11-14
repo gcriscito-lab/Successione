@@ -146,9 +146,51 @@ def csv_testo(dati: dict) -> str:
     return "﻿" + out.getvalue()      # BOM: Excel riconosce l'UTF-8 (lettere accentate)
 
 
+#: colonne d'importo che nella stampa si leggono in euro all'italiana (126.000 / 1.000,50); il CSV resta con i valori inseriti
+IMPORTI_STAMPA = {"rendita", "reddito_dominicale", "valore"}
+
+
+def _importo_it(v: str) -> str:
+    """«126000» -> «126.000», «1000.5» -> «1.000,50». Un testo che non e' un numero resta com'e'."""
+    m = re.fullmatch(r"(-?)(\d+)(?:\.(\d{1,2}))?", (v or "").strip())
+    if not m:
+        return v
+    intero = f"{int(m.group(2)):,}".replace(",", ".")
+    return m.group(1) + intero + ("," + m.group(3).ljust(2, "0") if m.group(3) else "")
+
+
+def _diritto_leggibile(v: str) -> str:
+    """«1» o «proprieta» -> «1 - Proprieta'» (descrizione delle tabelle ufficiali dei codici); un valore non riconosciuto resta."""
+    cod = codice_diritto(v)
+    if not cod:
+        return v
+    from . import codici as C
+    for tipo in ("CodiciDiritto_Type", "CodiciDirittoImmobili_Type", "CodiciDirittoNonImmobili"):
+        try:
+            voce = next((x for x in C.voci(tipo) if x["valore"] == cod), None)
+        except Exception:
+            voce = None
+        if voce:
+            return f"{cod} - {voce['etichetta']}"
+    return v
+
+
+def _per_stampa(righe_t: list[dict]) -> list[dict]:
+    out = []
+    for x in righe_t:
+        y = dict(x)
+        for c in IMPORTI_STAMPA & y.keys():
+            y[c] = _importo_it(str(y[c]))
+        if y.get("diritto"):
+            y["diritto"] = _diritto_leggibile(str(y["diritto"]))
+        out.append(y)
+    return out
+
+
 def html(dati: dict, *, titolo: str, revisione: int | None = None) -> str:
     """Pagina stampabile (Stampa > Salva come PDF dal browser)."""
     r = righe(dati)
+    r = {k: _per_stampa(v) for k, v in r.items()}
 
     def tabella(intest: list[str], righe_t: list[dict]) -> str:
         th = "".join(f"<th>{escape(c.replace('_', ' '))}</th>" for c in intest)

@@ -291,9 +291,19 @@ class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin
         v = self.verifica(pratica_id)
         d = self.leggi(pratica_id)
         rilievi = [{**r, "quadro": Q.quadro_per_percorso(d["dati"], r["percorso"])} for r in v["rilievi"]]
+        # cio' che blocca «Genera file» e non e' gia' un rilievo: un solo elenco nei Controlli (revisione del 14/11/2026)
+        from . import rimedi as RM
+        gia = {(r.get("percorso"), r.get("codice")) for r in rilievi} | {(r.get("percorso"), r.get("messaggio")) for r in rilievi}
+        per_il_file = []
+        for x in self.da_sistemare_file(pratica_id, d["dati"]):
+            if (x["percorso"], x["codice"]) in gia or (x["percorso"], x["messaggio"]) in gia:
+                continue
+            mq = re.match(r"quadro\[([A-Z]{2})", x["percorso"])
+            q = x.get("quadro") or (mq.group(1) if mq else Q.quadro_per_percorso(d["dati"], x["percorso"]) if x["percorso"] else "FILE")
+            per_il_file.append({**x, "quadro": q, "rimedio": RM.rimedio(x["codice"], q)})
         return {"pratica_id": pratica_id, "revisione": d["revisione"], "quadri": Q.stato_quadri(d["dati"], v["rilievi"]),
                 "esito": v["esito"], "finalizzabile": v["finalizzabile"], "blocchi_finalizzazione": v["blocchi_finalizzazione"],
-                "rilievi": rilievi, "avvisi": v["avvisi"],
+                "rilievi": rilievi, "avvisi": v["avvisi"], "per_il_file": per_il_file,
                 "ambito": v["ambito"]}
 
     # ------------------------------------------------------------------ interni

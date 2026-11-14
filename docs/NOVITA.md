@@ -1,5 +1,18 @@
 Novità del programma (le più recenti in alto)
 
+14 novembre 2026 — revisione di usabilità (punto grave ed errori)
+Imposte e file telematico non cambiano.
+- Un solo elenco di ciò che impedisce di generare il file: nei Controlli, in File e invio (passo 2) e nei quadri EE, EF ed EH,
+  ogni voce con «Vai al dato». «Controlla (n)» e la barra in basso contano anche questi punti: il programma non dice più
+  «Nessun rilievo» quando il file non si può generare.
+- L'esito di «Genera file» resta scritto nel passo 2 con i motivi; le avvertenze tecniche interne non si mostrano più.
+- Errori corretti: Ctrl+S con il cursore ancora nel campo; «File XML: aggiornato» senza file; barra in alto a sole icone nella
+  pagina iniziale; data di nascita dal codice fiscale in formato GG/MM/AAAA nella procedura guidata; importazione riuscita
+  mostrata come errore; il defunto tra chi riceve nelle devoluzioni; rimedio «quadro EC» anche per i terreni; «0 righe» con
+  una riga nuova; descrizione della densità compatta; brogliaccio con diritti per esteso e importi all'italiana; errore
+  della calcolatrice senza beni; errori vecchi che restavano cambiando quadro; liquidazione EF calcolata anche se manca solo
+  un file allegato.
+
 8 novembre 2026 — versione 0.4.0
 Contiene le versioni 0.3 e 0.4 e le correzioni della revisione completa dell'8 novembre. Imposte e file telematico non
 cambiano. Cambiano due cose: il valore catastale proposto per alcune categorie di lusso (vedi sotto) e la citazione delle norme

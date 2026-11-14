@@ -402,7 +402,7 @@ function filtriHome(box) {
 }
 function renderHome() {
   const box = $("#elencoPratiche"); if (!box) return;
-  document.body.classList.toggle("in-home", !S.P);   // anche all'avvio, prima del primo render()
+  document.body.classList.toggle("in-home", !S.P); if (window.compattaBarra) window.compattaBarra();   // anche all'avvio, prima del primo render()
   // con una pratica aperta l'elenco non serve (e le sue righe non devono confondersi con quelle dei quadri): si ricostruisce al ritorno
   if (S.P) { box.replaceChildren(); return; }
   const vuoto = !S.pratiche.length;
@@ -511,7 +511,7 @@ function render() {
   const aperta = !!S.P;
   $("#vuoto") && ($("#vuoto").hidden = aperta);
   // pagina iniziale: niente colonna dei quadri e niente comandi della pratica (sarebbero spenti); tornano aprendo una pratica
-  document.body.classList.toggle("in-home", !aperta);
+  document.body.classList.toggle("in-home", !aperta); if (window.compattaBarra) window.compattaBarra();
   if (aperta) { const e = $("#elencoPratiche"); if (e) e.replaceChildren(); }   // righe della pagina iniziale fuori dal DOM
   const q = aperta ? quadro() : null;
   // quadro con una sola riga: si apre gia' selezionata (report grafica 07/11/2026, punto 2)
@@ -531,23 +531,27 @@ function aggiornaBottoni() {
   $("#bSalva").disabled = !n || S.writeBusy; $("#bSalva").textContent = S.writeBusy ? "Salvataggio…" : n ? "Salva (" + n + ")" : "Salva";
   $("#bControlla").disabled = !S.P; $("#bGenera").disabled = !S.P; $("#bGenera").title = "Apri l'area unica File e invio della pratica";
   $('#bGenera').setAttribute('aria-pressed', String(S.sel === 'FILE'));
-  $("#bControlla").textContent = S.Q && S.Q.rilievi.length ? "Controlla (" + S.Q.rilievi.length + ")" : "Controlla";
+  const nDaSist = S.Q ? S.Q.rilievi.length + perIlFile().length : 0;
+  $("#bControlla").textContent = nDaSist ? "Controlla (" + nDaSist + ")" : "Controlla";
 }
 function renderSb() {
   const sb = $("#sb"); sb.replaceChildren();
   const arch = STUDIO.archivio ? h("span", { class: "arch", title: STUDIO.archivio }, "Archivio: " + STUDIO.archivio.split(/[\\/]/).filter(Boolean).pop()) : null;
   if (!S.P) { sb.append(...[arch, h("span", {}, "Nessuna pratica aperta")].filter(Boolean)); return; }
-  const n = S.Q.rilievi.length;
+  const n = S.Q.rilievi.length, pf = perIlFile().length;
+  const aiControlli = () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); };
   sb.append(...[arch, h("span", {}, "Revisione " + S.P.revisione),
     S.salvata ? h("span", { class: "ok" }, "Salvata alle " + S.salvata) : null,
     nMod() ? h("span", { class: "am" }, nMod() + (nMod() === 1 ? " modifica non salvata" : " modifiche non salvate")) : null,
-    n ? h("button", { onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, n + (n === 1 ? " rilievo" : " rilievi")) : h("span", {}, "Nessun rilievo"),
+    n ? h("button", { onclick: aiControlli }, n + (n === 1 ? " rilievo" : " rilievi")) : null,
+    pf ? h("button", { class: "am", onclick: aiControlli, title: "Cose da sistemare prima di generare il file" }, pf + (pf === 1 ? " punto" : " punti") + " da sistemare per il file") : null,
+    !n && !pf ? h("span", {}, "Nessun rilievo") : null,
     (S.Q.avvisi || []).length ? h("button", { class: "am", onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, S.Q.avvisi.length + (S.Q.avvisi.length === 1 ? " avviso" : " avvisi")) : null,
-    h("span", {}, S.Q.finalizzabile ? "Finalizzabile" : "Non finalizzabile" + ((S.Q.blocchi_finalizzazione || []).length ? ": file XML completo non generato" : "")),
-    h("span", {}, "Controllo ufficiale: vedi File e invio")].filter(Boolean));
+    h("span", {}, S.Q.finalizzabile ? "File generato e aggiornato" : (S.Q.blocchi_finalizzazione || []).length ? "File da generare" : "Non finalizzabile")].filter(Boolean));
 }
-function vaiFile() { if (!S.P) return; S.sel = 'FILE'; S.riga = null; S.tab = 'dati'; $('#vista').scrollTop = 0; render(); }
-function scegliQuadro(id, tuttiImmobili = false) { S.sel = id; S.riga = null; S.chiuso = null; S.tab = 'dati'; S.immobiliTutti = tuttiImmobili; $('#vista').scrollTop = 0; render(); }
+function chiudiErroreVecchio() { const m = $("#msg"); if (m && !m.hidden && m.className === "e") msg(""); }
+function vaiFile() { if (!S.P) return; chiudiErroreVecchio(); S.sel = 'FILE'; S.riga = null; S.tab = 'dati'; $('#vista').scrollTop = 0; render(); }
+function scegliQuadro(id, tuttiImmobili = false) { chiudiErroreVecchio(); S.sel = id; S.riga = null; S.chiuso = null; S.tab = 'dati'; S.immobiliTutti = tuttiImmobili; $('#vista').scrollTop = 0; render(); }
 function chiudiPannello() { const q = quadro(); S.chiuso = q ? q.id : null; S.riga = null; S.tab = "dati"; render(); tornaTabella(); }
 
 /* ---------- albero dei quadri ---------- */
@@ -617,7 +621,8 @@ function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
     el.value = val || "";
   } else if (kind.startsWith("ref:")) {
     const rc = kind.slice(4);
-    el = h("select", { name: campo, "aria-label": lbl(coll, campo) }, h("option", { value: "" }, ""), (S.P.dati[rc] || []).map(e => h("option", { value: e.id }, etichetta(rc, e))));
+    el = h("select", { name: campo, "aria-label": lbl(coll, campo) }, h("option", { value: "" }, ""), (S.P.dati[rc] || []).filter(e => !(coll === "devoluzioni" && rc === "persone" && e.ruolo === "defunto" && e.id !== val))   // il defunto non riceve (E6)
+      .map(e => h("option", { value: e.id }, etichetta(rc, e))));
     el.value = val || "";
   } else {
     const lista = listaSuggerimenti(coll + "." + campo);
@@ -717,7 +722,7 @@ function renderVista() {
   const linkIstr = arg ? h("button", { class: "lk istr-quadro", title: "Apre le istruzioni ufficiali alla pagina " + arg.pagina, onclick: () => apriIstruzioni(arg.documento, arg.pagina) }, "Istruzioni del quadro") : null;
   main.append(h("div", { class: "testa-quadro" }, titoloQ, linkIstr, q.coll && (q.vista === "tabella" || q.vista === "documenti") && q.supportato ? menuOperazioni(q) : null));
   // stato di lavorazione del quadro (voce 10: nota interna) nella riga sotto il titolo, per non spostare il menu «Operazioni»
-  main.append(h("div", { class: "sottotitolo" }, q.nota || (q.vista === "tabella" || q.vista === "documenti" ? (q.righe + (q.righe === 1 ? " riga" : " righe")) : ""), " ", selettoreStato(q)));
+  main.append(h("div", { class: "sottotitolo" }, q.nota || (q.vista === "tabella" || q.vista === "documenti" ? contaRighe(q) : ""), " ", selettoreStato(q)));
   if (!q.attivo && q.supportato) main.append(h("div", { class: "nota" }, "Questo quadro non è selezionato per la dichiarazione. ", h("button", { class: "lk", onclick: () => impostaQuadro(q.id, true) }, "Seleziona il quadro")));
   if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { class: "cresce" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
   if (q.vista === "frontespizio") renderFront(main);
@@ -771,8 +776,8 @@ async function renderAnteprima(main, q) {
       h("p", { class: "mut dentro-testo" }, "Testamento, interdetti, rinunce, eredi e aziende derivano dai dati degli altri quadri. Qui sotto le caselle che dipendono da una dichiarazione esplicita.")));
     box.append(sezioneDatiDichiarazione(['dichiara_copie_conformi', 'flag_inventari', 'separazione_con_colpa', 'no_scioglimento_unione_civile'], 'Caselle del dichiarante (quadro EH, lettere h ed l)'));
   }
-  const punti = [...r.errori.map(t => ["er", t]), ...r.mancanti.map(t => ["av", t])];
-  if (punti.length) box.append(h("section", { class: "grp" }, h("h2", {}, "Da sistemare prima di generare il file"), h("ul", { class: "elenco-azioni" }, punti.map(([k, t]) => h("li", { class: k }, t)))));
+  const el = elencoPerIlFile();
+  if (el) box.append(h("section", { class: "grp" }, h("h2", {}, "Da sistemare prima di generare il file"), el));
 }
 function renderNonSupp(main, q) {
   if (q.generato) {   // EE, EF, EH, EI: li produce il programma alla generazione del file; non c'e' nulla da compilare ne' da selezionare
@@ -791,6 +796,11 @@ async function impostaQuadro(id, on) {
 }
 
 // colonne fisse: la prima (riconoscimento) a sinistra, valore/importo (ultima) a destra (report grafica 07/11/2026, punto 1)
+// righe salvate piu' quelle nuove non ancora salvate (revisione 14/11/2026, E9: non «0 righe» mentre se ne compila una)
+function contaRighe(q) {
+  const nuove = [...S.nuove.values()].filter(n => n.q === q.id).length, n = q.righe + nuove;
+  return n + (n === 1 ? " riga" : " righe") + (nuove ? " (" + nuove + " da salvare)" : "");
+}
 function classeColonna(q) {
   const col = colonneVista(q), ultima = col.length - 1, fissaDx = ["valore", "importo"].includes(col[ultima]);
   return (c, j) => [["quota", "quota_defunto", "importo", "rendita", "valore", "reddito_dominicale"].includes(c) ? "n" : "",
@@ -1605,8 +1615,9 @@ function renderStrutturati(ins, q, r) {
 }
 function insControlli(ins) {
   const q = S.Q;
-  ins.append(h("p", { class: "mut" }, q.ambito + (q.finalizzabile ? ". Finalizzabile." : ". Non finalizzabile.")));
-  for (const b of (q.blocchi_finalizzazione || [])) ins.append(h("div", { class: "nota stretta" }, b.messaggio));
+  ins.append(h("p", { class: "mut" }, q.ambito + "."));
+  const el = elencoPerIlFile();
+  if (el) ins.append(h("section", { class: "per-il-file" }, h("h3", {}, "Per generare il file manca"), el));
   // avvisi che non impediscono la finalizzazione (es. visure catastali vecchie o senza data)
   // ogni rilievo e avviso con il rimedio: dove intervenire e con quale comando (docs/ANALISI_REPLICA_2026-11-07.md, voce 19)
   const rimedio = x => x.rimedio ? h("div", { class: "rimedio" }, h("b", {}, "Come risolvere: "), x.rimedio) : null;
@@ -1618,14 +1629,30 @@ function insControlli(ins) {
     if (gruppo.length === 1) { ins.append(h("div", { class: "nota stretta", role: "status" }, h("b", {}, "Avviso: "), a.messaggio, rimedio(a),
       a.quadro && a.percorso ? h("button", { class: "lk", onclick: () => vaiA(a) }, "Vai al dato") : null)); continue; }
     const uguali = gruppo.every(x => x.messaggio === a.messaggio);
-    ins.append(h("div", { class: "nota stretta avvisi-gruppo", role: "status" }, h("b", {}, "Avviso, " + gruppo.length + " dati: "), uguali ? a.messaggio : null, rimedio(a),
+    // dati di quadri diversi (EB ed EC): il rimedio non nomina un quadro solo (revisione 14/11/2026, E7)
+    const misti = new Set(gruppo.map(x => x.quadro)).size > 1;
+    const rim = misti && a.rimedio ? { rimedio: a.rimedio.replace(/ \(quadro [A-Z]{2}\)/g, "") } : a;
+    ins.append(h("div", { class: "nota stretta avvisi-gruppo", role: "status" }, h("b", {}, "Avviso, " + gruppo.length + " dati: "), uguali ? a.messaggio : null, rimedio(rim),
       h("ul", { class: "avvisi-elenco" }, gruppo.map(x => h("li", {}, h("span", {}, nomeDatoAvviso(x) + (uguali ? "" : ": " + x.messaggio)),
         x.quadro && x.percorso ? h("button", { class: "lk", onclick: () => vaiA(x) }, "Vai al dato") : null)))));
   }
-  if (!q.rilievi.length) { ins.append(h("p", { class: "ok esito-ok" }, "Nessun rilievo sui dati inseriti.")); return; }
+  if (!q.rilievi.length) { if (!el) ins.append(h("p", { class: "ok esito-ok" }, "Nessun rilievo: il file si può generare.")); return; }
   const ul = h("ul", { class: "rl" });
   for (const r of q.rilievi) ul.append(h("li", {}, h("button", { onclick: () => vaiA(r) }, h("span", { class: "sigla" }, r.quadro), h("span", {}, h("div", {}, r.messaggio), rimedio(r), h("div", { class: "cod" }, r.codice + " · " + r.percorso)))));
   ins.append(ul);
+}
+/* Cio' che blocca «Genera file» (server: quadri().per_il_file, revisione di usabilita' del 14/11/2026): un solo elenco, uguale
+   nei Controlli, in File e invio e nei quadri calcolati, ogni voce con «Vai al dato». */
+function perIlFile() { return (S.Q && S.Q.per_il_file) || []; }
+function elencoPerIlFile() {
+  const voci = perIlFile(); if (!voci.length) return null;
+  return h("ul", { class: "elenco-azioni per-il-file-voci" }, voci.map(x => h("li", { class: "er" },
+    h("span", {}, testoPerIlFile(x)), x.rimedio ? h("div", { class: "rimedio" }, x.rimedio) : null,
+    x.quadro ? h("button", { class: "lk", onclick: () => vaiA(x) }, x.quadro === "FILE" ? "Vai a File e invio" : "Vai al dato") : null)));
+}
+function testoPerIlFile(x) {
+  try { const d = descriviErrore(x); if (d.coll) return d.testo; } catch (_) { /* testo semplice */ }
+  const t = String(x.messaggio || ""); return (x.quadro && x.quadro !== "FILE" ? "Quadro " + x.quadro + ": " : "") + t.charAt(0).toUpperCase() + t.slice(1);
 }
 /* «Fabbricato Roma fg.100 p.200 sub.3 (EC)»: la riga a cui si riferisce l'avviso, dal percorso «coll[id].campo». */
 function nomeDatoAvviso(x) {
@@ -1649,7 +1676,7 @@ async function insCronologia(ins) {
     ins.append(h("div", { class: "rv" }, h("b", {}, "Revisione " + x.n), " · " + x.canale + " · " + x.autore, h("div", { class: "mut" }, x.ts), h("div", {}, x.sommario), b));
   }
 }
-const PILLOLE = { aggiornato: "ok", valido: "ok", positivo: "ok", senza_rilievi: "ok", negativo: "er", non_valido: "er", con_rilievi: "am", obsoleto: "am", non_eseguito: "", non_preparata: "" };
+const PILLOLE = { da_sistemare: "am", non_generato: "", aggiornato: "ok", valido: "ok", positivo: "ok", senza_rilievi: "ok", negativo: "er", non_valido: "er", con_rilievi: "am", obsoleto: "am", non_eseguito: "", non_preparata: "" };
 function riga_stato(nome, stato, extra) {
   return h("div", { class: "rg rg-stato" }, h("span", { class: "etichetta" }, nome), h("div", {}, h("span", { class: "pz " + (PILLOLE[stato] || "") }, String(stato).replaceAll("_", " ")), extra ? h("div", { class: "mut stato-extra" }, extra) : null));
 }
@@ -1668,8 +1695,10 @@ async function insFile(dest) {
   const fileOk = ex.generato && ex.completo && ex.stato === 'aggiornato';
   const stato = h('section', { class: 'grp riepilogo' }, h('h2', {}, 'Stato della dichiarazione'));
   const nAvv = ((S.Q && S.Q.avvisi) || []).length;   // come nella barra in basso: rilievi e avvisi insieme (report 09/11/2026, punto 7)
-  stato.append(riga_stato('Dati', st.dati.stato, st.dati.rilievi + (st.dati.rilievi === 1 ? ' rilievo' : ' rilievi') + ' · ' + nAvv + (nAvv === 1 ? ' avviso' : ' avvisi')),
-    riga_stato('File XML', ex.stato, ex.generato ? (ex.completo ? 'Completo nel perimetro supportato' : 'Bozza tecnica: non trasmissibile') : 'Nessun file generato'),
+  const nPf = perIlFile().length;
+  stato.append(riga_stato('Dati', nPf && st.dati.stato === 'senza_rilievi' ? 'da_sistemare' : st.dati.stato, st.dati.rilievi + (st.dati.rilievi === 1 ? ' rilievo' : ' rilievi') + ' · ' + nAvv + (nAvv === 1 ? ' avviso' : ' avvisi')
+      + (nPf ? ' · ' + nPf + (nPf === 1 ? ' punto' : ' punti') + ' da sistemare per il file' : '')),
+    riga_stato('File XML', ex.generato ? ex.stato : 'non_generato', ex.generato ? (ex.completo ? 'Completo nel perimetro supportato' : 'Bozza tecnica: non trasmissibile') : 'Nessun file generato'),
     riga_stato('Struttura del file', st.xsd.stato), riga_stato('Controllo ufficiale', ct.stato, ct.versione_controllo),
     riga_stato('Trasmissione', st.trasmissione.stato, st.trasmissione.nota));
   if (ex.versioni) stato.append(h('p', { class: 'mut piccolo' }, 'Versioni del file: programma ' + ex.versioni.applicazione + ', regole ' + ex.versioni.regole +
@@ -1707,17 +1736,27 @@ async function insFile(dest) {
       if (nMod() && !(await salvaTutto())) return;
       const r = await post('/api/pratiche/' + pid + '/esporta', { scopo });
       const motivi = [...(r.quadri_mancanti || []), ...(r.non_supportato || []), ...(r.errori || [])].map(motivoLeggibile);
-      if (!r.generato) msg('File non generato: ' + motivi.slice(0, 3).join(' | ') + '. Nessun file parziale è stato prodotto.', 'e');
-      else msg((r.completo ? 'File generato e valido per lo schema.' : 'Bozza tecnica generata. ' + r.avvertenza)
-        + ((r.avvisi || []).length ? ' Avvertenze: ' + r.avvisi.map(a => a.messaggio).join(' | ') : ''), r.completo ? 'o' : 'e');
+      // l'esito resta scritto nel passo 2 (non un messaggio che sparisce); le avvertenze tecniche restano nel registro del file
+      S.esitoFile = { pid, rev: S.P && S.P.revisione, ok: !!r.generato, testo: r.generato ? (r.completo ? 'File generato e valido per lo schema.' : 'Bozza tecnica generata. ' + r.avvertenza)
+        : 'File non generato: nessun file parziale è stato prodotto.', motivi: r.generato ? [] : motivi,
+        // avvertenze utili al professionista; quelle interne (mappa dei campi, compressione) restano nel registro del file
+        avvisi: (r.avvisi || []).map(a => a.messaggio).filter(t => !/docs\/|DEFLATE|campo di lavoro interno/.test(t)) };
+      if (!r.generato) msg('File non generato: i motivi sono elencati nel passo 2.', 'e');
+      else msg(S.esitoFile.testo, r.completo ? 'o' : 'e');
       if (r.backup && r.backup.errore) msg('Attenzione: backup automatico non riuscito (' + r.backup.errore + ')', 'e');
       else if (r.backup && r.backup.eseguito) STUDIO.ultimoBackup = r.backup.nome;
       if (S.P && S.P.pratica_id === pid) { await ricarica(); render(); }
     } catch (e) { msg(e.message, 'e'); }
   });
+  const daSist = elencoPerIlFile();
+  if (daSist) elaborati.append(h('div', { class: 'per-il-file' }, h('h3', {}, 'Prima di generare il file sistema questi punti'), daSist));
   elaborati.append(h('p', { class: 'mut' }, 'Genera il file quando i dati sono pronti. La bozza tecnica conserva evidenza dei limiti e non è trasmissibile.'),
     h('div', { class: 'az' }, h('button', { class: 'pil', disabled: OCCUPATI.has('esporta'), onclick: esegui('completo') }, 'Genera file'),
       h('button', { class: 'gh', disabled: OCCUPATI.has('esporta'), onclick: esegui('bozza_tecnica') }, 'Genera bozza tecnica')));
+  const esito = S.esitoFile && S.esitoFile.pid === pid && S.esitoFile.rev === S.P.revisione ? S.esitoFile : null;
+  if (esito && (!esito.ok || esito.avvisi.length)) elaborati.append(h('div', { class: 'esito-file' + (esito.ok ? ' ok' : ' er'), role: 'status' }, h('b', {}, esito.testo),
+    esito.motivi.length ? h('ul', {}, esito.motivi.map(t => h('li', {}, t))) : null,
+    esito.avvisi.length ? [h('div', {}, 'Avvertenze:'), h('ul', {}, esito.avvisi.map(t => h('li', {}, t)))] : null));
   if (ex.generato) elaborati.append(h('div', { class: 'az' },
     h('a', { class: 'gh', href: '/api/pratiche/' + pid + '/file.xml?job=' + ex.job_id, download: '' }, 'Scarica XML')));
   const controllo = passo(3, 'Controllo ufficiale', ct.stato === 'positivo');
@@ -1880,6 +1919,7 @@ async function renderRicevute(ins, pid, tid) {
   for (const doc of stato.documenti) ins.append(h('p', { class: 'mut' }, h('a', { href: url + '/file/' + doc.job_id, download: '' }, doc.nome), ' · ' + doc.tipo + ' · ' + (doc.esito || '') + ' · SHA-256 ' + doc.sha256));
 }
 function vaiA(r) {
+  if (r.quadro === "FILE") { vaiFile(); setTimeout(() => { const f = document.querySelector("#fornitore input"); if (f) { f.scrollIntoView({ block: "center" }); f.focus(); } }, 300); return; }
   S.sel = r.quadro;
   const m = r.percorso.match(/^([a-z_]+)\[([^\]]+)\]/);
   const q = quadro();
@@ -2490,7 +2530,7 @@ function wizRender() {
 }
 async function wizDaCF(valore) {
   const d = W.dati;
-  const { testo } = await suggerisciDaCF(valore, "defunto", c => d[c], (c, x) => { d[c] = x; const el = $("#w_" + c); if (el) el.value = x; }, () => W.dati === d && String(d.codice_fiscale || "").trim().toUpperCase() === String(valore || "").trim().toUpperCase());
+  const { testo } = await suggerisciDaCF(valore, "defunto", c => d[c], (c, x) => { x = dataIt(x); d[c] = x; const el = $("#w_" + c); if (el) el.value = x; }, () => W.dati === d && String(d.codice_fiscale || "").trim().toUpperCase() === String(valore || "").trim().toUpperCase());
   const nota = $("#w_cf_nota"); if (nota) nota.textContent = testo;
 }
 /* Una chiave di richiesta per ogni apertura della procedura: un doppio clic o un nuovo tentativo dopo un errore di rete
@@ -2547,7 +2587,7 @@ function impAspettoRender(p) {
   scelte('dimensione', 'Dimensione del testo', Array.from({ length: 11 }, (_, i) => [String(i + 12), (i + 12) + ' px']));
   scelte('interlinea', 'Spaziatura delle righe', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
   scelte('accento', 'Colore di accento', [['predefinito', 'Verde modello (predefinito)'], ['blu', 'Blu'], ['verde', 'Verde'], ['viola', 'Viola'], ['arancio', 'Arancio'], ['rosso', 'Rosso'], ['grafite', 'Grafite']]);
-  scelte('densita', 'Densità di tabelle e schede', [['compatta', 'Compatta (schede con etichette a sinistra, aiuto quando entri nel campo)'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
+  scelte('densita', 'Densità di tabelle e schede', [['compatta', 'Compatta (schede con etichette a sinistra)'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
   scelte('disposizione', 'Pannello della riga selezionata', [['destra', 'A destra della tabella'], ['sotto', 'Sotto la tabella, a tutta larghezza']]);
   scelte('contrasto', 'Contrasto', [['normale', 'Normale'], ['alto', 'Alto (bordi e testi più marcati)']]);
   scelte('movimento', 'Animazioni', [['normale', 'Normali'], ['ridotto', 'Ridotte']]);
@@ -2749,8 +2789,12 @@ async function importaXml(file) {
     if (!r.ok) return msg("Importazione non riuscita: " + (j.messaggio || j.codice || r.status), "e");
     await caricaPratiche(); await apri(j.pratica_id, "AN");
     const n = Object.entries(j.importato).filter(([, v]) => v).map(([k, v]) => v + " " + (ETICHETTE_IMPORTATO[k] || k.replaceAll("_", " "))).join(", ");
-    const resto = j.non_importato.concat(j.avvisi);
-    msg("Importata: " + n + ". Verifica i dati." + (resto.length ? " Da reinserire o controllare: " + resto.join("; ") + "." : ""), resto.length ? "e" : "o");
+    // EE ed EF li ricalcola il programma: e' una nota, non un problema (revisione 14/11/2026, E5)
+    const ricalcolati = /^Quadro(EE|EF): .*ricalcolat/;
+    const leggibile = t => String(t).replace(/Quadro([A-Z]{2})/g, "Quadro $1");
+    const resto = j.non_importato.concat(j.avvisi).filter(t => !ricalcolati.test(t)).map(leggibile);
+    const nota = j.non_importato.some(t => ricalcolati.test(t)) ? " Totali e imposte (quadri EE ed EF) li ricalcola il programma." : "";
+    msg("Importata: " + n + ". Verifica i dati." + nota + (resto.length ? " Da reinserire o controllare: " + resto.join("; ") + "." : ""), resto.length ? "e" : "o");
   } catch (e) { msg("Importazione non riuscita: " + e.message, "e"); }
 }
 $("#bImporta").onclick = () => $("#fImporta").click();
@@ -2778,7 +2822,11 @@ $('#bHome').onclick = () => {
   S.sel = 'AN'; S.tab = 'dati'; $('#vista').scrollTop = 0; $('#titolo').textContent = 'Nessuna pratica aperta'; render(); caricaPratiche();
 };
 // con una finestra aperta (Operazioni, procedura guidata, Calcolatrice, Guida...) Ctrl+S non salva la pratica: la finestra ha i suoi pulsanti
-document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && (ev.key === "s" || ev.key === "S")) { ev.preventDefault(); if (document.querySelector("dialog[open]")) return; salvaTutto(); } });
+document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && (ev.key === "s" || ev.key === "S")) { ev.preventDefault(); if (document.querySelector("dialog[open]")) return;
+  // il campo in cui si sta scrivendo registra il valore all'uscita (change): prima lo si chiude, poi si salva (revisione 14/11/2026, E1)
+  const a = document.activeElement;
+  if (a && a.matches("input, select, textarea")) { a.blur(); a.focus({ preventScroll: true }); }
+  salvaTutto(); } });
 /* Scorciatoie per chi inserisce dati tutto il giorno (report grafica 07/11/2026, punto 10). «?» mostra l'elenco. */
 const SCORCIATOIE = [["Ctrl+S", "Salva le modifiche"], ["Alt+N", "Nuova riga nel quadro"], ["Alt+D", "Duplica la riga selezionata"],
   ["Alt+PagGiù / Alt+PagSu", "Quadro successivo / precedente"], ["Ctrl+G", "Vai a un quadro (scrivi la sigla, es. EC)"],
@@ -3112,7 +3160,12 @@ async function calcEsegui() {
   ris.setAttribute("aria-busy", "true");
   let r;
   try { r = await post("/api/calcolatrice", d); }
-  catch (e) { if (mio !== CALC.seq) return; ris.removeAttribute("aria-busy"); calcMostraErrore(e.message); return; }
+  catch (e) {
+    if (mio !== CALC.seq) return; ris.removeAttribute("aria-busy");
+    // ancora nessun bene: non e' un errore, si sta compilando (revisione 14/11/2026, E12)
+    if (/almeno un bene/.test(e.message)) { ris.replaceChildren(h("p", { class: "calc-avv" }, "Stima: non sostituisce la dichiarazione né il controllo ufficiale."), h("p", { class: "mut" }, "Aggiungi almeno un bene: il risultato compare qui mentre scrivi.")); return; }
+    calcMostraErrore(e.message); return;
+  }
   if (mio !== CALC.seq) return;            // risposta superata da una modifica successiva
   ris.removeAttribute("aria-busy");
   const primaSugg = JSON.stringify((CALC.ultimo || {}).valori_catastali || []) + JSON.stringify((CALC.ultimo || {}).quote_di_legge);

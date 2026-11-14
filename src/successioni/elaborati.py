@@ -123,6 +123,67 @@ class ElaboratiMixin:
                                "Il file NON è una dichiarazione completa e non è trasmissibile: serve solo ai controlli tecnici.")
                 if es.xml is not None else None}
 
+    def da_sistemare_file(self, pratica_id: str, dati: dict | None = None) -> list[dict]:
+        """Tutto cio' che oggi impedisce di generare il file completo, in un solo elenco (revisione di usabilita' del
+        14/11/2026): il fornitore e i blocchi che darebbe «Genera file», calcolati come l'anteprima (nessun file salvato).
+        Ogni voce: codice, percorso (per «Vai al dato»), messaggio. I quadri EF/EG/EH «obbligatori ma non generati» sono una
+        conseguenza delle altre voci e compaiono solo se non c'e' altro."""
+        import re
+        from .telematico.esporta import ContestoExport, esporta_xml
+        if dati is None:
+            dati = self.leggi(pratica_id)["dati"]
+        out: list[dict] = []
+        forn = (dati.get("opzioni", {}) or {}).get("fornitore", {}) or {}
+        if not (forn.get("cf") or "").strip():
+            out.append({"codice": "FORNITORE_CF", "percorso": "opzioni.fornitore.cf", "quadro": "FILE",
+                        "messaggio": "manca il codice fiscale del fornitore (File e invio, passo 1)"})
+        ctx = self._contesto_bozza(dati)
+        if ctx is None:
+            return out
+        cf, tipo, imp, dimp = ctx
+        try:
+            es = esporta_xml(dati, ContestoExport(cf_fornitore=cf, tipo_fornitore=tipo, scopo="bozza_tecnica",
+                                                  allegati=self._allegati_export(pratica_id, dati),
+                                                  impegno_codice=imp if tipo == "10" else None,
+                                                  data_impegno=dimp if tipo == "10" else None))
+        except Exception as e:          # come l'anteprima: il motivo si mostra, il lavoro non si ferma
+            return out + [{"codice": "ANTEPRIMA_NON_CALCOLABILE", "percorso": "", "messaggio": f"controllo del file non eseguito: {e}"}]
+
+        def pulito(m: str) -> str:      # il nome dell'elemento XML non dice nulla al professionista: il campo lo dice gia'
+            m = re.sub(r"dato obbligatorio per <[^>]+>", "dato obbligatorio", m)
+            return re.sub(r"^<[A-Za-z_]+>:\s*", "", m)
+        voci = [*es.errori, *es.quadri_mancanti]
+        altre = [e for e in voci if not (e.codice == "QUADRO_OBBLIGATORIO_NON_SUPPORTATO"
+                                         and e.percorso in ("quadro[EF]", "quadro[EG]", "quadro[EH]"))]
+        visti = set()
+        for e in (altre or voci):
+            k = (e.percorso, e.messaggio)
+            if k in visti:
+                continue
+            visti.add(k)
+            out.append({"codice": e.codice, "percorso": e.percorso, "messaggio": pulito(e.messaggio)})
+        out += [{"codice": "NON_SUPPORTATO", "percorso": "", "messaggio": m} for m in es.non_supportato]
+        return out
+
+    def _contesto_bozza(self, dati: dict):
+        """Fornitore per i calcoli di anteprima: quello del profilo; se manca, il presentatore (tipo 1). Con l'intermediario
+        senza impegno si usa un impegno provvisorio. None se non c'e' nessun codice fiscale utilizzabile."""
+        from datetime import date
+        forn = (dati.get("opzioni", {}) or {}).get("fornitore", {}) or {}
+        pres_id = (((dati.get("opzioni") or {}).get("telematico") or {}).get("dichiarazione") or {}).get("presentatore", {}).get("persona_id")
+        persone = {p.get("id"): p for p in dati.get("persone", [])}
+        cf_pres = (persone.get(pres_id) or next((p for p in dati.get("persone", []) if p.get("ruolo") == "presentatore"), {})).get("codice_fiscale")
+        cf = (forn.get("cf") or cf_pres or next((p.get("codice_fiscale") for p in dati.get("persone", []) if p.get("ruolo") == "defunto"), "")
+              or "")
+        cf = cf.strip().upper() if isinstance(cf, str) else ""
+        if not cf:
+            return None
+        tipo = str(forn.get("tipo") or "1") if forn.get("cf") else "1"
+        imp, dimp = forn.get("impegno_codice"), forn.get("data_impegno")
+        if tipo == "10" and not (imp and dimp):
+            imp, dimp = "1", date.today().isoformat()
+        return cf, tipo, imp, dimp
+
     def anteprima_quadri(self, pratica_id: str) -> dict:
         """Quadri EE, EF ed EH come li scriverebbe la generazione del file, per vederli a video (nessun file salvato, nessun job).
         Fornitore: quello del profilo; se manca, il presentatore (tipo 1). Con l'intermediario senza impegno si usa un impegno
@@ -159,6 +220,20 @@ class ElaboratiMixin:
         out["errori"] = [e.messaggio for e in es.errori] + list(es.non_supportato)
         out["mancanti"] = [m.messaggio for m in es.quadri_mancanti]
         out["avvisi"] = [a.messaggio for a in es.avvisi]
+        if es.xml is None and es.errori and all(e.codice.startswith("ALLEGATO_") for e in es.errori) and not es.non_supportato:
+            # mancano solo file allegati: le imposte non dipendono dai documenti, EE ed EF si calcolano lo stesso senza il
+            # quadro EG (revisione di usabilita' del 14/11/2026, E14). EH resta «non calcolabile» finche' ci sono errori.
+            import copy
+            senza_doc = copy.deepcopy(dati)
+            senza_doc["documenti_ref"] = []
+            try:
+                es2 = esporta_xml(senza_doc, ContestoExport(cf_fornitore=cf, tipo_fornitore=tipo, scopo="bozza_tecnica",
+                                                            impegno_codice=imp if tipo == "10" else None,
+                                                            data_impegno=dimp if tipo == "10" else None))
+            except Exception:
+                es2 = None
+            if es2 is not None and es2.xml is not None:
+                es, out["solo_ee_ef"] = es2, True
         if es.xml is None:
             # i quadri EF/EG/EH bloccati (es. IBAN mancante) non devono nascondere il riepilogo EE: secondo calcolo senza di essi
             try:
@@ -176,12 +251,12 @@ class ElaboratiMixin:
         for q in root.iter():
             if loc(q) == "QuadroEE":
                 out["ee"] = [{"campo": loc(e), "valore": e.text.strip()} for e in q.iter() if len(e) == 0 and (e.text or "").strip()]
-            elif loc(q) == "QuadroEH":
+            elif loc(q) == "QuadroEH" and not out.get("solo_ee_ef"):
                 for e in q.iter():
                     if len(e) == 0 and (e.text or "").strip() and loc(e).startswith(("Flag", "Presenza")):
                         sez = next((loc(a) for a in e.iterancestors() if loc(a).startswith("Sezione")), "")
                         out["eh"].append({"sezione": sez, "campo": loc(e), "gruppo": loc(e.getparent())})
-            elif loc(q) == "QuadroEG":
+            elif loc(q) == "QuadroEG" and not out.get("solo_ee_ef"):
                 for g in q:
                     nomi = [c.text.strip() for a in g if loc(a).endswith("All") for c in a
                             if loc(c) == "FileName" and (c.text or "").strip()]

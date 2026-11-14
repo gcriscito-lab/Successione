@@ -931,3 +931,14 @@ input[type=file]::file-selector-button { font:inherit; color:var(--t); border:1p
 .lat .voce[data-stato=inattivo] .nome { font-size:var(--fs-m); font-weight:400; color:var(--t2); }
 .lat .voce[aria-current=true], .lat .voce[aria-current=page] { box-shadow:inset 3px 0 0 var(--blu); }
 .lat .voce[aria-current=true] .nome { font-weight:700; }
+
+/* ==== 14/11/2026: un solo elenco di cio' che blocca il file (Controlli, File e invio, EE/EF/EH) ==== */
+.per-il-file { margin:var(--s-2) 0 var(--s-3); padding:var(--s-2) var(--s-3); border:1px solid var(--er-b); border-left-width:4px; border-radius:var(--r1); background:var(--solido); }
+.per-il-file > h3 { margin:0 0 var(--s-1); font-size:var(--fs-m); color:var(--er); }
+.per-il-file-voci { margin:0; padding-left:var(--s-4); }
+.per-il-file-voci > li { margin:var(--s-1) 0; }
+.per-il-file-voci .rimedio { font-size:var(--fs-s); color:var(--t2); }
+.per-il-file-voci .lk { margin-left:var(--s-2); }
+.esito-file { margin:var(--s-2) 0; padding:var(--s-2) var(--s-3); border-radius:var(--r1); background:var(--solido); border:1px solid var(--er-b); }
+.esito-file ul { margin:var(--s-1) 0 0; padding-left:var(--s-4); }
+.esito-file.ok { border-color:var(--sep-f); }

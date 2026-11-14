@@ -114,7 +114,11 @@ async function runExport(page, praticaId, url = "http://127.0.0.1:8813/?t=t0k") 
   assert.equal(esito.completo, true);
   assert.equal(esito.generato, true);
   assert.equal(esito.avvisi.length > 0, true);
-  await page.waitForFunction(() => document.querySelector('#msg').textContent.includes('Avvertenze:'));
+  // 14/11/2026: le avvertenze utili restano scritte nel passo 2; quelle interne (mappa dei campi, compressione) non si mostrano
+  const utili = esito.avvisi.map(a => a.messaggio).filter(t => !/docs\/|DEFLATE|campo di lavoro interno/.test(t));
+  await page.waitForFunction(() => /File generato/.test(document.querySelector('#msg').textContent));
+  if (utili.length) await page.waitForFunction(() => /Avvertenze:/.test((document.querySelector('#vista .esito-file') || {}).textContent || ''));
+  assert.ok(!/DEFLATE|docs\//.test(await page.textContent('#msg')), 'niente avvertenze tecniche nel messaggio');
   assert.deepEqual(await page.evaluate(() => S.P.dati.opzioni.fornitore), {
     cf: 'RSSLCU72B02H501O', tipo: '10', impegno_codice: '2', data_impegno: '2026-10-30'
   });

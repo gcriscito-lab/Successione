@@ -24,12 +24,14 @@ const { ok } = require('./verifiche');
   ok((await pg.locator('#vista tbody tr[aria-selected=true]').count()) === 1, 'il rilievo seleziona la riga');
   await pg.locator('#ins [name=foglio]').fill('512'); await pg.locator('#ins [name=particella]').fill('88'); await pg.locator('#ins [name=quota_defunto]').fill('1/1');
   await pg.click('#ins .az .pil'); await pg.waitForFunction(() => document.querySelector('#msg').textContent.includes('Salvato (revisione 3)')); await pg.click('#bControlla'); await pg.waitForTimeout(300);
-  ok((await pg.textContent('#ins')).includes('Nessun rilievo'), 'dopo la correzione nessun rilievo');
+  // 14/11/2026: senza rilievi resta l'elenco di cio' che blocca il file (fornitore, documenti): «Nessun rilievo» compare solo se non c'e' altro
+  ok((await pg.locator('#ins .rl li').count()) === 0 && /Nessun rilievo|Per generare il file manca/.test(await pg.textContent('#ins')), 'dopo la correzione nessun rilievo');
   await pg.getByRole('tab', { name: 'Cronologia', exact: true }).click(); await pg.waitForSelector('#ins .rv'); ok((await pg.locator('#ins .rv').count()) >= 3, 'cronologia con le revisioni');
   await pg.click('#bGenera'); await pg.waitForSelector('#vista [aria-label="Codice fiscale del fornitore"]');
   await pg.fill('#vista [aria-label="Codice fiscale del fornitore"]', 'RSSNNA70A41H501X'); await pg.getByRole('button', { name: 'Genera file' }).last().click();
-  await pg.waitForFunction(() => document.querySelector('#msg').textContent.includes('Nessun file parziale'));
-  ok((await pg.textContent('#msg')).includes('File non generato'), 'Genera file: nessun XML parziale, motivi mostrati');
+  // 14/11/2026: l'esito resta scritto nel passo 2 con i motivi (non solo nel messaggio che sparisce)
+  await pg.waitForFunction(() => /nessun file parziale/i.test((document.querySelector('#vista .esito-file') || {}).textContent || ''));
+  ok((await pg.textContent('#msg')).includes('File non generato') && (await pg.locator('#vista .esito-file li').count()) > 0, 'Genera file: nessun XML parziale, motivi mostrati');
   // la scheda si ridisegna dopo il messaggio: si attende la condizione invece di leggerla subito
   ok(await pg.waitForFunction(() => document.querySelector('#vista').textContent.includes('non eseguito'), null, { timeout: 15000 }).then(() => true, () => false), 'scheda File con stati separati');
   await pg.click('.voce[data-q=EI]'); ok((await pg.textContent('#vista')).includes('si genera da solo'), 'quadro derivato spiegato');
