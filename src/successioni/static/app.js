@@ -68,14 +68,17 @@ const ASPETTO_DEFAULT = { tema: 'sistema', stile: 'moderno', font: 'sistema', di
   disposizione: 'destra', altezza_pannello: 380 };
 // colori in app.css (:root[data-accento=...], con la variante per il tema scuro)
 const ACCENTI = ['blu', 'verde', 'viola', 'arancio', 'rosso', 'grafite'];
-const FONT_UI = { sistema: '"Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif', segoe: '"Segoe UI", system-ui, sans-serif',
+// «sistema»: il carattere di sistema nello stile moderno (Segoe UI Variable su Windows, SF su Mac), Atkinson nel classico
+const FONT_SISTEMA = '"Segoe UI Variable Text", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif';
+const FONT_UI = { atkinson: '"Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif', sistema: '"Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif', segoe: '"Segoe UI", system-ui, sans-serif',
   arial: 'Arial, sans-serif', verdana: 'Verdana, sans-serif', georgia: 'Georgia, serif', consolas: 'Consolas, monospace' };
 let preferenze = { ...ASPETTO_DEFAULT };
 const sistemaScuro = window.matchMedia('(prefers-color-scheme: dark)');
 function applicaAspetto(valori) {
   const p = { ...ASPETTO_DEFAULT, ...valori }, root = document.documentElement;
   root.dataset.tema = p.tema === 'sistema' ? (sistemaScuro.matches ? 'scuro' : 'chiaro') : p.tema;
-  root.style.setProperty('--f-ui', FONT_UI[p.font] || FONT_UI.sistema);
+  const moderno = p.stile !== 'classico';
+  root.style.setProperty('--f-ui', p.font === 'sistema' || !FONT_UI[p.font] ? (moderno ? FONT_SISTEMA : FONT_UI.atkinson) : FONT_UI[p.font]);
   // personalizzazione: accento (con la variante adatta al tema scuro), densita', contrasto, movimento, nome dello studio
   root.dataset.accento = ACCENTI.includes(p.accento) ? p.accento : 'predefinito';
   root.dataset.densita = p.densita; root.dataset.contrasto = p.contrasto; root.dataset.movimento = p.movimento;
@@ -2585,7 +2588,7 @@ function impAspettoRender(p) {
   };
   scelte('tema', 'Tema', [['sistema', 'Come il sistema'], ['chiaro', 'Chiaro'], ['scuro', 'Scuro'], ['seppia', 'Seppia']]);
   scelte('stile', 'Stile grafico', [['moderno', 'Moderno (predefinito)'], ['classico', 'Classico (com’era fino al 14/11/2026)']]);
-  scelte('font', 'Carattere', [['sistema', 'Atkinson Hyperlegible (predefinito)'], ['segoe', 'Segoe UI'], ['arial', 'Arial'], ['verdana', 'Verdana'], ['georgia', 'Georgia'], ['consolas', 'Consolas']]);
+  scelte('font', 'Carattere', [['sistema', 'Del sistema (predefinito)'], ['atkinson', 'Atkinson Hyperlegible (molto leggibile)'], ['segoe', 'Segoe UI'], ['arial', 'Arial'], ['verdana', 'Verdana'], ['georgia', 'Georgia'], ['consolas', 'Consolas']]);
   scelte('dimensione', 'Dimensione del testo', Array.from({ length: 11 }, (_, i) => [String(i + 12), (i + 12) + ' px']));
   scelte('interlinea', 'Spaziatura delle righe', [['compatta', 'Compatta'], ['normale', 'Normale'], ['ampia', 'Ampia']]);
   scelte('accento', 'Colore di accento', [['predefinito', 'Verde modello (predefinito)'], ['blu', 'Blu'], ['verde', 'Verde'], ['viola', 'Viola'], ['arancio', 'Arancio'], ['rosso', 'Rosso'], ['grafite', 'Grafite']]);

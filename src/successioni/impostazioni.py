@@ -66,7 +66,7 @@ INTERVALLI_INTERFACCIA = {"dimensione": (12, 22), "larghezza_pannello": (280, 76
 SCELTE_INTERFACCIA = {"tema": ("sistema", "chiaro", "scuro", "seppia"),
                       # 14/11/2026: aspetto rinnovato (superfici, pulsanti, tabelle); «classico» e' quello di prima
                       "stile": ("moderno", "classico"),
-                      "font": ("sistema", "segoe", "arial", "verdana", "georgia", "consolas"),
+                      "font": ("sistema", "atkinson", "segoe", "arial", "verdana", "georgia", "consolas"),
                       "interlinea": ("compatta", "normale", "ampia"),
                       "accento": ("predefinito", "blu", "verde", "viola", "arancio", "rosso", "grafite"),
                       "densita": ("compatta", "normale", "ampia"), "contrasto": ("normale", "alto"),

@@ -944,80 +944,108 @@ input[type=file]::file-selector-button { font:inherit; color:var(--t); border:1p
 .esito-file.ok { border-color:var(--sep-f); }
 
 /* ===================================================================================================================
-   Stile «moderno» (14/11/2026, skill ui-ux-pro-max + design-system): stessa struttura, stesse posizioni, stessi testi.
-   Cambiano solo le superfici: fondo neutro e schede bianche con ombra leggera, pulsanti secondari senza cornice nella barra
-   in alto, tabelle e campi piu' ariosi, anello di fuoco morbido. Il bordo dei controlli resta --sep-f (>= 3:1).
-   «Classico» (Impostazioni > Aspetto) e' l'aspetto di prima: basta togliere data-stile="moderno".
+   Stile «moderno» (14/11/2026, richiesta: «più Apple style»; skill ui-ux-pro-max + design-system). Stessa struttura, stesse
+   posizioni, stessi testi. Linguaggio delle app Apple per Mac: fondo grigio chiaro, schede bianche senza cornice con ombre
+   morbide, angoli ampi, barra in alto traslucida, barra laterale come il Finder (voce aperta piena nel colore d'accento),
+   controllo segmentato, titoli grandi e compatti, carattere di sistema (Segoe UI Variable su Windows, SF su Mac).
+   Il bordo dei campi resta --sep-f (>= 3:1, WCAG 1.4.11). «Classico» (Impostazioni > Aspetto) e' l'aspetto di prima.
    =================================================================================================================== */
 :root[data-stile="moderno"] {
-  --r1:6px; --r2:10px;
-  --anello:0 0 0 3px color-mix(in srgb, var(--blu) 24%, transparent);
-  --ombra:0 0 0 1px var(--sep), 0 1px 2px rgba(16,26,24,.05), 0 2px 8px rgba(16,26,24,.04);
-  --e1:var(--ombra); --e2:0 0 0 1px var(--sep), 0 10px 28px rgba(16,26,24,.14);
-  --testa-tab:color-mix(in srgb, var(--solido) 94%, var(--t));
+  --r0:5px; --r1:8px; --r2:12px; --r3:14px;
+  --anello:0 0 0 4px color-mix(in srgb, var(--blu) 28%, transparent);
+  --ombra:0 0 0 1px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.05);
+  --e1:var(--ombra); --e2:0 0 0 1px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.16);
+  --vetro:rgba(255,255,255,.72); --traccia:rgba(118,118,128,.12); --riga-alt:rgba(0,0,0,.022);
+  --dur-1:.15s; --dur-2:.22s;
 }
-:root[data-stile="moderno"][data-tema="chiaro"] { --fondo:#F1F4F2; --lat:#EAEFEC; --pann:#F1F4F2; }
-:root[data-stile="moderno"][data-tema="seppia"] { --pann:var(--fondo); }
+/* chiaro: i grigi delle app Apple, accento verde modello un poco piu' vivo (testo bianco sopra >= 5:1) */
+:root[data-stile="moderno"][data-tema="chiaro"] {
+  --fondo:#F5F5F7; --lat:#ECECEE; --pann:#F5F5F7; --solido:#FFFFFF; --campo:#FFFFFF;
+  --t:#1D1D1F; --t2:#5F5F65; --sep:rgba(0,0,0,.09); --grigio:rgba(0,0,0,.05);
+}
+:root[data-stile="moderno"][data-tema="chiaro"]:not([data-accento]), :root[data-stile="moderno"][data-tema="chiaro"][data-accento="predefinito"] {
+  --blu:#1F7552; --blu-t:#E3F1EA;
+}
+:root[data-stile="moderno"][data-tema="seppia"] { --pann:var(--fondo); --vetro:rgba(255,251,244,.75); }
 :root[data-stile="moderno"][data-tema="scuro"] {
-  --pann:var(--fondo); --ombra:0 0 0 1px var(--sep), 0 2px 10px rgba(0,0,0,.35); --e2:0 0 0 1px var(--sep), 0 12px 32px rgba(0,0,0,.55);
+  --fondo:#1C1C1E; --lat:#232325; --pann:#1C1C1E; --solido:#2C2C2E; --campo:#1C1C1E;
+  --t:#F5F5F7; --t2:#A1A1A8; --sep:rgba(255,255,255,.10); --grigio:rgba(255,255,255,.07);
+  --ombra:0 0 0 1px rgba(255,255,255,.06), 0 2px 12px rgba(0,0,0,.35); --e2:0 0 0 1px rgba(255,255,255,.08), 0 14px 36px rgba(0,0,0,.6);
+  --vetro:rgba(36,36,38,.78); --traccia:rgba(118,118,128,.24); --riga-alt:rgba(255,255,255,.025);
 }
 
-/* barra in alto: superficie piena con ombra sottile; azioni secondarie come pulsanti leggeri, l'azione principale resta piena */
-:root[data-stile="moderno"] .tb { background:var(--solido); border-bottom-color:transparent; box-shadow:0 1px 0 var(--sep), 0 2px 10px rgba(16,26,24,.05); position:relative; z-index:3; }
+/* titoli: grandi e compatti, come i «large title» */
+:root[data-stile="moderno"] body { letter-spacing:-.003em; }
+:root[data-stile="moderno"] main h1 { font-size:calc(var(--fs-xl) * 1.08); font-weight:700; letter-spacing:-.022em; }
+:root[data-stile="moderno"] :is(h2, h3, h4) { letter-spacing:-.01em; }
+
+/* barra in alto traslucida; azioni secondarie senza cornice */
+:root[data-stile="moderno"] .tb { background:var(--vetro); -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:0; box-shadow:0 1px 0 var(--sep); position:relative; z-index:3; }
 :root[data-stile="moderno"] .tb .azioni .gh { border-color:transparent; background:transparent; }
 :root[data-stile="moderno"] .tb .azioni .gh:hover:not(:disabled) { background:var(--grigio); color:var(--t); border-color:transparent; }
-:root[data-stile="moderno"] .tb .azioni .gh[aria-pressed="true"] { background:var(--blu-t); color:var(--t); }
-:root[data-stile="moderno"] .tb .azioni .pil { box-shadow:0 1px 2px rgba(16,26,24,.18); }
+:root[data-stile="moderno"] .tb .azioni .gh[aria-pressed="true"] { background:var(--grigio); color:var(--blu); }
+:root[data-stile="moderno"] .sb { background:var(--vetro); -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px); border-top:0; box-shadow:0 -1px 0 var(--sep); }
 
-/* pulsanti */
-:root[data-stile="moderno"] :is(.gh, .pil) { border-radius:var(--r1); padding:var(--s-15) var(--s-3); transition:background var(--dur-1), border-color var(--dur-1), box-shadow var(--dur-1), color var(--dur-1); }
-:root[data-stile="moderno"] .gh:hover:not(:disabled) { background:var(--grigio); }
-:root[data-stile="moderno"] .pil { box-shadow:0 1px 2px rgba(16,26,24,.16); }
-:root[data-stile="moderno"] .pil:hover:not(:disabled) { filter:none; background:color-mix(in srgb, var(--blu) 88%, #000); border-color:color-mix(in srgb, var(--blu) 88%, #000); }
+/* pulsanti: grigi pieni senza cornice (secondari), pieni nel colore d'accento (principale) */
+:root[data-stile="moderno"] :is(.gh, .pil) { border-radius:var(--r1); padding:var(--s-15) var(--s-3); font-weight:500;
+  transition:background var(--dur-1), border-color var(--dur-1), box-shadow var(--dur-1), color var(--dur-1), transform var(--dur-1); }
+:root[data-stile="moderno"] .gh { background:var(--grigio); border-color:transparent; }
+:root[data-stile="moderno"] .gh:hover:not(:disabled) { background:color-mix(in srgb, var(--t) 10%, transparent); border-color:transparent; color:var(--t); }
+:root[data-stile="moderno"] .pil { box-shadow:0 1px 2px rgba(0,0,0,.14); }
+:root[data-stile="moderno"] .pil:hover:not(:disabled) { filter:none; background:color-mix(in srgb, var(--blu) 90%, #000); border-color:color-mix(in srgb, var(--blu) 90%, #000); }
+:root[data-stile="moderno"] :is(.gh, .pil):active:not(:disabled) { transform:scale(.98); }
+:root[data-stile="moderno"] .chip { border-color:transparent; background:var(--solido); box-shadow:var(--ombra); transition:background var(--dur-1); }
+:root[data-stile="moderno"] .chip[aria-pressed=true] { background:var(--blu); }
 
-/* campi: piu' respiro, angoli morbidi, passaggio del mouse e anello di fuoco */
+/* campi: angoli ampi, alone d'accento quando ci entri */
 :root[data-stile="moderno"] :is(input, select, textarea):not([type=checkbox]):not([type=radio]):not([type=file]) {
   padding:var(--s-15) var(--s-2); border-radius:var(--r1); transition:border-color var(--dur-1), box-shadow var(--dur-1); }
-:root[data-stile="moderno"] :is(input, select, textarea):not([type=checkbox]):not([type=radio]):not(:disabled):hover { border-color:color-mix(in srgb, var(--sep-f) 60%, var(--t)); }
 :root[data-stile="moderno"] :is(input, select, textarea):focus-visible { border-color:var(--blu); box-shadow:var(--anello); outline:none; }
+:root[data-stile="moderno"] input[type=checkbox], :root[data-stile="moderno"] input[type=radio] { accent-color:var(--blu); }
 
-/* area centrale: fondo neutro, schede e tabelle bianche che si staccano */
+/* area centrale e schede: bianche, senza cornice, ombra morbida, angoli ampi */
 :root[data-stile="moderno"] main { background:var(--fondo); }
-:root[data-stile="moderno"] :is(.grp, .tab) { border-radius:var(--r2); box-shadow:var(--ombra); }
+:root[data-stile="moderno"] :is(.grp, .tab, .elenco-pratiche) { border-radius:var(--r2); box-shadow:var(--ombra); }
+:root[data-stile="moderno"] .grp.riepilogo { background:var(--solido); }
 :root[data-stile="moderno"] .tab.piatta { box-shadow:none; border-radius:0; }
-:root[data-stile="moderno"] th { background:var(--testa-tab); color:var(--t2); border-bottom:1px solid var(--sep); padding:var(--s-2) var(--s-3); }
-:root[data-stile="moderno"] td { padding:var(--s-2) var(--s-3); }
-:root[data-stile="moderno"] tbody tr:last-child td { border-bottom:0; }
+/* tabelle come gli elenchi del Finder: intestazione semplice, righe alternate, selezione piena */
+:root[data-stile="moderno"] th { background:var(--solido); color:var(--t2); font-weight:600; border-bottom:1px solid var(--sep); padding:var(--s-2) var(--s-3); }
+:root[data-stile="moderno"] td { padding:var(--s-2) var(--s-3); border-bottom:0; }
+:root[data-stile="moderno"] tbody tr:nth-child(even) td { background:var(--riga-alt); }
+:root[data-stile="moderno"] tbody tr:hover td { background:var(--grigio); }
 :root[data-stile="moderno"] tbody tr[aria-selected=true] td { background:var(--blu-t); }
 :root[data-stile="moderno"] tbody tr[aria-selected=true] td:first-child { box-shadow:inset 3px 0 0 var(--blu); }
-:root[data-stile="moderno"] tfoot td { background:var(--testa-tab); font-weight:600; }
+:root[data-stile="moderno"] tfoot td { background:var(--solido); border-top:1px solid var(--sep); font-weight:600; }
 
-/* barra laterale: la voce aperta e' una piccola scheda bianca con il filo verde */
+/* barra laterale come il Finder: titoli di sezione piccoli e grigi, voce aperta piena nel colore d'accento */
 :root[data-stile="moderno"] .lat { background:var(--lat); box-shadow:inset -1px 0 0 var(--sep); }
+:root[data-stile="moderno"] .lat .gruppo { border-top:0; color:var(--t2); font-size:var(--fs-s); font-weight:600; letter-spacing:0; margin-top:var(--s-4); padding-top:0; }
 :root[data-stile="moderno"] .voce { border-radius:var(--r1); transition:background var(--dur-1); }
-:root[data-stile="moderno"] .voce:hover { background:color-mix(in srgb, var(--solido) 60%, transparent); }
-:root[data-stile="moderno"] .lat .voce[aria-current=true], :root[data-stile="moderno"] .lat .voce[aria-current=page] {
-  background:var(--solido); box-shadow:inset 3px 0 0 var(--blu), 0 0 0 1px var(--sep), 0 1px 3px rgba(16,26,24,.06); }
+:root[data-stile="moderno"] .voce:hover { background:var(--grigio); }
+:root[data-stile="moderno"] .lat .voce[aria-current=true], :root[data-stile="moderno"] .lat .voce[aria-current=page] { background:var(--blu); box-shadow:none; }
+:root[data-stile="moderno"] .lat .voce:is([aria-current=true], [aria-current=page]) :is(.nome, .st) { color:var(--su-acc); }
+:root[data-stile="moderno"] .lat .voce:is([aria-current=true], [aria-current=page]) .sigla { background:color-mix(in srgb, var(--su-acc) 22%, transparent); color:var(--su-acc); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--su-acc) 55%, transparent); }
 :root[data-stile="moderno"] .sigla { border-radius:var(--r0); }
-:root[data-stile="moderno"] .nav-file { border-color:transparent; box-shadow:var(--ombra); border-radius:var(--r2); }
+:root[data-stile="moderno"] .nav-file { border-color:transparent; background:var(--solido); box-shadow:var(--ombra); border-radius:var(--r2); }
 :root[data-stile="moderno"] .pratiche li button { border-radius:var(--r1); }
 
-/* pannello della riga: superficie bianca, titoli dei gruppi come intestazioni leggere (non piu' blocchi grigi) */
+/* pannello della riga: bianco; linguette come controllo segmentato; titoli dei gruppi leggeri */
 :root[data-stile="moderno"] .ins { background:var(--solido); box-shadow:inset 1px 0 0 var(--sep); }
-:root[data-stile="moderno"] .ins > .seg { background:linear-gradient(var(--grigio), var(--grigio)), var(--solido); }   /* opaca sul pannello bianco */
-:root[data-stile="moderno"] .seg { background:var(--grigio); border-radius:var(--r2); }
-:root[data-stile="moderno"] .seg button { border-radius:var(--r1); transition:background var(--dur-1), color var(--dur-1); }
-:root[data-stile="moderno"] .seg button[aria-selected=true] { box-shadow:0 0 0 1px var(--sep), 0 1px 3px rgba(16,26,24,.10); }
+:root[data-stile="moderno"] .seg { background:var(--traccia); border-radius:var(--r1); padding:var(--s-05); }
+:root[data-stile="moderno"] .ins > .seg { background:linear-gradient(var(--traccia), var(--traccia)), var(--solido); }   /* opaca sul pannello bianco */
+:root[data-stile="moderno"] .seg button { border-radius:6px; transition:background var(--dur-2), color var(--dur-1); color:var(--t); }
+:root[data-stile="moderno"] .seg button[aria-selected=true] { background:var(--solido); box-shadow:0 3px 8px rgba(0,0,0,.12), 0 3px 1px rgba(0,0,0,.04); }
+:root[data-stile="moderno"][data-tema="scuro"] .seg button[aria-selected=true] { background:#636366; }
 :root[data-stile="moderno"] .gruppo-scheda > h4, :root[data-stile="moderno"] .gruppo-scheda > summary {
-  background:none; border-radius:0; padding:var(--s-1) 0; border-bottom:1px solid var(--sep); color:var(--blu); font-weight:700; }
+  background:none; border-radius:0; padding:var(--s-1) 0; border-bottom:1px solid var(--sep); color:var(--t); font-weight:700; }
 :root[data-stile="moderno"] .gruppo-scheda { margin-top:var(--s-4); }
 
-/* finestre, messaggi e barra di stato */
-:root[data-stile="moderno"] dialog { border-radius:12px; box-shadow:0 0 0 1px var(--sep), 0 24px 60px -12px rgba(10,20,18,.35); }
+/* finestre e messaggi */
+:root[data-stile="moderno"] dialog { border-radius:var(--r3); box-shadow:var(--e2); }
+:root[data-stile="moderno"] dialog::backdrop { background:rgba(0,0,0,.28); -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); }
 :root[data-stile="moderno"] #msg { border-radius:var(--r2); box-shadow:var(--e2); }
-:root[data-stile="moderno"] .sb { background:var(--solido); border-top-color:var(--sep); }
-:root[data-stile="moderno"] .chip { transition:background var(--dur-1), border-color var(--dur-1); }
-:root[data-stile="moderno"] .elenco-pratiche { border-radius:var(--r2); }
 @media (prefers-reduced-motion: reduce) { :root[data-stile="moderno"] * { transition:none !important; } }
 :root[data-movimento="ridotto"][data-stile="moderno"] * { transition:none !important; }
-:root[data-stile="moderno"] .grp.riepilogo { background:var(--solido); }
+:root[data-contrasto="alto"][data-stile="moderno"] :is(.grp, .tab, .elenco-pratiche, .chip, .nav-file) { box-shadow:0 0 0 1px var(--sep-f); }
+:root[data-contrasto="alto"][data-stile="moderno"] .gh { box-shadow:inset 0 0 0 1px var(--sep-f); }
