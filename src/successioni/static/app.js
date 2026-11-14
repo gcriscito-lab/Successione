@@ -281,7 +281,9 @@ const rilievi = () => (S.Q ? S.Q.rilievi : []);
 const quadro = () => S.Q && S.Q.quadri.find(x => x.id === S.sel);
 
 /* ---------- caricamento ---------- */
-const mostraInfo = i => { $("#info").textContent = "Versione " + i.versione + ". Accesso solo da questo computer. PDF/A: Ghostscript " + (i.pdfa.ghostscript ? "presente" : "assente") + ", veraPDF " + (i.pdfa.veraPDF ? "presente" : "non configurato"); };
+// solo la versione (richiesta del 14/11/2026); gli strumenti PDF/A restano nella Diagnosi e nel suggerimento
+const mostraInfo = i => { const el = $("#info"); el.textContent = "Versione " + i.versione;
+  el.title = "Accesso solo da questo computer. PDF/A: Ghostscript " + (i.pdfa.ghostscript ? "presente" : "assente") + ", veraPDF " + (i.pdfa.veraPDF ? "presente" : "non configurato"); };
 async function init() {
   try {
     const i = await api("/api/info");
@@ -543,14 +545,14 @@ function renderSb() {
   const arch = STUDIO.archivio ? h("span", { class: "arch", title: STUDIO.archivio }, "Archivio: " + STUDIO.archivio.split(/[\\/]/).filter(Boolean).pop()) : null;
   if (!S.P) { sb.append(...[arch, h("span", {}, "Nessuna pratica aperta")].filter(Boolean)); return; }
   const n = S.Q.rilievi.length, pf = perIlFile().length;
-  const aiControlli = () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); };
+  const aiControlli = vaiControlli;
   sb.append(...[arch, h("span", {}, "Revisione " + S.P.revisione),
     S.salvata ? h("span", { class: "ok" }, "Salvata alle " + S.salvata) : null,
     nMod() ? h("span", { class: "am" }, nMod() + (nMod() === 1 ? " modifica non salvata" : " modifiche non salvate")) : null,
     n ? h("button", { onclick: aiControlli }, n + (n === 1 ? " rilievo" : " rilievi")) : null,
     pf ? h("button", { class: "am", onclick: aiControlli, title: "Cose da sistemare prima di generare il file" }, pf + (pf === 1 ? " punto" : " punti") + " da sistemare per il file") : null,
     !n && !pf ? h("span", {}, "Nessun rilievo") : null,
-    (S.Q.avvisi || []).length ? h("button", { class: "am", onclick: () => { if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render(); } }, S.Q.avvisi.length + (S.Q.avvisi.length === 1 ? " avviso" : " avvisi")) : null,
+    (S.Q.avvisi || []).length ? h("button", { class: "am", onclick: vaiControlli }, S.Q.avvisi.length + (S.Q.avvisi.length === 1 ? " avviso" : " avvisi")) : null,
     h("span", {}, S.Q.finalizzabile ? "File generato e aggiornato" : (S.Q.blocchi_finalizzazione || []).length ? "File da generare" : "Non finalizzabile")].filter(Boolean));
 }
 function chiudiErroreVecchio() { const m = $("#msg"); if (m && !m.hidden && m.className === "e") msg(""); }
@@ -728,7 +730,7 @@ function renderVista() {
   // stato di lavorazione del quadro (voce 10: nota interna) nella riga sotto il titolo, per non spostare il menu «Operazioni»
   main.append(h("div", { class: "sottotitolo" }, q.nota || (q.vista === "tabella" || q.vista === "documenti" ? contaRighe(q) : ""), " ", selettoreStato(q)));
   if (!q.attivo && q.supportato) main.append(h("div", { class: "nota" }, "Questo quadro non è selezionato per la dichiarazione. ", h("button", { class: "lk", onclick: () => impostaQuadro(q.id, true) }, "Seleziona il quadro")));
-  if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { class: "cresce" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: () => { S.tab = "controlli"; renderIns(); } }, "Vedi controlli")));
+  if (q.rilievi && q.vista !== "frontespizio") main.append(h("div", { class: "avv" }, h("b", {}, q.rilievi + (q.rilievi === 1 ? " rilievo" : " rilievi")), h("span", { class: "cresce" }, rilievi().find(r => r.quadro === q.id).messaggio), h("button", { class: "gh", onclick: vaiControlli }, "Vedi controlli")));
   if (q.vista === "frontespizio") renderFront(main);
   else if (q.vista === "derivato") main.append(h("div", { class: "nota" }, q.nota || "Quadro generato automaticamente dal programma."));
   else if (q.generato && ["EE", "EF", "EH"].includes(q.id)) renderAnteprima(main, q);
@@ -972,9 +974,12 @@ function boxValoreCatastale(q, r) {
     box.replaceChildren(h("h4", {}, "Valore catastale ", h("span", { class: "etich-calc" }, "calcolato")));
     if (!v) return box.append(h("p", { class: "mut" }, "Non disponibile per questa riga."));
     if (!v.calcolabile) return box.append(h("p", { class: "mut" }, "Non calcolato: " + v.motivo + "."));
-    box.title = "Fonti: " + v.fonti.join("; ");   // scheda compatta: le fonti restano consultabili nel suggerimento
+    // 14/11/2026 («a cosa serve scrivere tutta questa roba?»): a vista solo il valore e il calcolo; le norme restano nei dati e
+    // si leggono da «Fonti» (suggerimento al passaggio del mouse, testo intero al clic)
+    const fonti = "Fonti: " + v.fonti.join("; ");
+    const dett = h("details", { class: "fonte-vc-det" }, h("summary", { title: fonti }, "Fonti"), h("p", { class: "mut fonte-vc" }, fonti));
     box.append(h("p", {}, h("strong", {}, euroIntero(v.valore)), " — minimo che l'ufficio non può rettificare."),
-      h("p", { class: "mut" }, v.formula), h("p", { class: "mut fonte-vc" }, "Fonti: " + v.fonti.join("; ")));
+      h("p", { class: "mut" }, v.formula), dett);
     if (v.avviso) box.append(h("p", { class: "avv" }, v.avviso));
     if (S.dirty.has(r.key)) box.append(h("p", { class: "mut" }, "Il calcolo usa i dati salvati: salva le modifiche per aggiornarlo."));
     if (v.inferiore) box.append(h("p", { class: "avv" }, "Il valore dichiarato (" + euroIntero(v.dichiarato) + ") è inferiore."));
@@ -1027,6 +1032,7 @@ function menuOperazioni(q) {
   if (q.vista === "tabella" && colonneIncolla(q).length) voci.push(["Incolla da Excel…", "", () => incollaRighe(q)]);
   if (q.coll === "beni" || q.coll === "devoluzioni") voci.push(["Brogliaccio da stampare", "", () => anteprima("/api/pratiche/" + S.P.pratica_id + "/brogliaccio", "Brogliaccio beni e quote")],
     ["Brogliaccio in CSV", "", () => { const a = h("a", { href: "/api/pratiche/" + S.P.pratica_id + "/brogliaccio.csv", download: "" }); document.body.append(a); a.click(); a.remove(); }]);
+  voci.push(["Cronologia delle modifiche", "", apriCronologia]);
   voci.push(["Elimina la riga selezionata", "", () => eliminaRigaSelezionata(q)]);
   const d = h("details", { class: "operazioni" }, h("summary", { class: "gh" }, "Operazioni"));
   const voceMenu = n => { const v = [...d.querySelectorAll(".menu-op button")]; if (v.length) v[(n + v.length) % v.length].focus(); };
@@ -1400,19 +1406,32 @@ function schedeTastiera(lista, pannelloId, dove) {
     setTimeout(() => { const l = dove(); const s = l && l.querySelector("[role=tab][aria-selected=true]"); if (s) s.focus(); }, 0);
   });
 }
+/* Pannello del quadro: solo i dati della riga (14/11/2026). I controlli di tutta la pratica stanno in cima a «File e invio»
+   (Controlla, barra in basso), la cronologia nel menu Operazioni. */
 function renderIns() {
-  let ins = $("#ins"); ins.replaceChildren();
+  const ins = $("#ins"); ins.replaceChildren();
+  S.tab = "dati";
+  if (!S.P || S.sel === 'FILE') return;
+  if (S.riga) ins.append(h("button", { class: "lk solo-mobile", onclick: tornaTabella }, "↑ Torna alla tabella"));
+  insDati(ins);
+}
+/* Controlla, barra in basso e avvisi del quadro portano qui: in cima a «File e invio», con «Vai al dato» per ogni voce. */
+function vaiControlli() {
   if (!S.P) return;
-  if (S.sel === 'FILE') return;
-  const nr = rilievi().length;
-  const seg = h("div", { class: "seg", role: "tablist", "aria-label": "Schede del pannello" }, [["dati", "Dati"], ["controlli", "Controlli" + (nr ? " (" + nr + ")" : "")], ["cronologia", "Cronologia"]].map(([k, n]) =>
-    h("button", { role: "tab", id: "insTab_" + k, "aria-selected": S.tab === k ? "true" : "false", onclick: () => { S.tab = k; render(); } }, n)));
-  const pannello = h("div", { id: "insPannello", role: "tabpanel", "aria-labelledby": "insTab_" + S.tab });
-  schedeTastiera(seg, "insPannello", () => $("#ins .seg"));
-  ins.append(seg, pannello);
-  ins = pannello;
-  if (S.tab === "dati" && S.riga) ins.append(h("button", { class: "lk solo-mobile", onclick: tornaTabella }, "↑ Torna alla tabella"));
-  if (S.tab === "dati") insDati(ins); else if (S.tab === "controlli") insControlli(ins); else insCronologia(ins);
+  vaiFile();
+  const vai = (n = 0) => { const el = document.getElementById("controlliFile"); if (el) { $("#vista").scrollTop = 0; document.scrollingElement.scrollTop = 0; const t = el.querySelector("h2"); if (t) { t.tabIndex = -1; t.focus({ preventScroll: true }); } } else if (n < 40) setTimeout(() => vai(n + 1), 50); };
+  vai();
+}
+/* Cronologia delle modifiche in una finestra (menu Operazioni e File e invio). */
+function apriCronologia() {
+  if (!S.P) return;
+  const corpo = h("div", { class: "cronologia-corpo" });
+  const d = h("dialog", { id: "dCronologia", class: "guida", "aria-label": "Cronologia delle modifiche" },
+    h("form", { method: "dialog" }, h("h2", {}, "Cronologia delle modifiche"), corpo,
+      h("div", { class: "wiz-az" }, h("button", { class: "gh", value: "chiudi" }, "Chiudi"))));
+  d.addEventListener("close", () => d.remove());
+  document.body.append(d); d.showModal();
+  insCronologia(corpo, () => d.isConnected);
 }
 const ESTERO_IMM = new Set(["codice_stato_estero", "stato_estero", "stato_federato", "localita_estero", "imposta_estera"]);   // etichette.py: _ESTERO_IMM
 function rigaSelezionata() {
@@ -1652,7 +1671,7 @@ function elencoPerIlFile() {
   const voci = perIlFile(); if (!voci.length) return null;
   return h("ul", { class: "elenco-azioni per-il-file-voci" }, voci.map(x => h("li", { class: "er" },
     h("span", {}, testoPerIlFile(x)), x.rimedio ? h("div", { class: "rimedio" }, x.rimedio) : null,
-    x.quadro ? h("button", { class: "lk", onclick: () => vaiA(x) }, x.quadro === "FILE" ? "Vai a File e invio" : "Vai al dato") : null)));
+    x.quadro ? h("button", { class: "lk", onclick: () => vaiA(x) }, "Vai al dato") : null)));
 }
 function testoPerIlFile(x) {
   try { const d = descriviErrore(x); if (d.coll) return d.testo; } catch (_) { /* testo semplice */ }
@@ -1664,18 +1683,18 @@ function nomeDatoAvviso(x) {
   const e = m && (S.P.dati[m[1]] || []).find(y => y.id === m[2]);
   return (e ? etichetta(m[1], e) : (x.percorso || "dato")) + (x.quadro ? " (" + x.quadro + ")" : "");
 }
-async function insCronologia(ins) {
+async function insCronologia(ins, attiva = () => true) {
   ins.append(h("p", { class: "mut" }, "Ogni salvataggio crea una revisione. Il ripristino non cancella la cronologia."));
   let lista;
   try { lista = await api("/api/pratiche/" + S.P.pratica_id + "/revisioni"); }
-  catch (e) { if (S.tab === "cronologia") { ins.append(h("p", { class: "err" }, e.message)); msg(e.message, "e"); } return; }
-  if (S.tab !== "cronologia") return;
+  catch (e) { if (attiva()) { ins.append(h("p", { class: "err" }, e.message)); msg(e.message, "e"); } return; }
+  if (!attiva()) return;
   for (const x of lista.slice().reverse()) {
     const b = x.n !== S.P.revisione ? h("button", { class: "gh spazio-su", onclick: async () => {
       if (S.writeBusy || nMod()) return msg("Completa il salvataggio delle modifiche prima di ripristinare una revisione.", "e");
       if (!confirm("Creare una nuova revisione con i dati della n. " + x.n + "?")) return;
       S.writeBusy = true; aggiornaBottoni();
-      try { await post("/api/pratiche/" + S.P.pratica_id + "/ripristina", { revisione_attesa: S.P.revisione, a_revisione: x.n }); await ricarica(); render(); msg("Dati della revisione " + x.n + " ripristinati in una nuova revisione.", "o"); } catch (e) { msg(e.message, "e"); }
+      try { await post("/api/pratiche/" + S.P.pratica_id + "/ripristina", { revisione_attesa: S.P.revisione, a_revisione: x.n }); const dc = document.getElementById("dCronologia"); if (dc) dc.close(); await ricarica(); render(); msg("Dati della revisione " + x.n + " ripristinati in una nuova revisione.", "o"); } catch (e) { msg(e.message, "e"); }
       finally { S.writeBusy = false; aggiornaBottoni(); } } }, "Ripristina") : null;
     ins.append(h("div", { class: "rv" }, h("b", {}, "Revisione " + x.n), " · " + x.canale + " · " + x.autore, h("div", { class: "mut" }, x.ts), h("div", {}, x.sommario), b));
   }
@@ -1697,6 +1716,9 @@ async function insFile(dest) {
     h('h2', {}, h('span', { class: 'n' + (fatto ? ' fatto' : ''), 'aria-hidden': 'true' }, fatto ? '✓' : String(n)),
       h('span', {}, h('span', { class: 'vh' }, 'Passo ' + n + ': '), titolo, fatto ? h('span', { class: 'vh' }, ' (fatto)') : null)));
   const fileOk = ex.generato && ex.completo && ex.stato === 'aggiornato';
+  const controlli = h('section', { class: 'grp controlli-file', id: 'controlliFile' }, h('h2', {}, 'Controlli della pratica'));
+  insControlli(controlli);
+  controlli.append(h('div', { class: 'az' }, h('button', { class: 'gh', type: 'button', onclick: apriCronologia }, 'Cronologia delle modifiche')));
   const stato = h('section', { class: 'grp riepilogo' }, h('h2', {}, 'Stato della dichiarazione'));
   const nAvv = ((S.Q && S.Q.avvisi) || []).length;   // come nella barra in basso: rilievi e avvisi insieme (report 09/11/2026, punto 7)
   const nPf = perIlFile().length;
@@ -1752,8 +1774,7 @@ async function insFile(dest) {
       if (S.P && S.P.pratica_id === pid) { await ricarica(); render(); }
     } catch (e) { msg(e.message, 'e'); }
   });
-  const daSist = elencoPerIlFile();
-  if (daSist) elaborati.append(h('div', { class: 'per-il-file' }, h('h3', {}, 'Prima di generare il file sistema questi punti'), daSist));
+  if (perIlFile().length) elaborati.append(h('p', { class: 'nota stretta' }, 'Prima di generare il file sistema i punti elencati in «Controlli della pratica», in cima alla pagina.'));
   elaborati.append(h('p', { class: 'mut' }, 'Genera il file quando i dati sono pronti. La bozza tecnica conserva evidenza dei limiti e non è trasmissibile.'),
     h('div', { class: 'az' }, h('button', { class: 'pil', disabled: OCCUPATI.has('esporta'), onclick: esegui('completo') }, 'Genera file'),
       h('button', { class: 'gh', disabled: OCCUPATI.has('esporta'), onclick: esegui('bozza_tecnica') }, 'Genera bozza tecnica')));
@@ -1802,7 +1823,7 @@ async function insFile(dest) {
         'Riepilogo per gli eredi: beni, quote, passività e imposte, con gli stessi importi del file') : null,
       ex.generato ? linkAnteprima('/api/pratiche/' + pid + '/stampa?job=' + ex.job_id, 'Prospetto tecnico del file') : null));
   const invio = passo(5, 'Invio e ricevute', st.trasmissione.stato === 'trasmessa' && st.trasmissione.modalita !== 'simulata', { id: 'invioPratica' });
-  griglia.append(stato, fornitore, elaborati, controllo, stampa, invio, strumentiStudio(pid));
+  griglia.append(controlli, stato, fornitore, elaborati, controllo, stampa, invio, strumentiStudio(pid));
   await renderInvio(invio, ex, ct);
 }
 /* Profilo e importi della copia congelata in parole, non in JSON (revisione 2, punto 6). */
@@ -2575,7 +2596,7 @@ async function wizAvanti() {
 }
 
 /* Impostazioni: percorsi degli strumenti esterni (server: /api/impostazioni), con stato di rilevamento. */
-const IMP = { voci: [], iniziali: {}, aspetto: null, profilo: {}, preferenze: {} };
+const IMP = { voci: [], iniziali: {}, aspetto: null, profilo: {}, intestazione: {}, preferenze: {} };
 function impAspettoRender(p) {
   IMP.aspetto = { ...preferenze, ...p };
   const grid = h('div', { class: 'aspetto-griglia' });
@@ -2612,8 +2633,10 @@ function impAspettoRender(p) {
     h('p', { class: 'mut' }, 'Trascina il separatore accanto ai dati per allargare o restringere il pannello. La larghezza viene ricordata.'),
     h('button', { type: 'button', class: 'gh', onclick: () => { impAspettoRender(ASPETTO_DEFAULT); applicaAspetto(IMP.aspetto); } }, 'Ripristina aspetto predefinito'));
 }
-function impProfiloRender(p) {
-  IMP.profilo = { ...p };
+const VOCI_INTESTAZIONE = [['nome', 'Nome dello studio', 60], ['indirizzo', 'Indirizzo', 100], ['cap_comune', 'CAP, comune e provincia', 80],
+  ['telefono', 'Telefono', 40], ['email', 'Posta elettronica', 120], ['pec', 'PEC', 120], ['cf_piva', 'Codice fiscale o partita IVA', 16]];
+function impProfiloRender(p, intest) {
+  IMP.profilo = { ...p }; IMP.intestazione = { ...(intest || {}) };
   const campo = (chiave, titolo, el) => { el.id = 'prof_' + chiave; el.setAttribute('aria-label', titolo); return h('div', { class: 'campo' }, h('label', { for: el.id }, titolo), el); };
   const cf = h('input', { class: 'mono cf', value: p.cf || '', placeholder: 'codice fiscale', oninput: e => { IMP.profilo.cf = e.target.value.trim().toUpperCase(); } });
   const tipo = h('select', {}, h('option', { value: '' }, 'Non indicato'), h('option', { value: '1' }, 'Dichiarante (1)'), h('option', { value: '10' }, 'Intermediario (10)'));
@@ -2622,7 +2645,14 @@ function impProfiloRender(p) {
   imp.value = p.impegno_codice || ''; imp.addEventListener('change', () => { IMP.profilo.impegno_codice = imp.value; });
   $('#impProfilo').replaceChildren(h('h3', {}, 'Profilo dello studio'),
     h('p', { class: 'mut' }, 'Chi presenta il file. Viene proposto in ogni nuova pratica e si può cambiare pratica per pratica.'),
-    h('div', { class: 'aspetto-griglia' }, campo('cf', 'Codice fiscale del fornitore', cf), campo('tipo', 'Tipo fornitore', tipo), campo('impegno', 'Impegno a trasmettere', imp)));
+    h('div', { class: 'aspetto-griglia' }, campo('cf', 'Codice fiscale del fornitore', cf), campo('tipo', 'Tipo fornitore', tipo), campo('impegno', 'Impegno a trasmettere', imp)),
+    // carta intestata delle stampe (prospetto per il cliente, preventivo, brogliaccio, fascicolo), 14/11/2026
+    h('h3', {}, 'Intestazione delle stampe'),
+    h('p', { class: 'mut' }, 'Compare in alto nelle stampe per il cliente. I campi vuoti non si stampano.'),
+    h('div', { class: 'aspetto-griglia' }, VOCI_INTESTAZIONE.map(([k, titolo, max]) => campo('int_' + k, titolo,
+      h('input', { value: IMP.intestazione[k] || '', maxlength: String(max), class: k === 'cf_piva' ? 'mono' : '', autocomplete: 'off',
+        type: k === 'email' || k === 'pec' ? 'email' : k === 'telefono' ? 'tel' : 'text',
+        oninput: e => { IMP.intestazione[k] = k === 'cf_piva' ? e.target.value.trim().toUpperCase() : e.target.value; } })))));
 }
 async function impBackupRender() {
   const box = $('#impBackup');
@@ -2684,7 +2714,7 @@ function impDiagnosiRender(componente) {
 }
 function impRender(s) {
   impDiagnosiRender(s.componente_controllo);
-  impProfiloRender(s.profilo || {}); impBackupRender(); impPreferenzeRender(s.preferenze || {});
+  impProfiloRender(s.profilo || {}, s.intestazione || {}); impBackupRender(); impPreferenzeRender(s.preferenze || {});
   IMP.voci = s.voci; IMP.iniziali = Object.fromEntries(s.voci.map(v => [v.chiave, v.valore || ""]));
   impAspettoRender(s.interfaccia);
   $("#impFile").textContent = "File di configurazione: " + s.file;
@@ -2697,7 +2727,7 @@ function impRender(s) {
 /* Impronta di cio' che si puo' modificare nelle Impostazioni: se alla chiusura e' diversa, ci sono modifiche non salvate. */
 function impFirma() {
   const voci = (IMP.voci || []).filter(v => v.modificabile).map(v => { const el = document.getElementById("imp_" + v.chiave); return el ? el.value.trim() : ""; });
-  return JSON.stringify([IMP.aspetto, IMP.profilo, IMP.preferenze, voci]);
+  return JSON.stringify([IMP.aspetto, IMP.profilo, IMP.intestazione, IMP.preferenze, voci]);
 }
 function impChiudi() {
   if (IMP.firma && impFirma() !== IMP.firma && !confirm("Ci sono modifiche non salvate nelle Impostazioni. Chiudere senza salvarle?")) return false;
@@ -2713,7 +2743,8 @@ async function impSalva() {
   for (const v of IMP.voci) if (v.modificabile) { const x = $("#imp_" + v.chiave).value.trim(); if (x !== IMP.iniziali[v.chiave]) modifiche[v.chiave] = x; }
   try {
     const profilo = Object.fromEntries(Object.entries(IMP.profilo).filter(([, v]) => v));
-    const s = await post("/api/impostazioni", { modifiche, interfaccia: IMP.aspetto, profilo, preferenze: IMP.preferenze });
+    const intestazione = Object.fromEntries(Object.entries(IMP.intestazione).map(([k, v]) => [k, String(v || '').trim()]).filter(([, v]) => v));
+    const s = await post("/api/impostazioni", { modifiche, interfaccia: IMP.aspetto, profilo, intestazione, preferenze: IMP.preferenze });
     STUDIO.profilo = s.profilo || {};
     memorizzaAspetto(s.interfaccia);
     impRender(s); IMP.firma = impFirma(); $("#impErr").textContent = "";
@@ -2817,7 +2848,7 @@ $("#bControlla").onclick = async () => {
   if (n && !confirm("Per controllare, il programma salva prima " + (n === 1 ? "la modifica in sospeso" : "le " + n + " modifiche in sospeso") + ". Continuare?")) return;
   if (n && !(await salvaTutto())) return;
   try { S.Q = await api("/api/pratiche/" + S.P.pratica_id + "/quadri"); } catch (e) { msg("Controllo non eseguito. " + e.message, "e"); return; }
-  if (S.sel === 'FILE') S.sel = 'AN'; S.tab = "controlli"; render();
+  vaiControlli();
 };
 $('#homeNuova').onclick = wizApri;
 $('#homeImporta').onclick = () => $('#fImporta').click();

@@ -583,7 +583,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         from . import impostazioni
         b = await request.json()
         return impostazioni.salva(b.get("modifiche", {}), interfaccia=b.get("interfaccia"), profilo=b.get("profilo"),
-                                   preferenze_nuove=b.get("preferenze"))
+                                   preferenze_nuove=b.get("preferenze"), intestazione=b.get("intestazione"))
 
     async def corpo(request):
         return await request.json() if (await request.body()) else {}

@@ -51,12 +51,11 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   });
   assert.ok(alt.b >= alt.a - 0.5, `riga vuota alta ${alt.b} contro ${alt.a}`);
 
-  // B01: linguette Dati/Controlli/Cronologia opache (lo sfondo copre cio' che scorre sotto)
+  // B01 superato (14/11/2026): nel pannello del quadro non ci sono piu' le linguette Dati/Controlli/Cronologia
   const pid = await page.evaluate(() => S.pratiche[0].pratica_id || S.pratiche[0].id);
   await page.evaluate(id => apri(id, "EA"), pid);
-  await page.waitForSelector(".ins > .seg");
-  const sfondo = await page.evaluate(() => getComputedStyle(document.querySelector(".ins > .seg")).backgroundImage);
-  assert.match(sfondo, /linear-gradient/, "sfondo delle linguette con il fondo pieno del pannello");
+  await page.waitForSelector("#vista tbody tr"); await page.click("#vista tbody tr >> nth=0"); await page.waitForSelector("#ins .rg");
+  assert.equal(await page.locator(".ins > .seg").count(), 0, "pannello del quadro senza linguette");
 
   // B02 (lotto 3): nei Dati generali le date non sono larghe quanto la scheda
   await page.evaluate(id => apri(id, "AN"), pid);

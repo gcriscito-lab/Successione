@@ -18,15 +18,17 @@ const { ok } = require('./verifiche');
   ok((await pg.locator('#vista tbody tr').first().innerText()).includes('Roma'), 'la tabella mostra subito il valore digitato');
   ok((await pg.textContent('#bSalva')).includes('(1)'), 'contatore modifiche non salvate');
   await pg.click('#bSalva'); await pg.waitForFunction(() => document.querySelector('#msg').textContent.includes('Salvato (revisione 2)')); ok((await pg.textContent('#sb')).includes('Revisione 2'), 'salvato: revisione 2 nella barra di stato');
-  await pg.click('#bControlla'); await pg.waitForSelector('#ins .rl li');
-  ok((await pg.locator('#ins .rl li').count()) === 1, 'un rilievo nei controlli (foglio/particella)');
-  await pg.locator('#ins .rl li button').first().click(); await pg.waitForTimeout(200);
+  // 14/11/2026: i controlli stanno in cima a «File e invio», non piu' in una linguetta del pannello del quadro
+  await pg.click('#bControlla'); await pg.waitForSelector('#controlliFile .rl li');
+  ok((await pg.locator('#controlliFile .rl li').count()) === 1, 'un rilievo nei controlli (foglio/particella)');
+  await pg.locator('#controlliFile .rl li button').first().click(); await pg.waitForTimeout(300);
   ok((await pg.locator('#vista tbody tr[aria-selected=true]').count()) === 1, 'il rilievo seleziona la riga');
   await pg.locator('#ins [name=foglio]').fill('512'); await pg.locator('#ins [name=particella]').fill('88'); await pg.locator('#ins [name=quota_defunto]').fill('1/1');
-  await pg.click('#ins .az .pil'); await pg.waitForFunction(() => document.querySelector('#msg').textContent.includes('Salvato (revisione 3)')); await pg.click('#bControlla'); await pg.waitForTimeout(300);
+  await pg.click('#ins .az .pil'); await pg.waitForFunction(() => document.querySelector('#msg').textContent.includes('Salvato (revisione 3)')); await pg.click('#bControlla'); await pg.waitForSelector('#controlliFile');
   // 14/11/2026: senza rilievi resta l'elenco di cio' che blocca il file (fornitore, documenti): «Nessun rilievo» compare solo se non c'e' altro
-  ok((await pg.locator('#ins .rl li').count()) === 0 && /Nessun rilievo|Per generare il file manca/.test(await pg.textContent('#ins')), 'dopo la correzione nessun rilievo');
-  await pg.getByRole('tab', { name: 'Cronologia', exact: true }).click(); await pg.waitForSelector('#ins .rv'); ok((await pg.locator('#ins .rv').count()) >= 3, 'cronologia con le revisioni');
+  ok((await pg.locator('#controlliFile .rl li').count()) === 0 && /Nessun rilievo|Per generare il file manca/.test(await pg.textContent('#controlliFile')), 'dopo la correzione nessun rilievo');
+  await pg.click('#controlliFile >> text=Cronologia delle modifiche'); await pg.waitForSelector('#dCronologia .rv'); ok((await pg.locator('#dCronologia .rv').count()) >= 3, 'cronologia con le revisioni');
+  await pg.click('#dCronologia >> text=Chiudi'); await pg.waitForFunction(() => !document.getElementById('dCronologia'));
   await pg.click('#bGenera'); await pg.waitForSelector('#vista [aria-label="Codice fiscale del fornitore"]');
   await pg.fill('#vista [aria-label="Codice fiscale del fornitore"]', 'RSSNNA70A41H501X'); await pg.getByRole('button', { name: 'Genera file' }).last().click();
   // 14/11/2026: l'esito resta scritto nel passo 2 con i motivi (non solo nel messaggio che sparisce)

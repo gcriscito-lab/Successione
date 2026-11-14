@@ -279,7 +279,7 @@ def preferenze(cartella_dati: Path | str | None = None) -> dict:
 # Voci del file di configurazione copiate nel backup (elenco chiuso): percorsi degli strumenti, aspetto, profilo dello studio e
 # preferenze. Escluse le chiavi non note (potrebbero contenere qualunque cosa, anche segreti scritti a mano) e
 # SUCCESSIONI_DATA (dopo un ripristino punterebbe alla vecchia cartella dei dati).
-VOCI_BACKUP = frozenset(k for k in CHIAVI if k != "SUCCESSIONI_DATA") | {"interfaccia", "profilo", "preferenze"}
+VOCI_BACKUP = frozenset(k for k in CHIAVI if k != "SUCCESSIONI_DATA") | {"interfaccia", "profilo", "preferenze", "intestazione"}
 
 
 def contenuto_per_backup(contenuto) -> dict | None:
@@ -314,6 +314,57 @@ def _valida_profilo(p) -> dict:
         if str(p["impegno_codice"]) not in ("1", "2"):
             raise DatiNonValidi("profilo dello studio: impegno a trasmettere 1 o 2")
         out["impegno_codice"] = str(p["impegno_codice"])
+    return out
+
+
+# Intestazione dello studio per le stampe (carta intestata, 14/11/2026): testi brevi su una riga, mai credenziali. Le stampe
+# leggono intestazione_studio(), che restituisce sempre tutte le chiavi.
+CHIAVI_INTESTAZIONE = ("nome", "indirizzo", "cap_comune", "telefono", "email", "pec", "cf_piva")
+LUNGHEZZE_INTESTAZIONE = {"nome": LUNGHEZZA_NOME_STUDIO, "indirizzo": 100, "cap_comune": 80, "telefono": 40, "email": 120,
+                          "pec": 120, "cf_piva": 16}
+_CONTROLLO = re.compile(r"[\x00-\x1f\x7f]")
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+
+def _valida_intestazione(p) -> dict:
+    if not isinstance(p, dict):
+        raise DatiNonValidi("intestazione dello studio: atteso un oggetto")
+    out: dict = {}
+    for k, v in p.items():
+        if k not in CHIAVI_INTESTAZIONE:
+            raise DatiNonValidi(f"intestazione dello studio: campo sconosciuto {k!r}", ammessi=list(CHIAVI_INTESTAZIONE))
+        if v is None or v == "":
+            continue
+        if not isinstance(v, str) or _CONTROLLO.search(v) or len(v.strip()) > LUNGHEZZE_INTESTAZIONE[k]:
+            raise DatiNonValidi(f"intestazione dello studio, {k}: testo su una riga di al massimo "
+                                f"{LUNGHEZZE_INTESTAZIONE[k]} caratteri", campo=k)
+        v = " ".join(v.split())
+        if k in ("email", "pec") and not _EMAIL.fullmatch(v):
+            raise DatiNonValidi(f"intestazione dello studio, {k}: indirizzo di posta non valido", campo=k)
+        if k == "cf_piva":
+            v = v.upper()
+            if not re.fullmatch(r"[0-9]{11}|[A-Z0-9]{16}", v):
+                raise DatiNonValidi("intestazione dello studio: codice fiscale (16 caratteri) o partita IVA (11 cifre)",
+                                    campo=k)
+        if v:
+            out[k] = v
+    return out
+
+
+def intestazione_studio(cartella_dati: Path | str | None = None) -> dict:
+    """Dati dello studio per la carta intestata: sempre tutte le chiavi di CHIAVI_INTESTAZIONE, testi (vuoti se mancano).
+    Il nome, se manca, e' il nome dello studio delle preferenze dell'interfaccia. Si legge dal file di configurazione accanto
+    ai dati indicati, come profilo e nome dello studio."""
+    env = os.environ.get("SUCCESSIONI_CONFIG")
+    f = Path(env) if env else (Path(cartella_dati) / "configurazione.json" if cartella_dati else file_configurazione())
+    try:
+        d = json.loads(f.read_text(encoding="utf-8-sig"))
+        salvata = _valida_intestazione(d.get("intestazione", {}) or {}) if isinstance(d, dict) else {}
+    except (OSError, ValueError, DatiNonValidi):
+        salvata = {}
+    out = {k: salvata.get(k, "") for k in CHIAVI_INTESTAZIONE}
+    if not out["nome"]:
+        out["nome"] = nome_studio(cartella_dati)
     return out
 
 
@@ -375,7 +426,8 @@ def stato() -> dict:
     # problema_configurazione: None se il file manca o e' valido; altrimenti il motivo (l'interfaccia usa i predefiniti e lo
     # mostra; il server MCP in questo caso si considera in sola lettura)
     return {"file": str(file_configurazione()), "voci": voci, "interfaccia": preferenze_interfaccia(nel_file),
-            "profilo": profilo_studio(), "preferenze": pref, "problema_configurazione": problema,
+            "profilo": profilo_studio(), "intestazione": intestazione_studio(), "preferenze": pref,
+            "problema_configurazione": problema,
             "componente_controllo": _componente_controllo()}
 
 
@@ -431,26 +483,33 @@ def _sostituisci(temp: Path, destinazione: Path) -> None:
 
 
 def salva(modifiche: dict, interfaccia: dict | None = None, profilo: dict | None = None,
-          preferenze_nuove: dict | None = None) -> dict:
+          preferenze_nuove: dict | None = None, intestazione: dict | None = None) -> dict:
     """Applica e salva le modifiche (valore vuoto = rimuove l'impostazione). Tutto o niente: se un valore e' errato non si
     scrive nulla. Restituisce lo stato aggiornato piu' gli eventuali `avvisi`. Un salvataggio alla volta: leggere, unire e
     riscrivere il file in parallelo perderebbe le modifiche dell'altro (per esempio due larghezze salvate di seguito)."""
     with _SALVATAGGIO:
-        return _salva(modifiche, interfaccia, profilo, preferenze_nuove)
+        return _salva(modifiche, interfaccia, profilo, preferenze_nuove, intestazione)
 
 
 def _salva(modifiche: dict, interfaccia: dict | None = None, profilo: dict | None = None,
-           preferenze_nuove: dict | None = None) -> dict:
-    if not isinstance(modifiche, dict) or (not modifiche and not interfaccia and profilo is None and preferenze_nuove is None):
+           preferenze_nuove: dict | None = None, intestazione: dict | None = None) -> dict:
+    if not isinstance(modifiche, dict) or (not modifiche and not interfaccia and profilo is None and preferenze_nuove is None
+                                           and intestazione is None):
         raise DatiNonValidi("nessuna modifica indicata")
     nuove = {k: _valida(k, v) for k, v in modifiche.items()}
     aspetto = _valida_interfaccia(interfaccia) if interfaccia is not None else None
     nuovo_profilo = _valida_profilo(profilo) if profilo is not None else None
     nuove_pref = _valida_preferenze(preferenze_nuove) if preferenze_nuove is not None else None
+    nuova_intest = _valida_intestazione(intestazione) if intestazione is not None else None
     contenuto = _leggi_file_stretto()
     if nuove_pref is not None:
         contenuto["preferenze"] = {k: v for k, v in {**(contenuto.get("preferenze") or {}), **nuove_pref}.items()
                                    if k in PREFERENZE_DEFAULT}
+    if nuova_intest is not None:     # l'intestazione si salva intera: i campi lasciati vuoti si tolgono
+        if nuova_intest:
+            contenuto["intestazione"] = nuova_intest
+        else:
+            contenuto.pop("intestazione", None)
     if nuovo_profilo is not None:
         if nuovo_profilo:
             contenuto["profilo"] = nuovo_profilo

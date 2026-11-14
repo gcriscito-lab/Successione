@@ -33,10 +33,11 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   assert.match(await page.textContent("#ins .dv-bene"), /1\/1 · completa/);
 
   // 19: rimedio nei controlli
-  await page.evaluate(() => { S.tab = "controlli"; renderIns(); });
-  const controlli = await page.textContent("#ins");
+  const daRipristinare = await page.evaluate(() => ({ sel: S.sel, riga: S.riga }));
+  await page.evaluate(() => vaiControlli()); await page.waitForSelector("#controlliFile");
+  const controlli = await page.textContent("#controlliFile");
   assert.match(controlli, /Come risolvere: Nel quadro DV aggiungi la riga/);
-  await page.evaluate(() => { S.tab = "dati"; renderIns(); });
+  await page.evaluate(p => { S.sel = p.sel; S.riga = p.riga; render(); }, daRipristinare); await page.waitForSelector("#ins .dv-bene");
 
   // 5: modifica di gruppo, una sola revisione
   const prima = await leggi();

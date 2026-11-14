@@ -109,16 +109,8 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   assert.equal(richieste, 2, "nuova revisione: nuova richiesta");
   page.off("request", conta);
 
-  // 7. schede Dati/Controlli/Cronologia con le frecce; tabindex mobile e aria-controls
-  await page.focus('#ins [role=tab][aria-selected=true]');
-  assert.equal(await page.getAttribute('#ins [role=tab][aria-selected=true]', "aria-controls"), "insPannello");
-  assert.equal(await page.locator('#ins [role=tab][tabindex="0"]').count(), 1);
-  await page.keyboard.press("ArrowRight");
-  await page.waitForFunction(() => S.tab === "controlli" && document.activeElement.getAttribute("role") === "tab" && document.activeElement.id === "insTab_controlli");
-  await page.keyboard.press("End");
-  await page.waitForFunction(() => S.tab === "cronologia" && document.activeElement.id === "insTab_cronologia");
-  await page.keyboard.press("ArrowRight");
-  await page.waitForFunction(() => S.tab === "dati" && document.activeElement.id === "insTab_dati");
+  // 7. (14/11/2026) il pannello del quadro mostra solo i dati: niente linguette Controlli/Cronologia
+  assert.equal(await page.locator('#ins [role=tab]').count(), 0);
 
   // 8. menu Operazioni: frecce, Home/Fine, Esc torna al pulsante
   await page.focus("#vista details.operazioni > summary");

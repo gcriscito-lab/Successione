@@ -28,24 +28,24 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   assert.ok(!/Controllo ufficiale: vedi/.test(conti.barra), "niente testo fisso sul controllo ufficiale nella barra");
 
   // scheda Controlli: lo stesso elenco con «Vai al dato», senza la nota fissa «file XML completo non generato»
-  await page.click("#bControlla"); await page.waitForSelector("#ins .per-il-file-voci li");
-  const ctl = await page.evaluate(() => ({ voci: document.querySelectorAll("#ins .per-il-file-voci > li").length,
-    vai: document.querySelectorAll("#ins .per-il-file-voci .lk").length, testo: $("#ins").textContent }));
+  await page.click("#bControlla"); await page.waitForSelector("#controlliFile .per-il-file-voci li");
+  const ctl = await page.evaluate(() => ({ voci: document.querySelectorAll("#controlliFile .per-il-file-voci > li").length,
+    vai: document.querySelectorAll("#controlliFile .per-il-file-voci .lk").length, testo: $("#controlliFile").textContent }));
   assert.equal(ctl.voci, conti.pf); assert.equal(ctl.vai, conti.pf, "ogni voce ha il suo «Vai al dato»");
   assert.ok(!/file XML completo non e' stato generato/.test(ctl.testo));
   assert.ok(!/Nessun rilievo/.test(ctl.testo));
 
   // File e invio, passo 2: stesso elenco prima del pulsante; «File XML» non dice «aggiornato» senza file
   await page.click("#navFile"); await page.waitForSelector("#fileContenuto .per-il-file-voci li");
-  assert.equal(await page.locator("#fileContenuto .per-il-file-voci > li").count(), conti.pf);
+  assert.equal(await page.locator("#fileContenuto .per-il-file-voci > li").count(), conti.pf, "un solo elenco nella pagina");
   const fileXml = await page.evaluate(() => { const r = [...document.querySelectorAll("#fileContenuto .rg-stato")].find(x => /File XML/.test(x.textContent)); return r && r.textContent; });
   if (/Nessun file generato/.test(fileXml)) assert.ok(!/aggiornato/.test(fileXml), "File XML: " + fileXml);
 
   // «Vai a File e invio» / «Vai al dato» dai Controlli porta al dato
-  await page.evaluate(() => { S.sel = "AN"; S.tab = "controlli"; render(); });
-  await page.waitForSelector("#ins .per-il-file-voci .lk");
+  await page.evaluate(() => vaiControlli());
+  await page.waitForSelector("#controlliFile .per-il-file-voci .lk");
   const primo = await page.evaluate(() => S.Q.per_il_file[0].quadro);
-  await page.click("#ins .per-il-file-voci .lk >> nth=0"); await page.waitForTimeout(400);
+  await page.click("#controlliFile .per-il-file-voci .lk >> nth=0"); await page.waitForTimeout(400);
   assert.equal(await page.evaluate(() => S.sel), primo, "«Vai al dato» apre il quadro giusto");
 
   // EF: lo stesso elenco
