@@ -659,6 +659,15 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         return sv.visura_carica(pid, await corpo_limitato(request, LIMITE_RICEVUTA, "visura"), nome=nome)
 
     @api
+    async def rubrica_api(request):
+        """Rubrica dello studio: GET le voci; POST {voci} sostituisce l'intera rubrica."""
+        from . import impostazioni
+        if request.method == "GET":
+            return {"voci": impostazioni.rubrica(sv.arch.base)}
+        b = await request.json() if (await request.body()) else {}
+        return {"voci": impostazioni.salva_rubrica(b.get("voci", []))}
+
+    @api
     async def ricevute_cartella_api(request):
         """Documenti della successione nella cartella dei download (solo i nomi da documento dell'Agenzia vengono aperti)."""
         return sv.ricevute_cerca(request.query_params.get("cartella") or None)
@@ -707,7 +716,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     threading.Thread(target=pulisci_silenziosa, args=(sv.arch.base,), daemon=True, name="pulizia-avvio").start()
     return Starlette(middleware=[Middleware(IntestazioniSicurezza)], routes=[
         Route("/api/codice-fiscale", cf_decodifica), Route("/api/codice-comune", codice_comune_api), Route("/api/calcolatrice", calcolatrice_api, methods=["POST"]), Route("/api/importa", importa, methods=["POST"]),
-        Route("/api/ricevute-cartella", ricevute_cartella_api), Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
+        Route("/api/ricevute-cartella", ricevute_cartella_api), Route("/api/rubrica", rubrica_api, methods=["GET", "POST"]), Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
         Route(P + "/ricevute/{tid}", ricevute, methods=["GET", "POST"]),

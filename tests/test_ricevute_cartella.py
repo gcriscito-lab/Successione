@@ -103,3 +103,28 @@ def test_rifiuta_altro_defunto_e_file_fuori_cartella(tmp_path):
         sv.ricevuta_da_cartella(pid, "../fuori_SUC13.pdf", cartella=dl)
     with pytest.raises(DatiNonValidi, match="cartella non trovata"):
         sv.ricevute_cerca(tmp_path / "inesistente")
+
+
+# ------------------------------------------------------------------ rubrica dello studio (14/11/2026)
+def test_rubrica_salva_valida_e_finisce_nel_backup(tmp_path, monkeypatch):
+    import json
+    from successioni import impostazioni as I
+    conf = tmp_path / "configurazione.json"
+    monkeypatch.setenv("SUCCESSIONI_CONFIG", str(conf))
+    assert I.rubrica() == []
+    voci = I.salva_rubrica([{"nome": "  Studio  Bianchi ", "codice_fiscale": "01234567890", "ruolo": "intermediario"},
+                            {"nome": "Rossi Anna", "codice_fiscale": T.CF_ANNA.lower(), "ruolo": "delegato", "note": "figlia"}])
+    assert [v["nome"] for v in voci] == ["Studio Bianchi", "Rossi Anna"] and voci[1]["codice_fiscale"] == T.CF_ANNA
+    assert all(v["id"].startswith("r_") for v in voci) and I.rubrica() == voci
+    # gli identificativi restano al salvataggio successivo
+    assert I.salva_rubrica(voci)[0]["id"] == voci[0]["id"]
+    assert "rubrica" in I.VOCI_BACKUP and json.loads(conf.read_text(encoding="utf-8"))["rubrica"] == voci
+    for errata, msg in (([{"nome": "X", "codice_fiscale": "123"}], "codice fiscale"),
+                        ([{"nome": "X", "codice_fiscale": "01234567890", "password": "p"}], "campo sconosciuto"),
+                        ([{"nome": "X", "codice_fiscale": "01234567890", "ruolo": "capo"}], "ruolo"),
+                        ([{"codice_fiscale": "01234567890"}], "nome obbligatorio"),
+                        ("non una lista", "lista")):
+        with pytest.raises(DatiNonValidi, match=msg):
+            I.salva_rubrica(errata)
+    assert I.rubrica() == voci                       # un errore non scrive nulla
+    assert I.salva_rubrica([]) == [] and I.rubrica() == []
