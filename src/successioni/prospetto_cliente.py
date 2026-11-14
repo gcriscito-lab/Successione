@@ -267,45 +267,25 @@ def isn_per_erede(xml: bytes) -> tuple[dict[tuple[str, str], Decimal], str | Non
     return out, None
 
 
+#: stili propri del prospetto; testata, caratteri, tabelle e piede vengono dalla carta intestata comune (carta_intestata.CSS)
 CSS = """
-@font-face{font-family:"Atkinson Hyperlegible Next";font-weight:200 800;src:url("/static/atkinson-next-latin.woff2") format("woff2")}
-@font-face{font-family:"Atkinson Hyperlegible Mono";font-weight:200 800;src:url("/static/atkinson-mono-latin.woff2") format("woff2")}
-:root{--inchiostro:#1F2A2A;--t2:#55615F;--verde:#2F6B57;--casella:#DDEBE3;--sep:rgba(31,42,42,.16);--ocra:#8A560C;--rosso:#B3261E}
-*{box-sizing:border-box}
-body{margin:0;background:#F6F7F4;color:var(--inchiostro);font:15px/1.5 "Atkinson Hyperlegible Next","Segoe UI",system-ui,sans-serif}
-.foglio{max-width:860px;margin:24px auto;background:#fff;padding:40px 48px;box-shadow:0 0 0 1px var(--sep)}
-.barra{max-width:860px;margin:16px auto 0;display:flex;gap:10px;justify-content:flex-end}
-.barra button{font:inherit;font-weight:700;padding:8px 16px;border-radius:4px;border:0;background:var(--verde);color:#fff;cursor:pointer}
-header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding-bottom:18px;border-bottom:2px solid var(--verde)}
-.studio{font-weight:700;color:var(--verde)} .data{color:var(--t2);font-size:13px;text-align:right}
-h1{font-size:26px;line-height:1.2;margin:18px 0 4px} .sotto{color:var(--t2);margin:0}
-h2{font-size:17px;margin:30px 0 10px;color:var(--verde)}
 .avviso{margin:18px 0 0;padding:10px 14px;border-left:4px solid var(--ocra);background:#FBF4E8;font-size:14px}
 .avviso.rosso{border-color:var(--rosso);background:#FBECEB}
 .cifre{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:20px;border:1px solid var(--sep);border-radius:4px}
 .cifre div{padding:12px 16px} .cifre div+div{border-left:1px solid var(--sep)}
 .cifre span{display:block;font-size:13px;color:var(--t2)} .cifre b{font-size:20px;font-variant-numeric:tabular-nums}
 .cifre .netto{background:var(--casella)}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:left;font-weight:700;font-size:13px;color:var(--t2);border-bottom:1px solid var(--inchiostro);padding:6px 8px}
-td{padding:7px 8px;border-bottom:1px solid var(--sep);vertical-align:top}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.mono{font-family:"Atkinson Hyperlegible Mono",Consolas,monospace;font-size:13px;letter-spacing:.03em}
-.dett{color:var(--t2);font-size:13px} tr.tot td{font-weight:700;border-top:1px solid var(--inchiostro);border-bottom:0}
-.gruppo td{background:#F6F7F4;font-weight:700;font-size:13px}
 .erede{display:grid;grid-template-columns:1fr auto;gap:2px 16px;padding:12px 0;border-bottom:1px solid var(--sep)}
 .erede .chi b{display:block} .erede .chi span{color:var(--t2);font-size:13px}
 .erede dl{margin:0;display:grid;grid-template-columns:auto auto;gap:0 14px;font-size:14px}
 .erede dt{color:var(--t2)} .erede dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
 .erede dd.forte{font-weight:700}
-footer{margin-top:32px;padding-top:12px;border-top:1px solid var(--sep);font-size:12px;color:var(--t2)}
-@media (max-width:640px){.foglio{padding:24px 18px;margin:0}.cifre{grid-template-columns:1fr}.cifre div+div{border-left:0;border-top:1px solid var(--sep)}}
-@media print{body{background:#fff}.barra{display:none}.foglio{box-shadow:none;margin:0;max-width:none;padding:0}
- @page{size:A4;margin:16mm 15mm}h2{break-after:avoid}tr,.erede{break-inside:avoid}}
+@media (max-width:640px){.cifre{grid-template-columns:1fr}.cifre div+div{border-left:0;border-top:1px solid var(--sep)}}
+@media print{.erede{break-inside:avoid}}
 """
 
 
-def html(xml: bytes, *, titolo: str, studio: str = "", revisione: int | None = None, completo: bool = True,
+def html(xml: bytes, *, titolo: str, studio: str | dict = "", revisione: int | None = None, completo: bool = True,
          obsoleto: bool = False, oggi: date | None = None) -> str:
     d = leggi(xml)
     isn, nota_isn = isn_per_erede(xml) if d["isn_totale"] else ({}, None)
@@ -379,12 +359,9 @@ def html(xml: bytes, *, titolo: str, studio: str = "", revisione: int | None = N
                                    f'{"deceduta" if df.get("f") else "deceduto"} il {e(df["decesso"])}' if df.get("decesso") else "") if x)
     devol = "Successione per legge" if df.get("per_legge") else "Successione testamentaria"
     rev = f", revisione {revisione}" if revisione is not None else ""
-    return f"""<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Prospetto per il cliente - {e(titolo)}</title><style>{CSS}</style></head><body>
-<div class="barra"><button type="button" onclick="window.print()">Stampa o salva in PDF</button></div>
-<main class="foglio">
-<header><div class="studio">{e(studio) or "&nbsp;"}</div><div class="data">Prospetto del {oggi.strftime("%d/%m/%Y")}<br>{e(titolo)}{e(rev)}</div></header>
-<h1>Successione di {e(df.get("nome") or titolo)}</h1>
+    from . import carta_intestata as CI
+    st = studio if isinstance(studio, dict) else {"nome": studio or ""}
+    corpo = f"""<h1>Successione di {e(df.get("nome") or titolo)}</h1>
 <p class="sotto">{sotto}</p><p class="sotto">{devol}</p>
 {"".join(f'<p class="avviso {c}">{e(m)}</p>' for c, m in avvisi)}
 {cifre}
@@ -392,7 +369,8 @@ def html(xml: bytes, *, titolo: str, studio: str = "", revisione: int | None = N
 {nota}
 <h2>Beni</h2>{tab_beni}
 {tab_pass}
-{tab_imp}
-<footer>Valori e imposte riportati dal file della dichiarazione generato dal programma. Le quote indicano la parte di ciascun bene
-che spetta a ogni erede. Per dubbi rivolgersi allo studio.</footer>
-</main></body></html>"""
+{tab_imp}"""
+    return CI.pagina(titolo_finestra=f"Prospetto per il cliente - {titolo}", studio=st,
+                     riferimento=["Prospetto per il cliente", f"del {oggi.strftime('%d/%m/%Y')}", f"{titolo}{rev}"], corpo=corpo,
+                     piede="Valori e imposte riportati dal file della dichiarazione generato dal programma. Le quote indicano la parte "
+                           "di ciascun bene che spetta a ogni erede. Per dubbi rivolgersi allo studio.", css_extra=CSS)

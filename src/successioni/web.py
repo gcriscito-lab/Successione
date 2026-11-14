@@ -395,12 +395,12 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     @api
     async def prospetto_cliente_api(request):
         """Riepilogo stampabile per gli eredi, letto dall'ultimo file generato (stessi importi della dichiarazione)."""
-        from . import impostazioni
+        from . import carta_intestata
         from .prospetto_cliente import html as prospetto_html
         pid = request.path_params["pid"]
         xml, j = sv.file_export(pid)
         stato = sv.stato_elaborati(pid)["export"]
-        studio = impostazioni.nome_studio(sv.arch.base)
+        studio = carta_intestata.dati_studio(sv.arch.base)
         return HTMLResponse(prospetto_html(xml, titolo=sv.leggi(pid)["titolo"], studio=studio, revisione=j["input"]["revisione"],
                                            completo=bool(j["risultato"].get("completo")), obsoleto=stato.get("stato") == "obsoleto"),
                             headers={"Cache-Control": "no-store"})
@@ -417,7 +417,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def brogliaccio_html(request):
         from . import brogliaccio as BR
         d = sv.leggi(request.path_params["pid"])
-        return HTMLResponse(BR.html(d["dati"], titolo=d["titolo"], revisione=d["revisione"]), headers={"Cache-Control": "no-store"})
+        from . import carta_intestata
+        return HTMLResponse(BR.html(d["dati"], titolo=d["titolo"], revisione=d["revisione"],
+                                    studio=carta_intestata.dati_studio(sv.arch.base)), headers={"Cache-Control": "no-store"})
 
     @api
     async def diagnosi_api(request):
@@ -471,9 +473,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def preventivo_api(request):
-        from . import impostazioni
+        from . import carta_intestata
         from .preventivo import html as prev_html
-        studio = impostazioni.nome_studio(sv.arch.base)
+        studio = carta_intestata.dati_studio(sv.arch.base)
         testo = prev_html(sv, request.path_params["pid"], request.query_params.get("tipo", "preventivo"), studio)
         return HTMLResponse(testo, headers={"Cache-Control": "no-store"})
 
