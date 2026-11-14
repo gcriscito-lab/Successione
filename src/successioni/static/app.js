@@ -1430,7 +1430,8 @@ function insDati(ins) {
   ins.append(h("div", { class: "ins-testa" }, h("h3", {}, r.nuova ? "Nuova riga" : etichetta(q.coll, r.e)),
     h("button", { class: "lk chiudi-ins", title: "Chiudi il pannello (Esc dalla tabella)", "aria-label": "Chiudi il pannello", onclick: chiudiPannello }, "Chiudi")));
   for (const x of rilievi().filter(x => id && x.percorso === q.coll + "[" + id + "]")) ins.append(h("div", { class: "e e-riga" }, x.messaggio));
-  if ((OBBLIGATORI[q.id] || []).length) ins.append(h("p", { class: "legenda-obbl" }, "In grassetto i dati richiesti dal quadro."));
+  // stile moderno: le etichette sono tutte uguali e i dati richiesti hanno un pallino (il nome intero lo dice nel suggerimento)
+  if ((OBBLIGATORI[q.id] || []).length && document.documentElement.dataset.stile === "classico") ins.append(h("p", { class: "legenda-obbl" }, "In grassetto i dati richiesti dal quadro."));
   const visibili = q.campi ? new Set(q.campi) : (((S.schema.ordine || {})[q.id]) ? new Set(S.schema.ordine[q.id]) : null);   // solo i campi pertinenti al quadro; uno gia' valorizzato resta visibile
   const ordine = ordinati(q.id, Object.keys(campi));
   const gruppi = q.coll === "beni" || q.id === "EA" ? GRUPPI_SCHEDA[q.id] : null, righeCampi = [];
