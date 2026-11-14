@@ -1,0 +1,25 @@
+<!-- Illustrazione per lo stato vuoto (ricevute), generata il 14/11/2026 con Higgsfield (modello gpt_image_2_6, uscita SVG) nella palette del programma. -->
+<svg viewBox="0 0 1168 880" width="1168" height="880" xmlns="http://www.w3.org/2000/svg">
+  <title>Ricevute dell'Agenzia</title>
+  <g transform="translate(234 176) scale(0.6)" stroke="#1F2A2A" stroke-width="3.333" stroke-linecap="round" stroke-linejoin="round">
+    <g id="envelope">
+      <path d="M605 333H1071C1105 333 1132 360 1132 394V676C1132 710 1105 737 1071 737H605Z" fill="#2F6B57" />
+      <path d="M605 333H1071C1100 333 1124 353 1131 382L907 550C882 570 848 570 823 550L605 383Z" fill="#DDEBE3" />
+    </g>
+    <g id="rear-receipt">
+      <path d="M128 730L30 177C25 150 42 125 69 119L439 43C466 37 488 52 494 78L510 158L244 138C218 136 195 155 192 182Z" fill="#F6F7F4" />
+    </g>
+    <g id="front-receipt">
+      <path d="M244 135L648 173C675 175 693 195 690 222L602 812C599 832 586 845 571 843C545 841 547 806 520 804C494 801 491 832 465 830C440 828 441 796 416 794C389 791 387 822 362 820C337 818 339 787 313 783C286 779 282 811 257 809C232 807 235 775 208 772C184 770 179 799 155 799C134 799 121 783 125 761L192 183C195 154 216 132 244 135Z" fill="#F6F7F4" />
+      <g id="seal">
+        <circle cx="424" cy="350" r="119" fill="#A86A12" stroke="none" />
+        <path d="M377 361L402 388L479 311" fill="none" stroke="#F6F7F4" stroke-width="20" />
+      </g>
+      <g id="receipt-rules" fill="none" stroke="#2F6B57">
+        <path d="M252 518L549 547" />
+        <path d="M244 595L540 623" />
+        <path d="M235 671L405 687" />
+      </g>
+    </g>
+  </g>
+</svg>

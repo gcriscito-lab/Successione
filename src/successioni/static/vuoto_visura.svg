@@ -1,0 +1,11 @@
+<!-- Illustrazione per lo stato vuoto (visura), generata il 14/11/2026 con Higgsfield (modello gpt_image_2_6, uscita SVG) nella palette del programma. -->
+<svg viewBox="0 0 1168 880" fill="none" xmlns="http://www.w3.org/2000/svg" width="1168" height="880">
+  <title>Carica un PDF</title>
+  <g stroke="#1F2A2A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path id="tray-back" d="M214 638C214 599 245 568 284 568H884C923 568 954 599 954 638V768C954 808 923 840 883 840H285C246 840 214 808 214 768Z" fill="#DDEBE3" />
+    <path id="paper" d="M350 46H679C692 46 704 51 713 60L836 183C845 192 850 204 850 217V742H295V101C295 71 320 46 350 46Z" fill="#F6F7F4" />
+    <path id="fold" d="M683 47V144C683 172 705 194 733 194H844" fill="#DDEBE3" />
+    <path id="upload-arrow" d="M558 690V578L519 617C510 626 495 626 486 617C477 608 477 593 486 584L564 507C573 498 588 498 597 507L675 584C684 593 684 608 675 617C666 626 651 626 642 617L603 578V690C603 703 593 713 581 713C568 713 558 703 558 690Z" fill="#A86A12" stroke="#A86A12" />
+    <path id="tray-front" d="M214 638H367C394 638 417 657 424 683L428 698C435 724 459 743 486 743H678C706 743 730 724 737 698L741 683C748 657 771 638 798 638H954V769C954 808 922 840 883 840H285C246 840 214 808 214 769Z" fill="#2F6B57" />
+  </g>
+</svg>
