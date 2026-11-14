@@ -1258,22 +1258,6 @@ function presentatoreId() {
   const dich = ((S.P.dati.opzioni.telematico || {}).dichiarazione || {});
   return (dich.presentatore || {}).persona_id || ((S.P.dati.persone || []).find(p => p.ruolo === "presentatore") || {}).id || null;
 }
-function boxRiepilogoSoggetto(r) {
-  const pid = r.e.id, box = h("div", { class: "riepilogo-soggetto" }, h("h4", {}, "Nella successione"));
-  const voci = [nomeVal("persone", "ruolo", valRiga(r, "ruolo"))];
-  const sdg = struttDi("persone", "grado_parentela", null), g = valRiga(r, "grado_parentela");
-  const og = g && sdg && sdg.opzioni && sdg.opzioni.find(x => x.valore === riconosciVoce(sdg, g));
-  if (g) voci.push(og ? og.etichetta : g);
-  if (presentatoreId() === pid) voci.push("dichiarante");
-  if (valRiga(r, "rappresentato_cf")) voci.push("per rappresentazione");
-  if (valRiga(r, "certificatore_disabilita")) voci.push("disabilità o interdizione");
-  box.append(h("p", {}, voci.filter(Boolean).join(" · ")));
-  const devs = righeDV(x => valRiga(x, "persona_id") === pid);
-  if (!devs.length) { box.append(h("p", { class: "mut" }, "Nessun bene attribuito nel quadro DV.")); return box; }
-  box.append(h("ul", { class: "beni-soggetto" }, devs.map(x => { const b = (S.P.dati.beni || []).find(y => y.id === valRiga(x, "bene_id"));
-    return h("li", {}, (b ? etichetta("beni", b) : "bene non indicato") + " — " + mostra("quota", valRiga(x, "quota")) + " (" + nomeDiritto(valRiga(x, "diritto"), b && b.tipo) + ")"); })));
-  return box;
-}
 /* Voce 5: modifica di gruppo (beni e devoluzioni). I valori scelti diventano modifiche da salvare sulle righe spuntate: con
    «Salva» si crea una sola revisione, annullabile dalla Cronologia. Nessun campo viene cambiato se non e' spuntato. */
 const CAMPI_GRUPPO = { beni: ["diritto", "quota_defunto", "data_visura"], devoluzioni: ["diritto", "quota"] };
@@ -1523,7 +1507,8 @@ function insDati(ins) {
   const extra = h("div", { class: "extra-scheda" });
   if (q.coll === "beni" && r.e && ["fabbricato", "terreno"].includes(valRiga(r, "tipo"))) extra.append(boxValoreCatastale(q, r));
   if (q.coll === "beni" && r.e) extra.append(boxDevoluzioniBene(r));            // voce 22: somma delle quote del bene
-  if (q.coll === "persone" && r.e && valRiga(r, "ruolo") !== "defunto") extra.append(boxRiepilogoSoggetto(r));   // voce 33
+  // voce 33 tolta il 14/11/2026 («che senso ha mettere sotto i dati dell'erede tutti i dati della successione?»): i beni per
+  // erede si vedono nel quadro DV e nel brogliaccio; il ruolo e la parentela sono gia' nei campi della scheda
   if (r.e) extra.append(boxAppunti(q, r));                                        // voce 10: nota interna della riga
   if (extra.childElementCount) ins.append(extra);
   const az = h("div", { class: "az" }, h("button", { class: "pil", onclick: salvaTutto }, "Salva"));
@@ -1537,7 +1522,7 @@ function insDati(ins) {
       S.dirty.delete(r.key); S.supDirty.delete(supKey); S.riga = null;
     });
   } }, "Elimina riga"));
-  ins.append(az, h("p", { class: "mut mono id-riga" }, r.e ? r.e.id : ""));
+  ins.append(az);   // 14/11/2026: niente identificativo tecnico della riga sotto Salva
 }
 function renderStrutturati(ins, q, r) {
   if (!['beni', 'passivita', 'persone', 'devoluzioni'].includes(q.coll)) return;

@@ -67,10 +67,9 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   assert.deepEqual(nuove, [["VERDI", "MARIA", "erede"], ["NERI", "PAOLO", "erede"]]);
   await page.evaluate(() => { S.nuove.clear(); render(); });
 
-  // 33: riepilogo del soggetto con i beni ricevuti
-  await page.click('#vista tr[data-key="e:persone:p_annaa001"]');
-  const riep = await page.textContent("#ins .riepilogo-soggetto");
-  assert.match(riep, /fg\.1 p\.11/); assert.match(riep, /fg\.1 p\.12/);
+  // 33 tolta (14/11/2026): sotto i dati dell'erede non c'e' piu' il riepilogo della successione
+  await page.click('#vista tr[data-key="e:persone:p_annaa001"]'); await page.waitForSelector("#ins .rg");
+  assert.equal(await page.locator("#ins .riepilogo-soggetto").count(), 0);
 
   // 10: appunti e stato del quadro: note interne, impronta dichiarativa invariata
   const impronta = (await leggi()).impronta_dichiarativa;
