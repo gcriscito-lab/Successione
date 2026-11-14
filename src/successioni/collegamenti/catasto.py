@@ -42,7 +42,9 @@ TERMINALI = (COMPLETATO, PARZIALE, ERRORE, ANNULLATO, CARICATO_MANUALMENTE)
 CAMPI_IDENTIFICATIVI = ("tipo", "comune", "codice_comune", "sezione", "foglio", "particella", "subalterno")
 CAMPI_NOTI = {"catasto", "comune", "codice_comune", "sezione", "foglio", "particella", "subalterno", "graffati",
               "porzione", "categoria", "classe", "consistenza", "superficie", "rendita", "reddito_dominicale",
-              "reddito_agrario", "qualita", "indirizzo", "titolarita", "partita", "data_situazione"}
+              "reddito_agrario", "qualita", "indirizzo", "titolarita", "partita", "data_situazione",
+              # dal PDF delle Risultanze catastali (collegamenti.visura_pdf)
+              "zona", "provincia", "unita_consistenza", "reddito_dominicale_con_deduzioni", "altri_dati"}
 
 
 # --------------------------------------------------------------------------------------- trasporto
@@ -276,22 +278,30 @@ def proponi_importazione(immobili: list[dict], dati_pratica: dict, *, cf_defunto
                  "sezione": im.get("sezione"),
                  "foglio": im.get("foglio"), "particella": im.get("particella"), "subalterno": im.get("subalterno"),
                  "categoria": im.get("categoria") if im["catasto"] == "F" else None,
-                 "rendita": im.get("rendita") if im["catasto"] == "F" else None}
+                 "rendita": im.get("rendita") if im["catasto"] == "F" else None,
+                 "provincia": im.get("provincia"),
+                 # fabbricati: classe, consistenza, zona censuaria e indirizzo; terreni: reddito dominicale
+                 "classe": im.get("classe") if im["catasto"] == "F" else None,
+                 "consistenza": im.get("consistenza") if im["catasto"] == "F" else None,
+                 "zona_censuaria": im.get("zona") if im["catasto"] == "F" else None,
+                 "indirizzo": im.get("indirizzo") if im["catasto"] == "F" else None,
+                 "reddito_dominicale": im.get("reddito_dominicale") if im["catasto"] == "T" else None}
         quota, diritto, s = _quota_defunto(im, cf_defunto)
         segnalazioni += s
         campi["quota_defunto"], campi["diritto"] = quota, diritto
         campi = {c: (str(v) if not isinstance(v, dict) else v) for c, v in campi.items() if v not in (None, "")}
-        if "rendita" in campi:
-            try:
-                V.parse_importo(campi["rendita"])
-            except V.ValoreNonValido:
-                segnalazioni.append({"codice": "IMPORTO_NON_VALIDO", "chiave": k, "valore": campi.pop("rendita"),
-                                     "messaggio": "rendita non in formato decimale con punto: non proposta"})
+        for c_imp in ("rendita", "reddito_dominicale"):
+            if c_imp in campi:
+                try:
+                    V.parse_importo(campi[c_imp])
+                except V.ValoreNonValido:
+                    segnalazioni.append({"codice": "IMPORTO_NON_VALIDO", "chiave": k, "valore": campi.pop(c_imp),
+                                         "messaggio": f"{c_imp.replace('_', ' ')} non in formato decimale con punto: non proposta"})
         segnalazioni.append({"codice": "SITUAZIONE_AL_DECESSO", "chiave": k,
                              "messaggio": "titolarita' catastale da verificare alla data del decesso; "
                                           "l'acquisizione non prova la proprieta' ne' agevolazioni"})
-        non_mappati = sorted(c for c in ("reddito_dominicale", "reddito_agrario", "classe", "consistenza",
-                                         "superficie", "qualita", "indirizzo", "partita") if im.get(c))
+        non_mappati = sorted(c for c in ("reddito_agrario", "superficie", "qualita", "partita")
+                             + (("reddito_dominicale",) if im["catasto"] == "F" else ("classe",)) if im.get(c))
         if non_mappati:
             segnalazioni.append({"codice": "CAMPI_SENZA_DESTINAZIONE", "chiave": k, "campi": non_mappati,
                                  "messaggio": "dati restituiti senza campo corrispondente nel modello: conservati "
@@ -407,7 +417,8 @@ class CatastoEntratelAdattatore:
     def _registra_pagina(self, job_id: str, resp: RispostaCatasto, *, modalita: str = "trasporto") -> None:
         j = self.job.leggi(job_id, TIPO_JOB)
         r = j["risultato"]
-        art = self.deposito.salva_bytes(resp.originale or b"", f"risultanze_p{r.get('pagine', 0) + 1}.json",
+        est = ".pdf" if (resp.originale or b"")[:5] == b"%PDF-" else ".json"
+        art = self.deposito.salva_bytes(resp.originale or b"", f"risultanze_p{r.get('pagine', 0) + 1}{est}",
                                         "risultanze_originali", formato=resp.formato or "sconosciuto")
         grezzi = list(r.get("grezzi", [])) + list(resp.immobili)
         imm, segn = normalizza(grezzi)
@@ -428,12 +439,38 @@ class CatastoEntratelAdattatore:
         if stato == CARICATO_MANUALMENTE:
             patch["completezza"] = {"completo": False, "dichiarato_dal_file": True,
                                     "motivo": "completezza dichiarata dal file inserito a mano, non confermata da Entratel"}
-        self.job.transizione(job_id, APERTI, stato, patch=patch, nota=f"pagina {patch['pagine']} acquisita")
+        # piu' file caricati a mano nella stessa lavorazione (es. fabbricati e poi terreni): si sommano
+        da = APERTI + ((CARICATO_MANUALMENTE, PARZIALE) if modalita == "registrazione_manuale" else ())
+        self.job.transizione(job_id, da, stato, patch=patch, nota=f"pagina {patch['pagine']} acquisita")
 
     def registra_originale(self, job_id: str, contenuto: bytes, *, formato: str, fonte: str) -> RisultatoAdattatore:
         """Continuita' operativa: l'utente registra il file scaricato da Entratel. Viene sempre conservato; e' letto
         solo se nel formato interno (il convertitore del formato reale e' da collaudare)."""
         j = self.job.leggi(job_id, TIPO_JOB)
+        if contenuto[:5] == b"%PDF-":
+            from .visura_pdf import leggi as leggi_pdf
+            try:
+                letto = leggi_pdf(contenuto)
+            except DatiNonValidi as e:
+                letto, motivo = None, e.messaggio if hasattr(e, "messaggio") else str(e)
+            if letto is not None:
+                resp = RispostaCatasto("risultati", immobili=letto["immobili"], originale=contenuto, formato=letto["formato"],
+                                       completo=False, limiti=letto["limiti"],
+                                       provenienza={"fonte": fonte, "codice_fiscale": letto["codice_fiscale"],
+                                                    "provincia": letto["provincia"], "data_ricerca": letto["data"],
+                                                    "aggiornamento": letto["aggiornamento"],
+                                                    "segnalazioni_lettura": letto["segnalazioni"]})
+                self._registra_pagina(job_id, resp, modalita="registrazione_manuale")
+                return self.leggi(job_id)
+            art = self.deposito.salva_bytes(contenuto, "risultanze_originali.pdf", "risultanze_originali",
+                                            formato="pdf", fonte=fonte)
+            self.job.transizione(job_id, None, None, patch={
+                "originali": j["risultato"].get("originali", []) + [art],
+                "azione_richiesta": f"File conservato (sha256 {art['sha256']}): PDF non riconosciuto come «Risultanze "
+                                    f"catastali» di Entratel ({motivo}). Inserire gli immobili a mano, o fornire il PDF per "
+                                    "estendere il convertitore."},
+                nota="originale conservato, PDF non riconosciuto")
+            return self.leggi(job_id)
         if formato != FORMATO_INTERNO:
             art = self.deposito.salva_bytes(contenuto, "risultanze_originali", "risultanze_originali",
                                             formato=formato, fonte=fonte)

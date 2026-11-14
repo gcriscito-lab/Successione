@@ -1,0 +1,39 @@
+<!-- Illustrazione per lo stato vuoto (beni), generata il 14/11/2026 con Higgsfield (modello gpt_image_2_6, uscita SVG) nella palette del programma. -->
+<svg viewBox="0 0 1168 880" fill="none" xmlns="http://www.w3.org/2000/svg" width="1168" height="880">
+  <title>Mappa catastale</title>
+  <defs>
+    <clipPath id="map-boundary">
+      <path d="M300 238C359 206 429 202 492 209C563 217 598 251 678 255C743 260 803 244 850 277C905 316 921 391 906 460C892 529 860 591 804 632C750 671 697 677 629 669C558 661 515 671 449 680C368 691 291 683 250 636C211 591 223 528 217 476C206 387 226 280 300 238Z" />
+    </clipPath>
+  </defs>
+  <g id="cadastral-map" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <g clip-path="url(#map-boundary)">
+      <path d="M300 238C359 206 429 202 492 209C563 217 598 251 678 255C743 260 803 244 850 277C905 316 921 391 906 460C892 529 860 591 804 632C750 671 697 677 629 669C558 661 515 671 449 680C368 691 291 683 250 636C211 591 223 528 217 476C206 387 226 280 300 238Z" fill="#DDEBE3" />
+      <g id="surrounding-parcels" stroke="#1F2A2A">
+        <path d="M401 198L332 390L206 378" />
+        <path d="M332 390L295 503C262 494 237 497 211 506" />
+        <path d="M568 206L535 328" />
+        <path d="M806 243L784 338" />
+        <path d="M750 492L909 518" />
+        <path d="M340 569L285 689" />
+        <path d="M510 613L486 691" />
+      </g>
+      <g id="map-roads" fill="#F6F7F4" stroke="#1F2A2A">
+        <path d="M447 193L413 311Q408 327 425 328C572 335 744 332 923 350L925 386C751 367 577 367 418 360Q398 359 391 380L343 505Q337 522 354 529C429 562 506 578 600 586C691 594 770 597 843 645L809 673C744 630 672 631 585 621C489 611 403 595 327 561C286 542 255 544 211 566L207 530C241 512 268 510 295 515L409 193Z" />
+      </g>
+      <g id="selected-parcels" fill="#DDEBE3" stroke="#2F6B57">
+        <path d="M419 360L586 365L518 572C458 562 402 548 354 529Q337 522 343 505L391 380Q398 359 419 360Z" />
+        <path d="M586 365L782 374L731 609C688 596 643 591 600 586C572 583 544 579 518 572Z" />
+      </g>
+    </g>
+    <g id="house" stroke="#2F6B57" fill="#F6F7F4">
+      <path d="M687 457V418H708V473" />
+      <path d="M598 467L660 419L723 467H712V532H610V467Z" />
+      <path d="M647 532V490H675V532" />
+    </g>
+    <g id="location-pin">
+      <path d="M684 382C684 394 660 419 660 419C660 419 636 394 636 382C636 368 647 357 660 357C673 357 684 368 684 382Z" fill="#A86A12" />
+      <circle cx="660" cy="381" r="8" fill="#F6F7F4" />
+    </g>
+  </g>
+</svg>

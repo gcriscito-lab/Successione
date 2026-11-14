@@ -279,7 +279,7 @@ def preferenze(cartella_dati: Path | str | None = None) -> dict:
 # Voci del file di configurazione copiate nel backup (elenco chiuso): percorsi degli strumenti, aspetto, profilo dello studio e
 # preferenze. Escluse le chiavi non note (potrebbero contenere qualunque cosa, anche segreti scritti a mano) e
 # SUCCESSIONI_DATA (dopo un ripristino punterebbe alla vecchia cartella dei dati).
-VOCI_BACKUP = frozenset(k for k in CHIAVI if k != "SUCCESSIONI_DATA") | {"interfaccia", "profilo", "preferenze", "intestazione"}
+VOCI_BACKUP = frozenset(k for k in CHIAVI if k != "SUCCESSIONI_DATA") | {"interfaccia", "profilo", "preferenze", "intestazione", "rubrica"}
 
 
 def contenuto_per_backup(contenuto) -> dict | None:
@@ -366,6 +366,82 @@ def intestazione_studio(cartella_dati: Path | str | None = None) -> dict:
     if not out["nome"]:
         out["nome"] = nome_studio(cartella_dati)
     return out
+
+
+# Rubrica dello studio (14/11/2026): intermediari, delegati e presentatori ricorrenti da scegliere nelle pratiche invece di
+# riscriverli. Solo nome, codice fiscale, ruolo e una nota: mai credenziali.
+RUOLI_RUBRICA = ("intermediario", "delegato", "presentatore", "altro")
+CHIAVI_RUBRICA = ("id", "nome", "codice_fiscale", "ruolo", "note")
+MASSIMO_RUBRICA = 200
+
+
+def _valida_rubrica(voci) -> list[dict]:
+    if not isinstance(voci, list):
+        raise DatiNonValidi("rubrica: attesa una lista di voci")
+    if len(voci) > MASSIMO_RUBRICA:
+        raise DatiNonValidi(f"rubrica: al massimo {MASSIMO_RUBRICA} voci")
+    out, visti = [], set()
+    for n, v in enumerate(voci, 1):
+        if not isinstance(v, dict):
+            raise DatiNonValidi(f"rubrica, voce {n}: atteso un oggetto")
+        ignoti = set(v) - set(CHIAVI_RUBRICA)
+        if ignoti:
+            raise DatiNonValidi(f"rubrica, voce {n}: campo sconosciuto {sorted(ignoti)[0]!r}", ammessi=list(CHIAVI_RUBRICA))
+        def testo(k, massimo, obbligatorio=False):
+            x = v.get(k)
+            if x in (None, ""):
+                if obbligatorio:
+                    raise DatiNonValidi(f"rubrica, voce {n}: {k} obbligatorio", campo=k)
+                return ""
+            if not isinstance(x, str) or _CONTROLLO.search(x) or len(x.strip()) > massimo:
+                raise DatiNonValidi(f"rubrica, voce {n}, {k}: testo su una riga di al massimo {massimo} caratteri", campo=k)
+            return " ".join(x.split())
+        nome = testo("nome", 120, True)
+        cf = testo("codice_fiscale", 16, True).upper()
+        if not re.fullmatch(r"[0-9]{11}|[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]", cf):
+            raise DatiNonValidi(f"rubrica, voce {n} ({nome}): codice fiscale di 16 caratteri o numero di 11 cifre", campo="codice_fiscale")
+        ruolo = v.get("ruolo") or "altro"
+        if ruolo not in RUOLI_RUBRICA:
+            raise DatiNonValidi(f"rubrica, voce {n}: ruolo non ammesso", ammessi=list(RUOLI_RUBRICA))
+        vid = v.get("id")
+        if not (isinstance(vid, str) and re.fullmatch(r"r_[0-9a-f]{8}", vid)) or vid in visti:
+            import uuid
+            vid = "r_" + uuid.uuid4().hex[:8]
+        visti.add(vid)
+        out.append({"id": vid, "nome": nome, "codice_fiscale": cf, "ruolo": ruolo, "note": testo("note", 200)})
+    return out
+
+
+def rubrica(cartella_dati: Path | str | None = None) -> list[dict]:
+    """Voci della rubrica dello studio (lista vuota se non ce ne sono o se il file non si legge)."""
+    env = os.environ.get("SUCCESSIONI_CONFIG")
+    f = Path(env) if env else (Path(cartella_dati) / "configurazione.json" if cartella_dati else file_configurazione())
+    try:
+        d = json.loads(f.read_text(encoding="utf-8-sig"))
+        return _valida_rubrica(d.get("rubrica", []) or []) if isinstance(d, dict) else []
+    except (OSError, ValueError, DatiNonValidi):
+        return []
+
+
+def salva_rubrica(voci) -> list[dict]:
+    """Sostituisce l'intera rubrica (tutto o niente). Restituisce le voci salvate, con gli identificativi assegnati."""
+    nuove = _valida_rubrica(voci)
+    with _SALVATAGGIO:
+        contenuto = _leggi_file_stretto()
+        if nuove:
+            contenuto["rubrica"] = nuove
+        else:
+            contenuto.pop("rubrica", None)
+        destinazione = file_configurazione()
+        try:
+            destinazione.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=destinazione.parent, suffix=".tmp", delete=False) as fh:
+                json.dump(contenuto, fh, ensure_ascii=False, indent=2)
+                temp = Path(fh.name)
+            _sostituisci(temp, destinazione)
+        except OSError as e:
+            raise DatiNonValidi(f"impossibile scrivere il file di configurazione {destinazione}: {e}") from None
+    return nuove
 
 
 def nome_studio(cartella_dati: Path | str | None = None) -> str:

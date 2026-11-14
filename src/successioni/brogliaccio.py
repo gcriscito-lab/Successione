@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import io
 import re
+from decimal import Decimal, InvalidOperation
 from fractions import Fraction
 from html import escape
 
@@ -187,26 +188,128 @@ def _per_stampa(righe_t: list[dict]) -> list[dict]:
     return out
 
 
-def html(dati: dict, *, titolo: str, revisione: int | None = None) -> str:
-    """Pagina stampabile (Stampa > Salva come PDF dal browser)."""
+#: colonne della tabella dei beni nella stampa: (chiave, intestazione breve, nome intero nel suggerimento, numerica)
+COLONNE_STAMPA = [("descrizione", "Bene", "Descrizione o indirizzo del bene", False),
+                  ("comune", "Comune", "Comune (provincia) e codice comune", False),
+                  ("sezione", "Sez.", "Sezione", False), ("foglio", "Fg.", "Foglio", False), ("particella", "Part.", "Particella", False),
+                  ("subalterno", "Sub.", "Subalterno", False), ("categoria", "Cat.", "Categoria", False), ("classe", "Cl.", "Classe", False),
+                  ("consistenza", "Cons.", "Consistenza", True),
+                  ("rendita", "Rendita / R.D.", "Rendita catastale o reddito dominicale", True),
+                  ("diritto", "Diritto", "Diritto del defunto", False), ("quota_defunto", "Quota", "Quota del defunto", True),
+                  ("valore", "Valore", "Valore dichiarato (euro)", True), ("data_visura", "Visura", "Data della visura catastale", False)]
+
+
+def _decimale(v: str):
+    try:
+        return Decimal(str(v).strip())
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _data_it(v: str) -> str:
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", (v or "").strip())
+    return f"{m.group(3)}/{m.group(2)}/{m.group(1)}" if m else (v or "")
+
+
+def _numero_it(v: str) -> str:
+    """«5.50» -> «5,50»: numero con la virgola decimale (consistenza); un testo che non e' un numero resta com'e'."""
+    return v.replace(".", ",") if re.fullmatch(r"\d+\.\d+", (v or "").strip()) else (v or "")
+
+
+def _diritto_breve(v: str) -> str:
+    """Descrizione del diritto senza codice e con gli accenti: «1» -> «Proprietà»."""
+    from . import carta_intestata as CI
+    return CI.accenti(_diritto_leggibile(v).split(" - ", 1)[-1]) if v else ""
+
+
+def html(dati: dict, *, titolo: str, revisione: int | None = None, studio: dict | str | None = None, oggi=None) -> str:
+    """Pagina stampabile su carta intestata, A4 orizzontale (Stampa > Salva come PDF dal browser). Stessi dati di ``righe``:
+    nessun calcolo d'imposta; i totali per quadro sono la somma dei valori inseriti, solo da leggere."""
+    from . import carta_intestata as CI
+    from .quadri import PER_ID
+    e = escape
+    st = studio if isinstance(studio, dict) else {"nome": studio or ""}
     r = righe(dati)
-    r = {k: _per_stampa(v) for k, v in r.items()}
+    n_col = len(COLONNE_STAMPA)
 
-    def tabella(intest: list[str], righe_t: list[dict]) -> str:
-        th = "".join(f"<th>{escape(c.replace('_', ' '))}</th>" for c in intest)
-        trs = "".join("<tr>" + "".join(f"<td{' class=n' if c in COLONNE_NUMERICHE else ''}>{escape(str(x.get(c, '')))}</td>"
-                                       for c in intest) + "</tr>" for x in righe_t)
-        return f"<table><thead><tr>{th}</tr></thead><tbody>{trs or '<tr><td colspan=99>nessuna riga</td></tr>'}</tbody></table>"
+    # --- beni, raggruppati per quadro, con il totale dei valori inseriti
+    gruppi: dict[str, list[tuple[dict, dict]]] = {}
+    for riga, b in zip(r["beni"], dati.get("beni", [])):
+        gruppi.setdefault(riga["quadro"] or "", []).append((riga, b))
+    th = "".join(f'<th{" class=n" if num else ""} title="{e(lungo)}">{e(breve)}</th>' for _, breve, lungo, num in COLONNE_STAMPA)
+    corpo_beni, totale, parziale = [], Decimal(0), False
+    for qd, elenco in gruppi.items():
+        nome_q = (PER_ID.get(qd) or {}).get("titolo", "")
+        corpo_beni.append(f'<tr class="gruppo"><td colspan="{n_col}">{e(qd)} {e(nome_q)}</td></tr>')
+        somma, incompleta = Decimal(0), False
+        for riga, b in elenco:
+            desc = _testo(_campo(dati, "beni", b, "descrizione")) or _testo(_campo(dati, "beni", b, "indirizzo"))
+            if not desc:
+                desc = riga["bene"] if not riga.get("foglio") else (riga.get("tipo") or "").capitalize()
+            comune = e(riga.get("comune", "")) + (f" ({e(riga['provincia'])})" if riga.get("provincia") else "")
+            if riga.get("codice_comune"):
+                comune += f'<div class="dett mono">{e(riga["codice_comune"])}</div>'
+            celle = {"descrizione": e(desc) or "&nbsp;", "comune": comune,
+                     "consistenza": e(_numero_it(riga.get("consistenza", ""))),
+                     "rendita": e(_importo_it(riga.get("rendita") or riga.get("reddito_dominicale") or "")),
+                     "diritto": e(_diritto_breve(riga.get("diritto", ""))),
+                     "valore": e(_importo_it(riga.get("valore", ""))),
+                     "data_visura": e(_data_it(riga.get("data_visura", "")))}
+            v = _decimale(riga.get("valore", ""))
+            if v is None:
+                incompleta = True
+            else:
+                somma += v
+            tds = "".join(f'<td{" class=n" if num else ""}>{celle[k] if k in celle else e(str(riga.get(k, "")))}</td>'
+                          for k, _, _, num in COLONNE_STAMPA)
+            corpo_beni.append(f"<tr>{tds}</tr>")
+        nota = " (alcuni valori non indicati)" if incompleta else ""
+        corpo_beni.append(f'<tr class="subtot"><td colspan="{n_col - 2}">Totale {e(qd)}{nota}</td>'
+                          f'<td class="n">{e(_importo_it(str(somma)))}</td><td></td></tr>')
+        totale += somma
+        parziale = parziale or incompleta
+    if corpo_beni:
+        corpo_beni.append(f'<tr class="tot"><td colspan="{n_col - 2}">Totale dei beni'
+                          f'{" (alcuni valori non indicati)" if parziale else ""}</td>'
+                          f'<td class="n">{e(_importo_it(str(totale)))}</td><td></td></tr>')
+    tab_beni = (f'<table class="beni"><thead><tr>{th}</tr></thead><tbody>'
+                + ("".join(corpo_beni) or f'<tr><td colspan="{n_col}">Nessun bene.</td></tr>') + "</tbody></table>")
 
-    sotto = f" · revisione {revisione}" if revisione is not None else ""
-    return ("<!doctype html><html lang=it><head><meta charset=utf-8><title>Brogliaccio · " + escape(titolo) + "</title><style>"
-            "body{font:12px/1.4 system-ui,sans-serif;margin:16px;color:#111}h1{font-size:18px}h2{font-size:14px;margin-top:18px}"
-            "table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:2px 4px;text-align:left;vertical-align:top}"
-            "td.n{text-align:right;font-variant-numeric:tabular-nums}"
-            "th{background:#eee}@media print{h2{break-after:avoid}tr{break-inside:avoid}}</style></head><body>"
-            f"<h1>Brogliaccio · {escape(titolo)}</h1><p>Documento di lavoro dello studio{escape(sotto)}: dati come inseriti nella "
-            "pratica, senza calcoli d'imposta. Non sostituisce la dichiarazione.</p>"
-            "<h2>Beni</h2>" + tabella([c for c in COLONNE_BENI if c != "tipo"], r["beni"])
-            + "<h2>Quote per bene</h2>" + tabella(COLONNE_QUOTE, r["quote"])
-            + "<h2>Soggetti</h2>" + tabella(["soggetto", "codice_fiscale", "ruolo", "beni", "dettaglio"], r["soggetti"])
-            + "</body></html>")
+    # --- quote, raggruppate per bene e diritto, con l'esito della somma
+    righe_q, prec = [], None
+    for q in r["quote"]:
+        k = (q["quadro"], q["bene"], codice_diritto(q["diritto"]))
+        if k != prec:
+            prec = k
+            ok = q["esito"] == "completa"
+            dir_ = _diritto_breve(q["diritto"]) or "diritto non indicato"
+            righe_q.append(f'<tr class="gruppo"><td colspan="2">{e(q["quadro"])} – {e(q["bene"])} – {e(dir_)}</td>'
+                           f'<td class="n">somma {e(q["somma_quote_bene_diritto"])}</td>'
+                           f'<td><span class="esito {"ok" if ok else "no"}">{e(q["esito"])}</span></td></tr>')
+        righe_q.append(f'<tr><td>{e(q["soggetto"])}</td><td class="mono">{e(q["codice_fiscale"])}</td>'
+                       f'<td class="n">{e(q["quota"])}</td><td></td></tr>')
+    tab_quote = ('<table class="quote"><thead><tr><th>Soggetto</th><th>Codice fiscale</th><th class="n">Quota</th>'
+                 '<th>Esito</th></tr></thead><tbody>' + ("".join(righe_q) or '<tr><td colspan="4">Nessuna devoluzione.</td></tr>')
+                 + "</tbody></table>")
+
+    # --- soggetti
+    righe_s = "".join(f'<tr><td>{e(x["soggetto"])}</td><td class="mono">{e(x["codice_fiscale"])}</td><td>{e(x["ruolo"])}</td>'
+                      f'<td class="n">{x["beni"]}</td><td class="dett">{e(CI.accenti(x["dettaglio"]))}</td></tr>'
+                      for x in r["soggetti"])
+    tab_sogg = ('<table class="sogg"><thead><tr><th>Soggetto</th><th>Codice fiscale</th><th>Ruolo</th><th class="n">Beni</th>'
+                '<th>Dettaglio</th></tr></thead><tbody>' + (righe_s or '<tr><td colspan="5">Nessun soggetto.</td></tr>')
+                + "</tbody></table>")
+
+    css = (".beni{font-size:12.5px}.beni th,.beni td{padding:5px 6px}.beni td:first-child{width:26%}.beni td:nth-child(2){white-space:nowrap}"
+           ".beni tr.subtot td{font-weight:700;color:var(--t2);border-bottom:1px solid var(--inchiostro)}"
+           ".quote,.sogg{font-size:13px}.quote td,.sogg td{padding:5px 8px}.quote{width:auto;min-width:60%}.quote td:first-child,.sogg td:first-child{white-space:nowrap}.quote td:nth-child(2){padding-right:32px}"
+           ".esito{display:inline-block;padding:0 8px;border-radius:10px;font-size:12px;font-weight:700}"
+           ".esito.ok{background:var(--casella);color:var(--verde)}.esito.no{background:#FBECEB;color:var(--rosso)}"
+           ".gruppo td{font-size:12.5px}")
+    rif = ["Brogliaccio di lavoro", f"del {CI.data_it(oggi)}",
+           titolo + (f", revisione {revisione}" if revisione is not None else "")]
+    corpo = (f'<h1>{e(titolo)}</h1><p class="sotto">Dati come inseriti nella pratica, senza calcoli d’imposta. Documento di '
+             "lavoro dello studio: non sostituisce la dichiarazione.</p>"
+             f"<h2>Beni</h2>{tab_beni}<h2>Quote per bene</h2>{tab_quote}<h2>Soggetti</h2>{tab_sogg}")
+    return CI.pagina(titolo_finestra=f"Brogliaccio - {titolo}", studio=st, riferimento=rif, corpo=corpo, orizzontale=True,
+                     css_extra=css)

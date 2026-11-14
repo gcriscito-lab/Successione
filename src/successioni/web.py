@@ -395,12 +395,12 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     @api
     async def prospetto_cliente_api(request):
         """Riepilogo stampabile per gli eredi, letto dall'ultimo file generato (stessi importi della dichiarazione)."""
-        from . import impostazioni
+        from . import carta_intestata
         from .prospetto_cliente import html as prospetto_html
         pid = request.path_params["pid"]
         xml, j = sv.file_export(pid)
         stato = sv.stato_elaborati(pid)["export"]
-        studio = impostazioni.nome_studio(sv.arch.base)
+        studio = carta_intestata.dati_studio(sv.arch.base)
         return HTMLResponse(prospetto_html(xml, titolo=sv.leggi(pid)["titolo"], studio=studio, revisione=j["input"]["revisione"],
                                            completo=bool(j["risultato"].get("completo")), obsoleto=stato.get("stato") == "obsoleto"),
                             headers={"Cache-Control": "no-store"})
@@ -417,7 +417,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     async def brogliaccio_html(request):
         from . import brogliaccio as BR
         d = sv.leggi(request.path_params["pid"])
-        return HTMLResponse(BR.html(d["dati"], titolo=d["titolo"], revisione=d["revisione"]), headers={"Cache-Control": "no-store"})
+        from . import carta_intestata
+        return HTMLResponse(BR.html(d["dati"], titolo=d["titolo"], revisione=d["revisione"],
+                                    studio=carta_intestata.dati_studio(sv.arch.base)), headers={"Cache-Control": "no-store"})
 
     @api
     async def diagnosi_api(request):
@@ -471,9 +473,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
 
     @api
     async def preventivo_api(request):
-        from . import impostazioni
+        from . import carta_intestata
         from .preventivo import html as prev_html
-        studio = impostazioni.nome_studio(sv.arch.base)
+        studio = carta_intestata.dati_studio(sv.arch.base)
         testo = prev_html(sv, request.path_params["pid"], request.query_params.get("tipo", "preventivo"), studio)
         return HTMLResponse(testo, headers={"Cache-Control": "no-store"})
 
@@ -648,6 +650,53 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                                      tipo=q["tipo"], esito=q.get("esito") or None)
 
     @api
+    async def visure(request):
+        """Immobili dalla visura: GET stato e proposta; POST il PDF delle Risultanze catastali (corpo grezzo, ?nome=)."""
+        pid = request.path_params["pid"]
+        if request.method == "GET":
+            return sv.visura_stato(pid)
+        nome = nome_file_valido(request.query_params.get("nome") or "visura.pdf")
+        return sv.visura_carica(pid, await corpo_limitato(request, LIMITE_RICEVUTA, "visura"), nome=nome)
+
+    @api
+    async def rubrica_api(request):
+        """Rubrica dello studio: GET le voci; POST {voci} sostituisce l'intera rubrica."""
+        from . import impostazioni
+        if request.method == "GET":
+            return {"voci": impostazioni.rubrica(sv.arch.base)}
+        b = await request.json() if (await request.body()) else {}
+        return {"voci": impostazioni.salva_rubrica(b.get("voci", []))}
+
+    @api
+    async def ricevute_cartella_api(request):
+        """Documenti della successione nella cartella dei download (solo i nomi da documento dell'Agenzia vengono aperti)."""
+        return sv.ricevute_cerca(request.query_params.get("cartella") or None)
+
+    @api
+    async def ricevuta_da_cartella_api(request):
+        b = await request.json() if (await request.body()) else {}
+        return sv.ricevuta_da_cartella(request.path_params["pid"], str(b.get("file") or ""), cartella=b.get("cartella") or None,
+                                       tipo=b.get("tipo") or None)
+
+    @api
+    async def duplica_api(request):
+        b = await request.json() if (await request.body()) else {}
+        return sv.duplica_pratica(request.path_params["pid"], b.get("titolo"), chiave=b.get("chiave"))
+
+    @api
+    async def ordina_beni_api(request):
+        b = await request.json() if (await request.body()) else {}
+        return sv.ordina_beni(request.path_params["pid"], int(b.get("revisione_attesa", -1)), str(b.get("quadro") or ""),
+                              chiave=b.get("chiave"))
+
+    @api
+    async def visure_applica(request):
+        import json
+        b = json.loads(await corpo_limitato(request, 200_000, "scelta degli immobili") or b"{}")
+        return sv.visura_applica(request.path_params["pid"], int(b.get("revisione_attesa", -1)), b.get("selezione") or [],
+                                 chiave=b.get("chiave"))
+
+    @api
     async def ricevuta_file(request):
         from .collegamenti.base import DepositoArtefatti
         pid, tid = request.path_params["pid"], request.path_params["tid"]
@@ -667,7 +716,7 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
     threading.Thread(target=pulisci_silenziosa, args=(sv.arch.base,), daemon=True, name="pulizia-avvio").start()
     return Starlette(middleware=[Middleware(IntestazioniSicurezza)], routes=[
         Route("/api/codice-fiscale", cf_decodifica), Route("/api/codice-comune", codice_comune_api), Route("/api/calcolatrice", calcolatrice_api, methods=["POST"]), Route("/api/importa", importa, methods=["POST"]),
-        Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
+        Route("/api/ricevute-cartella", ricevute_cartella_api), Route("/api/rubrica", rubrica_api, methods=["GET", "POST"]), Route("/api/pulizia", pulizia_api, methods=["POST"]), Route("/api/diagnosi", diagnosi_api, methods=["POST"]), Route("/api/backup", backup_elenco), Route("/api/backup", backup_crea, methods=["POST"]),
         Route("/api/impostazioni", impostazioni_leggi), Route("/api/impostazioni", impostazioni_salva, methods=["POST"]),
         Route(P + "/invio", invio_stato), Route(P + "/invio/prepara", invio_prepara, methods=["POST"]),
         Route(P + "/ricevute/{tid}", ricevute, methods=["GET", "POST"]),
@@ -690,6 +739,9 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/controllo-ufficiale", controllo_ufficiale_api, methods=["POST"]),
         Route(P + "/controllo-ufficiale/diagnostico", diagnostico_controllo, methods=["POST"]), Route(P + "/verifica", verifica),
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
+        Route(P + "/duplica", duplica_api, methods=["POST"]),
+        Route(P + "/ricevute/da-cartella", ricevuta_da_cartella_api, methods=["POST"]), Route(P + "/ordina-beni", ordina_beni_api, methods=["POST"]),
+        Route(P + "/visure", visure, methods=["GET", "POST"]), Route(P + "/visure/applica", visure_applica, methods=["POST"]),
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),
         Route("/api/allegati/{aid}/elimina", elimina_allegato_api, methods=["POST"]),
         Route(P + "/allegati/riordina", riordina_allegati_api, methods=["POST"]),

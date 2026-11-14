@@ -81,7 +81,7 @@ def imposte_dal_file(sv, pid: str) -> dict | None:
             "incompleto": j["input"].get("scopo") == "bozza_tecnica" or not j["risultato"].get("completo")}
 
 
-def html(sv, pid: str, tipo: str, studio: str = "") -> str:
+def html(sv, pid: str, tipo: str, studio: str | dict = "") -> str:
     if tipo not in TIPI:
         raise DatiNonValidi("tipo di documento: preventivo o parcella")
     p = sv.leggi(pid)
@@ -118,22 +118,24 @@ def html(sv, pid: str, tipo: str, studio: str = "") -> str:
                             for t, v in imp["righe"])
             tot = f"<tr class='tot'><td>Totale imposte da versare con la dichiarazione</td><td class='n'>{_euro(Decimal(imp['totale']))}</td></tr>" \
                 if imp["totale"] is not None else ""
-            avviso = (" <b>Il file non e' aggiornato alle ultime modifiche.</b>" if imp["obsoleto"] else "") + (
-                " <b>Il file e' una bozza o e' incompleto: le imposte possono essere parziali.</b>" if imp.get("incompleto") else "")
+            avviso = (" <b>Il file non è aggiornato alle ultime modifiche.</b>" if imp["obsoleto"] else "") + (
+                " <b>Il file è una bozza o è incompleto: le imposte possono essere parziali.</b>" if imp.get("incompleto") else "")
             blocco_imp = (f"<h2>Imposte della dichiarazione (per conto del cliente)</h2><table>{r_imp}{tot}</table>"
                           f"<p class='mut'>Dal file generato (revisione {imp['revisione']}); sommate a parte, non fanno parte dei compensi.{avviso}</p>")
     intest = e(str(prev.get("intestatario") or "").strip())
     nota = e(str(prev.get("nota") or "").strip())
-    return f"""<!doctype html><html lang="it"><head><meta charset="utf-8"><title>{nome} - {e(p['titolo'])}</title>
-<style>body{{font:14px/1.45 system-ui,sans-serif;color:#1d1d1f;background:#fff;max-width:760px;margin:24px auto;padding:0 16px}}
-h1{{font-size:22px;margin:0}}h2{{font-size:15px;margin:22px 0 6px}}table{{width:100%;border-collapse:collapse}}
-td{{padding:5px 6px;border-bottom:1px solid #ddd}}td.n{{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}}
-tr.tot td{{font-weight:600;border-top:2px solid #999}}.mut{{color:#555;font-size:12.5px}}.testa{{display:flex;justify-content:space-between;gap:16px}}
-@media print{{body{{margin:0}}}}</style></head><body>
-<div class="testa"><div><h1>{nome}{(' n. ' + e(numero)) if numero else ''}</h1><div>{e(studio)}</div></div><div>Data: {e(data_it)}</div></div>
-<p>Pratica: <b>{e(p['titolo'])}</b>{('<br>Intestato a: ' + intest) if intest else ''}</p>
-<h2>Compensi</h2><table>{righe}</table><table>{tab_somme}</table>
+    from . import carta_intestata as CI
+    st = studio if isinstance(studio, dict) else {"nome": studio or ""}
+    css = ("table.voci td{padding:7px 8px}tr.tot td{font-weight:700;border-top:1px solid var(--inchiostro)}"
+           ".cliente{margin:22px 0 0;display:grid;grid-template-columns:max-content 1fr;gap:2px 14px;font-size:14px}"
+           ".cliente dt{color:var(--t2)}.cliente dd{margin:0}")
+    cliente = f"<dt>Pratica</dt><dd><b>{e(p['titolo'])}</b></dd>" + (f"<dt>Intestato a</dt><dd>{intest}</dd>" if intest else "")
+    corpo = f"""<h1>{nome}{(' n. ' + e(numero)) if numero else ''}</h1>
+<dl class="cliente">{cliente}</dl>
+<h2>Compensi</h2><table class="voci"><thead><tr><th>Voce</th><th class="n">Importo</th></tr></thead><tbody>{righe}{tab_somme}</tbody></table>
 {blocco_imp}
-{('<p>' + nota + '</p>') if nota else ''}
-<p class="mut">Documento di studio{', non una fattura' if tipo == 'parcella' else ''}. Percentuali indicate dal professionista;
-il programma esegue solo le somme mostrate.</p></body></html>"""
+{('<p>' + nota + '</p>') if nota else ''}"""
+    return CI.pagina(titolo_finestra=f"{nome} - {p['titolo']}", studio=st,
+                     riferimento=[nome + ((' n. ' + numero) if numero else ''), f"del {data_it}"], corpo=corpo, css_extra=css,
+                     piede=f"Documento di studio{', non una fattura' if tipo == 'parcella' else ''}. Percentuali indicate dal "
+                           "professionista; il programma esegue solo le somme mostrate.")

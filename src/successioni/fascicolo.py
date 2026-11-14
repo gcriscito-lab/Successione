@@ -81,7 +81,8 @@ def _documenti(sv, pid: str) -> tuple[list[tuple[str, bytes]], list[str]]:
     return docs, assenti
 
 
-def _copertina(titolo: str, docs: list[tuple[str, int]], assenti: list[str]) -> bytes:
+def _copertina(titolo: str, docs: list[tuple[str, int]], assenti: list[str], studio: list[str] | None = None) -> bytes:
+    """Copertina con la carta intestata dello studio (stesse righe delle altre stampe, ``carta_intestata.righe_studio``)."""
     out = io.BytesIO()
     c = canvas.Canvas(out, pagesize=A4)
     larg, alt = A4
@@ -95,6 +96,17 @@ def _copertina(titolo: str, docs: list[tuple[str, int]], assenti: list[str]) -> 
         c.drawString(20 * mm + rientro, y, testo[:110])
         y -= dim * 0.5 * mm + 3 * mm
 
+    if studio:
+        c.setFillColorRGB(0x2F / 255, 0x6B / 255, 0x57 / 255)
+        riga(studio[0], 12, True)
+        c.setFillColorRGB(0x55 / 255, 0x61 / 255, 0x5F / 255)
+        for r in studio[1:]:
+            riga(r, 8.5)
+        c.setFillColorRGB(0, 0, 0)
+        c.setStrokeColorRGB(0x2F / 255, 0x6B / 255, 0x57 / 255)
+        c.setLineWidth(1.2)
+        c.line(20 * mm, y + 2 * mm, larg - 20 * mm, y + 2 * mm)
+        y -= 8 * mm
     riga("Fascicolo per il cliente", 18, True)
     riga(titolo, 12)
     riga("Preparato il " + datetime.now().strftime("%d/%m/%Y alle %H:%M"), 9)
@@ -112,7 +124,7 @@ def _copertina(titolo: str, docs: list[tuple[str, int]], assenti: list[str]) -> 
         for a in assenti:
             riga(a, 9, rientro=4 * mm)
     y -= 6 * mm
-    riga("Raccolta dei documenti presenti nella pratica: non e' la dichiarazione da trasmettere.", 8)
+    riga("Raccolta dei documenti presenti nella pratica: non è la dichiarazione da trasmettere.", 8)
     c.save()
     return out.getvalue()
 
@@ -129,7 +141,9 @@ def fascicolo(sv, pid: str) -> tuple[bytes, dict]:
             assenti.append(f"{t}: PDF non leggibile ({type(e).__name__})")
     indice = [(t, len(r.pages)) for t, r in letti]
     w = PdfWriter()
-    cop = PdfReader(io.BytesIO(_copertina(titolo, indice, assenti)))
+    from . import carta_intestata as CI
+    studio = CI.righe_studio(CI.dati_studio(getattr(getattr(sv, "arch", None), "base", None)))
+    cop = PdfReader(io.BytesIO(_copertina(titolo, indice, assenti, studio)))
     for p in cop.pages:
         w.add_page(p)
     w.add_outline_item("Copertina e indice", 0)
