@@ -258,6 +258,23 @@ def _quota_defunto(im: dict, cf_defunto: str | None) -> tuple[dict | None, str |
     return quota, t.get("diritto"), segn
 
 
+def _codice_diritto(v) -> str:
+    """Codice del diritto come all'esportazione («proprieta» e «1» sono lo stesso diritto)."""
+    from ..telematico.esporta import codice_enum
+    try:
+        return codice_enum(str(v), "CodiciDiritto_Type", alias_descrizione=True)
+    except Exception:
+        return str(v)
+
+
+def _diritti_immobili() -> set[str]:
+    from .. import codici as C
+    try:
+        return {x["valore"] for x in C.voci("CodiciDirittoImmobili_Type")}
+    except Exception:          # tabella non leggibile: nessun filtro, decide il controllo all'esportazione
+        return set()
+
+
 def proponi_importazione(immobili: list[dict], dati_pratica: dict, *, cf_defunto: str | None = None,
                          selezione: list[str] | None = None) -> dict:
     """Confronta gli immobili acquisiti con i beni della pratica e propone operazioni per `Servizio.aggiorna`
@@ -288,6 +305,15 @@ def proponi_importazione(immobili: list[dict], dati_pratica: dict, *, cf_defunto
                  "reddito_dominicale": im.get("reddito_dominicale") if im["catasto"] == "T" else None}
         quota, diritto, s = _quota_defunto(im, cf_defunto)
         segnalazioni += s
+        ammessi = _diritti_immobili()
+        if diritto and ammessi and _codice_diritto(diritto) not in ammessi:
+            # lo schema SUC13 ammette per terreni e fabbricati solo i codici di CodiciDirittoImmobili_Type (non usufrutto,
+            # uso o abitazione): diritto e quota non si propongono, decide il professionista
+            segnalazioni.append({"codice": "DIRITTO_NON_AMMESSO_PER_IMMOBILI", "chiave": k, "diritto": diritto,
+                                 "messaggio": f"diritto «{diritto}» del defunto non ammesso per i beni immobili dalla tabella "
+                                              "CodiciDirittoImmobili_Type dello schema SUC13: diritto e quota non proposti, "
+                                              "da verificare"})
+            quota, diritto = None, None
         campi["quota_defunto"], campi["diritto"] = quota, diritto
         campi = {c: (str(v) if not isinstance(v, dict) else v) for c, v in campi.items() if v not in (None, "")}
         for c_imp in ("rendita", "reddito_dominicale"):

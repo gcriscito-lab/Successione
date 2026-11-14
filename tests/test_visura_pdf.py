@@ -84,6 +84,13 @@ def test_carica_proponi_e_applica_senza_doppioni(tmp_path):
     assert {i["esito"] for i in st["immobili"]} == {"nuovi"}
     codici = {s["codice"] for s in st["proposta"]["segnalazioni"]}
     assert "SITUAZIONE_AL_DECESSO" in codici and "LIMITE_DEL_SERVIZIO" in codici
+    # usufrutto del defunto su un fabbricato: codice non ammesso per gli immobili (CodiciDirittoImmobili_Type), non proposto
+    usufr = next(i["chiave"] for i in st["immobili"] if i.get("particella") == "318")
+    assert any(x["codice"] == "DIRITTO_NON_AMMESSO_PER_IMMOBILI" and x["chiave"] == usufr for x in st["proposta"]["segnalazioni"])
+    op = next(o for o in st["proposta"]["operazioni"] if o["campi"].get("particella") == "318")
+    assert "diritto" not in op["campi"] and "quota_defunto" not in op["campi"]
+    nuda = next(o for o in st["proposta"]["operazioni"] if o["campi"].get("particella") == "210")
+    assert nuda["campi"]["diritto"] == "2"
     scelti = [i["chiave"] for i in st["immobili"] if i["catasto"] == "F"][:2] + \
              [i["chiave"] for i in st["immobili"] if i["catasto"] == "T"][:1]
     rev = sv.leggi(pid)["revisione"]
