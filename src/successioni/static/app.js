@@ -778,13 +778,14 @@ async function renderAnteprima(main, q) {
   const pid = S.P.pratica_id;
   main.append(h("div", { class: "calcolato riquadro-calc" }, h("span", { class: "etich-calc" }, "calcolato"), " Il quadro " + q.id + " è calcolato dal programma con i dati salvati della pratica, come nel file della dichiarazione. " +
     (nMod() ? "Ci sono modifiche non salvate: salva per aggiornare questa vista." : "")));
-  const box = h("div", {}, h("p", { class: "mut" }, "Calcolo in corso…")); main.append(box);
+  const box = h("div", { class: q.id === "EH" ? "anteprima-eh" : null }, h("p", { class: "mut" }, "Calcolo in corso…")); main.append(box);
   let r;
   try { r = await api("/api/pratiche/" + pid + "/anteprima-quadri"); } catch (e) { box.replaceChildren(h("div", { class: "avv" }, e.message)); return; }
   if (!S.P || S.P.pratica_id !== pid || !quadro() || quadro().id !== q.id) return;
   box.replaceChildren();
   if (q.id === "EE") {
     if (!r.ee.length) box.append(h("p", { class: "mut" }, "Nessun totale calcolabile: vedi i motivi qui sotto."));
+    else if (r.ee_righi) box.append(prospettoEE(r.ee_righi));
     else box.append(h("div", { class: "tab piatta" }, h("table", {}, h("tbody", {}, r.ee.map(x => h("tr", { class: ["TotaleAttivo", "TotaleValoreAsseEreditarioNetto"].includes(x.campo) ? "fisso forte" : "fisso" },
       h("td", {}, VOCI_EE[x.campo] || x.campo), h("td", { class: "n" }, euroIt(x.valore, 2))))))));
   } else if (q.id === "EF") {
@@ -794,15 +795,84 @@ async function renderAnteprima(main, q) {
       h("tr", { class: "fisso forte" }, h("td", {}, "Totale da versare (EF19)"), h("td", { class: "n" }, r.ef.totale ? euroIt(r.ef.totale, 2) : "—")),
       r.ef.importo_da_versare && r.ef.importo_da_versare !== r.ef.totale ? h("tr", { class: "fisso" }, h("td", {}, "Importo da versare (frontespizio, con sanzioni e interessi)"), h("td", { class: "n" }, euroIt(r.ef.importo_da_versare, 2))) : null))));
   } else if (q.id === "EH") {
+    if (r.eh_dettaglio) box.append(...dettaglioEH(r.eh_dettaglio));
+    else {
     const sez1 = r.eh.filter(x => x.sezione === "SezioneI_DichSost"), altre = r.eh.filter(x => x.sezione !== "SezioneI_DichSost");
     box.append(h("section", { class: "grp" }, h("h2", {}, "Sezione I - Dichiarazioni sostitutive: cosa risulta dai dati"),
       sez1.length ? h("ul", { class: "spunte-eh" }, sez1.map(x => h("li", {}, "☑ " + (VOCI_EH[x.campo] || x.campo)))) : h("p", { class: "mut" }, r.solo_ee || r.errori.length ? "Non calcolabile finché non si risolvono i punti qui sotto." : "Nessuna casella."),
       altre.length ? h("p", { class: "mut" }, "Altre sezioni: " + [...new Set(altre.map(x => x.sezione.replace(/_/g, " ")))].join(", ")) : null,
       h("p", { class: "mut dentro-testo" }, "Testamento, interdetti, rinunce, eredi e aziende derivano dai dati degli altri quadri. Qui sotto le caselle che dipendono da una dichiarazione esplicita.")));
-    box.append(sezioneDatiDichiarazione(['dichiara_copie_conformi', 'flag_inventari', 'separazione_con_colpa', 'no_scioglimento_unione_civile'], 'Caselle del dichiarante (quadro EH, lettere h ed l)'));
+    }
+    box.append(caselleDichiaranteEH());
   }
   const el = elencoPerIlFile();
   if (el) box.append(h("section", { class: "grp" }, h("h2", {}, "Da sistemare prima di generare il file"), el));
+}
+/* Quadro EE come nel modello (revisione del 15/11/2026): sempre gli otto righi EE1-EE8 con il numero di rigo, vuoti con «—»;
+   EE6 ed EE8 (totali) in grassetto; accanto alla descrizione i quadri da cui viene il valore, per andarci. */
+function prospettoEE(righi) {
+  const navigabile = id => quadriNavigabili().some(x => x.id === id && (x.righe || 0) > 0);   // solo i quadri con righe
+  return h("div", { class: "tab piatta prospetto-ee" }, h("table", { "aria-label": "Riepilogo dell'asse ereditario (quadro EE)" },
+    h("thead", {}, h("tr", {}, h("th", { class: "c-rigo" }, "Rigo"), h("th", {}, "Descrizione"), h("th", { class: "n" }, "Valore"))),
+    h("tbody", {}, righi.map(x => {
+      const da = x.valore != null ? x.quadri.filter(navigabile) : [];
+      return h("tr", { class: "fisso" + (x.totale ? " forte" : "") + (x.valore == null ? " vuoto-ee" : "") },
+        h("td", { class: "c-rigo" }, x.rigo),
+        h("td", {}, x.testo, da.length ? h("span", { class: "da-quadri" }, da.map(id => h("button", { type: "button", class: "lk", title: "Vai al quadro " + id, onclick: () => scegliQuadro(id) }, id))) : null),
+        h("td", { class: "n" }, x.valore == null ? h("span", { class: "mut" }, "—") : euroIt(x.valore, 0)));
+    }))));
+}
+/* Quadro EH come nel modello: sezione I per lettera (a-m, Fascicolo I pp. 51-52) con la frase barrata e i dati che la
+   sostengono, gli eredi in tabella (righi EH1-EH3); le sezioni II-IV non compilate restano chiuse con il motivo. Ogni voce
+   rimanda al quadro in cui si modifica: la pagina mostra, non calcola. */
+const NOMI_DOVE = { AN: "Dati generali", EH: "caselle qui sotto" };
+function voceEH(v) {
+  const coppie = l => h("div", { class: "eh-dati" }, l.map(([k, val]) => h("span", { class: "eh-dato" }, h("span", { class: "mut" }, k + ": "), val == null || val === "" ? "—" : String(val))));
+  const vai = v.dove && v.dove !== "EH" && quadriNavigabili().some(x => x.id === v.dove)
+    ? h("button", { type: "button", class: "lk eh-vai", onclick: () => scegliQuadro(v.dove) }, "Modifica in " + v.dove + (NOMI_DOVE[v.dove] ? " (" + NOMI_DOVE[v.dove] + ")" : "")) : null;
+  return h("li", { class: "eh-voce" },
+    h("div", { class: "eh-testa" }, h("span", { class: "eh-titolo" }, v.lettera ? h("span", { class: "eh-lettera" }, v.lettera + ")") : null, v.titolo), vai),
+    v.scelta ? h("div", { class: "eh-scelta" }, h("span", { class: "eh-casella", "aria-hidden": "true" }, "☑"), " ", v.scelta) : null,
+    v.dati && v.dati.length ? coppie(v.dati) : null,
+    v.tabella && v.tabella.righe.length ? h("div", { class: "tab piatta eh-tabella" }, h("table", { "aria-label": v.titolo },
+      h("thead", {}, h("tr", {}, v.tabella.colonne.map(c => h("th", {}, c)))),
+      h("tbody", {}, v.tabella.righe.map(rr => h("tr", { class: "fisso" }, rr.map(c => h("td", {}, c == null || c === "" ? "—" : String(c)))))))) : null,
+    ...(v.registrazioni || []).map(reg => coppie(reg)),
+    ...(v.soggetti || []).map(sg => coppie(sg)),
+    v.elenco && v.elenco.length ? h("ul", { class: "eh-elenco" }, v.elenco.map(t => h("li", {}, "☑ " + t))) : null);
+}
+function dettaglioEH(d) {
+  const out = [];
+  const di = d.dichiarante;
+  if (di) out.push(h("p", { class: "eh-dichiarante" }, "Dichiarante: ", h("b", {}, di.nome || "—"),
+    di.codice_fiscale ? " · " + di.codice_fiscale : "", di.codice_carica ? " · codice carica " + di.codice_carica : ""));
+  for (const sz of d.sezioni) {
+    if (sz.presente) out.push(h("section", { class: "grp eh-sezione" }, h("h2", {}, sz.titolo),
+      sz.voci.length ? h("ol", { class: "eh-voci" }, sz.voci.map(voceEH)) : h("p", { class: "mut" }, "Nessuna voce.")));
+    else out.push(h("details", { class: "eh-sezione assente" }, h("summary", {}, sz.titolo, h("span", { class: "mut" }, " · non si compila")),
+      sz.nota ? h("p", { class: "mut" }, sz.nota) : null));
+  }
+  return out;
+}
+/* Caselle del dichiarante (lettere h ed l). Separazione con addebito solo con stato civile 5, nessuno scioglimento dell'unione
+   civile solo (e obbligatoria) con stato civile 7: XSD QuadroEH. Una casella gia' compilata con un altro stato civile resta
+   visibile, con l'avviso, per poterla togliere. */
+function caselleDichiaranteEH() {
+  const dich = (((S.P.dati.opzioni || {}).telematico || {}).dichiarazione) || {};
+  const val = k => S.dichDirty.has(k) ? S.dichDirty.get(k) : dich[k];
+  const sc = String(val("stato_civile") || "").trim();
+  const chiavi = ["dichiara_copie_conformi", "flag_inventari"], note = [];
+  const regola = [["separazione_con_colpa", "5", "separazione con addebito"], ["no_scioglimento_unione_civile", "7", "scioglimento dell'unione civile"]];
+  for (const [k, cod, nome] of regola) {
+    const compilata = val(k) != null && val(k) !== "";
+    if (sc === cod) chiavi.push(k);
+    else if (compilata) { chiavi.push(k); note.push("La casella sul" + (k.startsWith("sep") ? "la " : "lo ") + nome + " vale solo con stato civile " + cod + " (nel frontespizio è " + (sc || "non indicato") + "): togli il valore."); }
+  }
+  const sez = sezioneDatiDichiarazione(chiavi, "Caselle del dichiarante (quadro EH, lettere h ed l)");
+  for (const t of note) sez.append(h("p", { class: "nota stretta" }, t));
+  if (sc === "7" && (val("no_scioglimento_unione_civile") == null || val("no_scioglimento_unione_civile") === ""))
+    sez.append(h("p", { class: "nota stretta" }, "Con stato civile 7 la casella sullo scioglimento dell'unione civile va indicata."));
+  return sez;
 }
 function renderNonSupp(main, q) {
   if (q.generato) {   // EE, EF, EH, EI: li produce il programma alla generazione del file; non c'e' nulla da compilare ne' da selezionare

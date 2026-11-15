@@ -1129,3 +1129,30 @@ input.cella-quota[aria-invalid="true"] { border-color:var(--er); box-shadow:0 0 
 .aiuto-codice { font-size:var(--fs-s); }
 .agev-elenco { display:flex; flex-direction:column; gap:var(--s-1); max-height:50vh; overflow:auto; margin-top:var(--s-2); }
 .agev-tutti { font-size:var(--fs-s); }
+
+/* Quadri EE ed EH come nel modello (15/11/2026) */
+.prospetto-ee td { white-space:normal; }
+.prospetto-ee .c-rigo { width:4.5rem; font-weight:600; color:var(--t2); font-variant-numeric:tabular-nums; }
+.prospetto-ee td.n { width:10rem; font-variant-numeric:tabular-nums; }
+.prospetto-ee tr.forte td { font-weight:700; }
+.prospetto-ee tr.vuoto-ee td:not(.c-rigo) { color:var(--t2); }
+.prospetto-ee .da-quadri { margin-left:var(--s-2); display:inline-flex; gap:var(--s-1); font-size:var(--fs-s); }
+.eh-dichiarante { margin:0 0 var(--s-3); color:var(--t2); }
+.eh-dichiarante b { color:var(--t); }
+/* EH: la tabella degli eredi ha sei colonne, la pagina e' piu' larga degli altri riepiloghi (44rem) */
+.riquadro-calc + div.anteprima-eh > :is(.grp, details, p) { max-width:64rem; }
+.eh-voci { list-style:none; padding:0 var(--s-3) var(--s-2); margin:0; display:flex; flex-direction:column; }
+.eh-voce { padding:var(--s-2) 0; border-top:1px solid var(--sep); }
+.eh-voce:first-child { border-top:0; padding-top:0; }
+.eh-testa { display:flex; align-items:baseline; gap:var(--s-3); }
+.eh-titolo { font-weight:600; }
+.eh-lettera { display:inline-block; min-width:1.6em; color:var(--t2); }
+.eh-vai { margin-left:auto; font-size:var(--fs-s); white-space:nowrap; }
+.eh-scelta { margin-top:var(--s-05); padding-left:1.6em; }
+.eh-casella { color:var(--blu); }
+.eh-dati { display:flex; flex-wrap:wrap; gap:var(--s-05) var(--s-4); margin:var(--s-1) 0 0; padding-left:1.6em; font-size:var(--fs-s); }
+.eh-tabella { margin:var(--s-2) 0 0 1.6em; box-shadow:none; border:1px solid var(--sep); }
+.eh-elenco { margin:var(--s-1) 0 0; padding-left:1.6em; list-style:none; }
+details.eh-sezione.assente { margin:var(--s-2) 0; padding:var(--s-2) var(--s-3); border-radius:var(--r2); background:var(--grigio); }
+details.eh-sezione.assente > summary { cursor:pointer; font-weight:600; }
+details.eh-sezione.assente > p { margin:var(--s-2) 0 0; }

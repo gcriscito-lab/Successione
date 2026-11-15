@@ -1,5 +1,15 @@
 Novità del programma (le più recenti in alto)
 
+15 novembre 2026 — quadri EE ed EH come nel modello
+Imposte e file telematico non cambiano: le pagine leggono il file generato.
+- EE: sempre gli otto righi EE1-EE8 con il numero di rigo e i testi del modello; i righi vuoti con «—», i totali EE6 ed EE8 in
+  grassetto; accanto a ogni valore i quadri da cui viene. Corretto il rigo EE4 (aeromobili, navi e imbarcazioni), che con
+  questi beni compariva con il nome tecnico.
+- EH: sezione I per lettera (a, b, c…) con la frase barrata, i dati che la sostengono, gli eredi in tabella (righi EH1-EH3) e
+  il collegamento «Modifica in …» al quadro dove si cambia. Le sezioni II-IV non compilate restano chiuse con il motivo.
+- Caselle del dichiarante: la separazione con addebito compare solo con stato civile 5, l'unione civile solo con stato civile
+  7, dove è obbligatoria (schema ufficiale del file).
+
 15 novembre 2026 — griglia delle quote, agevolazioni guidate e scadenza nella pratica (idee riprese da DEAS)
 Imposte e file telematico non cambiano.
 - Quadro DV, «Elenco | Griglia delle quote»: una riga per bene e diritto (usufrutto e nuda proprietà su due righe), una colonna
