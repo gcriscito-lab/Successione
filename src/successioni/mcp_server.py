@@ -32,12 +32,13 @@ STRUMENTI_LETTURA = frozenset({
     "capacita", "schema_dati", "elenca_pratiche", "leggi_pratica", "revisioni_pratica", "differenze_pratica",
     "verifica_pratica", "stato_quadri", "stato_elaborati", "invio_stato", "decodifica_codice_fiscale",
     "file_in_ingresso", "elenca_allegati", "diagnosi", "valori_catastali", "brogliaccio", "stima_imposte",
-    "codice_comune", "tabelle_calcolo", "visura_stato",
+    "codice_comune", "tabelle_calcolo", "visura_stato", "quote_griglia", "agevolazioni_guidate",
 })
 STRUMENTI_SCRITTURA = frozenset({
     "crea_pratica", "aggiorna_pratica", "esporta_xml", "controllo_ufficiale", "registra_esito_controllo", "backup_archivio", "stampa_modello",
     "invio_prepara", "importa_xml_telematico", "acquisisci_allegato", "prepara_pdfa", "suddividi_allegato",
     "riordina_allegati", "genera_albero_genealogico", "visura_carica", "visura_applica", "duplica_pratica",
+    "quote_salva", "agevolazione_applica",
 })
 MESSAGGIO_SOLA_LETTURA = ("Claude è in sola lettura: modifica disattivata nelle Impostazioni → Operatività e sicurezza. "
                           "Lo strumento non è stato eseguito e nulla è stato modificato.")
@@ -304,6 +305,32 @@ def costruisci(servizio: Servizio | None = None) -> MCPServer:
         """Aggiunge alla pratica gli immobili scelti fra quelli di visura_stato (campo 'chiave'), con origine «acquisito». I
         dati inseriti o confermati dall'utente non vengono sovrascritti. Leggere prima la pratica per la revisione."""
         return sv.visura_applica(pratica_id, revisione_attesa, chiavi_immobili, chiave=chiave_richiesta, canale="mcp")
+
+    @tool
+    def quote_griglia(pratica_id: str) -> dict:
+        """Quote di devoluzione in griglia: una riga per bene e diritto, una colonna per erede o legatario, con la somma di
+        riga (completa a 1/1) e l'agevolazione di ogni cella. Stessi dati del quadro DV. Nessuna scrittura."""
+        return sv.quote_griglia(pratica_id)
+
+    @tool(ann=SCRITTURA)
+    def quote_salva(pratica_id: str, revisione_attesa: int, celle: list[dict], chiave_richiesta: str | None = None) -> dict:
+        """Scrive piu' quote in una volta. Ogni cella: {bene_id, persona_id, diritto (es. '1'), quota ('1/3' o {num, den})};
+        quota vuota o '0' toglie la riga di devoluzione, una cella nuova la crea. Una sola revisione per tutte le celle."""
+        return sv.quote_salva(pratica_id, revisione_attesa, celle, chiave=chiave_richiesta, autore="assistente", canale="mcp")
+
+    @tool
+    def agevolazioni_guidate(pratica_id: str) -> dict:
+        """Codici di agevolazione proposti (con i quadri in cui l'esportazione li supporta) e, per ogni bene, i beneficiari
+        con l'agevolazione gia' indicata. Nessuna scrittura."""
+        return sv.agevolazioni_guidate(pratica_id)
+
+    @tool(ann=SCRITTURA)
+    def agevolazione_applica(pratica_id: str, revisione_attesa: int, codice: str | None, beni: list[str], persone: list[str],
+                             chiave_richiesta: str | None = None) -> dict:
+        """Scrive il codice di agevolazione (vuoto per toglierlo) sulle righe di devoluzione dei beni e dei soggetti scelti.
+        Non crea righe: le coppie senza devoluzione tornano in 'senza_devoluzione'. I controlli restano all'esportazione."""
+        return sv.agevolazione_applica(pratica_id, revisione_attesa, codice, beni, persone, chiave=chiave_richiesta,
+                                       autore="assistente", canale="mcp")
 
     @tool(ann=SCRITTURA)
     def registra_esito_controllo(pratica_id: str, file_dgn: str, file_log_schema: str, file_wri: str | None = None,

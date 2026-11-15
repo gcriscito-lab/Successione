@@ -57,6 +57,8 @@ def argomenti_scrittura(pid, aid):
         "visura_carica": {"pratica_id": pid, "nome_file": "inesistente.pdf"},
         "visura_applica": {"pratica_id": pid, "revisione_attesa": 2, "chiavi_immobili": ["x"]},
         "duplica_pratica": {"pratica_id": pid, "chiave_richiesta": "ro-4"},
+        "quote_salva": {"pratica_id": pid, "revisione_attesa": 2, "celle": [{"bene_id": "x", "persona_id": "y", "diritto": "1", "quota": "1/2"}]},
+        "agevolazione_applica": {"pratica_id": pid, "revisione_attesa": 2, "codice": "P", "beni": ["x"], "persone": ["y"]},
     }
 
 

@@ -45,6 +45,16 @@ def _decorrenza(dati: dict) -> str | None:
     return v if isinstance(v, str) else None
 
 
+def termine_pratica(sv, pratica_id: str, oggi: date | None = None) -> dict:
+    """Termine di presentazione della pratica aperta (frontespizio): stessa regola della pagina iniziale (``_termine``, dodici
+    mesi dal decesso o dalla decorrenza indicata), letta dai dati correnti della pratica."""
+    p = sv.leggi(pratica_id)
+    dati = p["dati"]
+    decesso = next((x.get("data_decesso") for x in dati.get("persone", []) if x.get("ruolo") == "defunto"), None)
+    return {"revisione": p["revisione"],
+            "termine": _termine(decesso if isinstance(decesso, str) else None, oggi or date.today(), _decorrenza(dati))}
+
+
 def _dove(dati: dict, percorso: str | None) -> dict:
     """Punto dell'interfaccia per un percorso di errore dell'esportazione (``quadro[EG].X`` oppure un campo dei dati)."""
     if not percorso:

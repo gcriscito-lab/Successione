@@ -690,6 +690,30 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
                               chiave=b.get("chiave"))
 
     @api
+    async def termine_api(request):
+        from . import cruscotto
+        return cruscotto.termine_pratica(sv, request.path_params["pid"])
+
+    @api
+    async def quote_griglia_api(request):
+        import json
+        pid = request.path_params["pid"]
+        if request.method == "GET":
+            return sv.quote_griglia(pid)
+        b = json.loads(await corpo_limitato(request, 2_000_000, "griglia delle quote") or b"{}")
+        return sv.quote_salva(pid, int(b.get("revisione_attesa", -1)), b.get("celle"), chiave=b.get("chiave"))
+
+    @api
+    async def agevolazioni_guidate_api(request):
+        import json
+        pid = request.path_params["pid"]
+        if request.method == "GET":
+            return sv.agevolazioni_guidate(pid)
+        b = json.loads(await corpo_limitato(request, 200_000, "agevolazione") or b"{}")
+        return sv.agevolazione_applica(pid, int(b.get("revisione_attesa", -1)), b.get("codice"), b.get("beni") or [],
+                                       b.get("persone") or [], chiave=b.get("chiave"))
+
+    @api
     async def visure_applica(request):
         import json
         b = json.loads(await corpo_limitato(request, 200_000, "scelta degli immobili") or b"{}")
@@ -741,6 +765,8 @@ def crea_app(servizio: Servizio | None = None, token: str | None = None, porta: 
         Route(P + "/allegati", allegati), Route(P + "/allegati", carica, methods=["POST"]),
         Route(P + "/duplica", duplica_api, methods=["POST"]),
         Route(P + "/ricevute/da-cartella", ricevuta_da_cartella_api, methods=["POST"]), Route(P + "/ordina-beni", ordina_beni_api, methods=["POST"]),
+        Route(P + "/quote-griglia", quote_griglia_api, methods=["GET", "POST"]), Route(P + "/termine", termine_api),
+        Route(P + "/agevolazioni-guidate", agevolazioni_guidate_api, methods=["GET", "POST"]),
         Route(P + "/visure", visure, methods=["GET", "POST"]), Route(P + "/visure/applica", visure_applica, methods=["POST"]),
         Route("/api/allegati/{aid}/pdfa", converti, methods=["POST"]),
         Route("/api/allegati/{aid}/elimina", elimina_allegato_api, methods=["POST"]),

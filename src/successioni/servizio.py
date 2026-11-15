@@ -15,6 +15,7 @@ from .allegati import AllegatiMixin
 from .elaborati import ElaboratiMixin
 from .invio_servizio import InvioMixin
 from .visura_servizio import VisuraMixin
+from .quote_griglia import QuoteGrigliaMixin
 from .ricevute_cartella import RicevuteCartellaMixin
 from .archivio import Archivio
 from .errori import (ChiaveRiutilizzata, ConflittoRevisione, DatiNonValidi, ErroreServizio,  # noqa: F401
@@ -72,7 +73,8 @@ ID_VALIDO = re.compile(r"^[a-z]{1,4}_[a-z0-9]{4,32}$")
 PREFISSI = {"persone": "p", "beni": "b", "devoluzioni": "d", "passivita": "ps", "documenti_ref": "dr"}
 
 
-class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin, VisuraMixin, RicevuteCartellaMixin):
+class Servizio(AllegatiMixin, AlberoGenealogicoMixin, ElaboratiMixin, InvioMixin, VisuraMixin, RicevuteCartellaMixin,
+               QuoteGrigliaMixin):
     def __init__(self, archivio: Archivio | None = None):
         self.arch = archivio or Archivio()
 
