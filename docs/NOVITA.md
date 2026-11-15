@@ -1,5 +1,17 @@
 Novità del programma (le più recenti in alto)
 
+15 novembre 2026 — griglia delle quote, agevolazioni guidate e scadenza nella pratica (idee riprese da DEAS)
+Imposte e file telematico non cambiano.
+- Quadro DV, «Elenco | Griglia delle quote»: una riga per bene e diritto (usufrutto e nuda proprietà su due righe), una colonna
+  per soggetto. Le quote si scrivono nelle caselle, somma ed esito si aggiornano subito (la riga deve fare 1/1; la quota del
+  defunto è solo un'informazione). «Salva le quote» (o Salva, Ctrl+S) registra tutto in una revisione. Una casella vuota toglie
+  il soggetto dal bene. «Stessa ripartizione sulle righe scelte…» applica le stesse quote a più beni.
+- «Agevolazioni guidate…» nel menu Operazioni del quadro DV e dei quadri dei beni: codice, beni, soggetti, Fine. Si
+  propongono solo i beni dei quadri in cui il codice è ammesso. Le righe di devoluzione non si creano da sole: se manca una
+  riga, il programma lo segnala.
+- In alto, accanto al nome della pratica: «Presentare entro gg/mm/aaaa · tra N giorni», oppure «scaduto da N giorni». La
+  regola è la stessa della pagina iniziale e tiene conto anche della decorrenza indicata nel frontespizio.
+
 14 novembre 2026 — revisione di usabilità (punto grave ed errori)
 Imposte e file telematico non cambiano.
 - Un solo elenco di ciò che impedisce di generare il file: nei Controlli, in File e invio (passo 2) e nei quadri EE, EF ed EH,

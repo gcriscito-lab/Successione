@@ -1089,3 +1089,43 @@ dialog.dlg-visura { width:min(1000px, 96vw); }
 .tab-rubrica input, .tab-rubrica select { min-width:9rem; }
 .da-rubrica { max-width:20rem; margin:var(--s-1) 0 var(--s-2); }
 .dlg-visura .nota-riga { font-size:var(--fs-s); color:var(--am); margin-top:var(--s-05); }
+
+/* Scadenza della pratica accanto al titolo (15/11/2026) */
+.tb .termine-pratica { flex:none; white-space:nowrap; font-weight:500; }
+body.in-home .termine-pratica { display:none; }
+
+/* Griglia delle quote e agevolazioni guidate (15/11/2026) */
+.seg.seg-vista { display:inline-flex; margin:0 0 var(--s-2); }
+.seg.seg-vista button { flex:none; padding:var(--s-1) var(--s-3); }
+.barra-griglia { margin-top:0; }
+.tab-griglia th.c-sogg { max-width:11rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tab-griglia td.c-bene { max-width:24rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tab-griglia .c-sc { width:2rem; text-align:center; }
+.tab-griglia td.c-cella { padding-top:var(--s-05); padding-bottom:var(--s-05); white-space:nowrap; }
+.tab-griglia input.cella-quota { width:5.5rem; height:calc(var(--alto-campo) - 6px); text-align:right; font-variant-numeric:tabular-nums; }
+.tab-griglia td.cambiata input.cella-quota { background:var(--blu-t); border-color:var(--blu); }
+input.cella-quota[aria-invalid="true"] { border-color:var(--er); box-shadow:0 0 0 1px var(--er); }
+.tab-griglia input.cella-quota[readonly] { background:transparent; border-color:transparent; }
+.tab-griglia .ag-cella { display:inline-block; width:1.2em; text-align:left; margin-left:var(--s-1); font-size:var(--fs-s); font-weight:600; color:var(--blu); }
+.tab-griglia .c-somma { font-variant-numeric:tabular-nums; font-weight:600; }
+.tab-griglia .c-esito { white-space:nowrap; } .tab-griglia .c-esito .lk { margin-left:var(--s-2); }
+.tab-griglia .sigla-riga { display:inline-block; min-width:2.2em; margin-right:var(--s-2); font-size:var(--fs-s); font-weight:600; color:var(--t2); }
+.tab-griglia tr.riga-doppia td { color:var(--t2); }
+.nota-griglia { margin-top:var(--s-2); font-size:var(--fs-s); }
+.rip-campi { display:grid; grid-template-columns:repeat(auto-fill, minmax(12rem, 1fr)); gap:var(--s-2) var(--s-3); }
+.rip-campi .rip-campo { display:flex; flex-direction:column; gap:var(--s-1); }
+.rip-campi input.cella-quota { width:7rem; text-align:right; }
+.rip-righe { margin-top:var(--s-2); } .rip-righe ul { margin:var(--s-1) 0 0; padding-left:1.2rem; max-height:10rem; overflow:auto; }
+.dlg-agev { width:min(40rem, 92vw); }
+.agev-passi { display:flex; gap:var(--s-2); list-style:none; padding:0; margin:0 0 var(--s-3); counter-reset:passo; }
+.agev-passi li { counter-increment:passo; color:var(--t2); font-size:var(--fs-s); padding:var(--s-1) var(--s-2); border-radius:var(--r1); background:var(--grigio); }
+.agev-passi li::before { content:counter(passo) ". "; }
+.agev-passi li.attivo { color:var(--t); font-weight:600; background:var(--blu-t); }
+.agev-passi li.fatto { color:var(--t); }
+.agev-codici { display:flex; flex-direction:column; gap:var(--s-1); }
+.agev-codice { display:flex; gap:var(--s-2); align-items:flex-start; padding:var(--s-2); border-radius:var(--r1); cursor:pointer; }
+.agev-codice:hover { background:var(--grigio); }
+.agev-codice > span { display:flex; flex-direction:column; gap:var(--s-05); }
+.aiuto-codice { font-size:var(--fs-s); }
+.agev-elenco { display:flex; flex-direction:column; gap:var(--s-1); max-height:50vh; overflow:auto; margin-top:var(--s-2); }
+.agev-tutti { font-size:var(--fs-s); }
