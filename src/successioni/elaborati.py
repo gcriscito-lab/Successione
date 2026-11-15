@@ -204,8 +204,9 @@ class ElaboratiMixin:
         imp, dimp = forn.get("impegno_codice"), forn.get("data_impegno")
         if tipo == "10" and not (imp and dimp):
             imp, dimp = "1", date.today().isoformat()
+        from . import riepilogo_ee_eh as RIE
         out: dict = {"pratica_id": pratica_id, "revisione": d["revisione"], "ee": [], "ef": None, "eh": [], "eg": [],
-                     "errori": [], "mancanti": [], "avvisi": []}
+                     "errori": [], "mancanti": [], "avvisi": [], "ee_righi": RIE.righi_ee([]), "eh_dettaglio": None}
         if not cf:
             out["errori"].append("manca un codice fiscale (fornitore, presentatore o defunto) per calcolare l'anteprima")
             return out
@@ -251,7 +252,9 @@ class ElaboratiMixin:
         for q in root.iter():
             if loc(q) == "QuadroEE":
                 out["ee"] = [{"campo": loc(e), "valore": e.text.strip()} for e in q.iter() if len(e) == 0 and (e.text or "").strip()]
+                out["ee_righi"] = RIE.righi_ee(out["ee"])
             elif loc(q) == "QuadroEH" and not out.get("solo_ee_ef"):
+                out["eh_dettaglio"] = RIE.sezioni_eh(q)
                 for e in q.iter():
                     if len(e) == 0 and (e.text or "").strip() and loc(e).startswith(("Flag", "Presenza")):
                         sez = next((loc(a) for a in e.iterancestors() if loc(a).startswith("Sezione")), "")
