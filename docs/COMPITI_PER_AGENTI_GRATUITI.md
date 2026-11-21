@@ -20,9 +20,9 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 
 ## C1. Maschera «Dati della dichiarazione» nel frontespizio
 **Perché:** stato civile, codice carica, contatti e versamento oggi si impostano solo da MCP o API (rilievo R20 aperto).
-**File consentiti:** `src/successioni/static/app.js`, `src/successioni/static/app.css`, `tests/e2e/gui_flusso.js` (solo per aggiungere verifiche).
+**File consentiti:** `src/successioni/static/*.js` (interfaccia divisa per argomento dal 21/11/2026: il file giusto si trova col titolo in testa), `src/successioni/static/app.css`, `tests/e2e/gui_flusso.js` (solo per aggiungere verifiche).
 **Cosa fare:** nella scheda «Dati generali» aggiungere una sezione «Dati della dichiarazione» con i campi di `opzioni.telematico.dichiarazione` elencati in `src/successioni/telematico/supplemento.py` (`stato_civile`, `devoluzione_per_legge`, `firma_dichiarante`, `presentatore.persona_id`, `presentatore.codice_carica`, `presentatore.telefono`, `presentatore.email`, `versamento.iban`, `versamento.cf_titolare`, `tempistica_pagamento`). Salvataggio con l'operazione `{op:"set", sezione:"opzioni", campi:{telematico:<oggetto completo aggiornato>}}`: **leggere l'oggetto corrente e modificare solo le chiavi toccate**, senza perdere `persone`, `beni`, `passivita`. I codici ammessi non vanno inventati: mostrare un campo di testo con il suggerimento «codice come da istruzioni del frontespizio».
-**Accettazione:** `node --check src/successioni/static/app.js`; nel browser (metodo di `.claude/skills/webapp-testing`) il valore inserito sopravvive a ricaricamento pagina e alla modifica di una persona; una verifica nuova in `tests/e2e/gui_flusso.js`; nessun errore JavaScript.
+**Accettazione:** `python -m pytest -q tests/test_interfaccia_divisa.py` (sintassi di tutti i file dell'interfaccia); nel browser (metodo di `.claude/skills/webapp-testing`) il valore inserito sopravvive a ricaricamento pagina e alla modifica di una persona; una verifica nuova in `tests/e2e/gui_flusso.js`; nessun errore JavaScript.
 
 ## C2. Manuale breve per il professionista
 **File:** `docs/MANUALE_BREVE.md` (nuovo).
@@ -48,7 +48,7 @@ Regole fiscali e calcoli, esportazione XML, logica di invio e riconciliazione, s
 **Accettazione:** ogni domanda ha una sola risposta corretta, indipendente dal tempo, verificabile con una query sull'archivio.
 
 ## C6. Verifica di accessibilità dell'interfaccia
-**File:** `src/successioni/static/app.js`, `src/successioni/static/app.css`, `tests/e2e/accessibilita.js` (nuovo).
+**File:** `src/successioni/static/*.js` (interfaccia divisa per argomento dal 21/11/2026: il file giusto si trova col titolo in testa), `src/successioni/static/app.css`, `tests/e2e/accessibilita.js` (nuovo).
 **Contesto:** `tests/e2e/gui_flusso.js`.
 **Cosa fare:** uso completo da tastiera (albero dei quadri, tabella, ispettore, procedura guidata, finestra di dialogo con focus che rientra al chiudere), etichette associate ai campi, contrasti sufficienti in tema chiaro e scuro, ordine di tabulazione sensato. Un test Playwright che percorra il flusso solo con tastiera.
 **Accettazione:** il test passa; nessuna regressione in `tests/e2e/gui_flusso.js`; elenco in `CONSEGNA.md` dei punti non risolti.

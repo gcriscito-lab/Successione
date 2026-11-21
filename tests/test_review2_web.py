@@ -9,9 +9,10 @@ from successioni.archivio import Archivio
 from successioni.servizio import Servizio
 from successioni import web
 from successioni.web import crea_app
+from gui_js import testo_interfaccia
 
 T = "tok-rev2"
-JS = (Path(__file__).parent.parent / "src" / "successioni" / "static" / "app.js").read_text(encoding="utf-8")
+JS = testo_interfaccia()
 
 
 def client(tmp_path, porta=8765, nome="d"):

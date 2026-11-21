@@ -12,6 +12,7 @@ from successioni import impostazioni as IM
 from successioni.archivio import Archivio
 from successioni.servizio import Servizio
 from successioni.web import crea_app
+from gui_js import testo_interfaccia
 
 STATIC = Path(__file__).resolve().parents[1] / "src" / "successioni" / "static"
 T = "tok123"
@@ -293,7 +294,7 @@ def test_css_mobile_un_solo_scroll_e_cassetto(css):
 
 # ---------------------------------------------------------------- problema 9 e 7: comportamenti JS (controllo sul sorgente)
 def test_js_tabella_roving_tabindex_e_tasti():
-    js = (STATIC / "app.js").read_text(encoding="utf-8")
+    js = testo_interfaccia()
     assert 'tabindex: "0"' not in js.split("function renderTabella")[1].split("function aggiungiRiga")[0].replace('? "0" : "-1"', "")
     assert '? "0" : "-1"' in js
     corpo = js.split("function tastiTabella")[1].split("function rigaDaFocalizzare")[0]
@@ -311,7 +312,7 @@ def test_layout_js_esc_e_collegamento_label():
 
 
 def test_voci_dei_quadri_con_tooltip_e_testo_su_piu_righe(css):
-    js = (STATIC / "app.js").read_text(encoding="utf-8")
+    js = testo_interfaccia()
     voce = js.split("function renderAlbero")[1].split("/* ---------- campi")[0]
     assert 'title: q.id + " — " + q.titolo' in voce
     nome = next(c for s, c in _blocchi(css) if s.strip() == ".voce .nome")

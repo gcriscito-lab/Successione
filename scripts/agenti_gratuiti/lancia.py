@@ -32,10 +32,10 @@ LIMITE_CONTESTO_BYTE = 160_000
 
 # Verifiche eseguite dal lanciatore (mai dal modello), per compito. Comandi senza shell.
 VERIFICHE: dict[str, list[list[str]]] = {
-    "C1": [["node", "--check", "src/successioni/static/app.js"]],
+    "C1": [[sys.executable, "-m", "pytest", "-q", "tests/test_interfaccia_divisa.py"]],
     "C2": [], "C3": [], "C5": [],
     "C4": [[sys.executable, "-m", "pytest", "-q", "tests/test_valori_schema_extra.py"]],
-    "C6": [["node", "--check", "src/successioni/static/app.js"]],
+    "C6": [[sys.executable, "-m", "pytest", "-q", "tests/test_interfaccia_divisa.py"]],
     "C8": [[sys.executable, "-m", "pytest", "-q", "tests/test_supplemento_extra.py"]],
     "C9": [[sys.executable, "-m", "pytest", "-q", "tests/test_invio_lettori_extra.py"]],
     "C10": [[sys.executable, "-m", "pytest", "-q", "tests/test_formati_extra.py"]],

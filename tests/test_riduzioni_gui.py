@@ -14,8 +14,9 @@ from successioni.telematico.esporta import esporta_xml
 from test_elaborati import ops_da_caso
 from test_telematico_controllo import NS
 from test_telematico_riduzioni_art25 import CTX, D, base, con_eg
+from gui_js import testo_interfaccia
 
-JS = (Path(__file__).parent.parent / "src" / "successioni" / "static" / "app.js").read_text(encoding="utf-8")
+JS = testo_interfaccia()
 
 
 def _pratica(tmp_path, d):

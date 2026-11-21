@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from successioni import impostazioni as IM
+from gui_js import testo_interfaccia
 
 STATIC = Path(__file__).resolve().parents[1] / "src" / "successioni" / "static"
 
@@ -38,7 +39,7 @@ def test_configurazione_vecchia_senza_chiavi_nuove(tmp_path, monkeypatch):
 
 
 def test_interfaccia_conosce_le_stesse_preferenze():
-    js = (STATIC / "app.js").read_text(encoding="utf-8")
+    js = testo_interfaccia()
     predef = js.split("const ASPETTO_DEFAULT = {")[1].split("};")[0]
     for k, v in IM.INTERFACCIA_DEFAULT.items():
         assert k + ":" in predef.replace(" ", ""), k

@@ -18,6 +18,7 @@ from successioni.archivio import Archivio  # noqa: E402
 from successioni.collegamenti.base import Esito, ReinvioNonAmmesso, RegistroJob  # noqa: E402
 from successioni.errori import DatiNonValidi  # noqa: E402
 from test_collegamenti_invio import ctx, prepara  # noqa: E402,F401
+from gui_js import testo_interfaccia
 
 A10 = Path(__file__).parent / "fixture_telematico" / "controllo_20261101"
 
@@ -188,7 +189,7 @@ def test_2_stati_pratica_rimossa_e_documento_allineato():
 
 
 def test_2_interfaccia_usa_la_copia_attiva():
-    js = (Path(__file__).resolve().parents[1] / "src" / "successioni" / "static" / "app.js").read_text(encoding="utf-8")
+    js = testo_interfaccia()
     corpo = js[js.index("async function renderInvio("):js.index("async function renderRicevute(")]
     assert "const c = copie[0];" not in corpo
     assert "sti.copia_attiva" in corpo and "bloccoPrep" in corpo and "elenco_copie" in corpo

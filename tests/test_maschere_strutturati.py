@@ -25,6 +25,7 @@ from telematico_casi import (ALLEGATI_A10, FIXTURE, aggiungi_fabbricato, caso_pr
 from test_elaborati import ops_da_caso  # noqa: E402
 from test_telematico_controllo import NS  # noqa: E402
 from test_telematico_eo_esenti import caso_esente  # noqa: E402
+from gui_js import testo_interfaccia
 
 XSD = next((Path(__file__).parent.parent / "fonti" / "Specifiche tecniche").rglob("fornituraSUC13_v1.xsd"))
 D = "/tm:Messaggio/tm:Contenuto/suc:Fornitura/suc:Dichiarazione"
@@ -104,7 +105,7 @@ def test_la_gui_ha_una_maschera_per_ogni_chiave_di_supplemento():
             ok = (coll in campi_modello and k in campi_modello[coll]) or f"{coll}.{k}" in S.STRUTTURATI
             if not ok:
                 senza_maschera.append(f"{coll}.{k}")
-    js = (Path(__file__).parent.parent / "src" / "successioni" / "static" / "app.js").read_text(encoding="utf-8")
+    js = testo_interfaccia()
     # dati strutturati con maschera propria in app.js (renderStrutturati)
     gestiti_js = {"persone.portatore_handicap", "beni.superficie", "beni.estremi_trascrizione", "beni.estremi_registrazione",
                   "passivita.ripartizione", "persone.rinuncia", "persone.denominazione", "persone.rinuncia_estremi",

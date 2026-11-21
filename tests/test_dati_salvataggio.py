@@ -16,8 +16,9 @@ from successioni.servizio import Servizio
 from successioni.telematico.esporta import codice_enum
 from successioni.telematico.quadri_efgh import _flag
 from successioni.web import crea_app, strutturati_completi
+from gui_js import testo_interfaccia
 
-JS = (Path(__file__).parent.parent / "src" / "successioni" / "static" / "app.js").read_text(encoding="utf-8")
+JS = testo_interfaccia()
 
 
 @pytest.fixture
