@@ -104,11 +104,50 @@
       if (c) l.htmlFor = idUnivoco(c);
     }
   }
+  /* Pulsante «?» accanto alle etichette con un aiuto (22/11/2026): prima era solo un segno grafico e l'aiuto compariva tenendo il
+     mouse fermo sull'etichetta; ora un clic apre un riquadro con lo stesso testo (attributo title dell'etichetta). Esc o un clic
+     fuori lo chiudono. */
+  let pop = null, aperto = null;
+  function chiudiAiuto() { if (pop) { pop.remove(); pop = null; } if (aperto) { aperto.setAttribute("aria-expanded", "false"); aperto = null; } }
+  function apriAiuto(btn, testo) {
+    const era = aperto === btn;
+    chiudiAiuto();
+    if (era) return;
+    pop = document.createElement("div");
+    pop.className = "aiuto-pop"; pop.setAttribute("role", "tooltip"); pop.id = "aiutoPop";
+    const [titolo, ...resto] = testo.split(". ");
+    const t = document.createElement("b"); t.textContent = titolo; pop.append(t);
+    if (resto.length) { const p = document.createElement("div"); p.textContent = resto.join(". "); pop.append(p); }
+    body.append(pop);
+    const r = btn.getBoundingClientRect(), w = Math.min(420, window.innerWidth - 24);
+    pop.style.maxWidth = w + "px";
+    pop.style.left = Math.max(12, Math.min(r.left, window.innerWidth - w - 12)) + "px";
+    const sotto = r.bottom + 6, alto = pop.getBoundingClientRect().height;
+    pop.style.top = (sotto + alto > window.innerHeight - 8 ? Math.max(8, r.top - alto - 6) : sotto) + "px";
+    btn.setAttribute("aria-expanded", "true"); btn.setAttribute("aria-describedby", "aiutoPop"); aperto = btn;
+  }
+  function aggiungiAiuti() {
+    for (const el of document.querySelectorAll(".rg.con-aiuto > label:not([data-aiuto]), h3.con-aiuto:not([data-aiuto])")) {
+      const testo = el.getAttribute("title") || "";
+      el.dataset.aiuto = "1";
+      if (!testo) continue;
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "aiuto-btn"; b.textContent = "?";
+      b.setAttribute("aria-label", "Aiuto: " + testo.split(". ")[0]); b.setAttribute("aria-expanded", "false");
+      b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); apriAiuto(b, el.getAttribute("title") || testo); });
+      el.append(b);
+    }
+  }
+  document.addEventListener("click", ev => { if (pop && !pop.contains(ev.target)) chiudiAiuto(); });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && pop) { ev.preventDefault(); ev.stopPropagation(); const b = aperto; chiudiAiuto(); if (b) b.focus(); } }, true);
+  window.addEventListener("scroll", () => chiudiAiuto(), true);
+  window.addEventListener("resize", () => chiudiAiuto());
+
   let programmata = false;
   new MutationObserver(() => {
     if (programmata) return;
     programmata = true;
-    queueMicrotask(() => { programmata = false; collegaEtichette(); });
+    queueMicrotask(() => { programmata = false; collegaEtichette(); aggiungiAiuti(); });
   }).observe(body, { childList: true, subtree: true });
-  collegaEtichette();
+  collegaEtichette(); aggiungiAiuti();
 })();

@@ -577,7 +577,6 @@ body[data-barra=minima] .tb :is(#bNuova, #bImporta, #bCalc, #bImpost, #bGuida, #
 :root[data-densita="compatta"] .vc { padding:var(--s-15) var(--s-2); margin:var(--s-15) 0; }
 :root[data-densita="compatta"] .ins .aiuto-voce { display:none; }
 :root[data-densita="compatta"] .ins .rg:focus-within .aiuto-voce { display:block; }
-:root[data-densita="compatta"] .ins .rg.con-aiuto > label::after { content:" ?"; color:var(--blu); font-weight:700; }
 :root[data-densita="compatta"] .gruppo-scheda { margin:var(--s-15) 0 var(--s-05); }
 :root[data-densita="compatta"] .gruppo-scheda > h4, :root[data-densita="compatta"] .gruppo-scheda > summary { padding:1px var(--s-2); margin-bottom:var(--s-05); }
 
@@ -747,6 +746,8 @@ th { overflow:hidden; text-overflow:ellipsis; }
 .campi-scheda.coppie { grid-template-columns:repeat(auto-fit, minmax(max(9.5rem, calc(50% - var(--s-2))), 1fr)); }
 :root[data-densita="compatta"] .ins .campi-scheda.coppie { grid-template-columns:repeat(auto-fit, minmax(max(17rem, calc(50% - var(--s-3))), 1fr)); }
 .campi-scheda.coppie .rg[data-campo=luogo_nascita], .campi-scheda.coppie .rg[data-campo=certificatore_disabilita], .campi-scheda.coppie .rg[data-campo=relazione_con_defunto] { grid-column:1/-1; }
+/* 22/11/2026: menu dei codici con etichette lunghe (ruolo, tipo, grado): a tutta larghezza, prima erano a coppie da 160 px e si leggevano tagliati */
+.campi-scheda.coppie .rg:is([data-campo=ruolo], [data-campo=tipo_soggetto], [data-campo=grado_parentela], [data-campo=rappresentato_grado]) { grid-column:1/-1; }
 /* avvisi raggruppati (punto 5) */
 .avvisi-elenco { list-style:none; margin:var(--s-15) 0 0; padding:0; }
 .avvisi-elenco li { display:flex; justify-content:space-between; align-items:baseline; gap:var(--s-3); padding:var(--s-05) 0; border-top:1px solid color-mix(in srgb, var(--am-b) 35%, transparent); }
@@ -917,8 +918,14 @@ input[type=file]::file-selector-button { font:inherit; color:var(--t); border:1p
 /* ==== 10/11/2026: niente istruzioni sotto i campi (tolgono spazio ai dati). Il testo resta nel suggerimento dell'etichetta,
    segnalato da «?», e nella descrizione accessibile del campo (aria-describedby funziona anche con l'elemento nascosto). ==== */
 .aiuto-voce, :root[data-densita] .ins .rg:focus-within .aiuto-voce { display:none; }
-:is(.rg.con-aiuto > label, h3.con-aiuto)::after { content:"\00a0?"; color:var(--blu); font-weight:700; }
-:is(.rg.con-aiuto > label, h3.con-aiuto) { cursor:help; }
+/* 22/11/2026: il «?» e' un pulsante (layout.js, aggiungiAiuti): un clic apre il riquadro con l'aiuto del campo */
+.aiuto-btn { display:inline-flex; align-items:center; justify-content:center; width:1.35em; height:1.35em; margin-left:var(--s-05); padding:0;
+  border:1px solid var(--blu); border-radius:var(--r-tondo); background:transparent; color:var(--blu); font-weight:700; font-size:.85em;
+  line-height:1; cursor:pointer; vertical-align:middle; }
+.aiuto-btn:hover, .aiuto-btn[aria-expanded="true"] { background:var(--blu); color:var(--solido); }
+.aiuto-pop { position:fixed; z-index:1000; background:var(--solido); color:var(--t); border-radius:var(--r2); box-shadow:var(--e2);
+  padding:var(--s-2) var(--s-3); font-size:var(--fs-s); line-height:1.45; }
+.aiuto-pop b { display:block; margin-bottom:var(--s-05); }
 
 /* ==== 10/11/2026: barra laterale dei quadri piu' leggibile ==== */
 .lat .gruppo { margin:var(--s-4) var(--s-2) var(--s-1); padding-top:var(--s-2); border-top:1px solid var(--sep);
