@@ -228,6 +228,9 @@ function render() {
   document.body.classList.toggle("in-home", !aperta); if (window.compattaBarra) window.compattaBarra();
   if (aperta) { const e = $("#elencoPratiche"); if (e) e.replaceChildren(); }   // righe della pagina iniziale fuori dal DOM
   const q = aperta ? quadro() : null;
+  // 22/11/2026 (revisione dell'altra chat): con la griglia predefinita un comando che punta a una riga (Aggiungi, Duplica, Incolla,
+  // «Vai al dato», salto al primo errore) apre l'elenco, altrimenti la riga resterebbe invisibile; solo per la sessione
+  if (q && grigliaAperta(q) && S.riga) S.vistaDV = "elenco";
   // quadro con una sola riga: si apre gia' selezionata (report grafica 07/11/2026, punto 2)
   if (q && q.coll && !grigliaAperta(q) && !S.riga && S.tab === "dati" && S.chiuso !== q.id) { const rr = righeQuadro(q); if (rr.length === 1) S.riga = rr[0].key; }
   // il pannello di destra resta chiuso finche' non c'e' una riga selezionata (o una scheda Controlli/Cronologia aperta):

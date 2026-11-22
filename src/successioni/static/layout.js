@@ -132,7 +132,7 @@
       el.dataset.aiuto = "1";
       if (!testo) continue;
       const b = document.createElement("button");
-      b.type = "button"; b.className = "aiuto-btn"; b.textContent = "?";
+      b.type = "button"; b.className = "aiuto-btn"; b.textContent = "?"; b.tabIndex = -1;   // fuori dal Tab: chi compila da tastiera non fa una tappa in piu' (l'aiuto resta nella descrizione del campo)
       b.setAttribute("aria-label", "Aiuto: " + testo.split(". ")[0]); b.setAttribute("aria-expanded", "false");
       b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); apriAiuto(b, el.getAttribute("title") || testo); });
       el.append(b);
