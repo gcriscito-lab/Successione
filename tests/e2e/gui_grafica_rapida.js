@@ -50,7 +50,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   assert.ok(intest.indexOf("Codice fiscale") > intest.indexOf("Nome"));
 
   // DV: diritto per nome, gruppi per bene con la somma
-  await page.evaluate(() => scegliQuadro("DV"));
+  await page.evaluate(() => { S.vistaDV = "elenco"; scegliQuadro("DV"); });   // dal 22/11/2026 la griglia e' la vista predefinita
   await page.waitForSelector('#vista tr[data-key="e:devoluzioni:d_g10000001"]');
   const dv = await page.evaluate(() => [...document.querySelectorAll("#vista tbody tr")].map(tr => tr.classList.contains("subtot") ? "S:" + tr.textContent : tr.dataset.key));
   assert.deepEqual(dv.map(x => x.startsWith("S:") ? "S" : x.split(":").pop()), ["d_g10000001", "d_g30000001", "S", "d_g20000001", "S"]);
@@ -70,7 +70,7 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
 
   // proposta 3: valori calcolati con tinta propria e scritta «calcolato» (valore catastale, somme delle quote)
   await page.waitForSelector("#ins .vc .etich-calc");
-  assert.ok(dv[2].includes("calcolato"));
+  assert.ok(dv[2].includes("Somma delle quote"));   // 22/11/2026: niente etichetta «calcolato» ne' nome del bene ripetuto nella riga di somma
   // proposta 4: codice comune dal nome, proposto con «Usa» (solo se le tabelle del componente SUC13 sono configurate)
   const cc = await page.evaluate(() => api("/api/codice-comune?nome=Roma"));
   if (cc.esito === "trovato") {

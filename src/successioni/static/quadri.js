@@ -340,13 +340,17 @@ function renderTabella(main, q) {
     q.coll === "beni" ? h("div", { class: "vuoto-illustrato" }, h("img", { src: "/static/vuoto_beni.svg", alt: "", "aria-hidden": "true", class: "illustrazione" }),
       h("div", {}, testoVuoto(q), ["EB", "EC"].includes(q.id) ? h("div", { class: "az" }, h("button", { class: "gh", type: "button", onclick: () => caricaVisura(q) }, "Carica visura catastale (PDF)")) : null))
       : testoVuoto(q))));
+  if (q.coll === "devoluzioni") { let prec = null; for (const tr of tb.rows) { if (tr.classList.contains("subtot")) { prec = null; continue; }
+    const td = tr.cells[0]; if (!td) continue; if (prec !== null && td.title === prec) td.classList.add("ripetuto"); prec = td.title; } }
   const piede = piedeTabella(q, vere); if (piede) t.append(piede);
   if (q.coll === "beni" && vere.length > 3) main.append(cercaImmobile(tb));
   main.append(h("div", { class: "tab" }, t));
   if (q.coll === "beni" && S.cercaBeni) filtraRigheBeni(tb, S.cercaBeni);
   main.append(h("div", { class: "barra" }, h("button", { class: "pil", onclick: () => aggiungiRiga(q) }, vistaImmobili(q) ? "Aggiungi riga in " + q.id : "Aggiungi riga"),
 
-    h("span", { class: "mut" }, "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
+    h("span", { class: "mut" }, q.coll === "devoluzioni"
+      ? "Una riga per ogni erede su ogni bene. Le quote di uno stesso bene devono sommare 1/1. Per vederle tutte insieme usa «Griglia delle quote»."
+      : "Quote come 1/2, importi come 1.234,50. Per un dato non noto scrivi «?» (da confermare), «assente», «zero» o «non applicabile».")));
 }
 /* Rilievi per riga («coll[id]») e per campo (percorso completo): costruito una volta per disegno, non per ogni cella. */
 function indiceRilievi() {
@@ -770,7 +774,8 @@ function sommaQuote(quote) {
 const quadroDV = () => S.Q && S.Q.quadri.find(x => x.id === "DV");
 function righeDV(filtro) { const q = quadroDV(); return q ? righeQuadro(q).filter(filtro) : []; }
 function nomeDiritto(codice, tipoBene) {
-  const sd = struttDi("devoluzioni", "diritto", tipoBene), o = sd && sd.opzioni && sd.opzioni.find(x => x.valore === codice);
+  const sd = struttDi("devoluzioni", "diritto", tipoBene), v = sd ? riconosciVoce(sd, String(codice || "")) : codice;   // anche «proprieta» -> Proprieta'
+  const o = sd && sd.opzioni && sd.opzioni.find(x => x.valore === v);
   return o ? o.etichetta : (codice || "diritto non indicato");
 }
 function nomePersona(id) { const p = (S.P.dati.persone || []).find(x => x.id === id); return p ? etichetta("persone", p) : "soggetto non indicato"; }
@@ -857,7 +862,8 @@ function rigaSubtotaleDV(r, colonne) {
       : s.n === s.d ? ["ok", "completa"] : s.n > s.d ? ["er", "supera 1/1"] : ["am", "manca " + (s.d - s.n) + "/" + s.d];
     return h("span", { class: "pz " + cls, title: nomeDiritto(dir, bene && bene.tipo) }, (perDiritto.size > 1 ? nomeDiritto(dir, bene && bene.tipo) + ": " : "") + s.n + "/" + s.d + " · " + t);
   });
-  return h("tr", { class: "subtot", "aria-hidden": "true" }, h("td", { colspan: colonne.length }, h("span", { class: "etich-calc" }, "calcolato"), " Somma delle quote" + (bene ? " di " + etichetta("beni", bene) : ""), " ", esiti));
+  return h("tr", { class: "subtot", "aria-hidden": "true", title: "Somma delle quote" + (bene ? " di " + etichetta("beni", bene) : "") },
+    h("td", { colspan: colonne.length }, "Somma delle quote ", esiti));   // 22/11/2026: il bene e' gia' nelle righe sopra
 }
 /* Report grafico DEAS dell'08/11/2026, proposta 4: codice catastale ricavato dal nome del comune, dalle tabelle del componente
    SUC13 configurato (server: codice_fiscale.cerca_codice_comune). E' un valore calcolato: si propone con «Usa», non si scrive

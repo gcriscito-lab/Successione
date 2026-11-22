@@ -22,12 +22,12 @@ function esitoRigaGriglia(G, riga) {
     : { cls: "am", testo: "manca " + (s.d - s.n) + "/" + s.d, somma };
 }
 function selettoreVistaDV() {
-  const v = S.vistaDV || "elenco";
+  const v = S.vistaDV || "griglia";
   const b = (k, t) => h("button", { type: "button", role: "tab", "aria-selected": v === k ? "true" : "false", onclick: () => cambiaVistaDV(k) }, t);
   return h("div", { class: "seg seg-vista", role: "tablist", "aria-label": "Vista del quadro DV" }, b("elenco", "Elenco"), b("griglia", "Griglia delle quote"));
 }
 function cambiaVistaDV(k) {
-  if ((S.vistaDV || "elenco") === k) return;
+  if ((S.vistaDV || "griglia") === k) return;
   S.vistaDV = k; S.riga = null; S.chiuso = "DV"; S.tab = "dati";
   try { localStorage.setItem("successioni.vistaDV", k); } catch (_) { /* facoltativo */ }
   render();

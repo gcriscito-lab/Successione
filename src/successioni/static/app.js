@@ -58,7 +58,7 @@ const STATI = { vuoto: "da compilare", compilato: "compilato", rilievi: "rilievi
    nell'elenco si mostrano come calcolati, non spenti in grigio (richiesta del 9/11/2026: «il quadro EF sia visibile»). */
 const statoInElenco = q => q.generato && ["EE", "EF", "EH"].includes(q.id) && q.stato === "inattivo" ? "calcolato" : q.stato;
 S.dichDirty = new Map();
-try { S.vistaDV = localStorage.getItem("successioni.vistaDV") === "griglia" ? "griglia" : "elenco"; } catch (_) { S.vistaDV = "elenco"; }
+try { S.vistaDV = localStorage.getItem("successioni.vistaDV") === "elenco" ? "elenco" : "griglia"; } catch (_) { S.vistaDV = "griglia"; }   // 22/11/2026: griglia predefinita
 S.supDirty = new Map();
 S.fornitoreDirty = {};
 const nMod = () => S.dirty.size + S.nuove.size + S.dichDirty.size + S.supDirty.size + (Object.keys(S.fornitoreDirty).length ? 1 : 0) + (S.griglia && S.griglia.mod.size ? 1 : 0);
@@ -276,6 +276,12 @@ function ordinati(chiaveOrdine, campi) {
 function etichetta(coll, e) {
   if (coll === "persone") return [e.cognome, e.nome].filter(Boolean).join(" ") || e.id;
   if (coll === "beni") return [nomeVal("beni", "tipo", e.tipo), e.comune, e.foglio && "fg." + e.foglio, e.particella && "p." + e.particella, e.subalterno && "sub." + e.subalterno, e.descrizione].filter(Boolean).join(" ") || e.id;
+  if (coll === "devoluzioni") {   // 22/11/2026: «Rossi Anna – Fabbricato Roma fg.100…» invece di «d_casaanna»
+    const p = (S.P && S.P.dati.persone || []).find(x => x.id === e.persona_id), b = (S.P && S.P.dati.beni || []).find(x => x.id === e.bene_id);
+    const t = [p && etichetta("persone", p), b && etichetta("beni", b)].filter(Boolean).join(" – ");
+    return t || "Nuova riga di devoluzione";
+  }
+  if (coll === "passivita" && e.descrizione) return e.descrizione;
   return e.id;
 }
 const rilievi = () => (S.Q ? S.Q.rilievi : []);

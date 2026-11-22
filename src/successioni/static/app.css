@@ -444,6 +444,8 @@ select.stato-lavoro { font-size:var(--fs-s); width:auto; max-width:14rem; margin
 /* devoluzioni raggruppate per bene: riga di somma sotto ogni bene (confronto grafico con DEAS II, 08/11/2026) */
 tr.subtot td { background:var(--calc); color:var(--t); font-size:var(--fs-s); padding:var(--s-1) var(--s-2); white-space:normal; max-width:none; }
 tr.subtot .pz { margin-left:var(--s-15); }
+/* 22/11/2026: nel quadro DV il nome del bene si legge una volta per gruppo (resta nel suggerimento della cella) */
+#vista td.ripetuto { color:transparent; }
 /* valori calcolati dal programma: tinta propria e scritta «calcolato» (il colore da solo non basta) */
 .calcolato { background:var(--calc); border-left:3px solid var(--calc-b); border-radius:var(--r1); padding:var(--s-1) var(--s-2); margin-top:var(--s-1); font-size:var(--fs-s); color:var(--t); }
 .calcolato .gh { padding:1px var(--s-2); margin-left:var(--s-1); }
