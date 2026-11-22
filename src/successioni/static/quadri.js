@@ -72,8 +72,15 @@ function campoInput(coll, id, campo, kind, val, onMod, tipoBene) {
     el.value = val || "";
   } else {
     const lista = listaSuggerimenti(coll + "." + campo);
+    if (kind === "str" && campo === "descrizione") {   // 22/11/2026: le descrizioni lunghe (titoli EO, conti...) in una casella su piu' righe
+      el = h("textarea", { name: campo, "aria-label": lbl(coll, campo), rows: 3, class: "descr-lunga", maxlength: MAX_LUNGHEZZA[coll + "." + campo],
+        onkeydown: ev => { if (ev.key === "Enter") ev.preventDefault(); },   // una riga sola nel dato: il testo va a capo da solo
+        oninput: ev => { if (/[\r\n]/.test(ev.target.value)) ev.target.value = ev.target.value.replace(/[\r\n]+/g, " "); } });
+      el.value = mostra(kind, val);
+    } else {
     el = h("input", { name: campo, "aria-label": lbl(coll, campo), autocomplete: "off", list: lista, maxlength: MAX_LUNGHEZZA[coll + "." + campo], class: kind === "cf" ? "mono cf" : (kind === "importo" || kind === "quota" ? "num" : ""), placeholder: kind === "quota" ? "1/2" : kind === "data" ? "GG/MM/AAAA" : "" });
     el.value = mostra(kind, val);
+    }
   }
   if (path) el.dataset.path = path;
   if (err.length) el.classList.add("bad");
@@ -537,11 +544,29 @@ function duplicaRiga(q) {
   S.riga = key; S.tab = "dati"; render();
   msg("Riga duplicata: modifica i dati diversi e premi «Salva»" + (q.coll === "beni" ? ". Le devoluzioni del bene non vengono copiate." : "."), "o");
 }
+/* 22/11/2026: eliminare un bene o un soggetto che ha quote o riferimenti era rifiutato dal server con «riferimento inesistente»:
+   ora le righe di devoluzione collegate si tolgono insieme (dopo conferma) e i riferimenti di passivita' e documenti si svuotano. */
+function opsEliminazione(coll, id) {
+  const d = S.P.dati, ops = [], note = [];
+  const ref = { beni: "bene_id", persone: "persona_id" }[coll];
+  if (ref) {
+    const dv = (d.devoluzioni || []).filter(x => x[ref] === id);
+    if (dv.length) { ops.push(...dv.map(x => ({ op: "remove", coll: "devoluzioni", id: x.id }))); note.push(dv.length === 1 ? "1 quota di devoluzione" : dv.length + " quote di devoluzione"); }
+    for (const c of ["passivita", "documenti_ref"]) {
+      if (!(S.schema.collezioni[c] || {})[ref]) continue;
+      const rr = (d[c] || []).filter(x => x[ref] === id);
+      if (rr.length) { ops.push(...rr.map(x => ({ op: "upsert", coll: c, id: x.id, campi: { [ref]: null } }))); note.push(rr.length + (c === "passivita" ? (rr.length === 1 ? " passività" : " passività") : (rr.length === 1 ? " documento" : " documenti")) + " (resta, senza il collegamento)"); }
+    }
+  }
+  ops.push({ op: "remove", coll, id });
+  return { ops, nota: note.length ? "\n\nInsieme verranno tolti anche: " + note.join(", ") + "." : "" };
+}
 async function eliminaRigaSelezionata(q) {
   const r = rigaSelezionata(); if (!q || !r) return msg("Seleziona prima la riga da eliminare.", "e");
   if (r.nuova) { S.nuove.delete(r.key); S.riga = null; return render(); }
   if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di eliminare la riga.", "e");
-  if (confirm("Eliminare dal quadro " + q.id + " la riga «" + etichetta(q.coll, r.e) + "»?")) await salvaOps([{ op: "remove", coll: q.coll, id: r.e.id }], () => {
+  const el = opsEliminazione(q.coll, r.e.id);
+  if (confirm("Eliminare dal quadro " + q.id + " la riga «" + etichetta(q.coll, r.e) + "»?" + el.nota)) await salvaOps(el.ops, () => {
     S.dirty.delete(r.key); S.riga = null; });
 }
 /* ==== Piccole comodita' (15/11/2026, con il lavoro della sessione «GitHub installation» sul server) ==== */

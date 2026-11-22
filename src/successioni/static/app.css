@@ -1165,3 +1165,8 @@ input.cella-quota[aria-invalid="true"] { border-color:var(--er); box-shadow:0 0 
 details.eh-sezione.assente { margin:var(--s-2) 0; padding:var(--s-2) var(--s-3); border-radius:var(--r2); background:var(--grigio); }
 details.eh-sezione.assente > summary { cursor:pointer; font-weight:600; }
 details.eh-sezione.assente > p { margin:var(--s-2) 0 0; }
+
+/* 22/11/2026: descrizione su piu' righe e a tutta larghezza nel pannello (etichetta sopra) */
+.ins .rg[data-campo=descrizione] { grid-template-columns:minmax(0,1fr); }
+.ins .rg[data-campo=descrizione] > label, :root[data-densita="compatta"] .ins .rg[data-campo=descrizione] > label { text-align:left; white-space:normal; }
+textarea.descr-lunga { width:100%; resize:vertical; min-height:4.2em; line-height:1.35; }

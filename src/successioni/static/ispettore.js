@@ -142,7 +142,8 @@ function insDati(ins) {
     if (S.writeBusy) return msg("Salvataggio in corso: attendi prima di eliminare la riga.", "e");
     const nomeRiga = etichetta(q.coll, r.e), posRiga = righeQuadro(q).findIndex(x => x.key === r.key) + 1;
     const descr = nomeRiga && nomeRiga !== r.e.id ? "«" + nomeRiga + "»" : posRiga ? "n. " + posRiga : "selezionata";
-    if (confirm("Eliminare la riga " + descr + " dal quadro " + q.id + (q.titolo ? " (" + q.titolo + ")" : "") + "?")) await salvaOps([{ op: "remove", coll: q.coll, id }], () => {
+    const el = opsEliminazione(q.coll, id);
+    if (confirm("Eliminare la riga " + descr + " dal quadro " + q.id + (q.titolo ? " (" + q.titolo + ")" : "") + "?" + el.nota)) await salvaOps(el.ops, () => {
       S.dirty.delete(r.key); S.supDirty.delete(supKey); S.riga = null;
     });
   } }, "Elimina riga"));
