@@ -262,3 +262,10 @@ def test_ordine_con_codici_numerici_e_alfanumerici_misti():
 def test_etichette_dei_suggerimenti():
     assert C.SUGGERIMENTI["beni.codice_comune_catastale"][1] == "codice del comune catastale (TN e BZ)"
     assert C.suggerimenti()["beni.codice_comune_catastale"]["etichetta"].startswith("codice del comune")
+
+
+def test_relazione_con_il_defunto_ha_il_menu_dei_gradi():
+    # richiesta del 22/11/2026: nella scheda del presentatore «Relazione con il defunto» era testo libero (si scriveva «02»)
+    s = C.strutturati()
+    assert s["persone.relazione_con_defunto"]["opzioni"] == s["persone.grado_parentela"]["opzioni"]
+    assert {"01", "02", "03"} <= {o["valore"] for o in s["persone.relazione_con_defunto"]["opzioni"]}

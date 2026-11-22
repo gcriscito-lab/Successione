@@ -24,6 +24,8 @@ REGOLE: dict[str, tuple[str, str]] = {
     "dichiarazione.credito_tipologia_2": ("TipoImposta_Type", "tipologia di imposta del credito (secondo acquisto)"),
     "dichiarazione.presentatore.codice_carica": ("CodiciCarica_Type", "carica del presentatore"),
     "persone.grado_parentela": ("GradoParentela_Type", "grado di parentela"),
+    # stesso elenco del grado: l'esportazione legge la relazione come grado se e' uno di questi codici (esporta.py, GradoParentela)
+    "persone.relazione_con_defunto": ("GradoParentela_Type", "relazione con il defunto (grado di parentela)"),
     "persone.rappresentato_grado": ("GradoParentela2_Type", "grado del rappresentato"),
     "persone.tipo_soggetto": ("TipoSoggetto_Type", "tipo di soggetto"),
     "beni.categoria": ("CodiciCategoriaCatastale_Type", "categoria catastale"),

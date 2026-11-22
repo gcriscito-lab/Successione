@@ -277,8 +277,7 @@ function documentiPratica() {
   if (beni.some(b => String(b.rendita_proposta || '').toLowerCase().startsWith('s'))) voci.push("Dichiarazione per la rendita proposta DOCFA (rigo EG8)");
   return h('section', { class: 'grp documenti-pratica' }, h('h2', {}, 'Documenti da avere per questa pratica'),
     voci.length ? h('ul', { class: 'spunte dentro-testo' }, voci.map(v => h('li', {}, v)))
-      : h('p', { class: 'mut dentro-testo' }, 'Inserisci eredi e beni: l’elenco si compone da solo.'),
-    h('p', { class: 'mut dentro-testo piccolo' }, 'Elenco ricavato dai dati inseriti (Fascicolo I, «Quali documenti occorrono»): non sostituisce il controllo del professionista.'));
+      : h('p', { class: 'mut dentro-testo' }, 'Inserisci eredi e beni: l’elenco si compone da solo.'));   // 22/11/2026: tolta la nota sotto l'elenco (richiesta)
 }
 
 /* ---------- documenti ---------- */
