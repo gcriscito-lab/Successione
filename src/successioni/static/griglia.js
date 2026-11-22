@@ -45,6 +45,21 @@ async function renderGrigliaQuote(main) {
     G = S.griglia = { pid, dati: d, mod: new Map(), sel: new Set() };
   }
   disegnaGriglia(box, G);
+  fuocoGriglia(box, G);
+}
+/* «Vai al dato» da un rilievo sulla somma delle quote di un bene (ispettore.js, vaiA): riga evidenziata e cursore nella prima casella vuota. */
+function fuocoGriglia(box, G) {
+  const f = S.grigliaFuoco; if (!f) return; S.grigliaFuoco = null;
+  const bene = (S.P.dati.beni || []).find(b => b.id === f.bene), sd = struttDi("devoluzioni", "diritto", bene && bene.tipo);
+  const dir = sd ? riconosciVoce(sd, String(f.diritto || "")) : f.diritto;
+  const righe = G.dati.righe.map((r, i) => [r, i]).filter(([r]) => r.bene_id === f.bene);
+  const scelta = righe.find(([r]) => r.diritto === dir || r.diritto === f.diritto) || righe[0];
+  if (!scelta) return;
+  const celle = [...box.querySelectorAll('input.cella-quota[data-r="' + scelta[1] + '"]')];
+  const tr = celle[0] && celle[0].closest("tr"); if (!tr) return;
+  tr.classList.add("evidenziata"); tr.scrollIntoView({ block: "center" });
+  const vuota = celle.find(x => !x.value.trim() && !x.disabled) || celle.find(x => !x.disabled);
+  if (vuota) vuota.focus();
 }
 function disegnaGriglia(box, G) {
   box.replaceChildren();

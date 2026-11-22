@@ -1170,3 +1170,5 @@ details.eh-sezione.assente > p { margin:var(--s-2) 0 0; }
 .ins .rg[data-campo=descrizione] { grid-template-columns:minmax(0,1fr); }
 .ins .rg[data-campo=descrizione] > label, :root[data-densita="compatta"] .ins .rg[data-campo=descrizione] > label { text-align:left; white-space:normal; }
 textarea.descr-lunga { width:100%; resize:vertical; min-height:4.2em; line-height:1.35; }
+/* 22/11/2026: riga della griglia raggiunta da «Vai al dato» */
+.tab-griglia tr.evidenziata td { background:var(--blu-t); }

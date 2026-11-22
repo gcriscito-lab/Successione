@@ -572,6 +572,10 @@ function vaiA(r) {
   if (r.quadro === "FILE") { vaiFile(); setTimeout(() => { const f = document.querySelector("#fornitore input"); if (f) { f.scrollIntoView({ block: "center" }); f.focus(); } }, 300); return; }
   S.sel = r.quadro;
   const m = r.percorso.match(/^([a-z_]+)\[([^\]]+)\]/);
+  // 22/11/2026: somma delle quote di un bene (DEVOLUZIONI_INCOMPLETE/ECCEDENTI, percorso «devoluzioni[bene=X,diritto=Y]»): non e' una
+  // riga, si corregge nella griglia sulla riga di quel bene, con il cursore nella prima casella vuota
+  const sb = m && m[1] === "devoluzioni" && m[2].match(/^bene=([^,]*),diritto=(.*)$/);
+  if (sb) { S.sel = "DV"; S.vistaDV = "griglia"; S.riga = null; S.tab = "dati"; S.grigliaFuoco = { bene: sb[1], diritto: sb[2] }; render(); return; }
   const q = quadro();
   S.riga = m && q && q.coll === m[1] ? "e:" + m[1] + ":" + m[2] : null;
   S.tab = "dati"; render();
