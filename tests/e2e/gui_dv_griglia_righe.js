@@ -41,15 +41,31 @@ async function run(page, url = "http://127.0.0.1:8813/?t=t0k") {
   await page.evaluate(() => { S.nuove.clear(); S.riga = null; cambiaVistaDV("griglia"); });
   await page.waitForSelector("#vista .tab-griglia");
 
-  // «Vai al dato» su un campo di una riga di devoluzione (come un errore di salvataggio o di esportazione) con la griglia aperta.
-  // Il rilievo DEVOLUZIONI_INCOMPLETE ha invece il percorso «devoluzioni[bene=…,diritto=…]», che non indica una riga: non e'
-  // coperto qui (segnalato a parte).
+  // «Vai al dato» su un campo di una riga di devoluzione (come un errore di salvataggio o di esportazione) con la griglia aperta
   await page.evaluate(() => vaiA({ quadro: "DV", percorso: "devoluzioni[d_terrdvga].quota", messaggio: "prova" }));
   await page.waitForSelector("#vista table:not(.tab-griglia) tbody tr[aria-selected=true]");
   const chiave = await page.evaluate(() => S.riga);
   assert.match(chiave, /^e:devoluzioni:/);
   assert.ok(await pannelloAperto(), "pannello della riga del rilievo aperto");
   assert.ok(await page.evaluate(k => document.querySelector("#vista tr[aria-selected=true]").dataset.key === k, chiave), "riga del rilievo selezionata");
+
+  // «Vai al dato» sul rilievo vero della somma incompleta (terreno: solo Anna per 1/2), partendo da un altro quadro: si apre la
+  // griglia sulla riga del bene, con il fuoco nella casella vuota di Luca (percorso «devoluzioni[bene=…,diritto=…]»)
+  // (la vista salvata si azzera prima: sopra «cambiaVistaDV» l'ha scritta; ora la vista della sessione e' l'elenco)
+  await page.evaluate(() => { localStorage.removeItem("successioni.vistaDV"); scegliQuadro("EA"); });
+  assert.equal(await page.evaluate(() => S.vistaDV), "elenco");
+  const somma = await page.evaluate(() => (S.Q.rilievi || []).find(r => r.codice === "DEVOLUZIONI_INCOMPLETE" && /b_terrdvg01/.test(r.percorso || "")) || null);
+  assert.ok(somma, "rilievo della somma incompleta presente");
+  await page.evaluate(r => vaiA(r), somma);
+  await page.waitForSelector("#vista .tab-griglia tr.evidenziata");
+  assert.equal(await page.evaluate(() => S.sel), "DV");
+  assert.equal(await page.locator("#vista .tab-griglia tr.evidenziata").count(), 1);
+  assert.match(await page.textContent("#vista .tab-griglia tr.evidenziata"), /Tivoli/);
+  await page.waitForFunction(() => document.activeElement && document.activeElement.matches("input.cella-quota"));
+  const fuoco = await page.evaluate(() => ({ valore: document.activeElement.value, nome: document.activeElement.getAttribute("aria-label") }));
+  assert.equal(fuoco.valore, "", "fuoco sulla casella vuota");
+  assert.match(fuoco.nome, /Rossi Luca.*Tivoli/);
+  assert.equal(await page.evaluate(() => localStorage.getItem("successioni.vistaDV")), null, "griglia aperta solo per la sessione");
 
   // eliminare un bene con quote: conferma che le nomina e le toglie nella stessa revisione
   const rev = await page.evaluate(() => S.P.revisione);
